@@ -1,0 +1,1218 @@
+[
+ {
+  "accepted_delta": {
+   "K": 6,
+   "U": 1,
+   "W": 1
+  },
+  "authority": "CLARITY:orchestrator",
+  "branch_id": "BR:build-a-community-school-for-my-chil:staged",
+  "destiny": "build a community school for my children without debt using open plans",
+  "entity_id": "ID:build-a-community-school-for-my-children",
+  "execution_receipt": {
+   "action": "created",
+   "artifact": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+   "bytes": 849,
+   "sha256": "aafe2355e472e1517cba0c86edcfb80d02e6be85555f6e9835cbec5141ec2f0e"
+  },
+  "observed_evidence": {
+   "artifact_path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+   "captured_at": "2026-09-05T00:58:59+00:00",
+   "evidence_id": "EV:aafe2355e472",
+   "kind": "observed_state",
+   "sha256": "aafe2355e472e1517cba0c86edcfb80d02e6be85555f6e9835cbec5141ec2f0e",
+   "size_bytes": 849
+  },
+  "outcome_status": "ACCEPTED",
+  "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "previous_state_hash": "0615ad70ad61482de65998a2072b400008ce392b48e9de2e973076c0e84f1d04",
+  "proposed_delta": {
+   "K": 6,
+   "U": 1,
+   "W": 1
+  },
+  "record_hash": "05559628f100ec55913403e04d4435b9c87b6d37095e96fbd07db3e8561e074f",
+  "rejection_reason": null,
+  "sid": "SID:build-a-community-school-for-my-children:b3eae0bb09",
+  "timestamp": "2026-09-05T00:58:59+00:00",
+  "transition_id": "TR:build-a-community-school-for-m:0001",
+  "verification": {
+   "expected": {
+    "artifact": "knowledgeform_build-a-community-school-for-my-chil.md",
+    "min_bytes": 200,
+    "required_sections": [
+     "essence",
+     "purpose_for_my_children_with"
+    ]
+   },
+   "mismatches": [],
+   "observed": {
+    "sha256": "aafe2355e472e1517cba0c86edcfb80d02e6be85555f6e9835cbec5141ec2f0e",
+    "size_bytes": 849
+   },
+   "result": "verified"
+  }
+ },
+ {
+  "accepted_delta": {
+   "K": 7,
+   "U": 1,
+   "W": 1
+  },
+  "authority": "CLARITY:orchestrator",
+  "branch_id": "BR:ascend-the-community-knowledge-forge:staged",
+  "branches": [
+   {
+    "actions": [
+     "compose knowledge form 'knowledgeform_ascend-the-community-knowledge-forge.md' from 7 meaning elements",
+     "write artifact in one governed pass"
+    ],
+    "approach": "single_pass_construct",
+    "branch_id": "BR:ascend-the-community-knowledge-forge:single-pass",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.78,
+    "evaluation": {
+     "confidence": 0.78,
+     "contradictions": [
+      "polarity conflict: 'debt' required by purpose ME 'forge for my children without debt using open blueprints' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community knowledge forge for my children without debt using' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.3343,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_ascend-the-community-knowledge-forge.md",
+     "min_bytes": 256,
+     "required_sections": [
+      "ascend",
+      "purpose_forge_for_my_childre"
+     ]
+    },
+    "risks": [
+     "single write: partial content loss if interrupted",
+     "must honor constraint: debt"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "write staging section set ['ascend', 'purpose_forge_for_my_childre']",
+     "verify staging sections then append remaining sections"
+    ],
+    "approach": "staged_construct",
+    "branch_id": "BR:ascend-the-community-knowledge-forge:staged",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.84,
+    "evaluation": {
+     "confidence": 0.84,
+     "contradictions": [
+      "polarity conflict: 'debt' required by purpose ME 'forge for my children without debt using open blueprints' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community knowledge forge for my children without debt using' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.3943,
+     "recommended_by": "CLARITY",
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_ascend-the-community-knowledge-forge.md",
+     "min_bytes": 200,
+     "required_sections": [
+      "ascend",
+      "purpose_forge_for_my_childre"
+     ]
+    },
+    "risks": [
+     "staging adds an extra failure surface",
+     "must honor constraint: debt"
+    ],
+    "status": "recommended"
+   },
+   {
+    "actions": [
+     "write a minimal seed artifact with the primary section only"
+    ],
+    "approach": "minimal_seeded_construct",
+    "branch_id": "BR:ascend-the-community-knowledge-forge:minimal-seed",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.55,
+    "evaluation": {
+     "confidence": 0.55,
+     "contradictions": [
+      "polarity conflict: 'debt' required by purpose ME 'forge for my children without debt using open blueprints' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community knowledge forge for my children without debt using' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0971,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_ascend-the-community-knowledge-forge.md",
+     "min_bytes": 40,
+     "required_sections": [
+      "ascend"
+     ]
+    },
+    "risks": [
+     "thin artifact may under-represent the Destiny MEs",
+     "must honor constraint: debt"
+    ],
+    "status": "simulated"
+   }
+  ],
+  "destiny": "ascend the community knowledge forge for my children without debt using open blueprints",
+  "destiny_id": "DESTINY:6e4dcc3faaf4",
+  "entity_id": "ENTITY:operator",
+  "execution_receipt": {
+   "action": "created",
+   "artifact": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_ascend-the-community-knowledge-forge.md",
+   "bytes": 944,
+   "capability": "digital_artifact_writer",
+   "files": [
+    {
+     "action": "created",
+     "bytes": 944,
+     "path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_ascend-the-community-knowledge-forge.md",
+     "sha256": "6be60ecfb631b677b3f79fa2a1d030e3e5605353c6b58e252259bc1f9b51ffe7"
+    }
+   ],
+   "sha256": "6be60ecfb631b677b3f79fa2a1d030e3e5605353c6b58e252259bc1f9b51ffe7",
+   "total_bytes": 944
+  },
+  "observed_evidence": {
+   "artifact_path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_ascend-the-community-knowledge-forge.md",
+   "captured_at": "2026-09-05T01:17:48+00:00",
+   "evidence_id": "EV:6be60ecfb631",
+   "kind": "observed_state",
+   "sha256": "6be60ecfb631b677b3f79fa2a1d030e3e5605353c6b58e252259bc1f9b51ffe7",
+   "size_bytes": 944
+  },
+  "outcome_status": "ACCEPTED",
+  "persisted": true,
+  "persisted_hash": "607469b019b2ff68d1e44ab63646d61996c1d9091885453642cad51e62eaedb5",
+  "previous_hash": "05559628f100ec55913403e04d4435b9c87b6d37095e96fbd07db3e8561e074f",
+  "previous_state_hash": "660dce16d78395de2e50ab5ac247243e5438811a8f313b2386815092b39ed5cd",
+  "proposed_delta": {
+   "K": 7,
+   "U": 1,
+   "W": 1
+  },
+  "record_hash": "6c152b3541b7e202ef282800515f47df75abe96aee86aed81ca4f20f8779fbcd",
+  "rejection_reason": null,
+  "rejection_reason_extra": null,
+  "sid": "SID:operator:ascend-the-community-kno:001",
+  "timestamp": "2026-09-05T01:17:48+00:00",
+  "transition_id": "TR:ascend-the-community-knowledge:0002",
+  "verification": {
+   "capability": "digital_artifact_writer",
+   "expected": {
+    "artifact": "knowledgeform_ascend-the-community-knowledge-forge.md",
+    "min_bytes": 200,
+    "required_sections": [
+     "ascend",
+     "purpose_forge_for_my_childre"
+    ]
+   },
+   "mismatches": [],
+   "observed": {
+    "files": 1,
+    "sha256": "6be60ecfb631b677b3f79fa2a1d030e3e5605353c6b58e252259bc1f9b51ffe7",
+    "size_bytes": 944,
+    "total_bytes": 944
+   },
+   "result": "verified"
+  }
+ },
+ {
+  "accepted_delta": {
+   "K": 7,
+   "U": 1,
+   "W": 1
+  },
+  "authority": "CLARITY:orchestrator",
+  "branch_id": "BR:ascend-the-community-knowledge-forge:staged",
+  "branches": [
+   {
+    "actions": [
+     "compose knowledge form 'knowledgeform_ascend-the-community-knowledge-forge.md' from 7 meaning elements",
+     "write artifact in one governed pass"
+    ],
+    "approach": "single_pass_construct",
+    "branch_id": "BR:ascend-the-community-knowledge-forge:single-pass",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.78,
+    "evaluation": {
+     "confidence": 0.78,
+     "contradictions": [
+      "polarity conflict: 'debt' required by purpose ME 'forge for my children without debt using open blueprints' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community knowledge forge for my children without debt using' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "maturity_bonus": 0.07,
+     "outcome_predictor": 0.4043,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_ascend-the-community-knowledge-forge.md",
+     "min_bytes": 256,
+     "required_sections": [
+      "ascend",
+      "purpose_forge_for_my_childre"
+     ]
+    },
+    "risks": [
+     "single write: partial content loss if interrupted",
+     "must honor constraint: debt"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "write staging section set ['ascend', 'purpose_forge_for_my_childre']",
+     "verify staging sections then append remaining sections"
+    ],
+    "approach": "staged_construct",
+    "branch_id": "BR:ascend-the-community-knowledge-forge:staged",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.84,
+    "evaluation": {
+     "confidence": 0.84,
+     "contradictions": [
+      "polarity conflict: 'debt' required by purpose ME 'forge for my children without debt using open blueprints' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community knowledge forge for my children without debt using' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "maturity_bonus": 0.07,
+     "outcome_predictor": 0.4643,
+     "recommended_by": "CLARITY",
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_ascend-the-community-knowledge-forge.md",
+     "min_bytes": 200,
+     "required_sections": [
+      "ascend",
+      "purpose_forge_for_my_childre"
+     ]
+    },
+    "risks": [
+     "staging adds an extra failure surface",
+     "must honor constraint: debt"
+    ],
+    "status": "recommended"
+   },
+   {
+    "actions": [
+     "write a minimal seed artifact with the primary section only"
+    ],
+    "approach": "minimal_seeded_construct",
+    "branch_id": "BR:ascend-the-community-knowledge-forge:minimal-seed",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.55,
+    "evaluation": {
+     "confidence": 0.55,
+     "contradictions": [
+      "polarity conflict: 'debt' required by purpose ME 'forge for my children without debt using open blueprints' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community knowledge forge for my children without debt using' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "maturity_bonus": 0.07,
+     "outcome_predictor": 0.1671,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_ascend-the-community-knowledge-forge.md",
+     "min_bytes": 40,
+     "required_sections": [
+      "ascend"
+     ]
+    },
+    "risks": [
+     "thin artifact may under-represent the Destiny MEs",
+     "must honor constraint: debt"
+    ],
+    "status": "simulated"
+   }
+  ],
+  "destiny": "ascend the community knowledge forge for my children without debt using open blueprints",
+  "destiny_id": "DESTINY:6e4dcc3faaf4",
+  "entity_id": "ENTITY:operator",
+  "execution_receipt": {
+   "action": "updated",
+   "artifact": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_ascend-the-community-knowledge-forge.md",
+   "bytes": 944,
+   "capability": "digital_artifact_writer",
+   "files": [
+    {
+     "action": "updated",
+     "bytes": 944,
+     "path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_ascend-the-community-knowledge-forge.md",
+     "sha256": "6be60ecfb631b677b3f79fa2a1d030e3e5605353c6b58e252259bc1f9b51ffe7"
+    }
+   ],
+   "sha256": "6be60ecfb631b677b3f79fa2a1d030e3e5605353c6b58e252259bc1f9b51ffe7",
+   "total_bytes": 944
+  },
+  "observed_evidence": {
+   "artifact_path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_ascend-the-community-knowledge-forge.md",
+   "captured_at": "2026-09-05T01:26:52+00:00",
+   "evidence_id": "EV:6be60ecfb631",
+   "kind": "observed_state",
+   "sha256": "6be60ecfb631b677b3f79fa2a1d030e3e5605353c6b58e252259bc1f9b51ffe7",
+   "size_bytes": 944
+  },
+  "outcome_status": "ACCEPTED",
+  "persisted": true,
+  "persisted_hash": "d7fcdbdd958de0d83588a2b947f4beb523a231e510e5b82a766f03492308c7ca",
+  "previous_hash": "6c152b3541b7e202ef282800515f47df75abe96aee86aed81ca4f20f8779fbcd",
+  "previous_state_hash": "7d365c192310147212049d500c28eff3a01df4f076ab81f1ca9a6ffbbd96f865",
+  "proposed_delta": {
+   "K": 7,
+   "U": 1,
+   "W": 1
+  },
+  "record_hash": "3de5c4a48704281c3103415f72697bddaa61a4937847dd6018045ffc60ebb1d8",
+  "rejection_reason": null,
+  "rejection_reason_extra": null,
+  "sid": "SID:operator:ascend-the-community-kno:002",
+  "timestamp": "2026-09-05T01:26:52+00:00",
+  "transition_id": "TR:ascend-the-community-knowledge:0003",
+  "verification": {
+   "capability": "digital_artifact_writer",
+   "expected": {
+    "artifact": "knowledgeform_ascend-the-community-knowledge-forge.md",
+    "min_bytes": 200,
+    "required_sections": [
+     "ascend",
+     "purpose_forge_for_my_childre"
+    ]
+   },
+   "mismatches": [],
+   "observed": {
+    "files": 1,
+    "sha256": "6be60ecfb631b677b3f79fa2a1d030e3e5605353c6b58e252259bc1f9b51ffe7",
+    "size_bytes": 944,
+    "total_bytes": 944
+   },
+   "result": "verified"
+  }
+ },
+ {
+  "accepted_delta": {
+   "K": 6,
+   "U": 1,
+   "W": 1
+  },
+  "authority": "user",
+  "branch_id": "BR:build-a-community-school-for-my-chil:staged",
+  "branches": [
+   {
+    "actions": [
+     "compose knowledge form 'knowledgeform_build-a-community-school-for-my-chil.md' from 6 meaning elements",
+     "write artifact in one governed pass"
+    ],
+    "approach": "single_pass_construct",
+    "branch_id": "BR:build-a-community-school-for-my-chil:single-pass",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.78,
+    "evaluation": {
+     "confidence": 0.78,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": null,
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.1867,
+     "relevance_bonus": 0.0,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 256,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_children_with"
+     ]
+    },
+    "risks": [
+     "single write: partial content loss if interrupted",
+     "must honor constraint: debt"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "write staging section set ['essence', 'purpose_for_my_children_with']",
+     "verify staging sections then append remaining sections"
+    ],
+    "approach": "staged_construct",
+    "branch_id": "BR:build-a-community-school-for-my-chil:staged",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.84,
+    "evaluation": {
+     "confidence": 0.84,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": null,
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.2467,
+     "recommended_by": "CLARITY",
+     "relevance_bonus": 0.0,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 200,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_children_with"
+     ]
+    },
+    "risks": [
+     "staging adds an extra failure surface",
+     "must honor constraint: debt"
+    ],
+    "status": "recommended"
+   },
+   {
+    "actions": [
+     "write a minimal seed artifact with the primary section only"
+    ],
+    "approach": "minimal_seeded_construct",
+    "branch_id": "BR:build-a-community-school-for-my-chil:minimal-seed",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.55,
+    "evaluation": {
+     "confidence": 0.55,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": null,
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0,
+     "relevance_bonus": 0.0,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 40,
+     "required_sections": [
+      "essence"
+     ]
+    },
+    "risks": [
+     "thin artifact may under-represent the Destiny MEs",
+     "must honor constraint: debt"
+    ],
+    "status": "simulated"
+   }
+  ],
+  "constraint_governance": {
+   "applicable": [],
+   "remembered_not_applicable": [],
+   "superseded": []
+  },
+  "destiny": "build a community school for my children without debt",
+  "destiny_id": "DESTINY:13a06ffdc652",
+  "entity_id": "ENTITY:operator",
+  "execution_receipt": {
+   "action": "updated",
+   "artifact": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+   "bytes": 815,
+   "capability": "digital_artifact_writer",
+   "capability_claim": "digital_artifact_writer",
+   "files": [
+    {
+     "action": "updated",
+     "bytes": 815,
+     "path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+     "sha256": "8b94f84c2860fe49f81d281d89f38503d01652aa3498f39963a8fa84cf8c4197"
+    }
+   ],
+   "sha256": "8b94f84c2860fe49f81d281d89f38503d01652aa3498f39963a8fa84cf8c4197",
+   "total_bytes": 815
+  },
+  "observed_evidence": {
+   "artifact_path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+   "captured_at": "2026-09-05T02:36:46+00:00",
+   "evidence_id": "EV:8b94f84c2860",
+   "kind": "observed_state",
+   "sha256": "8b94f84c2860fe49f81d281d89f38503d01652aa3498f39963a8fa84cf8c4197",
+   "size_bytes": 815
+  },
+  "outcome_status": "ACCEPTED",
+  "persisted": true,
+  "persisted_hash": "2d7b43bb282c56f166da85e72fd65f97f69d917f37cb1c0cfcd1a01577c45812",
+  "previous_hash": "3de5c4a48704281c3103415f72697bddaa61a4937847dd6018045ffc60ebb1d8",
+  "previous_state_hash": "539a2e4962e2e09b7984172336e21758e3194abf92229bc3f045179dbefcd9eb",
+  "proposed_delta": {
+   "K": 6,
+   "U": 1,
+   "W": 1
+  },
+  "record_hash": "b3f894fa71976f126954e450baea276d45870d59ccdca53fb44ad95f4c977f3b",
+  "rejection_reason": null,
+  "rejection_reason_extra": null,
+  "sid": "SID:operator:build-a-community-school:003",
+  "timestamp": "2026-09-05T02:36:46+00:00",
+  "transaction_id": "TX:403ac8aff4df7c56",
+  "transition_id": "TR:build-a-community-school-for-m:0004",
+  "verification": {
+   "capability": "digital_artifact_writer",
+   "expected": {
+    "artifact": "knowledgeform_build-a-community-school-for-my-chil.md",
+    "min_bytes": 200,
+    "required_sections": [
+     "essence",
+     "purpose_for_my_children_with"
+    ]
+   },
+   "mismatches": [],
+   "observed": {
+    "files": 1,
+    "sha256": "8b94f84c2860fe49f81d281d89f38503d01652aa3498f39963a8fa84cf8c4197",
+    "size_bytes": 815,
+    "total_bytes": 815
+   },
+   "result": "verified"
+  }
+ },
+ {
+  "accepted_delta": {
+   "K": 6,
+   "U": 1,
+   "W": 1
+  },
+  "authority": "user",
+  "branch_id": "BR:build-a-community-school-for-my-chil:incorporate-inherited",
+  "branches": [
+   {
+    "actions": [
+     "compose knowledge form 'knowledgeform_build-a-community-school-for-my-chil.md' from 6 meaning elements",
+     "write artifact in one governed pass"
+    ],
+    "approach": "single_pass_construct",
+    "branch_id": "BR:build-a-community-school-for-my-chil:single-pass",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.78,
+    "evaluation": {
+     "confidence": 0.78,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": "ignore",
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0267,
+     "relevance_bonus": -0.08,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 256,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_children_with"
+     ]
+    },
+    "risks": [
+     "single write: partial content loss if interrupted",
+     "must honor constraint: debt",
+     "does not address an inherited verified constraint"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "write staging section set ['essence', 'purpose_for_my_children_with']",
+     "verify staging sections then append remaining sections"
+    ],
+    "approach": "staged_construct",
+    "branch_id": "BR:build-a-community-school-for-my-chil:staged",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.84,
+    "evaluation": {
+     "confidence": 0.84,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": "ignore",
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0867,
+     "relevance_bonus": -0.08,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 200,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_children_with"
+     ]
+    },
+    "risks": [
+     "staging adds an extra failure surface",
+     "must honor constraint: debt",
+     "does not address an inherited verified constraint"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "write a minimal seed artifact with the primary section only"
+    ],
+    "approach": "minimal_seeded_construct",
+    "branch_id": "BR:build-a-community-school-for-my-chil:minimal-seed",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.55,
+    "evaluation": {
+     "confidence": 0.55,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": "ignore",
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0,
+     "relevance_bonus": -0.08,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 40,
+     "required_sections": [
+      "essence"
+     ]
+    },
+    "risks": [
+     "thin artifact may under-represent the Destiny MEs",
+     "must honor constraint: debt",
+     "does not address an inherited verified constraint"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "assemble using without directly"
+    ],
+    "approach": "conflict_with_verified_history",
+    "branch_id": "BR:build-a-community-school-for-my-chil:conflict-inherited",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.7,
+    "evaluation": {
+     "confidence": 0.7,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": "CONST:dc168a654d31",
+     "inherited_relation": "conflict",
+     "maturity_bonus": 0.06,
+     "outcome_predictor": 0.1467,
+     "relevance_bonus": -0.1,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 200,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_children_with"
+     ]
+    },
+    "risks": [
+     "conflicts with verified constraint: without debt"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "proceed without consulting prior constraints"
+    ],
+    "approach": "bypass_inherited_history",
+    "branch_id": "BR:build-a-community-school-for-my-chil:ignore-inherited",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.6,
+    "evaluation": {
+     "confidence": 0.6,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": "CONST:dc168a654d31",
+     "inherited_relation": "ignore",
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0067,
+     "relevance_bonus": -0.08,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 120,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_children_with"
+     ]
+    },
+    "risks": [
+     "ignores verified prior constraint"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "construct with compliant alternatives",
+     "record compliance with the inherited constraint in the artifact"
+    ],
+    "approach": "incorporate_verified_constraint_compliance",
+    "branch_id": "BR:build-a-community-school-for-my-chil:incorporate-inherited",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.8,
+    "evaluation": {
+     "confidence": 0.8,
+     "contradictions": [
+      "polarity conflict: 'debt' required by mechanism ME 'without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by purpose ME 'for my children without debt' but banned by constraint",
+      "polarity conflict: 'debt' required by environment ME 'community school for my children without debt' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": "CONST:dc168a654d31",
+     "inherited_relation": "incorporate",
+     "maturity_bonus": 0.06,
+     "outcome_predictor": 0.5267,
+     "recommended_by": "CLARITY",
+     "relevance_bonus": 0.1,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-school-for-my-chil.md",
+     "min_bytes": 240,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_children_with"
+     ]
+    },
+    "risks": [],
+    "status": "recommended"
+   }
+  ],
+  "constraint_governance": {
+   "applicable": [
+    {
+     "applicability_reason": "scoped constraint: subject + domain overlap",
+     "authority": "user",
+     "banned_tokens": [
+      "debt"
+     ],
+     "broad": false,
+     "confidence": 1.0,
+     "constraint_id": "CONST:dc168a654d31",
+     "created_at": "2026-09-05T02:36:46+00:00",
+     "entity_id": "ENTITY:operator",
+     "evidence_transition": null,
+     "meaning": "without debt",
+     "scope_domain_tokens": [
+      "community",
+      "school",
+      "children",
+      "debt"
+     ],
+     "scope_subject": [
+      "community",
+      "school",
+      "children"
+     ],
+     "source_destiny_id": "DESTINY:13a06ffdc652",
+     "status": "active",
+     "superseded_by": null
+    }
+   ],
+   "remembered_not_applicable": [],
+   "superseded": []
+  },
+  "destiny": "build a community school for my children without debt",
+  "destiny_id": "DESTINY:13a06ffdc652",
+  "entity_id": "ENTITY:operator",
+  "execution_receipt": {
+   "action": "updated",
+   "artifact": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+   "bytes": 854,
+   "capability": "digital_artifact_writer",
+   "capability_claim": "digital_artifact_writer",
+   "files": [
+    {
+     "action": "updated",
+     "bytes": 854,
+     "path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+     "sha256": "20a9ab1994e0bf89a3d73d5647415e3c28a82ed25492704c9a595301d3cd3fd4"
+    }
+   ],
+   "sha256": "20a9ab1994e0bf89a3d73d5647415e3c28a82ed25492704c9a595301d3cd3fd4",
+   "total_bytes": 854
+  },
+  "observed_evidence": {
+   "artifact_path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+   "captured_at": "2026-09-05T02:38:26+00:00",
+   "evidence_id": "EV:20a9ab1994e0",
+   "kind": "observed_state",
+   "sha256": "20a9ab1994e0bf89a3d73d5647415e3c28a82ed25492704c9a595301d3cd3fd4",
+   "size_bytes": 854
+  },
+  "outcome_status": "ACCEPTED",
+  "persisted": true,
+  "persisted_hash": "af620f7431dade38be2382b59cd795b821f1a9906ab9f9557a56c2079a205318",
+  "previous_hash": "b3f894fa71976f126954e450baea276d45870d59ccdca53fb44ad95f4c977f3b",
+  "previous_state_hash": "2891cf2852273bd3ced02cd15e514378d63544aa7d8c1fb632e1e2baaa470ee6",
+  "proposed_delta": {
+   "K": 6,
+   "U": 1,
+   "W": 1
+  },
+  "record_hash": "8d233813751269d8311dcfb28da32e6af75e45b000828ede67c99ddb8379c3d6",
+  "rejection_reason": null,
+  "rejection_reason_extra": null,
+  "sid": "SID:operator:build-a-community-school:004",
+  "timestamp": "2026-09-05T02:38:26+00:00",
+  "transaction_id": "TX:c8f244fcb0c756fd",
+  "transition_id": "TR:build-a-community-school-for-m:0005",
+  "verification": {
+   "capability": "digital_artifact_writer",
+   "expected": {
+    "artifact": "knowledgeform_build-a-community-school-for-my-chil.md",
+    "min_bytes": 240,
+    "required_sections": [
+     "essence",
+     "purpose_for_my_children_with"
+    ]
+   },
+   "mismatches": [],
+   "observed": {
+    "files": 1,
+    "sha256": "20a9ab1994e0bf89a3d73d5647415e3c28a82ed25492704c9a595301d3cd3fd4",
+    "size_bytes": 854,
+    "total_bytes": 854
+   },
+   "result": "verified"
+  }
+ },
+ {
+  "accepted_delta": {
+   "K": 6,
+   "U": 1,
+   "W": 1
+  },
+  "authority": "user",
+  "branch_id": "BR:build-a-community-archive-for-my-nei:single-pass",
+  "branches": [
+   {
+    "actions": [
+     "compose knowledge form 'knowledgeform_build-a-community-archive-for-my-nei.md' from 6 meaning elements",
+     "write artifact in one governed pass"
+    ],
+    "approach": "single_pass_construct",
+    "branch_id": "BR:build-a-community-archive-for-my-nei:single-pass",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.78,
+    "evaluation": {
+     "confidence": 0.78,
+     "contradictions": [
+      "polarity conflict: 'outside' required by mechanism ME 'without outside funding' but banned by constraint",
+      "polarity conflict: 'funding' required by mechanism ME 'without outside funding' but banned by constraint",
+      "polarity conflict: 'outside' required by purpose ME 'for my neighborhood without outside funding' but banned by constraint",
+      "polarity conflict: 'funding' required by purpose ME 'for my neighborhood without outside funding' but banned by constraint",
+      "polarity conflict: 'outside' required by environment ME 'community archive for my neighborhood without outside fundin' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": null,
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0,
+     "recommended_by": "CLARITY",
+     "relevance_bonus": 0.0,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-archive-for-my-nei.md",
+     "min_bytes": 256,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_neighborhood"
+     ]
+    },
+    "risks": [
+     "single write: partial content loss if interrupted",
+     "must honor constraint: outside funding"
+    ],
+    "status": "recommended"
+   },
+   {
+    "actions": [
+     "write staging section set ['essence', 'purpose_for_my_neighborhood']",
+     "verify staging sections then append remaining sections"
+    ],
+    "approach": "staged_construct",
+    "branch_id": "BR:build-a-community-archive-for-my-nei:staged",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.84,
+    "evaluation": {
+     "confidence": 0.84,
+     "contradictions": [
+      "polarity conflict: 'outside' required by mechanism ME 'without outside funding' but banned by constraint",
+      "polarity conflict: 'funding' required by mechanism ME 'without outside funding' but banned by constraint",
+      "polarity conflict: 'outside' required by purpose ME 'for my neighborhood without outside funding' but banned by constraint",
+      "polarity conflict: 'funding' required by purpose ME 'for my neighborhood without outside funding' but banned by constraint",
+      "polarity conflict: 'outside' required by environment ME 'community archive for my neighborhood without outside fundin' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": null,
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0,
+     "relevance_bonus": 0.0,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-archive-for-my-nei.md",
+     "min_bytes": 200,
+     "required_sections": [
+      "essence",
+      "purpose_for_my_neighborhood"
+     ]
+    },
+    "risks": [
+     "staging adds an extra failure surface",
+     "must honor constraint: outside funding"
+    ],
+    "status": "simulated"
+   },
+   {
+    "actions": [
+     "write a minimal seed artifact with the primary section only"
+    ],
+    "approach": "minimal_seeded_construct",
+    "branch_id": "BR:build-a-community-archive-for-my-nei:minimal-seed",
+    "capability": "digital_artifact_writer",
+    "confidence": 0.55,
+    "evaluation": {
+     "confidence": 0.55,
+     "contradictions": [
+      "polarity conflict: 'outside' required by mechanism ME 'without outside funding' but banned by constraint",
+      "polarity conflict: 'funding' required by mechanism ME 'without outside funding' but banned by constraint",
+      "polarity conflict: 'outside' required by purpose ME 'for my neighborhood without outside funding' but banned by constraint",
+      "polarity conflict: 'funding' required by purpose ME 'for my neighborhood without outside funding' but banned by constraint",
+      "polarity conflict: 'outside' required by environment ME 'community archive for my neighborhood without outside fundin' but banned by constraint"
+     ],
+     "guardian": "PASS",
+     "inherited_constraint": null,
+     "inherited_relation": null,
+     "maturity_bonus": 0.0,
+     "outcome_predictor": 0.0,
+     "relevance_bonus": 0.0,
+     "violations": []
+    },
+    "expected": {
+     "artifact_name": "knowledgeform_build-a-community-archive-for-my-nei.md",
+     "min_bytes": 40,
+     "required_sections": [
+      "essence"
+     ]
+    },
+    "risks": [
+     "thin artifact may under-represent the Destiny MEs",
+     "must honor constraint: outside funding"
+    ],
+    "status": "simulated"
+   }
+  ],
+  "constraint_governance": {
+   "applicable": [],
+   "remembered_not_applicable": [
+    {
+     "applicability_reason": "scoped constraint: different subject",
+     "authority": "user",
+     "banned_tokens": [
+      "debt"
+     ],
+     "broad": false,
+     "confidence": 1.0,
+     "constraint_id": "CONST:dc168a654d31",
+     "created_at": "2026-09-05T02:38:26+00:00",
+     "entity_id": "ENTITY:operator",
+     "evidence_transition": null,
+     "meaning": "without debt",
+     "scope_domain_tokens": [
+      "community",
+      "school",
+      "children",
+      "debt"
+     ],
+     "scope_subject": [
+      "community",
+      "school",
+      "children"
+     ],
+     "source_destiny_id": "DESTINY:13a06ffdc652",
+     "status": "active",
+     "superseded_by": null
+    }
+   ],
+   "superseded": []
+  },
+  "contradictions": [
+   {
+    "authority_comparison": {
+     "current": 1.0,
+     "prior": 1.0
+    },
+    "claim": {
+     "artifact_sha256": "aafe2355e472e1517cba0c86edcfb80d02e6be85555f6e9835cbec5141ec2f0e",
+     "destiny_id": "ID:build-a-community-school-for-my-children"
+    },
+    "contradiction_id": "CONTRA:2afc761b0e55",
+    "evidences": [
+     "EV:prior-aafe2355e4",
+     "EV:1a745a8041d0"
+    ],
+    "history_preserved": true,
+    "reason": "later independent observation with equal-or-higher authority supersedes the prior claim",
+    "resolution": "superseded",
+    "subject": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+    "temporal": {
+     "current": "2026-09-05T03:06:04+00:00",
+     "prior": ""
+    },
+    "winning_evidence": "EV:1a745a8041d0"
+   }
+  ],
+  "delta_event": {
+   "basis": {
+    "constraints_used": [],
+    "contradictions_resolved": [
+     "CONTRA:2afc761b0e55"
+    ],
+    "evidence_ids": [
+     "EV:efacc5bdd778"
+    ],
+    "models_changed": [
+     "world_model.known_state"
+    ],
+    "prior_state_refs": [
+     "DESTINY:c5df9bb50a68"
+    ],
+    "relationships_used": [
+     "DESTINY:13a06ffdc652->DESTINY:6e4dcc3faaf4"
+    ]
+   },
+   "delta_id": "DELTA:13fbc00b3d02",
+   "delta_k": 6,
+   "delta_u": 1,
+   "delta_w": 1,
+   "entity_id": "ENTITY:operator",
+   "justification": {
+    "knowledge_reason": "6 verified fact(s) entered the system",
+    "understanding_reason": "relational field updated: known state references 1 relationship(s); new scoped constraint entered the governing structure; world model corrected: verified state no longer matched observed reality; contradiction recorded, history preserved",
+    "wisdom_reason": "judged 1 remembered constraint(s) not applicable to this Destiny"
+   },
+   "timestamp": "2026-09-05T03:06:04+00:00",
+   "transition_id": "pending",
+   "verifier": "AutoSync:expected-vs-observed"
+  },
+  "delta_event_id": "DELTA:13fbc00b3d02",
+  "destiny": "build a community archive for my neighborhood without outside funding",
+  "destiny_id": "DESTINY:c5df9bb50a68",
+  "entity_id": "ENTITY:operator",
+  "evidence_id": "EV:efacc5bdd778",
+  "execution_receipt": {
+   "action": "created",
+   "artifact": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-archive-for-my-nei.md",
+   "bytes": 912,
+   "capability": "digital_artifact_writer",
+   "capability_claim": "digital_artifact_writer",
+   "files": [
+    {
+     "action": "created",
+     "bytes": 912,
+     "path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-archive-for-my-nei.md",
+     "sha256": "4684babbd58fb7ef6f4cbc8cd354fdace270c1018be47cf482e9e5cb0175d2a3"
+    }
+   ],
+   "sha256": "4684babbd58fb7ef6f4cbc8cd354fdace270c1018be47cf482e9e5cb0175d2a3",
+   "total_bytes": 912
+  },
+  "observed_evidence": {
+   "artifact_path": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-archive-for-my-nei.md",
+   "captured_at": "2026-09-05T03:06:04+00:00",
+   "evidence_id": "EV:efacc5bdd778",
+   "kind": "observed_state",
+   "sha256": "4684babbd58fb7ef6f4cbc8cd354fdace270c1018be47cf482e9e5cb0175d2a3",
+   "size_bytes": 912
+  },
+  "outcome_status": "ACCEPTED",
+  "persisted": true,
+  "persisted_hash": "335a023d4e8c27bf0a0a899f544d6f393155c54ebfe4d2816b47ba5ba99e4f4c",
+  "previous_hash": "8d233813751269d8311dcfb28da32e6af75e45b000828ede67c99ddb8379c3d6",
+  "previous_state_hash": "75b088f5dc95e20a5dc0790e95f55b62bdaf6c7c3bec037dcd5f35a9c01b4dd3",
+  "proposed_delta": {
+   "K": 6,
+   "U": 1,
+   "W": 1
+  },
+  "record_hash": "86af98312981116f582713becfab916bda9fe095e5d1a63b305d3fb3c030eeb0",
+  "rejection_reason": null,
+  "rejection_reason_extra": null,
+  "sid": "SID:operator:build-a-community-archiv:005",
+  "timestamp": "2026-09-05T03:06:04+00:00",
+  "transaction_id": "TX:162564694e0365b5",
+  "transition_id": "TR:build-a-community-archive-for:0006",
+  "verification": {
+   "capability": "digital_artifact_writer",
+   "expected": {
+    "artifact": "knowledgeform_build-a-community-archive-for-my-nei.md",
+    "min_bytes": 256,
+    "required_sections": [
+     "essence",
+     "purpose_for_my_neighborhood"
+    ]
+   },
+   "mismatches": [],
+   "observed": {
+    "files": 1,
+    "sha256": "4684babbd58fb7ef6f4cbc8cd354fdace270c1018be47cf482e9e5cb0175d2a3",
+    "size_bytes": 912,
+    "total_bytes": 912
+   },
+   "result": "verified"
+  }
+ }
+]

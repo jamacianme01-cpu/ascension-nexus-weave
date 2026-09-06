@@ -1,0 +1,60 @@
+{
+  "constraints": {
+    "CONST:8623a2f56546": {
+      "authority": "user",
+      "banned_tokens": [
+        "outside",
+        "funding"
+      ],
+      "broad": false,
+      "confidence": 1.0,
+      "constraint_id": "CONST:8623a2f56546",
+      "created_at": "2026-09-05T03:06:04+00:00",
+      "entity_id": "ENTITY:operator",
+      "evidence_transition": null,
+      "meaning": "without outside funding",
+      "scope_domain_tokens": [
+        "community",
+        "archive",
+        "neighborhood",
+        "outside",
+        "funding"
+      ],
+      "scope_subject": [
+        "community",
+        "archive",
+        "neighborhood"
+      ],
+      "source_destiny_id": "DESTINY:c5df9bb50a68",
+      "status": "active",
+      "superseded_by": null
+    },
+    "CONST:dc168a654d31": {
+      "authority": "user",
+      "banned_tokens": [
+        "debt"
+      ],
+      "broad": false,
+      "confidence": 1.0,
+      "constraint_id": "CONST:dc168a654d31",
+      "created_at": "2026-09-05T02:38:26+00:00",
+      "entity_id": "ENTITY:operator",
+      "evidence_transition": null,
+      "meaning": "without debt",
+      "scope_domain_tokens": [
+        "community",
+        "school",
+        "children",
+        "debt"
+      ],
+      "scope_subject": [
+        "community",
+        "school",
+        "children"
+      ],
+      "source_destiny_id": "DESTINY:13a06ffdc652",
+      "status": "active",
+      "superseded_by": null
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "ENTITY:operator": {
+    "created_at": "2026-09-05T01:17:48+00:00",
+    "delta": {
+      "K": 32,
+      "U": 5,
+      "W": 5
+    },
+    "destinies": {
+      "DESTINY:13a06ffdc652": {
+        "constraint_mes": [
+          {
+            "category": "constraint",
+            "me_id": "ME:v1-text:debt:constraint:cdbcb1c7",
+            "source": "destiny",
+            "text": "debt"
+          }
+        ],
+        "cycles": 2,
+        "destiny": "build a community school for my children without debt"
+      },
+      "DESTINY:6e4dcc3faaf4": {
+        "cycles": 2,
+        "destiny": "ascend the community knowledge forge for my children without debt using open blueprints"
+      },
+      "DESTINY:c5df9bb50a68": {
+        "constraint_mes": [
+          {
+            "category": "constraint",
+            "me_id": "ME:v1-text:outside-funding:constraint:bb681dff",
+            "source": "destiny",
+            "text": "outside funding"
+          }
+        ],
+        "cycles": 1,
+        "destiny": "build a community archive for my neighborhood without outside funding"
+      }
+    },
+    "entity_id": "ENTITY:operator",
+    "lineage": [
+      "TR:ascend-the-community-knowledge:0002",
+      "TR:ascend-the-community-knowledge:0003",
+      "TR:build-a-community-school-for-m:0004",
+      "TR:build-a-community-school-for-m:0005",
+      "TR:build-a-community-archive-for:0006"
+    ],
+    "me_ids": [
+      "ME:v1-text:children-without:identity:494c4dbc",
+      "ME:v1-text:community:identity:9c176e93",
+      "ME:v1-text:debt:constraint:cdbcb1c7",
+      "ME:v1-text:community-knowledge-forge-for-my-chi:environment:d20a31ce",
+      "ME:v1-text:forge-for-my-children-without-debt-u:purpose:b52da7e5",
+      "ME:v1-text:using-open-blueprints:mechanism:fa58c8df",
+      "ME:v1-text:ascend:form:dd51e662",
+      "ME:v1-text:community-school-for-my-children-wit:environment:88f8c7a1",
+      "ME:v1-text:for-my-children-without-debt:purpose:01920338",
+      "ME:v1-text:without-debt:mechanism:aff25df4",
+      "ME:v1-text:neighborhood-without:identity:450cdf20",
+      "ME:v1-text:outside-funding:constraint:bb681dff",
+      "ME:v1-text:community-archive-for-my-neighborhoo:environment:3b676cd3",
+      "ME:v1-text:for-my-neighborhood-without-outside:purpose:59d3cd5d",
+      "ME:v1-text:without-outside-funding:mechanism:22de2433"
+    ],
+    "operator_label": "operator",
+    "sid": "SID:operator:build-a-community-archiv:005"
+  },
+  "ID:build-a-community-school-for-my-children": {
+    "created_at": "2026-09-05T00:58:59+00:00",
+    "delta": {
+      "K": 6,
+      "U": 1,
+      "W": 1
+    },
+    "destiny": "build a community school for my children without debt using open plans",
+    "entity_id": "ID:build-a-community-school-for-my-children",
+    "lineage": [
+      "TR:build-a-community-school-for-m:0001"
+    ],
+    "me_ids": [
+      "ME:children-without:identity:494c4dbc",
+      "ME:community:identity:9c176e93",
+      "ME:debt-using-open-plans:constraint:901ab5d0",
+      "ME:community-school-for-my-children-wit:environment:0ed14136",
+      "ME:for-my-children-without-debt-using-o:purpose:02ece80c",
+      "ME:using-open-plans:mechanism:21eb46d3"
+    ],
+    "sid": "SID:build-a-community-school-for-my-children:b3eae0bb09"
+  }
+}

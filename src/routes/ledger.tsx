@@ -11,7 +11,7 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
-import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
+import { ChamberLoading, IntegrityFailure, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
 import { surfaceQuery, basename, chainLinkIntact } from "@/lib/ascension/state";
 
@@ -60,6 +60,13 @@ function Ledger() {
         }
       />
 
+      {!intact && (
+        <IntegrityFailure
+          what="Hash-chain continuity broken in the published ledger."
+          detail="a record's previous_hash does not equal the prior record_hash"
+        />
+      )}
+
       <div className="space-y-5">
         {ledger.map((record, i) => {
           const linked = chainLinkIntact(ledger[i - 1], record);
@@ -79,7 +86,7 @@ function Ledger() {
                 </div>
               }
             >
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="-mx-1 flex snap-x items-center gap-3 overflow-x-auto px-1 pb-1 lg:flex-wrap lg:overflow-visible">
                 {[
                   ["State", record.previous_state_hash ? "carried" : undefined],
                   ["Event", record.branch_id?.split(":").pop()],
@@ -95,7 +102,7 @@ function Ledger() {
                   ],
                   ["New state", record.persisted_hash ? "persisted" : undefined],
                 ].map(([label, value], step) => (
-                  <span key={String(label)} className="flex items-center gap-3">
+                  <span key={String(label)} className="flex shrink-0 snap-start items-center gap-3">
                     {step > 0 && <span className="font-mono text-xs text-gold/70">→</span>}
                     <span className="glass-inset rounded-md px-3 py-2">
                       <span className="label-eyebrow block">{String(label)}</span>

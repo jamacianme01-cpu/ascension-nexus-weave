@@ -149,9 +149,9 @@ export type SemanticState = {
 
 export type MeaningElementRef = {
   me_id: string;
-  category?: string;
-  source?: string;
-  text?: string;
+  category?: string | undefined;
+  source?: string | undefined;
+  text?: string | undefined;
 };
 
 export type DestinyRecord = {

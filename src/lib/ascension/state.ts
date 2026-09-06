@@ -57,14 +57,27 @@ export function parseMeId(meId: string): {
   hash?: string | undefined;
 } {
   const parts = meId.split(":");
-  if (parts[0] !== "ME" || parts.length < 5) return { me_id: meId };
-  return {
-    me_id: meId,
-    scheme: parts[1],
-    lexeme: parts[2]?.replace(/-/g, " "),
-    category: parts[3],
-    hash: parts[4],
-  };
+  if (parts[0] !== "ME") return { me_id: meId };
+  // Two id schemes exist in the published state: the current
+  // `ME:<scheme>:<lexeme>:<category>:<hash>` and a legacy `ME:<lexeme>:<category>:<hash>`.
+  if (parts.length >= 5) {
+    return {
+      me_id: meId,
+      scheme: parts[1],
+      lexeme: parts[2]?.replace(/-/g, " "),
+      category: parts[3],
+      hash: parts[4],
+    };
+  }
+  if (parts.length === 4) {
+    return {
+      me_id: meId,
+      lexeme: parts[1]?.replace(/-/g, " "),
+      category: parts[2],
+      hash: parts[3],
+    };
+  }
+  return { me_id: meId };
 }
 
 export type MeaningElement = ReturnType<typeof parseMeId> & {

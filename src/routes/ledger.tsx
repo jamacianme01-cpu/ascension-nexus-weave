@@ -11,6 +11,7 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
+import { Inspect } from "@/components/ascension/inspect";
 import { ascensionStateQuery, basename, chainLinkIntact } from "@/lib/ascension/state";
 
 export const Route = createFileRoute("/ledger")({

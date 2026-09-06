@@ -64,6 +64,7 @@ function Knowledgeverse() {
   const [category, setCategory] = useState<string>("all");
   const [openForm, setOpenForm] = useState<string | null>(data.knowledgeForms[0]?.file ?? null);
   const [selectedNode, setSelectedNode] = useState<string | undefined>();
+  const [labels, setLabels] = useState(true);
 
   const categories = useMemo(
     () => ["all", ...new Set(mes.map((m) => m.category ?? "uncategorised"))],
@@ -71,6 +72,10 @@ function Knowledgeverse() {
   );
   const visible = category === "all" ? mes : mes.filter((m) => (m.category ?? "") === category);
   const entities = Object.entries(data.entities);
+  // Library Card identity comes from the published operator entity record.
+  const card =
+    data.entities[data.chamber.entity_id ?? ""] ?? Object.values(data.entities)[0];
+  const cardDestinyId = data.chamber.last_transition?.destiny_id;
 
   return (
     <>

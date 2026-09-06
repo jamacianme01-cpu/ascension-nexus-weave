@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as KnowledgeverseRouteImport } from './routes/knowledgeverse'
+import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as PathwaysRouteImport } from './routes/pathways'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const KnowledgeverseRoute = KnowledgeverseRouteImport.update({
   path: '/knowledgeverse',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LedgerRoute = LedgerRouteImport.update({
+  id: '/ledger',
+  path: '/ledger',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PathwaysRoute = PathwaysRouteImport.update({
   id: '/pathways',
   path: '/pathways',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
+  '/ledger': typeof LedgerRoute
   '/pathways': typeof PathwaysRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
+  '/ledger': typeof LedgerRoute
   '/pathways': typeof PathwaysRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
+  '/ledger': typeof LedgerRoute
   '/pathways': typeof PathwaysRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/governance' | '/knowledgeverse' | '/pathways'
+  fullPaths: '/' | '/governance' | '/knowledgeverse' | '/ledger' | '/pathways'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/governance' | '/knowledgeverse' | '/pathways'
-  id: '__root__' | '/' | '/governance' | '/knowledgeverse' | '/pathways'
+  to: '/' | '/governance' | '/knowledgeverse' | '/ledger' | '/pathways'
+  id:
+    | '__root__'
+    | '/'
+    | '/governance'
+    | '/knowledgeverse'
+    | '/ledger'
+    | '/pathways'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GovernanceRoute: typeof GovernanceRoute
   KnowledgeverseRoute: typeof KnowledgeverseRoute
+  LedgerRoute: typeof LedgerRoute
   PathwaysRoute: typeof PathwaysRoute
 }
 
@@ -92,6 +108,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeverseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ledger': {
+      id: '/ledger'
+      path: '/ledger'
+      fullPath: '/ledger'
+      preLoaderRoute: typeof LedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pathways': {
       id: '/pathways'
       path: '/pathways'
@@ -106,6 +129,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GovernanceRoute: GovernanceRoute,
   KnowledgeverseRoute: KnowledgeverseRoute,
+  LedgerRoute: LedgerRoute,
   PathwaysRoute: PathwaysRoute,
 }
 export const routeTree = rootRouteImport

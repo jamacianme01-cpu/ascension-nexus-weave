@@ -12,6 +12,8 @@ import {
   Unavailable,
   verdictTone,
 } from "@/components/ascension/chrome";
+import { Inspect } from "@/components/ascension/inspect";
+import { BranchFan, FlowLegend } from "@/components/ascension/flow";
 import { ascensionStateQuery } from "@/lib/ascension/state";
 
 export const Route = createFileRoute("/pathways")({

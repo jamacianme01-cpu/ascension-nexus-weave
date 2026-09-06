@@ -80,59 +80,100 @@ const GLOSSARY: { term: string; gloss: string; source: string }[] = [
 
 export function Shell({ children }: { children: ReactNode }) {
   const [cardOpen, setCardOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Escape closes the Library Card; opening moves focus into it.
+  useEffect(() => {
+    if (!cardOpen) return;
+    cardRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCardOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cardOpen]);
 
   return (
     <div className="void-field relative min-h-screen">
       <div className="starfield pointer-events-none absolute inset-0 opacity-70" />
       <div className="relative z-10">
-        <header className="sticky top-0 z-30 border-b border-border/60 bg-void/70 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-            <Link to="/" className="group flex items-center gap-3">
-              <span className="alive size-2.5 rounded-full bg-primary photon-glow" />
-              <span className="font-display text-etched text-base tracking-[0.34em] text-foreground uppercase">
+        <header className="sticky top-0 z-30 border-b border-border/60 bg-void/80 backdrop-blur-xl">
+          <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 px-4 py-3 sm:px-6 lg:flex lg:flex-nowrap">
+            <Link to="/" className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+              <span className="alive size-2.5 shrink-0 rounded-full bg-primary photon-glow" />
+              <span className="font-display text-etched truncate text-sm tracking-[0.28em] text-foreground uppercase sm:text-base sm:tracking-[0.34em]">
                 Ascension
               </span>
             </Link>
-            <nav className="flex flex-1 flex-wrap items-center gap-1">
+            <div className="flex shrink-0 items-center gap-2 lg:order-3">
+              <SourceBadge className="hidden sm:inline-flex" />
+              <button
+                type="button"
+                onClick={() => setCardOpen((v) => !v)}
+                aria-expanded={cardOpen}
+                aria-controls="library-card"
+                className={cn(
+                  "min-h-9 rounded-sm border px-3 py-1.5 font-mono text-[0.62rem] tracking-[0.18em] uppercase transition-all duration-200 sm:text-[0.68rem] sm:tracking-[0.2em]",
+                  cardOpen
+                    ? "border-gold/60 bg-gold/15 text-gold gold-glow"
+                    : "border-border text-muted-foreground hover:border-gold/50 hover:text-gold",
+                )}
+              >
+                Library Card
+              </button>
+            </div>
+            <nav
+              aria-label="ASCENSION surfaces"
+              className="col-span-2 -mx-1 flex snap-x items-center gap-1 overflow-x-auto px-1 pb-0.5 lg:order-2 lg:col-span-1 lg:flex-1 lg:flex-wrap lg:overflow-visible"
+            >
               {NAV.map((item) => (
                 <Link
                   key={item.to}
                   to={item.to}
                   activeOptions={{ exact: item.to === "/" }}
-                  className="rounded-sm px-2.5 py-1.5 font-mono text-[0.68rem] tracking-[0.2em] text-muted-foreground uppercase transition-colors hover:text-foreground"
-                  activeProps={{ className: "text-primary bg-primary/10 border border-primary/30" }}
+                  className="shrink-0 snap-start rounded-sm border border-transparent px-2.5 py-1.5 font-mono text-[0.64rem] tracking-[0.18em] text-muted-foreground uppercase transition-colors hover:border-primary/25 hover:bg-primary/5 hover:text-foreground sm:text-[0.68rem] sm:tracking-[0.2em]"
+                  activeProps={{
+                    className: "text-primary bg-primary/10 border-primary/40 photon-glow",
+                  }}
                 >
                   {item.label}
                 </Link>
               ))}
             </nav>
-            <button
-              type="button"
-              onClick={() => setCardOpen((v) => !v)}
-              aria-expanded={cardOpen}
-              className={cn(
-                "rounded-sm border px-3 py-1.5 font-mono text-[0.68rem] tracking-[0.2em] uppercase transition-colors",
-                cardOpen
-                  ? "border-gold/60 bg-gold/15 text-gold gold-glow"
-                  : "border-border text-muted-foreground hover:text-gold",
-              )}
-            >
-              Library Card
-            </button>
           </div>
           <div className="gold-rule h-px opacity-60" />
         </header>
 
         {cardOpen && (
-          <aside className="border-b border-border/60 bg-void/80 backdrop-blur-xl">
-            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-              <p className="label-eyebrow">Library Card · Glossary</p>
-              <h2 className="text-etched mt-1 font-display text-lg text-gold uppercase">
-                Vocabulary of the governed contracts
-              </h2>
+          <aside
+            id="library-card"
+            aria-label="Library Card glossary"
+            className="border-b border-border/60 bg-void/85 backdrop-blur-xl"
+          >
+            <div
+              ref={cardRef}
+              tabIndex={-1}
+              className="mx-auto max-w-7xl px-4 py-6 outline-none sm:px-6"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="label-eyebrow">Library Card · Glossary</p>
+                  <h2 className="text-etched mt-1 font-display text-base text-gold uppercase sm:text-lg">
+                    Vocabulary of the governed contracts
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCardOpen(false)}
+                  className="min-h-9 rounded-sm border border-border px-3 py-1.5 font-mono text-[0.62rem] tracking-[0.2em] text-muted-foreground uppercase transition-colors hover:border-gold/50 hover:text-gold"
+                >
+                  Close · esc
+                </button>
+              </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {GLOSSARY.map((entry) => (
                   <div key={entry.term} className="glass-inset rounded-md px-3 py-3">
+
                     <p className="font-display text-sm tracking-wide text-primary">{entry.term}</p>
                     <p className="mt-1 text-[0.82rem] leading-relaxed text-muted-foreground">
                       {entry.gloss}

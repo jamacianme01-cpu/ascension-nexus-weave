@@ -12,6 +12,8 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
+import { Inspect } from "@/components/ascension/inspect";
+import { FlowLegend } from "@/components/ascension/flow";
 import { ascensionStateQuery, basename } from "@/lib/ascension/state";
 import type { ConstraintRecord } from "@/lib/ascension/contracts";
 

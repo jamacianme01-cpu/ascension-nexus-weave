@@ -12,6 +12,8 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
+import { Inspect } from "@/components/ascension/inspect";
+import { FlowLegend } from "@/components/ascension/flow";
 import { ascensionStateQuery, basename } from "@/lib/ascension/state";
 import type { ConstraintRecord } from "@/lib/ascension/contracts";
 
@@ -43,35 +45,51 @@ export const Route = createFileRoute("/governance")({
 });
 
 function ConstraintCard({ c }: { c: ConstraintRecord }) {
+  const status = (c.status ?? "").toLowerCase();
+  const tone =
+    status === "active" ? "photon" : status === "superseded" ? "violet" : status ? "gold" : "neutral";
   return (
-    <div className="glass-inset rounded-md px-3 py-3">
+    <div
+      className={
+        "glass-inset relative overflow-hidden rounded-md px-3 py-3 " +
+        (status === "active" ? "border-l-2 border-l-primary/70" : "border-l-2 border-l-gold/40")
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[0.68rem] text-gold/85">{c.constraint_id}</span>
-        <Pill tone={c.status === "active" ? "photon" : "neutral"}>
+        <Pill tone={tone} glow={status === "active"}>
           {c.status ?? "status unavailable"}
         </Pill>
+        {c.confidence !== undefined && (
+          <span className="font-mono text-[0.65rem] text-primary">
+            confidence {c.confidence.toFixed(2)}
+          </span>
+        )}
       </div>
-      <p className="mt-2 text-sm text-foreground">{c.meaning ?? <Unavailable />}</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <Field label="Authority" value={c.authority} mono />
-        <Field label="Source destiny" value={c.source_destiny_id} mono />
-        <Field label="Banned tokens" value={c.banned_tokens?.join(" · ")} mono />
-        <Field label="Scope subject" value={c.scope_subject?.join(" · ")} mono />
-        <Field label="Scope domain tokens" value={c.scope_domain_tokens?.join(" · ")} mono />
-        <Field label="Broad" value={c.broad === undefined ? undefined : String(c.broad)} mono />
-        <Field label="Created at" value={c.created_at} mono />
-        <Field label="Superseded by" value={c.superseded_by ?? undefined} mono />
-        <Field label="Evidence transition" value={c.evidence_transition ?? undefined} mono />
-        <Field label="Applicability reason" value={c.applicability_reason} mono />
-      </div>
-      {c.confidence !== undefined && (
-        <div className="mt-2">
-          <Meter label="Confidence" value={c.confidence} />
+      <p className="mt-2 text-sm leading-relaxed text-foreground">{c.meaning ?? <Unavailable />}</p>
+      <Inspect label="Inspect constraint" note={c.constraint_id}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field label="Constraint id" value={c.constraint_id} mono />
+          <Field label="Authority" value={c.authority} mono />
+          <Field label="Source destiny" value={c.source_destiny_id} mono />
+          <Field label="Banned tokens" value={c.banned_tokens?.join(" · ")} mono />
+          <Field label="Scope subject" value={c.scope_subject?.join(" · ")} mono />
+          <Field label="Scope domain tokens" value={c.scope_domain_tokens?.join(" · ")} mono />
+          <Field label="Broad" value={c.broad === undefined ? undefined : String(c.broad)} mono />
+          <Field label="Created at" value={c.created_at} mono />
+          <Field label="Superseded by" value={c.superseded_by ?? undefined} mono />
+          <Field label="Evidence transition" value={c.evidence_transition ?? undefined} mono />
+          <Field label="Applicability reason" value={c.applicability_reason} mono />
         </div>
-      )}
+        {c.confidence !== undefined && (
+          <div className="mt-2">
+            <Meter label="Confidence" value={c.confidence} />
+          </div>
+        )}
+      </Inspect>
     </div>
   );
 }
+
 
 function Governance() {
   const { data } = useSuspenseQuery(ascensionStateQuery);
@@ -90,9 +108,25 @@ function Governance() {
         right={<Pill tone="gold" glow>{registry.length} constraints</Pill>}
       />
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Panel eyebrow="Guardian" title="State" >
-          <div className="space-y-3">
+      <FlowLegend steps={["Guardian", "Constraints", "Applicability", "Evidence", "Verdict"]} />
+
+      <section className="glass relative overflow-hidden rounded-lg px-5 py-8 sm:px-8">
+        <div className="gold-rule absolute inset-x-6 top-0 h-px opacity-70" />
+        <p className="label-eyebrow">Guardian · protective law</p>
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <span
+            className={
+              "text-etched font-display text-3xl tracking-[0.2em] uppercase sm:text-4xl " +
+              (executed?.evaluation?.guardian === "PASS" ? "text-primary" : "text-gold")
+            }
+          >
+            {executed?.evaluation?.guardian ?? "unavailable"}
+          </span>
+          <Pill tone="gold">{t?.outcome_status ?? "outcome unavailable"}</Pill>
+          <Pill tone="violet">{registry.length} constraints held</Pill>
+        </div>
+        <Inspect label="Inspect Guardian decision" note="authority · branch · rejection">
+          <div className="grid gap-3 sm:grid-cols-2">
             <StatusPill label="Verdict" value={executed?.evaluation?.guardian} />
             <StatusPill label="Outcome" value={t?.outcome_status ?? undefined} />
             <Field label="Authority" value={t?.authority} mono />
@@ -100,9 +134,11 @@ function Governance() {
             <Field label="Rejection reason" value={t?.rejection_reason ?? undefined} mono />
             <Field label="Rejection detail" value={t?.rejection_reason_extra ?? undefined} mono />
           </div>
-        </Panel>
+        </Inspect>
+      </section>
 
-        <Panel eyebrow="Registry" title="Active constraints" className="lg:col-span-2">
+      <div className="grid gap-5">
+        <Panel eyebrow="Registry" title="Active constraints">
           {registry.length === 0 ? (
             <Unavailable label="constraints" />
           ) : (

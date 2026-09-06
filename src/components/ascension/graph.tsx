@@ -9,10 +9,12 @@ export function ResonanceField({
   relationships,
   onSelect,
   selected,
+  showLabels = true,
 }: {
   relationships?: Relationship[] | undefined;
   onSelect?: (id: string) => void | undefined;
   selected?: string | undefined;
+  showLabels?: boolean | undefined;
 }) {
   if (!relationships || relationships.length === 0) return <Unavailable label="relationships" />;
 
@@ -84,14 +86,16 @@ export function ResonanceField({
                 stroke={active ? "oklch(0.95 0.05 196)" : "oklch(0.83 0.11 84)"}
                 strokeWidth={1.5}
               />
-              <text
-                x={p.x}
-                y={p.y - 18}
-                textAnchor="middle"
-                className="fill-current font-mono text-[9px] text-muted-foreground"
-              >
-                {id.replace(/^DESTINY:/, "")}
-              </text>
+              {showLabels && (
+                <text
+                  x={p.x}
+                  y={p.y - 18}
+                  textAnchor="middle"
+                  className="fill-current font-mono text-[9px] text-muted-foreground"
+                >
+                  {id.replace(/^DESTINY:/, "")}
+                </text>
+              )}
             </g>
           );
         })}

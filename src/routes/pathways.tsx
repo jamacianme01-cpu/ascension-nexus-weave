@@ -12,6 +12,8 @@ import {
   Unavailable,
   verdictTone,
 } from "@/components/ascension/chrome";
+import { Inspect } from "@/components/ascension/inspect";
+import { BranchFan, FlowLegend } from "@/components/ascension/flow";
 import { ascensionStateQuery } from "@/lib/ascension/state";
 
 export const Route = createFileRoute("/pathways")({
@@ -67,6 +69,18 @@ function Pathways() {
           </div>
         }
       />
+
+      <FlowLegend
+        steps={["Origin", "Divergence", "Trajectory", "Balance", "Wisdom recommendation"]}
+      />
+
+      <Panel eyebrow="Transverse" title="Branching futures">
+        <BranchFan
+          branches={branches}
+          executedId={executedId}
+          recommendedId={recommended?.branch_id}
+        />
+      </Panel>
 
       <div className="grid gap-5 lg:grid-cols-3">
         <Panel eyebrow="Wisdom" title="Recommendation" className="lg:col-span-2">
@@ -148,11 +162,8 @@ function Pathways() {
               }
             >
               <div className="space-y-3">
-                <Field label="Branch id" value={b.branch_id} mono />
-                <Field label="Capability" value={b.capability} mono />
                 <Meter label="Confidence" value={b.confidence} />
                 <Meter label="Outcome predictor" value={b.evaluation?.outcome_predictor} />
-                <Meter label="Maturity bonus" value={b.evaluation?.maturity_bonus} />
                 <StatusPill label="Guardian" value={b.evaluation?.guardian} />
                 <div>
                   <p className="label-eyebrow mb-2">Actions</p>
@@ -162,27 +173,35 @@ function Pathways() {
                   <p className="label-eyebrow mb-2">Risks</p>
                   <List items={b.risks} tone="gold" />
                 </div>
-                <div>
-                  <p className="label-eyebrow mb-2">Contradictions</p>
-                  <List items={b.evaluation?.contradictions} tone="danger" />
-                </div>
-                <div>
-                  <p className="label-eyebrow mb-2">Violations</p>
-                  <List items={b.evaluation?.violations} tone="danger" />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field
-                    label="Expected artifact"
-                    mono
-                    value={b.expected?.artifact_name ?? b.expected?.artifact}
-                  />
-                  <Field label="Min bytes" mono value={b.expected?.min_bytes} />
-                </div>
-                <div>
-                  <p className="label-eyebrow mb-2">Required sections</p>
-                  <List items={b.expected?.required_sections} />
-                </div>
+                <Inspect label="Inspect branch" note="ids · expectation · contradictions">
+                  <div className="space-y-3">
+                    <Field label="Branch id" value={b.branch_id} mono />
+                    <Field label="Capability" value={b.capability} mono />
+                    <Meter label="Maturity bonus" value={b.evaluation?.maturity_bonus} />
+                    <div>
+                      <p className="label-eyebrow mb-2">Contradictions</p>
+                      <List items={b.evaluation?.contradictions} tone="danger" />
+                    </div>
+                    <div>
+                      <p className="label-eyebrow mb-2">Violations</p>
+                      <List items={b.evaluation?.violations} tone="danger" />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field
+                        label="Expected artifact"
+                        mono
+                        value={b.expected?.artifact_name ?? b.expected?.artifact}
+                      />
+                      <Field label="Min bytes" mono value={b.expected?.min_bytes} />
+                    </div>
+                    <div>
+                      <p className="label-eyebrow mb-2">Required sections</p>
+                      <List items={b.expected?.required_sections} />
+                    </div>
+                  </div>
+                </Inspect>
               </div>
+
             </Panel>
           );
         })}

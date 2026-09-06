@@ -12,6 +12,7 @@ import {
   Unavailable,
 } from "@/components/ascension/chrome";
 import { LineageSpine, ResonanceField } from "@/components/ascension/graph";
+import { Inspect } from "@/components/ascension/inspect";
 import {
   ascensionStateQuery,
   basename,
@@ -64,6 +65,7 @@ function Knowledgeverse() {
   const [category, setCategory] = useState<string>("all");
   const [openForm, setOpenForm] = useState<string | null>(data.knowledgeForms[0]?.file ?? null);
   const [selectedNode, setSelectedNode] = useState<string | undefined>();
+  const [labels, setLabels] = useState(true);
 
   const categories = useMemo(
     () => ["all", ...new Set(mes.map((m) => m.category ?? "uncategorised"))],
@@ -71,6 +73,10 @@ function Knowledgeverse() {
   );
   const visible = category === "all" ? mes : mes.filter((m) => (m.category ?? "") === category);
   const entities = Object.entries(data.entities);
+  // Library Card identity comes from the published operator entity record.
+  const card =
+    data.entities[data.chamber.entity_id ?? ""] ?? Object.values(data.entities)[0];
+  const cardDestinyId = data.chamber.last_transition?.destiny_id;
 
   return (
     <>
@@ -82,12 +88,33 @@ function Knowledgeverse() {
       />
 
       <div className="grid gap-5 lg:grid-cols-5">
-        <Panel eyebrow="World model" title="Resonance field" className="lg:col-span-3">
+        <Panel
+          eyebrow="World model"
+          title="Resonance field"
+          className="lg:col-span-3"
+          aside={
+            <button
+              type="button"
+              onClick={() => setLabels((v) => !v)}
+              aria-pressed={labels}
+              className={
+                "rounded-sm border px-2.5 py-1 font-mono text-[0.62rem] tracking-[0.18em] uppercase transition-colors " +
+                (labels
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground")
+              }
+            >
+              labels
+            </button>
+          }
+        >
           <ResonanceField
             relationships={data.worldModel.relationships}
             selected={selectedNode}
+            showLabels={labels}
             onSelect={(id) => setSelectedNode((prev) => (prev === id ? undefined : id))}
           />
+
           <div className="mt-4 space-y-3">
             {(data.worldModel.relationships ?? [])
               .filter((r) => !selectedNode || r.a === selectedNode || r.b === selectedNode)
@@ -201,10 +228,71 @@ function Knowledgeverse() {
                 </button>
                 {open && (
                   <div className="space-y-4 border-t border-border/50 px-3 py-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Field label="Executed branch" value={knowledgeFormBranch(form)} mono />
-                      <Field label="Required sections" value={knowledgeFormSections(form).join(", ")} mono />
+                    <div className="glass relative overflow-hidden rounded-md px-4 py-4">
+                      <div className="gold-rule absolute inset-x-4 top-0 h-px opacity-70" />
+                      <p className="label-eyebrow">Library Card</p>
+                      <h3 className="text-etched mt-1 font-display text-base tracking-[0.14em] text-gold uppercase">
+                        {knowledgeFormTitle(form) ?? form.file}
+                      </h3>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Field label="Name / type" value={`Knowledge Form · ${basename(form.file)}`} mono />
+                        <Field label="ID (entity_id)" value={card?.entity_id} mono />
+                        <Field label="SID" value={card?.sid} mono />
+                        <Field label="WHO · operator" value={card?.operator_label} />
+                        <Field label="WHAT · destiny" value={card?.destiny} />
+                        <Field
+                          label="WHY · purpose meaning elements"
+                          value={
+                            (card?.me_ids ?? [])
+                              .filter((m) => m.includes(":purpose:"))
+                              .map((m) => m.split(":")[2]?.replace(/-/g, " "))
+                              .join(" · ") || undefined
+                          }
+                        />
+                        <Field
+                          label="Chromosome / genesis type"
+                          value={card?.chromosome ? "present" : undefined}
+                        />
+                        <Field label="Meaning Elements in form" value={refs.length} mono />
+                        <Field label="Executed branch" value={knowledgeFormBranch(form)} mono />
+                        <Field
+                          label="Verified Δ"
+                          mono
+                          value={
+                            card?.delta
+                              ? `K ${card.delta.K} · U ${card.delta.U} · W ${card.delta.W}`
+                              : undefined
+                          }
+                        />
+                        <Field label="Phenotype · lineage depth" value={card?.lineage?.length} mono />
+                        <Field
+                          label="Relationships"
+                          value={
+                            (data.worldModel.relationships ?? []).filter(
+                              (r) => r.a === cardDestinyId || r.b === cardDestinyId,
+                            ).length || data.worldModel.relationships?.length
+                          }
+                          mono
+                        />
+                        <Field
+                          label="Environment / constraints"
+                          className="sm:col-span-2"
+                          value={
+                            Object.values(card?.destinies ?? {})
+                              .flatMap((d) => d.constraint_mes ?? [])
+                              .map((c) => c.text ?? c.me_id)
+                              .join(" · ") || undefined
+                          }
+                        />
+                        <Field label="Inherited / emerged traits" value={undefined} />
+                        <Field
+                          label="Purpose / trajectory"
+                          className="sm:col-span-3"
+                          value={knowledgeFormSections(form).join(" → ") || undefined}
+                        />
+                      </div>
                     </div>
+
                     <div className="grid gap-2 md:grid-cols-2">
                       {refs.map((ref) => (
                         <div key={ref.me_id} className="rounded-sm border border-border/50 px-2.5 py-2">
@@ -220,9 +308,12 @@ function Knowledgeverse() {
                         </div>
                       ))}
                     </div>
-                    <pre className="max-h-72 overflow-auto rounded-sm border border-border/50 bg-void/70 p-3 font-mono text-[0.68rem] leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                      {form.content}
-                    </pre>
+
+                    <Inspect label="Inspect raw artifact" note={form.file}>
+                      <pre className="max-h-72 overflow-auto rounded-sm border border-border/50 bg-void/70 p-3 font-mono text-[0.68rem] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                        {form.content}
+                      </pre>
+                    </Inspect>
                   </div>
                 )}
               </div>

@@ -9,10 +9,12 @@ export function ResonanceField({
   relationships,
   onSelect,
   selected,
+  showLabels = true,
 }: {
   relationships?: Relationship[] | undefined;
   onSelect?: (id: string) => void | undefined;
   selected?: string | undefined;
+  showLabels?: boolean | undefined;
 }) {
   if (!relationships || relationships.length === 0) return <Unavailable label="relationships" />;
 

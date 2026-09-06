@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -21,37 +21,50 @@ export function Inspect({
   className?: string | undefined;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const panelId = useId();
   return (
-    <div className={cn("mt-4", className)}>
+    <div className={cn("mt-5", className)}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        aria-controls={panelId}
         className={cn(
-          "group flex w-full items-center gap-3 rounded-sm border px-3 py-2 text-left transition-colors",
+          "group flex min-h-10 w-full items-center gap-3 rounded-sm border px-3 py-2 text-left transition-all duration-200",
           open
-            ? "border-gold/50 bg-gold/10 text-gold"
-            : "border-border/70 text-muted-foreground hover:border-gold/40 hover:text-gold",
+            ? "border-gold/55 bg-gold/10 text-gold gold-glow"
+            : "border-border/70 text-muted-foreground hover:border-gold/45 hover:bg-gold/5 hover:text-gold",
         )}
       >
         <span
+          aria-hidden="true"
           className={cn(
-            "font-mono text-[0.6rem] transition-transform",
+            "font-mono text-[0.6rem] transition-transform duration-200",
             open && "rotate-90",
           )}
         >
           ▸
         </span>
-        <span className="font-mono text-[0.66rem] tracking-[0.24em] uppercase">{label}</span>
-        {note && (
-          <span className="ml-auto truncate font-mono text-[0.6rem] tracking-[0.14em] uppercase opacity-70">
-            {note}
-          </span>
-        )}
+        <span className="min-w-0 font-mono text-[0.62rem] tracking-[0.2em] uppercase sm:text-[0.66rem] sm:tracking-[0.24em]">
+          {label}
+        </span>
+        <span className="ml-auto shrink-0 font-mono text-[0.58rem] tracking-[0.16em] uppercase opacity-70">
+          {open ? "hide" : "inspection layer"}
+        </span>
       </button>
       {open && (
-        <div className="relative mt-2 rounded-md border border-border/50 bg-void/60 p-3">
-          <span className="gold-rule absolute inset-x-3 top-0 h-px opacity-50" />
+        <div
+          id={panelId}
+          className="inspection-layer animate-in fade-in slide-in-from-top-1 relative mt-2 rounded-md p-3 duration-200 sm:p-4"
+        >
+          <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-border/40 pb-2">
+            <span className="font-mono text-[0.56rem] tracking-[0.24em] text-gold/70 uppercase">
+              Inspection · published source
+            </span>
+            {note && (
+              <span className="font-mono text-[0.58rem] break-all text-muted-foreground">{note}</span>
+            )}
+          </div>
           {children}
         </div>
       )}
@@ -75,18 +88,20 @@ export function Stage({
 }) {
   return (
     <section className="relative">
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3 sm:gap-5">
         <div className="flex flex-col items-center pt-1">
-          <span className="font-mono text-[0.6rem] tracking-[0.2em] text-gold/80">{index}</span>
+          <span className="font-mono text-[0.58rem] tracking-[0.2em] text-gold/80 sm:text-[0.6rem]">
+            {index}
+          </span>
           <span className="mt-2 size-2 rounded-full bg-primary photon-glow alive" />
-          <span className="mt-2 w-px flex-1 bg-gradient-to-b from-primary/60 via-gold/30 to-transparent" />
+          <span className="photon-track mt-2 w-px flex-1 opacity-50" />
         </div>
-        <div className="min-w-0 flex-1 pb-8">
+        <div className="experience-layer min-w-0 flex-1 rounded-r-lg py-1 pr-0 pb-8 pl-3 sm:pl-5">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <h2 className="text-etched font-display text-lg tracking-[0.18em] text-foreground uppercase sm:text-xl">
+            <h2 className="text-etched font-display text-base tracking-[0.14em] text-foreground uppercase sm:text-xl sm:tracking-[0.18em]">
               {name}
             </h2>
-            {read && <div className="text-sm text-muted-foreground">{read}</div>}
+            {read && <div className="text-[0.82rem] text-muted-foreground sm:text-sm">{read}</div>}
           </div>
           {glyph}
           {children}

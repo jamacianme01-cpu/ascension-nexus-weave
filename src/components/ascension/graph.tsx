@@ -101,7 +101,7 @@ export function ResonanceField({
 }
 
 /** Lineage as a photonic spine of transition ids, in source order. */
-export function LineageSpine({ lineage }: { lineage?: string[] }) {
+export function LineageSpine({ lineage }: { lineage?: string[] | undefined }) {
   if (!lineage || lineage.length === 0) return <Unavailable label="lineage" />;
   return (
     <ol className="relative space-y-2 pl-5">

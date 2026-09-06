@@ -80,77 +80,106 @@ function Ledger() {
                 </div>
               }
             >
-              <div className="grid gap-3 lg:grid-cols-3">
-                <div className="glass-inset rounded-md px-3 py-3">
-                  <p className="label-eyebrow">Chain</p>
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <p className="label-eyebrow">previous_hash</p>
-                      <HashChip value={record.previous_hash} />
-                    </div>
-                    <p className="text-center font-mono text-xs text-primary">↓</p>
-                    <div>
-                      <p className="label-eyebrow">record_hash</p>
-                      <HashChip value={record.record_hash} />
-                    </div>
-                    <div className="pt-1">
-                      <p className="label-eyebrow">previous_state_hash</p>
-                      <HashChip value={record.previous_state_hash} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="glass-inset rounded-md px-3 py-3">
-                  <p className="label-eyebrow">Transformation</p>
-                  <div className="mt-3 grid gap-2">
-                    <Field label="Destiny" value={record.destiny} />
-                    <Field label="Executed branch" value={record.branch_id} mono />
-                    <Field label="Entity ID" value={record.entity_id} mono />
-                    <Field label="SID" value={record.sid} mono />
-                    <Field
-                      label="Accepted Δ"
-                      mono
-                      value={
-                        record.accepted_delta
-                          ? `K ${record.accepted_delta.K} · U ${record.accepted_delta.U} · W ${record.accepted_delta.W}`
-                          : record.delta_k !== undefined
-                            ? `K ${record.delta_k} · U ${record.delta_u} · W ${record.delta_w}`
-                            : undefined
-                      }
-                    />
-                    <Field label="Authority" value={record.authority} mono />
-                  </div>
-                </div>
-
-                <div className="glass-inset rounded-md px-3 py-3">
-                  <p className="label-eyebrow">Execution receipt & verification</p>
-                  <div className="mt-3 grid gap-2">
-                    <StatusPill label="Verification" value={record.verification?.result} />
-                    <Field label="Capability" value={record.execution_receipt?.capability} mono />
-                    <Field label="Action" value={record.execution_receipt?.action} mono />
-                    <Field label="Artifact" value={basename(record.execution_receipt?.artifact)} mono />
-                    <Field label="Bytes" value={record.execution_receipt?.total_bytes ?? record.execution_receipt?.bytes} mono />
-                    <Field label="Receipt sha256" value={<HashChip value={record.execution_receipt?.sha256} />} />
-                    <div>
-                      <p className="label-eyebrow mb-2">Mismatches</p>
-                      <List items={record.verification?.mismatches} tone="danger" />
-                    </div>
-                  </div>
-                </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {[
+                  ["State", record.previous_state_hash ? "carried" : undefined],
+                  ["Event", record.branch_id?.split(":").pop()],
+                  ["Evidence", record.observed_evidence?.evidence_id ?? undefined],
+                  ["Verification", record.verification?.result],
+                  [
+                    "Verified Δ",
+                    record.accepted_delta
+                      ? `K ${record.accepted_delta.K} · U ${record.accepted_delta.U} · W ${record.accepted_delta.W}`
+                      : record.delta_k !== undefined
+                        ? `K ${record.delta_k} · U ${record.delta_u} · W ${record.delta_w}`
+                        : undefined,
+                  ],
+                  ["New state", record.persisted_hash ? "persisted" : undefined],
+                ].map(([label, value], step) => (
+                  <span key={String(label)} className="flex items-center gap-3">
+                    {step > 0 && <span className="font-mono text-xs text-gold/70">→</span>}
+                    <span className="glass-inset rounded-md px-3 py-2">
+                      <span className="label-eyebrow block">{String(label)}</span>
+                      <span className="mt-1 block font-mono text-[0.72rem] text-primary">
+                        {value ? String(value) : <Unavailable />}
+                      </span>
+                    </span>
+                  </span>
+                ))}
               </div>
 
-              {record.observed_evidence ? (
-                <div className="mt-3 grid gap-3 sm:grid-cols-4">
-                  <Field label="Evidence id" value={record.observed_evidence.evidence_id} mono />
-                  <Field label="Captured at" value={record.observed_evidence.captured_at} mono />
-                  <Field label="Size bytes" value={record.observed_evidence.size_bytes} mono />
-                  <Field label="Evidence sha256" value={<HashChip value={record.observed_evidence.sha256} />} />
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <Field label="Destiny" value={record.destiny} />
+                <Field label="Executed branch" value={record.branch_id} mono />
+                <StatusPill label="Verification" value={record.verification?.result} />
+              </div>
+
+              <Inspect label="Inspect record" note="hashes · receipt · evidence · authority">
+                <div className="grid gap-3 lg:grid-cols-3">
+                  <div className="rounded-sm border border-border/50 px-3 py-3">
+                    <p className="label-eyebrow">Chain</p>
+                    <div className="mt-3 space-y-2">
+                      <div>
+                        <p className="label-eyebrow">previous_hash</p>
+                        <HashChip value={record.previous_hash} />
+                      </div>
+                      <p className="text-center font-mono text-xs text-primary">↓</p>
+                      <div>
+                        <p className="label-eyebrow">record_hash</p>
+                        <HashChip value={record.record_hash} />
+                      </div>
+                      <div className="pt-1">
+                        <p className="label-eyebrow">previous_state_hash</p>
+                        <HashChip value={record.previous_state_hash} />
+                      </div>
+                      <div className="pt-1">
+                        <p className="label-eyebrow">persisted_hash</p>
+                        <HashChip value={record.persisted_hash} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-sm border border-border/50 px-3 py-3">
+                    <p className="label-eyebrow">Transformation</p>
+                    <div className="mt-3 grid gap-2">
+                      <Field label="Entity ID" value={record.entity_id} mono />
+                      <Field label="SID" value={record.sid} mono />
+                      <Field label="Authority" value={record.authority} mono />
+                      <Field
+                        label="Proposed Δ"
+                        mono
+                        value={
+                          record.proposed_delta
+                            ? `K ${record.proposed_delta.K} · U ${record.proposed_delta.U} · W ${record.proposed_delta.W}`
+                            : undefined
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-sm border border-border/50 px-3 py-3">
+                    <p className="label-eyebrow">Execution receipt & evidence</p>
+                    <div className="mt-3 grid gap-2">
+                      <Field label="Capability" value={record.execution_receipt?.capability} mono />
+                      <Field label="Action" value={record.execution_receipt?.action} mono />
+                      <Field label="Artifact" value={basename(record.execution_receipt?.artifact)} mono />
+                      <Field
+                        label="Bytes"
+                        value={record.execution_receipt?.total_bytes ?? record.execution_receipt?.bytes}
+                        mono
+                      />
+                      <Field label="Receipt sha256" value={<HashChip value={record.execution_receipt?.sha256} />} />
+                      <Field label="Evidence id" value={record.observed_evidence?.evidence_id} mono />
+                      <Field label="Evidence sha256" value={<HashChip value={record.observed_evidence?.sha256} />} />
+                      <div>
+                        <p className="label-eyebrow mb-2">Mismatches</p>
+                        <List items={record.verification?.mismatches} tone="danger" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-3">
-                  <Unavailable label="observed evidence" />
-                </p>
-              )}
+              </Inspect>
+
             </Panel>
           );
         })}

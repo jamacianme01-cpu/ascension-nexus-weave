@@ -108,9 +108,25 @@ function Governance() {
         right={<Pill tone="gold" glow>{registry.length} constraints</Pill>}
       />
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Panel eyebrow="Guardian" title="State" >
-          <div className="space-y-3">
+      <FlowLegend steps={["Guardian", "Constraints", "Applicability", "Evidence", "Verdict"]} />
+
+      <section className="glass relative overflow-hidden rounded-lg px-5 py-8 sm:px-8">
+        <div className="gold-rule absolute inset-x-6 top-0 h-px opacity-70" />
+        <p className="label-eyebrow">Guardian · protective law</p>
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <span
+            className={
+              "text-etched font-display text-3xl tracking-[0.2em] uppercase sm:text-4xl " +
+              (executed?.evaluation?.guardian === "PASS" ? "text-primary" : "text-gold")
+            }
+          >
+            {executed?.evaluation?.guardian ?? "unavailable"}
+          </span>
+          <Pill tone="gold">{t?.outcome_status ?? "outcome unavailable"}</Pill>
+          <Pill tone="violet">{registry.length} constraints held</Pill>
+        </div>
+        <Inspect label="Inspect Guardian decision" note="authority · branch · rejection">
+          <div className="grid gap-3 sm:grid-cols-2">
             <StatusPill label="Verdict" value={executed?.evaluation?.guardian} />
             <StatusPill label="Outcome" value={t?.outcome_status ?? undefined} />
             <Field label="Authority" value={t?.authority} mono />
@@ -118,7 +134,11 @@ function Governance() {
             <Field label="Rejection reason" value={t?.rejection_reason ?? undefined} mono />
             <Field label="Rejection detail" value={t?.rejection_reason_extra ?? undefined} mono />
           </div>
-        </Panel>
+        </Inspect>
+      </section>
+
+      <div className="grid gap-5">
+
 
         <Panel eyebrow="Registry" title="Active constraints" className="lg:col-span-2">
           {registry.length === 0 ? (

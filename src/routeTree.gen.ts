@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as KnowledgeverseRouteImport } from './routes/knowledgeverse'
 import { Route as PathwaysRouteImport } from './routes/pathways'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GovernanceRoute = GovernanceRouteImport.update({
+  id: '/governance',
+  path: '/governance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KnowledgeverseRoute = KnowledgeverseRouteImport.update({
@@ -31,30 +37,34 @@ const PathwaysRoute = PathwaysRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/pathways': typeof PathwaysRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/pathways': typeof PathwaysRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/pathways': typeof PathwaysRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/knowledgeverse' | '/pathways'
+  fullPaths: '/' | '/governance' | '/knowledgeverse' | '/pathways'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/knowledgeverse' | '/pathways'
-  id: '__root__' | '/' | '/knowledgeverse' | '/pathways'
+  to: '/' | '/governance' | '/knowledgeverse' | '/pathways'
+  id: '__root__' | '/' | '/governance' | '/knowledgeverse' | '/pathways'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GovernanceRoute: typeof GovernanceRoute
   KnowledgeverseRoute: typeof KnowledgeverseRoute
   PathwaysRoute: typeof PathwaysRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/governance': {
+      id: '/governance'
+      path: '/governance'
+      fullPath: '/governance'
+      preLoaderRoute: typeof GovernanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/knowledgeverse': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GovernanceRoute: GovernanceRoute,
   KnowledgeverseRoute: KnowledgeverseRoute,
   PathwaysRoute: PathwaysRoute,
 }

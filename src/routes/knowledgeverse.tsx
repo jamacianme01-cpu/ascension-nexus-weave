@@ -12,6 +12,7 @@ import {
   Unavailable,
 } from "@/components/ascension/chrome";
 import { LineageSpine, ResonanceField } from "@/components/ascension/graph";
+import { Inspect } from "@/components/ascension/inspect";
 import {
   ascensionStateQuery,
   basename,
@@ -268,7 +269,7 @@ function Knowledgeverse() {
                           label="Relationships"
                           value={
                             (data.worldModel.relationships ?? []).filter(
-                              (r) => r.a === card?.destiny_id || r.b === card?.destiny_id,
+                              (r) => r.a === cardDestinyId || r.b === cardDestinyId,
                             ).length || data.worldModel.relationships?.length
                           }
                           mono

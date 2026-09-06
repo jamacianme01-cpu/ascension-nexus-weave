@@ -43,35 +43,51 @@ export const Route = createFileRoute("/governance")({
 });
 
 function ConstraintCard({ c }: { c: ConstraintRecord }) {
+  const status = (c.status ?? "").toLowerCase();
+  const tone =
+    status === "active" ? "photon" : status === "superseded" ? "violet" : status ? "gold" : "neutral";
   return (
-    <div className="glass-inset rounded-md px-3 py-3">
+    <div
+      className={
+        "glass-inset relative overflow-hidden rounded-md px-3 py-3 " +
+        (status === "active" ? "border-l-2 border-l-primary/70" : "border-l-2 border-l-gold/40")
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[0.68rem] text-gold/85">{c.constraint_id}</span>
-        <Pill tone={c.status === "active" ? "photon" : "neutral"}>
+        <Pill tone={tone} glow={status === "active"}>
           {c.status ?? "status unavailable"}
         </Pill>
+        {c.confidence !== undefined && (
+          <span className="font-mono text-[0.65rem] text-primary">
+            confidence {c.confidence.toFixed(2)}
+          </span>
+        )}
       </div>
-      <p className="mt-2 text-sm text-foreground">{c.meaning ?? <Unavailable />}</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <Field label="Authority" value={c.authority} mono />
-        <Field label="Source destiny" value={c.source_destiny_id} mono />
-        <Field label="Banned tokens" value={c.banned_tokens?.join(" · ")} mono />
-        <Field label="Scope subject" value={c.scope_subject?.join(" · ")} mono />
-        <Field label="Scope domain tokens" value={c.scope_domain_tokens?.join(" · ")} mono />
-        <Field label="Broad" value={c.broad === undefined ? undefined : String(c.broad)} mono />
-        <Field label="Created at" value={c.created_at} mono />
-        <Field label="Superseded by" value={c.superseded_by ?? undefined} mono />
-        <Field label="Evidence transition" value={c.evidence_transition ?? undefined} mono />
-        <Field label="Applicability reason" value={c.applicability_reason} mono />
-      </div>
-      {c.confidence !== undefined && (
-        <div className="mt-2">
-          <Meter label="Confidence" value={c.confidence} />
+      <p className="mt-2 text-sm leading-relaxed text-foreground">{c.meaning ?? <Unavailable />}</p>
+      <Inspect label="Inspect constraint" note={c.constraint_id}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Field label="Constraint id" value={c.constraint_id} mono />
+          <Field label="Authority" value={c.authority} mono />
+          <Field label="Source destiny" value={c.source_destiny_id} mono />
+          <Field label="Banned tokens" value={c.banned_tokens?.join(" · ")} mono />
+          <Field label="Scope subject" value={c.scope_subject?.join(" · ")} mono />
+          <Field label="Scope domain tokens" value={c.scope_domain_tokens?.join(" · ")} mono />
+          <Field label="Broad" value={c.broad === undefined ? undefined : String(c.broad)} mono />
+          <Field label="Created at" value={c.created_at} mono />
+          <Field label="Superseded by" value={c.superseded_by ?? undefined} mono />
+          <Field label="Evidence transition" value={c.evidence_transition ?? undefined} mono />
+          <Field label="Applicability reason" value={c.applicability_reason} mono />
         </div>
-      )}
+        {c.confidence !== undefined && (
+          <div className="mt-2">
+            <Meter label="Confidence" value={c.confidence} />
+          </div>
+        )}
+      </Inspect>
     </div>
   );
 }
+
 
 function Governance() {
   const { data } = useSuspenseQuery(ascensionStateQuery);

@@ -138,9 +138,7 @@ function Governance() {
       </section>
 
       <div className="grid gap-5">
-
-
-        <Panel eyebrow="Registry" title="Active constraints" className="lg:col-span-2">
+        <Panel eyebrow="Registry" title="Active constraints">
           {registry.length === 0 ? (
             <Unavailable label="constraints" />
           ) : (

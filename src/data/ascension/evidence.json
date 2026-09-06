@@ -1,0 +1,32 @@
+{
+  "evidence": {
+    "EV:1a745a8041d0": {
+      "artifact_sha256": "20a9ab1994e0bf89a3d73d5647415e3c28a82ed25492704c9a595301d3cd3fd4",
+      "confidence": 1.0,
+      "evidence_id": "EV:1a745a8041d0",
+      "independence": "independent_observation",
+      "measurement": "sha256+size of artifact bytes",
+      "method": "drift reconciliation observation",
+      "observer": "ASCENSION:EvidenceEngine",
+      "size_bytes": 854,
+      "source": "independent disk observation",
+      "target": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-school-for-my-chil.md",
+      "timestamp": "2026-09-05T03:06:04+00:00",
+      "transitions_supported": []
+    },
+    "EV:efacc5bdd778": {
+      "artifact_sha256": "4684babbd58fb7ef6f4cbc8cd354fdace270c1018be47cf482e9e5cb0175d2a3",
+      "confidence": 1.0,
+      "evidence_id": "EV:efacc5bdd778",
+      "independence": "independent_observation",
+      "measurement": "sha256+size of artifact bytes",
+      "method": "independent disk observation",
+      "observer": "ASCENSION:EvidenceEngine",
+      "size_bytes": 912,
+      "source": "capability execution",
+      "target": "C:\\Users\\Gordo\\Projects\\clarity\\ASCENSION_CORE\\state_demo\\world\\knowledgeform_build-a-community-archive-for-my-nei.md",
+      "timestamp": "2026-09-05T03:06:04+00:00",
+      "transitions_supported": []
+    }
+  }
+}

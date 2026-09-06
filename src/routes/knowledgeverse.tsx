@@ -201,10 +201,71 @@ function Knowledgeverse() {
                 </button>
                 {open && (
                   <div className="space-y-4 border-t border-border/50 px-3 py-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Field label="Executed branch" value={knowledgeFormBranch(form)} mono />
-                      <Field label="Required sections" value={knowledgeFormSections(form).join(", ")} mono />
+                    <div className="glass relative overflow-hidden rounded-md px-4 py-4">
+                      <div className="gold-rule absolute inset-x-4 top-0 h-px opacity-70" />
+                      <p className="label-eyebrow">Library Card</p>
+                      <h3 className="text-etched mt-1 font-display text-base tracking-[0.14em] text-gold uppercase">
+                        {knowledgeFormTitle(form) ?? form.file}
+                      </h3>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Field label="Name / type" value={`Knowledge Form · ${basename(form.file)}`} mono />
+                        <Field label="ID (entity_id)" value={card?.entity_id} mono />
+                        <Field label="SID" value={card?.sid} mono />
+                        <Field label="WHO · operator" value={card?.operator_label} />
+                        <Field label="WHAT · destiny" value={card?.destiny} />
+                        <Field
+                          label="WHY · purpose meaning elements"
+                          value={
+                            (card?.me_ids ?? [])
+                              .filter((m) => m.includes(":purpose:"))
+                              .map((m) => m.split(":")[2]?.replace(/-/g, " "))
+                              .join(" · ") || undefined
+                          }
+                        />
+                        <Field
+                          label="Chromosome / genesis type"
+                          value={card?.chromosome ? "present" : undefined}
+                        />
+                        <Field label="Meaning Elements in form" value={refs.length} mono />
+                        <Field label="Executed branch" value={knowledgeFormBranch(form)} mono />
+                        <Field
+                          label="Verified Δ"
+                          mono
+                          value={
+                            card?.delta
+                              ? `K ${card.delta.K} · U ${card.delta.U} · W ${card.delta.W}`
+                              : undefined
+                          }
+                        />
+                        <Field label="Phenotype · lineage depth" value={card?.lineage?.length} mono />
+                        <Field
+                          label="Relationships"
+                          value={
+                            (data.worldModel.relationships ?? []).filter(
+                              (r) => r.a === card?.destiny_id || r.b === card?.destiny_id,
+                            ).length || data.worldModel.relationships?.length
+                          }
+                          mono
+                        />
+                        <Field
+                          label="Environment / constraints"
+                          className="sm:col-span-2"
+                          value={
+                            Object.values(card?.destinies ?? {})
+                              .flatMap((d) => d.constraint_mes ?? [])
+                              .map((c) => c.text ?? c.me_id)
+                              .join(" · ") || undefined
+                          }
+                        />
+                        <Field label="Inherited / emerged traits" value={undefined} />
+                        <Field
+                          label="Purpose / trajectory"
+                          className="sm:col-span-3"
+                          value={knowledgeFormSections(form).join(" → ") || undefined}
+                        />
+                      </div>
                     </div>
+
                     <div className="grid gap-2 md:grid-cols-2">
                       {refs.map((ref) => (
                         <div key={ref.me_id} className="rounded-sm border border-border/50 px-2.5 py-2">
@@ -220,9 +281,12 @@ function Knowledgeverse() {
                         </div>
                       ))}
                     </div>
-                    <pre className="max-h-72 overflow-auto rounded-sm border border-border/50 bg-void/70 p-3 font-mono text-[0.68rem] leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                      {form.content}
-                    </pre>
+
+                    <Inspect label="Inspect raw artifact" note={form.file}>
+                      <pre className="max-h-72 overflow-auto rounded-sm border border-border/50 bg-void/70 p-3 font-mono text-[0.68rem] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                        {form.content}
+                      </pre>
+                    </Inspect>
                   </div>
                 )}
               </div>

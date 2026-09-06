@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { SourceBadge } from "@/components/ascension/states";
 import { cn } from "@/lib/utils";
+
 
 const NAV = [
   { to: "/", label: "Chamber" },

@@ -11,11 +11,11 @@ export function Panel({
   children,
   className,
 }: {
-  eyebrow?: string;
-  title?: string;
-  aside?: ReactNode;
+  eyebrow?: string | undefined;
+  title?: string | undefined;
+  aside?: ReactNode | undefined;
   children: ReactNode;
-  className?: string;
+  className?: string | undefined;
 }) {
   return (
     <section className={cn("glass relative rounded-lg", className)}>
@@ -51,9 +51,9 @@ export function Field({
   className,
 }: {
   label: string;
-  value?: ReactNode;
-  mono?: boolean;
-  className?: string;
+  value?: ReactNode | undefined;
+  mono?: boolean | undefined;
+  className?: string | undefined;
 }) {
   const empty = value === undefined || value === null || value === "";
   return (
@@ -88,9 +88,9 @@ export function Pill({
   className,
 }: {
   children: ReactNode;
-  tone?: Tone;
-  glow?: boolean;
-  className?: string;
+  tone?: Tone | undefined;
+  glow?: boolean | undefined;
+  className?: string | undefined;
 }) {
   return (
     <span
@@ -212,8 +212,8 @@ export function PageHeader({
 }: {
   eyebrow: string;
   title: string;
-  intent?: string;
-  right?: ReactNode;
+  intent?: string | undefined;
+  right?: ReactNode | undefined;
 }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 pb-5">

@@ -10,9 +10,9 @@ export function ResonanceField({
   onSelect,
   selected,
 }: {
-  relationships?: Relationship[];
-  onSelect?: (id: string) => void;
-  selected?: string;
+  relationships?: Relationship[] | undefined;
+  onSelect?: (id: string) => void | undefined;
+  selected?: string | undefined;
 }) {
   if (!relationships || relationships.length === 0) return <Unavailable label="relationships" />;
 

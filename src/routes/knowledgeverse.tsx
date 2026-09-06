@@ -87,12 +87,33 @@ function Knowledgeverse() {
       />
 
       <div className="grid gap-5 lg:grid-cols-5">
-        <Panel eyebrow="World model" title="Resonance field" className="lg:col-span-3">
+        <Panel
+          eyebrow="World model"
+          title="Resonance field"
+          className="lg:col-span-3"
+          aside={
+            <button
+              type="button"
+              onClick={() => setLabels((v) => !v)}
+              aria-pressed={labels}
+              className={
+                "rounded-sm border px-2.5 py-1 font-mono text-[0.62rem] tracking-[0.18em] uppercase transition-colors " +
+                (labels
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground")
+              }
+            >
+              labels
+            </button>
+          }
+        >
           <ResonanceField
             relationships={data.worldModel.relationships}
             selected={selectedNode}
+            showLabels={labels}
             onSelect={(id) => setSelectedNode((prev) => (prev === id ? undefined : id))}
           />
+
           <div className="mt-4 space-y-3">
             {(data.worldModel.relationships ?? [])
               .filter((r) => !selectedNode || r.a === selectedNode || r.b === selectedNode)

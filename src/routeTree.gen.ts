@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as KnowledgeverseRouteImport } from './routes/knowledgeverse'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KnowledgeverseRoute = KnowledgeverseRouteImport.update({
+  id: '/knowledgeverse',
+  path: '/knowledgeverse',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/knowledgeverse': typeof KnowledgeverseRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/knowledgeverse': typeof KnowledgeverseRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/knowledgeverse': typeof KnowledgeverseRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/knowledgeverse'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/knowledgeverse'
+  id: '__root__' | '/' | '/knowledgeverse'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  KnowledgeverseRoute: typeof KnowledgeverseRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/knowledgeverse': {
+      id: '/knowledgeverse'
+      path: '/knowledgeverse'
+      fullPath: '/knowledgeverse'
+      preLoaderRoute: typeof KnowledgeverseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  KnowledgeverseRoute: KnowledgeverseRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -12,9 +12,10 @@ import {
   Unavailable,
 } from "@/components/ascension/chrome";
 import { LineageSpine, ResonanceField } from "@/components/ascension/graph";
+import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
 import {
-  ascensionStateQuery,
+  surfaceQuery,
   basename,
   buildMeaningElements,
   knowledgeFormBranch,
@@ -40,12 +41,9 @@ export const Route = createFileRoute("/knowledgeverse")({
       },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(ascensionStateQuery),
-  errorComponent: ({ error }) => (
-    <p role="alert" className="font-mono text-sm text-destructive">
-      {error.message}
-    </p>
-  ),
+  loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("knowledgeverse")),
+  errorComponent: ({ error }) => <SourceFailure error={error} surface="Knowledgeverse" />,
+  pendingComponent: () => <ChamberLoading surface="Knowledgeverse" />,
   notFoundComponent: () => <p className="font-mono text-sm">No Knowledgeverse state published.</p>,
   component: Knowledgeverse,
 });
@@ -60,7 +58,7 @@ const CATEGORY_TONE: Record<string, "photon" | "gold" | "violet" | "neutral"> = 
 };
 
 function Knowledgeverse() {
-  const { data } = useSuspenseQuery(ascensionStateQuery);
+  const { data } = useSuspenseQuery(surfaceQuery("knowledgeverse"));
   const mes = useMemo(() => buildMeaningElements(data), [data]);
   const [category, setCategory] = useState<string>("all");
   const [openForm, setOpenForm] = useState<string | null>(data.knowledgeForms[0]?.file ?? null);

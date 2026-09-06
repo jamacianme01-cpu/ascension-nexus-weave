@@ -12,6 +12,7 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
+import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect, Stage } from "@/components/ascension/inspect";
 import {
   BranchFan,
@@ -21,7 +22,7 @@ import {
   TreeGlyph,
   type EngineSignal,
 } from "@/components/ascension/flow";
-import { ascensionStateQuery, basename, buildMeaningElements } from "@/lib/ascension/state";
+import { surfaceQuery, basename, buildMeaningElements } from "@/lib/ascension/state";
 import chamberPlate from "@/assets/chamber.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -43,18 +44,15 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(ascensionStateQuery),
-  errorComponent: ({ error }) => (
-    <p role="alert" className="font-mono text-sm text-destructive">
-      {error.message}
-    </p>
-  ),
+  loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("chamber")),
+  errorComponent: ({ error }) => <SourceFailure error={error} surface="Chamber" />,
+  pendingComponent: () => <ChamberLoading surface="Chamber" />,
   notFoundComponent: () => <p className="font-mono text-sm">No chamber state published.</p>,
   component: Chamber,
 });
 
 function Chamber() {
-  const { data } = useSuspenseQuery(ascensionStateQuery);
+  const { data } = useSuspenseQuery(surfaceQuery("chamber"));
   const { chamber, semantic, entities, worldModel } = data;
   const t = chamber.last_transition;
   const branches = t?.branches ?? [];

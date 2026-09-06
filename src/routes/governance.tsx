@@ -12,9 +12,10 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
+import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
 import { FlowLegend } from "@/components/ascension/flow";
-import { ascensionStateQuery, basename } from "@/lib/ascension/state";
+import { surfaceQuery, basename } from "@/lib/ascension/state";
 import type { ConstraintRecord } from "@/lib/ascension/contracts";
 
 export const Route = createFileRoute("/governance")({
@@ -34,12 +35,9 @@ export const Route = createFileRoute("/governance")({
       },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(ascensionStateQuery),
-  errorComponent: ({ error }) => (
-    <p role="alert" className="font-mono text-sm text-destructive">
-      {error.message}
-    </p>
-  ),
+  loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("governance")),
+  errorComponent: ({ error }) => <SourceFailure error={error} surface="Governance" />,
+  pendingComponent: () => <ChamberLoading surface="Governance" />,
   notFoundComponent: () => <p className="font-mono text-sm">No governance state published.</p>,
   component: Governance,
 });
@@ -92,7 +90,7 @@ function ConstraintCard({ c }: { c: ConstraintRecord }) {
 
 
 function Governance() {
-  const { data } = useSuspenseQuery(ascensionStateQuery);
+  const { data } = useSuspenseQuery(surfaceQuery("governance"));
   const registry = Object.values(data.constraints.constraints ?? {});
   const t = data.chamber.last_transition;
   const gov = data.semantic.transition?.constraint_governance ?? t?.constraint_governance;

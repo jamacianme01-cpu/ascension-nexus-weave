@@ -11,8 +11,9 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
+import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
-import { ascensionStateQuery, basename, chainLinkIntact } from "@/lib/ascension/state";
+import { surfaceQuery, basename, chainLinkIntact } from "@/lib/ascension/state";
 
 export const Route = createFileRoute("/ledger")({
   head: () => ({
@@ -31,18 +32,15 @@ export const Route = createFileRoute("/ledger")({
       },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(ascensionStateQuery),
-  errorComponent: ({ error }) => (
-    <p role="alert" className="font-mono text-sm text-destructive">
-      {error.message}
-    </p>
-  ),
+  loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("ledger")),
+  errorComponent: ({ error }) => <SourceFailure error={error} surface="Verified Δ ledger" />,
+  pendingComponent: () => <ChamberLoading surface="Verified Δ ledger" />,
   notFoundComponent: () => <p className="font-mono text-sm">No ledger published.</p>,
   component: Ledger,
 });
 
 function Ledger() {
-  const { data } = useSuspenseQuery(ascensionStateQuery);
+  const { data } = useSuspenseQuery(surfaceQuery("ledger"));
   const ledger = data.ledger;
   const intact = ledger.every((record, i) => chainLinkIntact(ledger[i - 1], record));
 

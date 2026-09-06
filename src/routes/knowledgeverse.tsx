@@ -209,13 +209,14 @@ function Knowledgeverse() {
                 <button
                   type="button"
                   onClick={() => setOpenForm(open ? null : form.file)}
-                  className="flex w-full flex-wrap items-center justify-between gap-3 px-3 py-3 text-left"
+                  className="flex min-h-11 w-full flex-wrap items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-primary/5"
+                  aria-expanded={open}
                 >
-                  <span>
-                    <span className="font-display text-sm tracking-wide text-foreground">
+                  <span className="min-w-0 flex-1">
+                    <span className="font-display text-sm tracking-wide break-words text-foreground">
                       {knowledgeFormTitle(form) ?? form.file}
                     </span>
-                    <span className="mt-1 block font-mono text-[0.65rem] text-muted-foreground">
+                    <span className="mt-1 block font-mono text-[0.65rem] break-all text-muted-foreground">
                       {form.file}
                     </span>
                   </span>

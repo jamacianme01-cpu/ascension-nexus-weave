@@ -18,7 +18,7 @@ export function Panel({
   className?: string | undefined;
 }) {
   return (
-    <section className={cn("glass relative rounded-lg", className)}>
+    <section className={cn("glass crystal-frame relative rounded-lg transition-shadow duration-300", className)}>
       <div className="gold-rule absolute inset-x-4 top-0 h-px opacity-70" />
       {(eyebrow || title || aside) && (
         <header className="flex flex-wrap items-end justify-between gap-3 px-5 pt-5">

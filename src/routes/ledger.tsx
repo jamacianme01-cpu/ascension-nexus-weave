@@ -11,8 +11,9 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
+import { ChamberLoading, IntegrityFailure, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
-import { ascensionStateQuery, basename, chainLinkIntact } from "@/lib/ascension/state";
+import { surfaceQuery, basename, chainLinkIntact } from "@/lib/ascension/state";
 
 export const Route = createFileRoute("/ledger")({
   head: () => ({
@@ -31,18 +32,15 @@ export const Route = createFileRoute("/ledger")({
       },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(ascensionStateQuery),
-  errorComponent: ({ error }) => (
-    <p role="alert" className="font-mono text-sm text-destructive">
-      {error.message}
-    </p>
-  ),
+  loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("ledger")),
+  errorComponent: ({ error }) => <SourceFailure error={error} surface="Verified Δ ledger" />,
+  pendingComponent: () => <ChamberLoading surface="Verified Δ ledger" />,
   notFoundComponent: () => <p className="font-mono text-sm">No ledger published.</p>,
   component: Ledger,
 });
 
 function Ledger() {
-  const { data } = useSuspenseQuery(ascensionStateQuery);
+  const { data } = useSuspenseQuery(surfaceQuery("ledger"));
   const ledger = data.ledger;
   const intact = ledger.every((record, i) => chainLinkIntact(ledger[i - 1], record));
 
@@ -61,6 +59,13 @@ function Ledger() {
           </div>
         }
       />
+
+      {!intact && (
+        <IntegrityFailure
+          what="Hash-chain continuity broken in the published ledger."
+          detail="a record's previous_hash does not equal the prior record_hash"
+        />
+      )}
 
       <div className="space-y-5">
         {ledger.map((record, i) => {
@@ -81,7 +86,7 @@ function Ledger() {
                 </div>
               }
             >
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="-mx-1 flex snap-x items-center gap-3 overflow-x-auto px-1 pb-1 lg:flex-wrap lg:overflow-visible">
                 {[
                   ["State", record.previous_state_hash ? "carried" : undefined],
                   ["Event", record.branch_id?.split(":").pop()],
@@ -97,7 +102,7 @@ function Ledger() {
                   ],
                   ["New state", record.persisted_hash ? "persisted" : undefined],
                 ].map(([label, value], step) => (
-                  <span key={String(label)} className="flex items-center gap-3">
+                  <span key={String(label)} className="flex shrink-0 snap-start items-center gap-3">
                     {step > 0 && <span className="font-mono text-xs text-gold/70">→</span>}
                     <span className="glass-inset rounded-md px-3 py-2">
                       <span className="label-eyebrow block">{String(label)}</span>

@@ -12,6 +12,7 @@ import {
   StatusPill,
   Unavailable,
 } from "@/components/ascension/chrome";
+import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect, Stage } from "@/components/ascension/inspect";
 import {
   BranchFan,
@@ -21,7 +22,7 @@ import {
   TreeGlyph,
   type EngineSignal,
 } from "@/components/ascension/flow";
-import { ascensionStateQuery, basename, buildMeaningElements } from "@/lib/ascension/state";
+import { surfaceQuery, basename, buildMeaningElements } from "@/lib/ascension/state";
 import chamberPlate from "@/assets/chamber.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -43,18 +44,15 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(ascensionStateQuery),
-  errorComponent: ({ error }) => (
-    <p role="alert" className="font-mono text-sm text-destructive">
-      {error.message}
-    </p>
-  ),
+  loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("chamber")),
+  errorComponent: ({ error }) => <SourceFailure error={error} surface="Chamber" />,
+  pendingComponent: () => <ChamberLoading surface="Chamber" />,
   notFoundComponent: () => <p className="font-mono text-sm">No chamber state published.</p>,
   component: Chamber,
 });
 
 function Chamber() {
-  const { data } = useSuspenseQuery(ascensionStateQuery);
+  const { data } = useSuspenseQuery(surfaceQuery("chamber"));
   const { chamber, semantic, entities, worldModel } = data;
   const t = chamber.last_transition;
   const branches = t?.branches ?? [];
@@ -91,14 +89,15 @@ function Chamber() {
   return (
     <>
       {/* ═══ ENTRY ═══ */}
-      <section className="relative overflow-hidden rounded-lg border border-border/70">
+      <section className="crystal-frame relative overflow-hidden rounded-lg">
         <img
           src={chamberPlate.url}
           alt="The ASCENSION chamber: a crystalline tree of knowledge above concentric metallic platforms"
           className="absolute inset-0 size-full object-cover opacity-45"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-void/55 via-void/80 to-void" />
-        <div className="relative px-5 py-14 sm:px-10 sm:py-20">
+        <span className="gold-rule absolute inset-x-8 top-0 z-10 h-px opacity-80" />
+        <div className="relative px-5 py-12 sm:px-10 sm:py-20">
           <p className="label-eyebrow">Ascension · Entry</p>
           <h1 className="text-etched mt-3 font-display text-3xl leading-tight text-foreground uppercase sm:text-5xl">
             Everything is connected

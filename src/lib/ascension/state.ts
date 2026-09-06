@@ -1,52 +1,49 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import { getAscensionDataSource, type AscensionDataSource } from "./datasource";
 import type {
   AscensionState,
-  ChamberState,
-  ConstraintsFile,
-  EntitiesFile,
-  EvidenceFile,
   KnowledgeForm,
   MeaningElementRef,
-  SemanticState,
   Transition,
-  WorldModel,
 } from "./contracts";
 
 /**
- * Observation-only loader. Reads the published/demo state fixtures copied from
- * ASCENSION_CORE/state_demo. There is no write path anywhere in this module.
+ * Observation-only read layer. All reads go through the AscensionDataSource
+ * boundary, so the surfaces never know whether state came from published
+ * fixtures or (later) the read-only Observation Gateway. No write path exists.
  */
-export async function loadAscensionState(): Promise<AscensionState> {
-  const [chamber, semantic, entities, constraints, evidence, worldModel, ledger, knowledgeForms] =
-    await Promise.all([
-      import("@/data/ascension/chamber_state.json"),
-      import("@/data/ascension/semantic_state.json"),
-      import("@/data/ascension/entities.json"),
-      import("@/data/ascension/constraints.json"),
-      import("@/data/ascension/evidence.json"),
-      import("@/data/ascension/world_model.json"),
-      import("@/data/ascension/ledger.json"),
-      import("@/data/ascension/knowledge_forms.json"),
-    ]);
+export type AscensionSurfaceName =
+  | "chamber"
+  | "knowledgeverse"
+  | "pathways"
+  | "governance"
+  | "ledger";
 
-  return {
-    chamber: chamber.default as ChamberState,
-    semantic: semantic.default as SemanticState,
-    entities: entities.default as EntitiesFile,
-    constraints: constraints.default as ConstraintsFile,
-    evidence: evidence.default as EvidenceFile,
-    worldModel: worldModel.default as WorldModel,
-    ledger: ledger.default as Transition[],
-    knowledgeForms: knowledgeForms.default as KnowledgeForm[],
-  };
+export function surfaceQuery(surface: AscensionSurfaceName) {
+  return queryOptions({
+    queryKey: ["ascension", surface],
+    queryFn: (): Promise<AscensionState> => {
+      const source: AscensionDataSource = getAscensionDataSource();
+      return source[surface]();
+    },
+    staleTime: 30_000,
+    retry: false,
+  });
 }
 
-export const ascensionStateQuery = queryOptions({
-  queryKey: ["ascension", "published-state"],
-  queryFn: loadAscensionState,
-  staleTime: Infinity,
-});
+export function libraryCardQuery(entityId: string) {
+  return queryOptions({
+    queryKey: ["ascension", "library-card", entityId],
+    queryFn: () => getAscensionDataSource().libraryCard(entityId),
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/** Legacy alias kept so existing callers resolve to the chamber surface. */
+export const ascensionStateQuery = surfaceQuery("chamber");
+
 
 /** ME ids follow `ME:v1-text:<lexeme-slug>:<category>:<hash>`. */
 export function parseMeId(meId: string): {

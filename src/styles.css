@@ -205,3 +205,64 @@
   stroke-dasharray: 4 10;
   animation: drift-line 8s linear infinite;
 }
+
+/* Structural gold/bronze frame with bevelled crystalline edges. */
+@utility crystal-frame {
+  position: relative;
+  border: 1px solid oklch(0.72 0.09 84 / 30%);
+  background:
+    linear-gradient(155deg, oklch(0.36 0.06 210 / 30%) 0%, oklch(0.17 0.03 258 / 70%) 55%, oklch(0.13 0.026 258 / 86%) 100%);
+  box-shadow:
+    inset 0 1px 0 oklch(0.96 0.03 210 / 20%),
+    inset 0 -1px 0 oklch(0.05 0.02 258 / 70%),
+    inset 0 0 48px oklch(0.55 0.11 200 / 9%),
+    0 30px 60px -30px oklch(0.04 0.02 258 / 92%);
+}
+
+/* Experience layer: brighter, more dimensional, larger air. */
+@utility experience-layer {
+  background:
+    radial-gradient(120% 100% at 0% 0%, oklch(0.4 0.08 205 / 20%) 0%, transparent 62%),
+    linear-gradient(180deg, oklch(0.22 0.035 258 / 45%), oklch(0.14 0.028 258 / 72%));
+  border-left: 1px solid oklch(0.86 0.14 196 / 24%);
+}
+
+/* Inspection layer: recessed, cooler, technical. */
+@utility inspection-layer {
+  background: linear-gradient(180deg, oklch(0.13 0.024 258 / 88%), oklch(0.11 0.022 258 / 94%));
+  border: 1px solid oklch(0.72 0.09 84 / 18%);
+  box-shadow: inset 0 2px 12px oklch(0.03 0.02 258 / 70%);
+}
+
+@utility photon-track {
+  background: linear-gradient(90deg, transparent, var(--color-photon-dim), var(--color-photon), transparent);
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-photon);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: oklch(0.86 0.14 196 / 30%);
+  }
+}
+
+/* Motion communicates flow; it must never be required to read the state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .alive,
+  .flowing-line {
+    opacity: 1 !important;
+  }
+}

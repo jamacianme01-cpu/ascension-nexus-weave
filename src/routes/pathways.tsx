@@ -12,9 +12,10 @@ import {
   Unavailable,
   verdictTone,
 } from "@/components/ascension/chrome";
+import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
 import { BranchFan, FlowLegend } from "@/components/ascension/flow";
-import { ascensionStateQuery } from "@/lib/ascension/state";
+import { surfaceQuery } from "@/lib/ascension/state";
 
 export const Route = createFileRoute("/pathways")({
   head: () => ({
@@ -33,18 +34,15 @@ export const Route = createFileRoute("/pathways")({
       },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(ascensionStateQuery),
-  errorComponent: ({ error }) => (
-    <p role="alert" className="font-mono text-sm text-destructive">
-      {error.message}
-    </p>
-  ),
+  loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("pathways")),
+  errorComponent: ({ error }) => <SourceFailure error={error} surface="Pathways" />,
+  pendingComponent: () => <ChamberLoading surface="Pathways" />,
   notFoundComponent: () => <p className="font-mono text-sm">No pathway state published.</p>,
   component: Pathways,
 });
 
 function Pathways() {
-  const { data } = useSuspenseQuery(ascensionStateQuery);
+  const { data } = useSuspenseQuery(surfaceQuery("pathways"));
   const t = data.chamber.last_transition;
   const branches = t?.branches ?? [];
   const executedId = t?.branch_id;

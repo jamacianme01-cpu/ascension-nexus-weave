@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as KnowledgeverseRouteImport } from './routes/knowledgeverse'
+import { Route as PathwaysRouteImport } from './routes/pathways'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const KnowledgeverseRoute = KnowledgeverseRouteImport.update({
   path: '/knowledgeverse',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PathwaysRoute = PathwaysRouteImport.update({
+  id: '/pathways',
+  path: '/pathways',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
+  '/pathways': typeof PathwaysRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
+  '/pathways': typeof PathwaysRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
+  '/pathways': typeof PathwaysRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/knowledgeverse'
+  fullPaths: '/' | '/knowledgeverse' | '/pathways'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/knowledgeverse'
-  id: '__root__' | '/' | '/knowledgeverse'
+  to: '/' | '/knowledgeverse' | '/pathways'
+  id: '__root__' | '/' | '/knowledgeverse' | '/pathways'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   KnowledgeverseRoute: typeof KnowledgeverseRoute
+  PathwaysRoute: typeof PathwaysRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeverseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pathways': {
+      id: '/pathways'
+      path: '/pathways'
+      fullPath: '/pathways'
+      preLoaderRoute: typeof PathwaysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   KnowledgeverseRoute: KnowledgeverseRoute,
+  PathwaysRoute: PathwaysRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

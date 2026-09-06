@@ -51,25 +51,38 @@ export const ascensionStateQuery = queryOptions({
 /** ME ids follow `ME:v1-text:<lexeme-slug>:<category>:<hash>`. */
 export function parseMeId(meId: string): {
   me_id: string;
-  scheme?: string;
-  lexeme?: string;
-  category?: string;
-  hash?: string;
+  scheme?: string | undefined;
+  lexeme?: string | undefined;
+  category?: string | undefined;
+  hash?: string | undefined;
 } {
   const parts = meId.split(":");
-  if (parts[0] !== "ME" || parts.length < 5) return { me_id: meId };
-  return {
-    me_id: meId,
-    scheme: parts[1],
-    lexeme: parts[2]?.replace(/-/g, " "),
-    category: parts[3],
-    hash: parts[4],
-  };
+  if (parts[0] !== "ME") return { me_id: meId };
+  // Two id schemes exist in the published state: the current
+  // `ME:<scheme>:<lexeme>:<category>:<hash>` and a legacy `ME:<lexeme>:<category>:<hash>`.
+  if (parts.length >= 5) {
+    return {
+      me_id: meId,
+      scheme: parts[1],
+      lexeme: parts[2]?.replace(/-/g, " "),
+      category: parts[3],
+      hash: parts[4],
+    };
+  }
+  if (parts.length === 4) {
+    return {
+      me_id: meId,
+      lexeme: parts[1]?.replace(/-/g, " "),
+      category: parts[2],
+      hash: parts[3],
+    };
+  }
+  return { me_id: meId };
 }
 
 export type MeaningElement = ReturnType<typeof parseMeId> & {
-  text?: string;
-  source?: string;
+  text?: string | undefined;
+  source?: string | undefined;
   usedBy: string[];
 };
 
@@ -117,9 +130,9 @@ export function parseKnowledgeFormMes(form: KnowledgeForm): MeaningElementRef[] 
     if (!match) return;
     const textLine = lines[i + 1]?.match(/^-\s*text:\s*(.+)$/);
     refs.push({
-      me_id: match[2],
-      category: match[1],
-      text: textLine ? textLine[1].trim() : undefined,
+      me_id: match[2]!,
+      category: match[1]!,
+      text: textLine?.[1]?.trim(),
     });
   });
   return refs;

@@ -11,11 +11,11 @@ export function Panel({
   children,
   className,
 }: {
-  eyebrow?: string;
-  title?: string;
-  aside?: ReactNode;
+  eyebrow?: string | undefined;
+  title?: string | undefined;
+  aside?: ReactNode | undefined;
   children: ReactNode;
-  className?: string;
+  className?: string | undefined;
 }) {
   return (
     <section className={cn("glass relative rounded-lg", className)}>
@@ -36,7 +36,7 @@ export function Panel({
   );
 }
 
-export function Unavailable({ label }: { label?: string }) {
+export function Unavailable({ label }: { label?: string | undefined }) {
   return (
     <span className="font-mono text-xs tracking-wide text-muted-foreground/70 italic">
       unavailable{label ? ` · ${label}` : ""}
@@ -51,9 +51,9 @@ export function Field({
   className,
 }: {
   label: string;
-  value?: ReactNode;
-  mono?: boolean;
-  className?: string;
+  value?: ReactNode | undefined;
+  mono?: boolean | undefined;
+  className?: string | undefined;
 }) {
   const empty = value === undefined || value === null || value === "";
   return (
@@ -88,9 +88,9 @@ export function Pill({
   className,
 }: {
   children: ReactNode;
-  tone?: Tone;
-  glow?: boolean;
-  className?: string;
+  tone?: Tone | undefined;
+  glow?: boolean | undefined;
+  className?: string | undefined;
 }) {
   return (
     <span
@@ -107,14 +107,14 @@ export function Pill({
   );
 }
 
-export function verdictTone(value?: string): Tone {
+export function verdictTone(value?: string | undefined): Tone {
   const v = value?.toUpperCase() ?? "";
   if (["PASS", "ACCEPTED", "VERIFIED", "TRUE"].includes(v)) return "photon";
   if (["FAIL", "REJECTED", "MISMATCH", "FALSE"].includes(v)) return "danger";
   return "gold";
 }
 
-export function StatusPill({ label, value }: { label: string; value?: string }) {
+export function StatusPill({ label, value }: { label: string; value?: string | undefined }) {
   return (
     <div className="flex items-center gap-2">
       <span className="label-eyebrow">{label}</span>
@@ -123,7 +123,7 @@ export function StatusPill({ label, value }: { label: string; value?: string }) 
   );
 }
 
-export function HashChip({ value, label }: { value?: string | null; label?: string }) {
+export function HashChip({ value, label }: { value?: string | null | undefined; label?: string | undefined }) {
   if (!value) return <Unavailable label={label} />;
   return (
     <span
@@ -141,7 +141,7 @@ const deltaMeta = {
   W: { name: "Wisdom", tone: "text-gold", bar: "bg-gold" },
 } as const;
 
-export function DeltaMeters({ delta, max }: { delta?: Delta; max?: number }) {
+export function DeltaMeters({ delta, max }: { delta?: Delta | undefined; max?: number | undefined }) {
   if (!delta) return <Unavailable label="delta" />;
   const ceiling = max ?? Math.max(delta.K, delta.U, delta.W, 1);
   return (
@@ -169,7 +169,7 @@ export function DeltaMeters({ delta, max }: { delta?: Delta; max?: number }) {
   );
 }
 
-export function Meter({ label, value }: { label: string; value?: number }) {
+export function Meter({ label, value }: { label: string; value?: number | undefined }) {
   return (
     <div className="glass-inset rounded-md px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">
@@ -188,7 +188,7 @@ export function Meter({ label, value }: { label: string; value?: number }) {
   );
 }
 
-export function List({ items, tone = "photon" }: { items?: string[]; tone?: Tone }) {
+export function List({ items, tone = "photon" }: { items?: string[] | undefined; tone?: Tone | undefined }) {
   if (!items || items.length === 0) return <Unavailable />;
   const dot =
     tone === "danger" ? "bg-destructive" : tone === "gold" ? "bg-gold" : "bg-primary";
@@ -212,8 +212,8 @@ export function PageHeader({
 }: {
   eyebrow: string;
   title: string;
-  intent?: string;
-  right?: ReactNode;
+  intent?: string | undefined;
+  right?: ReactNode | undefined;
 }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 pb-5">

@@ -490,6 +490,27 @@ function Chamber() {
           </div>
         </Panel>
       </div>
+
+      {live && (
+        <div className="space-y-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <LiveSurface
+              eyebrow="Gateway"
+              title="Observation status"
+              path="/api/ascension/v1/status"
+              response={live.surfaces["status"]}
+            />
+            <LiveSurface
+              eyebrow="Manifestation"
+              title="Same-revision specifications"
+              path="/api/ascension/v1/manifestation"
+              response={live.surfaces["manifestation"]}
+            />
+          </div>
+          <LiveController live={live} />
+          <LiveGovernedState live={live} />
+        </div>
+      )}
     </>
   );
 }

@@ -67,8 +67,10 @@ function Chamber() {
     (b) => b.status === "recommended" || b.evaluation?.recommended_by,
   );
   const operator = entities[chamber.entity_id ?? ""] ?? Object.values(entities)[0];
-  const destinyId = t?.destiny_id;
-  const cycles = destinyId ? operator?.destinies?.[destinyId]?.cycles : undefined;
+  const live = data.live;
+  const liveForm = live?.forms[0];
+  const destinyId = t?.destiny_id ?? (typeof liveForm?.destiny_id === "string" ? liveForm.destiny_id : undefined);
+  const cycles = t?.destiny_id ? operator?.destinies?.[t.destiny_id]?.cycles : undefined;
   const mes = buildMeaningElements(data);
 
   const engines: EngineSignal[] = [

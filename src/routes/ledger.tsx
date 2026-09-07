@@ -13,6 +13,7 @@ import {
 } from "@/components/ascension/chrome";
 import { ChamberLoading, IntegrityFailure, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
+import { LiveLedger, LiveProvenance } from "@/components/ascension/live";
 import { surfaceQuery, basename, chainLinkIntact } from "@/lib/ascension/state";
 
 export const Route = createFileRoute("/ledger")({

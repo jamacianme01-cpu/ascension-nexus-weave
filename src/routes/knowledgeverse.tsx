@@ -79,6 +79,7 @@ function Knowledgeverse() {
 
   return (
     <>
+      {data.live && <LiveProvenance live={data.live} />}
       <PageHeader
         eyebrow="Surface 02"
         title="Knowledgeverse"

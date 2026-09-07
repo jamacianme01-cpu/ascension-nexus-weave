@@ -14,6 +14,7 @@ import {
 } from "@/components/ascension/chrome";
 import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
+import { LiveProvenance, LiveSurface } from "@/components/ascension/live";
 import { BranchFan, FlowLegend } from "@/components/ascension/flow";
 import { surfaceQuery } from "@/lib/ascension/state";
 
@@ -56,6 +57,7 @@ function Pathways() {
 
   return (
     <>
+      {data.live && <LiveProvenance live={data.live} />}
       <PageHeader
         eyebrow="Surface 03"
         title="Pathways · DTF / Transverse"
@@ -232,6 +234,23 @@ function Pathways() {
           </div>
         )}
       </Panel>
+
+      {data.live && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <LiveSurface
+            eyebrow="DTF / Transverse"
+            title="Committed pathway & execution"
+            path="/api/ascension/v1/pathways"
+            response={data.live.surfaces["pathways"]}
+          />
+          <LiveSurface
+            eyebrow="Outcome Predictor · Balance · Wisdom"
+            title="Published outcome summaries"
+            path="/api/ascension/v1/outcomes"
+            response={data.live.surfaces["outcomes"]}
+          />
+        </div>
+      )}
     </>
   );
 }

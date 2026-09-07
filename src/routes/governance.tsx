@@ -14,6 +14,7 @@ import {
 } from "@/components/ascension/chrome";
 import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
+import { LiveProvenance, LiveSurface } from "@/components/ascension/live";
 import { FlowLegend } from "@/components/ascension/flow";
 import { surfaceQuery, basename } from "@/lib/ascension/state";
 import type { ConstraintRecord } from "@/lib/ascension/contracts";

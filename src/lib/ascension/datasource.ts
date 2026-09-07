@@ -238,16 +238,20 @@ function liveState(live: LiveObservation): AscensionState {
   for (const form of live.forms) {
     entities[form.entity_id] = { entity_id: form.entity_id, sid: form.sid };
   }
+  const outcomeStatus = typeof runtime?.["status"] === "string" ? (runtime["status"] as string) : undefined;
+  const verification =
+    typeof provenance["verification_status"] === "string"
+      ? (provenance["verification_status"] as string)
+      : undefined;
+  const chamber: AscensionState["chamber"] = {};
+  if (outcomeStatus !== undefined) chamber.outcome_status = outcomeStatus;
+  if (verification !== undefined) chamber.verification_result = verification;
+  if (live.publishedAt !== undefined) chamber.updated_at = live.publishedAt;
+  const semantic: AscensionState["semantic"] = {};
+  if (live.publishedAt !== undefined) semantic.updated_at = live.publishedAt;
   return {
-    chamber: {
-      outcome_status: typeof runtime?.["status"] === "string" ? (runtime["status"] as string) : undefined,
-      verification_result:
-        typeof provenance["verification_status"] === "string"
-          ? (provenance["verification_status"] as string)
-          : undefined,
-      updated_at: live.publishedAt,
-    },
-    semantic: { updated_at: live.publishedAt },
+    chamber,
+    semantic,
     entities,
     constraints: {},
     evidence: {},

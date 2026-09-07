@@ -1,4 +1,22 @@
 import type { AscensionState, EntityRecord } from "./contracts";
+import type { Json, SurfaceResponse } from "./observation-v1";
+import {
+  gatewayBaseUrl,
+  getController,
+  getGalaxyBridges,
+  getGovernance,
+  getKnowledgeverse,
+  getLedger,
+  getLibraryCard,
+  getManifestation,
+  getOutcomes,
+  getPathways,
+  getSnapshot,
+  getStatus,
+  toLiveObservation,
+  type LiveObservation,
+} from "./gateway";
+import { AscensionSourceError } from "./errors";
 
 /**
  * Data-source boundary for the ASCENSION observation console.

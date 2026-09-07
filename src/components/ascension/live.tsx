@@ -74,16 +74,18 @@ export function LiveProvenance({ live }: { live: LiveObservation }) {
 
 /** The separate LIVE_CONTROLLER read — never merged into a governed revision. */
 export function LiveController({ live }: { live: LiveObservation }) {
-  const controller = live.controller;
+  const raw = live.controller;
+  const failed = raw && !("availability" in raw) ? raw : undefined;
+  const controller = raw && "availability" in raw ? raw : undefined;
   return (
     <Panel eyebrow="Unreal controller · separate source" title="LIVE_CONTROLLER state">
-      {!controller ? (
+      {!raw ? (
         <Unavailable label="controller not read on this surface" />
-      ) : controller.availability !== "available" ? (
+      ) : failed || !controller || controller.availability !== "available" ? (
         <div className="space-y-2">
           <Pill tone="gold">UNAVAILABLE</Pill>
           <p className="font-mono text-[0.68rem] text-muted-foreground">
-            {controller.error ?? "controller state unavailable"}
+            {failed?.error ?? controller?.error ?? "controller state unavailable"}
           </p>
         </div>
       ) : (

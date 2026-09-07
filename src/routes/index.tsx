@@ -50,6 +50,7 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("chamber")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Chamber" />,
   pendingComponent: () => <ChamberLoading surface="Chamber" />,

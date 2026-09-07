@@ -35,6 +35,7 @@ export const Route = createFileRoute("/pathways")({
       },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("pathways")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Pathways" />,
   pendingComponent: () => <ChamberLoading surface="Pathways" />,

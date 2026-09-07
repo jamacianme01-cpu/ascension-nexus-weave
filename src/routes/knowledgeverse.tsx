@@ -42,6 +42,7 @@ export const Route = createFileRoute("/knowledgeverse")({
       },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("knowledgeverse")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Knowledgeverse" />,
   pendingComponent: () => <ChamberLoading surface="Knowledgeverse" />,

@@ -36,6 +36,7 @@ export const Route = createFileRoute("/governance")({
       },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("governance")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Governance" />,
   pendingComponent: () => <ChamberLoading surface="Governance" />,

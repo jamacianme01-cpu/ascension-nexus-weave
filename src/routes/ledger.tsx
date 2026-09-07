@@ -33,6 +33,7 @@ export const Route = createFileRoute("/ledger")({
       },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("ledger")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Verified Δ ledger" />,
   pendingComponent: () => <ChamberLoading surface="Verified Δ ledger" />,

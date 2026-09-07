@@ -14,6 +14,7 @@ import {
 import { LineageSpine, ResonanceField } from "@/components/ascension/graph";
 import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
+import { LiveForms, LiveProvenance, LiveSurface } from "@/components/ascension/live";
 import {
   surfaceQuery,
   basename,
@@ -414,6 +415,18 @@ function Knowledgeverse() {
           </div>
         )}
       </Panel>
+
+      {data.live && (
+        <div className="space-y-5">
+          <LiveSurface
+            eyebrow="Knowledgeverse"
+            title="Live form specifications"
+            path="/api/ascension/v1/knowledgeverse"
+            response={data.live.surfaces["knowledgeverse"]}
+          />
+          <LiveForms live={data.live} />
+        </div>
+      )}
     </>
   );
 }

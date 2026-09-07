@@ -172,6 +172,8 @@ export type EntityRecord = {
   me_ids?: string[];
   chromosome?: unknown;
   genesis?: unknown;
+  /** Published Library Card payload as returned by the live gateway. */
+  live_card?: unknown;
 };
 
 export type EntitiesFile = Record<string, EntityRecord>;

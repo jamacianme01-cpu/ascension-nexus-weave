@@ -172,6 +172,8 @@ export type EntityRecord = {
   me_ids?: string[];
   chromosome?: unknown;
   genesis?: unknown;
+  /** Published Library Card payload as returned by the live gateway. */
+  live_card?: unknown;
 };
 
 export type EntitiesFile = Record<string, EntityRecord>;
@@ -237,4 +239,10 @@ export type AscensionState = {
   worldModel: WorldModel;
   ledger: Transition[];
   knowledgeForms: KnowledgeForm[];
+  /**
+   * Present only when the read came from the live Observation Gateway.
+   * Carries the governed publication verbatim (classification, revision,
+   * hashes, forms, surface payloads) plus the separate LIVE_CONTROLLER read.
+   */
+  live?: import("./gateway").LiveObservation | undefined;
 };

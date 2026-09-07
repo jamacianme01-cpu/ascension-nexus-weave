@@ -14,6 +14,7 @@ import {
 } from "@/components/ascension/chrome";
 import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
+import { LiveProvenance, LiveSurface } from "@/components/ascension/live";
 import { FlowLegend } from "@/components/ascension/flow";
 import { surfaceQuery, basename } from "@/lib/ascension/state";
 import type { ConstraintRecord } from "@/lib/ascension/contracts";
@@ -35,6 +36,7 @@ export const Route = createFileRoute("/governance")({
       },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("governance")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Governance" />,
   pendingComponent: () => <ChamberLoading surface="Governance" />,
@@ -99,6 +101,7 @@ function Governance() {
 
   return (
     <>
+      {data.live && <LiveProvenance live={data.live} />}
       <PageHeader
         eyebrow="Surface 04"
         title="Governance"
@@ -226,6 +229,23 @@ function Governance() {
           </div>
         </div>
       </Panel>
+
+      {data.live && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <LiveSurface
+            eyebrow="Guardian · AutoSync"
+            title="Recorded governance results"
+            path="/api/ascension/v1/governance"
+            response={data.live.surfaces["governance"]}
+          />
+          <LiveSurface
+            eyebrow="Galaxy Bridge"
+            title="Linked publisher"
+            path="/api/ascension/v1/galaxy-bridges"
+            response={data.live.surfaces["galaxy-bridges"]}
+          />
+        </div>
+      )}
     </>
   );
 }

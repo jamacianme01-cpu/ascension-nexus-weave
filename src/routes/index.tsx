@@ -22,6 +22,12 @@ import {
   TreeGlyph,
   type EngineSignal,
 } from "@/components/ascension/flow";
+import {
+  LiveController,
+  LiveGovernedState,
+  LiveProvenance,
+  LiveSurface,
+} from "@/components/ascension/live";
 import { surfaceQuery, basename, buildMeaningElements } from "@/lib/ascension/state";
 import chamberPlate from "@/assets/chamber.png.asset.json";
 
@@ -44,6 +50,7 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("chamber")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Chamber" />,
   pendingComponent: () => <ChamberLoading surface="Chamber" />,
@@ -61,8 +68,10 @@ function Chamber() {
     (b) => b.status === "recommended" || b.evaluation?.recommended_by,
   );
   const operator = entities[chamber.entity_id ?? ""] ?? Object.values(entities)[0];
-  const destinyId = t?.destiny_id;
-  const cycles = destinyId ? operator?.destinies?.[destinyId]?.cycles : undefined;
+  const live = data.live;
+  const liveForm = live?.forms[0];
+  const destinyId = t?.destiny_id ?? (typeof liveForm?.destiny_id === "string" ? liveForm.destiny_id : undefined);
+  const cycles = t?.destiny_id ? operator?.destinies?.[t.destiny_id]?.cycles : undefined;
   const mes = buildMeaningElements(data);
 
   const engines: EngineSignal[] = [
@@ -110,18 +119,23 @@ function Chamber() {
           <div className="mt-8 max-w-2xl">
             <p className="label-eyebrow">Destiny · active objective</p>
             <p className="text-etched mt-2 font-display text-xl leading-snug text-primary sm:text-2xl">
-              {chamber.destiny ?? <Unavailable label="destiny" />}
+              {chamber.destiny ?? destinyId ?? <Unavailable label="destiny" />}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Pill tone="photon" glow>
                 {chamber.outcome_status ?? "status unavailable"}
               </Pill>
               <Pill tone="gold">{chamber.verification_result ?? "verification unavailable"}</Pill>
-              <Pill tone="violet">{chamber.verified_transitions ?? "—"} verified transitions</Pill>
+              <Pill tone="violet">
+                {chamber.verified_transitions ?? live?.ledger?.entry_count ?? "—"} verified
+                transitions
+              </Pill>
             </div>
           </div>
         </div>
       </section>
+
+      {live && <LiveProvenance live={live} />}
 
       <FlowLegend
         steps={[
@@ -477,6 +491,27 @@ function Chamber() {
           </div>
         </Panel>
       </div>
+
+      {live && (
+        <div className="space-y-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <LiveSurface
+              eyebrow="Gateway"
+              title="Observation status"
+              path="/api/ascension/v1/status"
+              response={live.surfaces["status"]}
+            />
+            <LiveSurface
+              eyebrow="Manifestation"
+              title="Same-revision specifications"
+              path="/api/ascension/v1/manifestation"
+              response={live.surfaces["manifestation"]}
+            />
+          </div>
+          <LiveController live={live} />
+          <LiveGovernedState live={live} />
+        </div>
+      )}
     </>
   );
 }

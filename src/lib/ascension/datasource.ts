@@ -1,4 +1,22 @@
 import type { AscensionState, EntityRecord } from "./contracts";
+import type { Json, SurfaceResponse } from "./observation-v1";
+import {
+  gatewayBaseUrl,
+  getController,
+  getGalaxyBridges,
+  getGovernance,
+  getKnowledgeverse,
+  getLedger,
+  getLibraryCard,
+  getManifestation,
+  getOutcomes,
+  getPathways,
+  getSnapshot,
+  getStatus,
+  toLiveObservation,
+  type LiveObservation,
+} from "./gateway";
+import { AscensionSourceError } from "./errors";
 
 /**
  * Data-source boundary for the ASCENSION observation console.
@@ -25,26 +43,8 @@ export interface AscensionDataSource {
 
 export type SourceMode = "fixture" | "live";
 
-export type AscensionErrorCode =
-  | "LIVE_GATEWAY_NOT_CONFIGURED"
-  | "LIVE_STATE_UNAVAILABLE"
-  | "MALFORMED_SOURCE"
-  | "INTEGRITY_FAILURE";
-
-export class AscensionSourceError extends Error {
-  readonly code: AscensionErrorCode;
-  readonly detail?: string | undefined;
-  constructor(code: AscensionErrorCode, message: string, detail?: string) {
-    super(message);
-    this.name = "AscensionSourceError";
-    this.code = code;
-    this.detail = detail;
-  }
-}
-
-export function asAscensionError(error: unknown): AscensionSourceError | undefined {
-  return error instanceof AscensionSourceError ? error : undefined;
-}
+export { AscensionSourceError, asAscensionError } from "./errors";
+export type { AscensionErrorCode } from "./errors";
 
 /* ------------------------------------------------------------------ */
 /* Fixture implementation — published/demo state copied read-only       */
@@ -133,47 +133,133 @@ export class FixtureAscensionDataSource implements AscensionDataSource {
 }
 
 /* ------------------------------------------------------------------ */
-/* Live implementation — intentionally empty until the contract lands  */
+/* Live implementation — documented Observation Gateway v1 GET routes  */
 /* ------------------------------------------------------------------ */
 
 /**
- * Placeholder for the ASCENSION Observation Gateway.
+ * Reads the ASCENSION Observation Gateway v1 (read-only, GET only).
  *
- * NO endpoint schema, response shape, field name or value is invented here.
- * Every method fails with LIVE_GATEWAY_NOT_CONFIGURED until the real
- * read-only gateway contract is supplied. When it arrives, only this class
- * changes — the surfaces above it do not.
+ * Every route and field comes from ASCENSION_OBSERVATION_API_V1.md and the
+ * committed consumer contract. The snapshot is hash-verified before use, the
+ * governed publication is preserved verbatim, and the LIVE_CONTROLLER chamber
+ * read is kept in its own field — never merged into a governed revision.
+ * Values absent from the publication stay absent, so the surfaces render
+ * "unavailable" instead of an inferred value.
  */
 export class LiveAscensionDataSource implements AscensionDataSource {
   readonly mode = "live" as const;
-  readonly label = "ASCENSION Observation Gateway";
+  readonly label = `ASCENSION Observation Gateway · ${gatewayBaseUrl()}`;
 
-  private notConfigured(): never {
-    throw new AscensionSourceError(
-      "LIVE_GATEWAY_NOT_CONFIGURED",
-      "LIVE ASCENSION STATE UNAVAILABLE",
-      "No Observation Gateway contract is configured. Demo state is not substituted.",
-    );
+  private async base(): Promise<AscensionState> {
+    const snapshot = await getSnapshot();
+    return liveState(toLiveObservation(snapshot));
   }
 
-  chamber(): Promise<AscensionState> {
-    this.notConfigured();
+  async chamber(): Promise<AscensionState> {
+    const state = await this.base();
+    const [status, manifestation, controller] = await Promise.all([
+      getStatus().catch(surfaceError),
+      getManifestation().catch(surfaceError),
+      getController(),
+    ]);
+    const live = state.live!;
+    live.surfaces["status"] = status;
+    live.surfaces["manifestation"] = manifestation;
+    live.controller = controller;
+    return state;
   }
-  knowledgeverse(): Promise<AscensionState> {
-    this.notConfigured();
+
+  async knowledgeverse(): Promise<AscensionState> {
+    const state = await this.base();
+    state.live!.surfaces["knowledgeverse"] = await getKnowledgeverse().catch(surfaceError);
+    return state;
   }
-  pathways(): Promise<AscensionState> {
-    this.notConfigured();
+
+  async pathways(): Promise<AscensionState> {
+    const state = await this.base();
+    const [pathways, outcomes] = await Promise.all([
+      getPathways().catch(surfaceError),
+      getOutcomes().catch(surfaceError),
+    ]);
+    state.live!.surfaces["pathways"] = pathways;
+    state.live!.surfaces["outcomes"] = outcomes;
+    return state;
   }
-  governance(): Promise<AscensionState> {
-    this.notConfigured();
+
+  async governance(): Promise<AscensionState> {
+    const state = await this.base();
+    const [governance, bridges] = await Promise.all([
+      getGovernance().catch(surfaceError),
+      getGalaxyBridges().catch(surfaceError),
+    ]);
+    state.live!.surfaces["governance"] = governance;
+    state.live!.surfaces["galaxy-bridges"] = bridges;
+    return state;
   }
-  ledger(): Promise<AscensionState> {
-    this.notConfigured();
+
+  async ledger(): Promise<AscensionState> {
+    const state = await this.base();
+    state.live!.ledger = await getLedger().catch(() => undefined);
+    return state;
   }
-  libraryCard(): Promise<EntityRecord | undefined> {
-    this.notConfigured();
+
+  async libraryCard(entityId: string): Promise<EntityRecord | undefined> {
+    const card = await getLibraryCard(entityId);
+    if (!card.data) return undefined;
+    return { entity_id: entityId, live_card: card.data as unknown } as EntityRecord;
   }
+}
+
+/** A surface that failed is reported as unavailable, never fabricated. */
+function surfaceError(cause: unknown) {
+  return {
+    schema_version: "ascension.observation.v1",
+    generated_at: new Date().toISOString(),
+    availability: "unavailable",
+    error: cause instanceof Error ? cause.message : String(cause),
+    snapshot_revision: null,
+    snapshot_hash: null,
+    data: null,
+  } as SurfaceResponse;
+}
+
+/**
+ * Governed publication → surface view model.
+ *
+ * Only fields the contract guarantees are mapped. The legacy fixture-shaped
+ * containers stay empty for live reads: their field names belong to the demo
+ * contracts and must not be projected onto governed publication values.
+ */
+function liveState(live: LiveObservation): AscensionState {
+  const governed = live.governedState ?? {};
+  const runtime = governed["runtime"] as Record<string, Json> | undefined;
+  const provenance = live.provenance ?? {};
+  const entities: Record<string, EntityRecord> = {};
+  for (const form of live.forms) {
+    entities[form.entity_id] = { entity_id: form.entity_id, sid: form.sid };
+  }
+  const outcomeStatus = typeof runtime?.["status"] === "string" ? (runtime["status"] as string) : undefined;
+  const verification =
+    typeof provenance["verification_status"] === "string"
+      ? (provenance["verification_status"] as string)
+      : undefined;
+  const chamber: AscensionState["chamber"] = {};
+  if (outcomeStatus !== undefined) chamber.outcome_status = outcomeStatus;
+  if (verification !== undefined) chamber.verification_result = verification;
+  if (live.publishedAt !== undefined) chamber.updated_at = live.publishedAt;
+  const semantic: AscensionState["semantic"] = {};
+  if (live.publishedAt !== undefined) semantic.updated_at = live.publishedAt;
+  return {
+    chamber,
+    semantic,
+    entities,
+    constraints: {},
+    evidence: {},
+    worldModel: {},
+    ledger: [],
+    knowledgeForms: [],
+    live,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -182,21 +268,17 @@ export class LiveAscensionDataSource implements AscensionDataSource {
 
 const env = import.meta.env as Record<string, string | boolean | undefined>;
 
-/** Fixtures are a development/test source. Production must opt in loudly. */
+/** Fixtures are explicit development/test data only. */
 export function fixturesPermitted(): boolean {
-  if (env["DEV"] === true) return true;
-  return env["VITE_ASCENSION_ALLOW_FIXTURES"] === "true";
+  if (env["VITE_ASCENSION_SOURCE"] !== "fixture") return false;
+  return env["DEV"] === true || env["VITE_ASCENSION_ALLOW_FIXTURES"] === "true";
 }
 
 let source: AscensionDataSource | undefined;
 
 export function getAscensionDataSource(): AscensionDataSource {
   if (source) return source;
-  const requested = env["VITE_ASCENSION_SOURCE"];
-  source =
-    requested === "live" || !fixturesPermitted()
-      ? new LiveAscensionDataSource()
-      : new FixtureAscensionDataSource();
+  source = fixturesPermitted() ? new FixtureAscensionDataSource() : new LiveAscensionDataSource();
   return source;
 }
 

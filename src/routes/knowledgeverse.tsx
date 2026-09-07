@@ -14,6 +14,7 @@ import {
 import { LineageSpine, ResonanceField } from "@/components/ascension/graph";
 import { ChamberLoading, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
+import { LiveForms, LiveProvenance, LiveSurface } from "@/components/ascension/live";
 import {
   surfaceQuery,
   basename,
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/knowledgeverse")({
       },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("knowledgeverse")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Knowledgeverse" />,
   pendingComponent: () => <ChamberLoading surface="Knowledgeverse" />,
@@ -78,6 +80,7 @@ function Knowledgeverse() {
 
   return (
     <>
+      {data.live && <LiveProvenance live={data.live} />}
       <PageHeader
         eyebrow="Surface 02"
         title="Knowledgeverse"
@@ -414,6 +417,18 @@ function Knowledgeverse() {
           </div>
         )}
       </Panel>
+
+      {data.live && (
+        <div className="space-y-5">
+          <LiveSurface
+            eyebrow="Knowledgeverse"
+            title="Live form specifications"
+            path="/api/ascension/v1/knowledgeverse"
+            response={data.live.surfaces["knowledgeverse"]}
+          />
+          <LiveForms live={data.live} />
+        </div>
+      )}
     </>
   );
 }

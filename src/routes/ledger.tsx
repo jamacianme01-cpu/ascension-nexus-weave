@@ -13,6 +13,7 @@ import {
 } from "@/components/ascension/chrome";
 import { ChamberLoading, IntegrityFailure, SourceFailure } from "@/components/ascension/states";
 import { Inspect } from "@/components/ascension/inspect";
+import { LiveLedger, LiveProvenance } from "@/components/ascension/live";
 import { surfaceQuery, basename, chainLinkIntact } from "@/lib/ascension/state";
 
 export const Route = createFileRoute("/ledger")({
@@ -32,6 +33,7 @@ export const Route = createFileRoute("/ledger")({
       },
     ],
   }),
+  ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("ledger")),
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Verified Δ ledger" />,
   pendingComponent: () => <ChamberLoading surface="Verified Δ ledger" />,
@@ -46,6 +48,7 @@ function Ledger() {
 
   return (
     <>
+      {data.live && <LiveProvenance live={data.live} />}
       <PageHeader
         eyebrow="Surface 05"
         title="Verified Δ Ledger"
@@ -190,6 +193,8 @@ function Ledger() {
           );
         })}
       </div>
+
+      {data.live && <LiveLedger live={data.live} />}
     </>
   );
 }

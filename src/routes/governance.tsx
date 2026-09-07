@@ -100,6 +100,7 @@ function Governance() {
 
   return (
     <>
+      {data.live && <LiveProvenance live={data.live} />}
       <PageHeader
         eyebrow="Surface 04"
         title="Governance"
@@ -227,6 +228,23 @@ function Governance() {
           </div>
         </div>
       </Panel>
+
+      {data.live && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <LiveSurface
+            eyebrow="Guardian · AutoSync"
+            title="Recorded governance results"
+            path="/api/ascension/v1/governance"
+            response={data.live.surfaces["governance"]}
+          />
+          <LiveSurface
+            eyebrow="Galaxy Bridge"
+            title="Linked publisher"
+            path="/api/ascension/v1/galaxy-bridges"
+            response={data.live.surfaces["galaxy-bridges"]}
+          />
+        </div>
+      )}
     </>
   );
 }

@@ -47,6 +47,7 @@ function Ledger() {
 
   return (
     <>
+      {data.live && <LiveProvenance live={data.live} />}
       <PageHeader
         eyebrow="Surface 05"
         title="Verified Δ Ledger"
@@ -191,6 +192,8 @@ function Ledger() {
           );
         })}
       </div>
+
+      {data.live && <LiveLedger live={data.live} />}
     </>
   );
 }

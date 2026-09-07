@@ -118,18 +118,23 @@ function Chamber() {
           <div className="mt-8 max-w-2xl">
             <p className="label-eyebrow">Destiny · active objective</p>
             <p className="text-etched mt-2 font-display text-xl leading-snug text-primary sm:text-2xl">
-              {chamber.destiny ?? <Unavailable label="destiny" />}
+              {chamber.destiny ?? destinyId ?? <Unavailable label="destiny" />}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Pill tone="photon" glow>
                 {chamber.outcome_status ?? "status unavailable"}
               </Pill>
               <Pill tone="gold">{chamber.verification_result ?? "verification unavailable"}</Pill>
-              <Pill tone="violet">{chamber.verified_transitions ?? "—"} verified transitions</Pill>
+              <Pill tone="violet">
+                {chamber.verified_transitions ?? live?.ledger?.entry_count ?? "—"} verified
+                transitions
+              </Pill>
             </div>
           </div>
         </div>
       </section>
+
+      {live && <LiveProvenance live={live} />}
 
       <FlowLegend
         steps={[

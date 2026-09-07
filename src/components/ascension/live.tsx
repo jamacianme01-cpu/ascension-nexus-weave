@@ -79,10 +79,12 @@ export function LiveController({ live }: { live: LiveObservation }) {
     <Panel eyebrow="Unreal controller · separate source" title="LIVE_CONTROLLER state">
       {!controller ? (
         <Unavailable label="controller not read on this surface" />
-      ) : "error" in controller ? (
+      ) : controller.availability !== "available" ? (
         <div className="space-y-2">
           <Pill tone="gold">UNAVAILABLE</Pill>
-          <p className="font-mono text-[0.68rem] text-muted-foreground">{controller.error}</p>
+          <p className="font-mono text-[0.68rem] text-muted-foreground">
+            {controller.error ?? "controller state unavailable"}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">

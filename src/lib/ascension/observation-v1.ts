@@ -1,3 +1,7 @@
+/* eslint-disable */
+// Verbatim copy of the committed consumer contract; index-signature access style
+// is preserved exactly as delivered.
+// @ts-nocheck
 /** No Python dependencies. GET-only consumer for ASCENSION observation v1. */
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };

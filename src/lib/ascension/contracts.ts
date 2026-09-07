@@ -237,4 +237,10 @@ export type AscensionState = {
   worldModel: WorldModel;
   ledger: Transition[];
   knowledgeForms: KnowledgeForm[];
+  /**
+   * Present only when the read came from the live Observation Gateway.
+   * Carries the governed publication verbatim (classification, revision,
+   * hashes, forms, surface payloads) plus the separate LIVE_CONTROLLER read.
+   */
+  live?: import("./gateway").LiveObservation | undefined;
 };

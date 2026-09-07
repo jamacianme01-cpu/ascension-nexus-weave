@@ -16,7 +16,7 @@ import {
   type Snapshot,
   type SurfaceResponse,
 } from "./observation-v1";
-import { AscensionSourceError } from "./datasource";
+import { AscensionSourceError } from "./errors";
 
 const env = import.meta.env as Record<string, string | boolean | undefined>;
 

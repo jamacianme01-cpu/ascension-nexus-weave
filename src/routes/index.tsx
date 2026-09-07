@@ -22,6 +22,12 @@ import {
   TreeGlyph,
   type EngineSignal,
 } from "@/components/ascension/flow";
+import {
+  LiveController,
+  LiveGovernedState,
+  LiveProvenance,
+  LiveSurface,
+} from "@/components/ascension/live";
 import { surfaceQuery, basename, buildMeaningElements } from "@/lib/ascension/state";
 import chamberPlate from "@/assets/chamber.png.asset.json";
 

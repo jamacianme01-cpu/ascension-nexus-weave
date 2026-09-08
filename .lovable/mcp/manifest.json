@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "sdk_version": "2.0.4",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "ascension-weaver",
+      "version": "0.1.0",
+      "title": "Ascension Weaver"
+    },
+    "tools": [
+      {
+        "name": "ascension_chamber",
+        "title": "Chamber state",
+        "description": "Read the ASCENSION Chamber state: Destiny, ΔK/ΔU/ΔW, Guardian verdict, last verified transition, developmental/lifecycle state and manifestation readiness.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "ascension_knowledgeverse",
+        "title": "Knowledgeverse",
+        "description": "Read the ASCENSION Knowledgeverse: Meaning Elements, Knowledge Forms, relationships, emergence candidates, entity IDs/SIDs and lineage.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "include_knowledge_forms": {
+              "description": "Include the full published Knowledge Form documents (large). Defaults to false.",
+              "type": "boolean"
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "ascension_pathways",
+        "title": "Pathways / DTF",
+        "description": "Read ASCENSION Pathways (DTF/Transverse): branch comparison, trajectory effects, confidence and uncertainty, constraints, emergence points, balance evaluation and any published Wisdom recommendation.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "ascension_governance",
+        "title": "Governance",
+        "description": "Read the ASCENSION governance layer: active constraints, applicable / remembered-not-applicable / superseded categories, Guardian state and the provenance and evidence basis.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "ascension_ledger",
+        "title": "Verified Δ ledger",
+        "description": "Read the ASCENSION Verified Δ ledger records: hash-chain continuity (previous_hash → record_hash), execution receipts, verification state and transformation lineage.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "Maximum number of most recent records to return. Defaults to all.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "ascension_library_card",
+        "title": "Library Card",
+        "description": "Read the Library Card / glossary record for one ASCENSION entity: ID, SID, WHO/WHAT/WHY, chromosome/genesis state where published, Meaning Elements, lineage and relationships.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "entity_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Entity ID, e.g. ENTITY:operator. Use ascension_knowledgeverse to list available IDs."
+            }
+          },
+          "required": [
+            "entity_id"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

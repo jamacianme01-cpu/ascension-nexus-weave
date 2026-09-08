@@ -5,6 +5,8 @@ import pathwaysTool from "./tools/pathways";
 import governanceTool from "./tools/governance";
 import ledgerTool from "./tools/ledger";
 import libraryCardTool from "./tools/library-card";
+import executeTool from "./tools/execute";
+import runStatusTool from "./tools/run-status";
 
 // The OAuth issuer must be the direct Supabase auth host: the published runtime
 // URL is proxied and would fail the RFC 8414 issuer match.

@@ -20,6 +20,7 @@ import { Route as PathwaysRouteImport } from './routes/pathways'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as ApiPublicAscensionExecutionQueueRouteImport } from './routes/api/public/ascension/execution-queue'
 import { Route as ApiPublicAscensionPublishRouteImport } from './routes/api/public/ascension/publish'
 
 const IndexRoute = IndexRouteImport.update({
@@ -77,6 +78,12 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAscensionExecutionQueueRoute =
+  ApiPublicAscensionExecutionQueueRouteImport.update({
+    id: '/api/public/ascension/execution-queue',
+    path: '/api/public/ascension/execution-queue',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAscensionPublishRoute =
   ApiPublicAscensionPublishRouteImport.update({
     id: '/api/public/ascension/publish',
@@ -95,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRoutesByTo {
@@ -108,6 +116,7 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRoutesById {
@@ -123,6 +132,7 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRouteTypes {
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/live'
     | '/.lovable/oauth/consent'
+    | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/live'
     | '/.lovable/oauth/consent'
+    | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
   id:
     | '__root__'
@@ -165,6 +177,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/live'
     | '/.lovable/oauth/consent'
+    | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
   fileRoutesById: FileRoutesById
 }
@@ -179,6 +192,7 @@ export interface RootRouteChildren {
   PathwaysRoute: typeof PathwaysRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
+  ApiPublicAscensionExecutionQueueRoute: typeof ApiPublicAscensionExecutionQueueRoute
   ApiPublicAscensionPublishRoute: typeof ApiPublicAscensionPublishRoute
 }
 
@@ -261,6 +275,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ascension/execution-queue': {
+      id: '/api/public/ascension/execution-queue'
+      path: '/api/public/ascension/execution-queue'
+      fullPath: '/api/public/ascension/execution-queue'
+      preLoaderRoute: typeof ApiPublicAscensionExecutionQueueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ascension/publish': {
       id: '/api/public/ascension/publish'
       path: '/api/public/ascension/publish'
@@ -294,6 +315,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
+  ApiPublicAscensionExecutionQueueRoute: ApiPublicAscensionExecutionQueueRoute,
   ApiPublicAscensionPublishRoute: ApiPublicAscensionPublishRoute,
 }
 export const routeTree = rootRouteImport

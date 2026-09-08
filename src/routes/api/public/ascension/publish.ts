@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+
+import type { Json } from "@/integrations/supabase/types";
 import { timingSafeEqual } from "crypto";
 
 /**
@@ -78,7 +80,7 @@ export const Route = createFileRoute("/api/public/ascension/publish")({
           snapshot_hash: optionalString(body.snapshot_hash),
           content_hash: optionalString(body.content_hash),
           published_at: optionalString(body.published_at),
-          payload: payload ?? null,
+          payload: (payload ?? null) as Json,
         }));
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

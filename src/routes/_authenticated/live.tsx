@@ -91,7 +91,7 @@ function LivePage() {
             type="button"
             onClick={async () => {
               await supabase.auth.signOut();
-              void navigate({ to: "/auth" });
+              void navigate({ to: "/auth", search: { next: "/live" } });
             }}
             className="min-h-9 rounded-sm border border-border px-3 py-1.5 font-mono text-[0.66rem] tracking-[0.2em] text-muted-foreground uppercase hover:border-gold/50 hover:text-gold"
           >

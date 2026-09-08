@@ -132,6 +132,71 @@
           ]
         },
         "outputSchema": null
+      },
+      {
+        "name": "ascension_execute",
+        "title": "Submit objective for governed execution",
+        "description": "Submit an objective (with optional evidence and constraints) to the ASCENSION governed runtime. This records a signed submission in the operator's queue; the governed core claims it and runs its own cycle (Objective → Meaning Element decomposition → DTF branches → evaluation → Guardian → selection → execution → AutoSync verification → Δ → persistence). This tool never executes, evaluates, selects or writes governed state itself. Use ascension_run_status with the returned request_id to follow the run and read the Verified Δ once the runtime publishes it.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "objective": {
+              "type": "string",
+              "description": "The objective / Destiny statement to submit, in the operator's own words."
+            },
+            "evidence": {
+              "description": "Optional supporting evidence statements or references submitted with the objective.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "constraints": {
+              "description": "Optional constraints to submit with the objective, e.g. 'without debt'.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "objective"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "ascension_run_status",
+        "title": "Run status",
+        "description": "Read the status of objectives submitted with ascension_execute: queued / claimed / running / verified / rejected / failed, the current stage reported by the governed runtime, Guardian verdict, outcome status, accepted Δ, transition id and runtime revision. Only the caller's own submissions are visible. Absent fields are absent, never inferred.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "request_id": {
+              "description": "Optional request_id returned by ascension_execute. Omit to list recent submissions.",
+              "type": "string"
+            },
+            "limit": {
+              "description": "Maximum number of recent submissions to return when no request_id is given. Defaults to 10.",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "outputSchema": null
       }
     ]
   }

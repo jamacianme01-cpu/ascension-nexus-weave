@@ -21,7 +21,7 @@ export default defineMcp({
     acceptedAudiences: "authenticated",
   }),
   instructions:
-    "Read-only observation tools for the ASCENSION console. Callers must sign in as a user of this app. Every tool returns bundled published DEMO state with a source_classification field; none of them can write to or reinterpret the governed ASCENSION core (Knowledgeverse runtime, DTF, Galaxy Bridge, Guardian, AutoSync, ID/SID, Meaning Elements, Verified Δ, Unreal, CAD). Absent fields are absent, never inferred. Start with ascension_chamber for Destiny and current state, then ascension_knowledgeverse, ascension_pathways, ascension_governance, ascension_ledger, and ascension_library_card for a single entity.",
+    "Observation and objective-intake tools for the ASCENSION console. Callers must sign in as an operator of this app. The observation tools (ascension_chamber, ascension_knowledgeverse, ascension_pathways, ascension_governance, ascension_ledger, ascension_library_card) return bundled published DEMO state with a source_classification field. ascension_execute submits an objective to the operator's governed runtime queue and ascension_run_status reports the run; neither executes the cycle here. Nothing in this layer can write to or reinterpret the governed ASCENSION core (Knowledgeverse runtime, DTF, Galaxy Bridge, Guardian, AutoSync, ID/SID, Meaning Elements, Verified Δ, Unreal, CAD) — decomposition, branching, evaluation, Guardian, selection, execution, AutoSync verification, Δ and persistence all happen inside the governed core. Absent fields are absent, never inferred. Start with ascension_chamber for Destiny and current state; to give ASCENSION work, call ascension_execute then poll ascension_run_status with the returned request_id.",
   tools: [
     chamberTool,
     knowledgeverseTool,
@@ -29,5 +29,7 @@ export default defineMcp({
     governanceTool,
     ledgerTool,
     libraryCardTool,
+    executeTool,
+    runStatusTool,
   ],
 });

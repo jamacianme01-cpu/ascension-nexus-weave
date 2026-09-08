@@ -19,6 +19,7 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PathwaysRouteImport } from './routes/pathways'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicAscensionPublishRouteImport } from './routes/api/public/ascension/publish'
 
 const IndexRoute = IndexRouteImport.update({
@@ -71,6 +72,11 @@ const AuthenticatedLiveRoute = AuthenticatedLiveRouteImport.update({
   path: '/live',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicAscensionPublishRoute =
   ApiPublicAscensionPublishRouteImport.update({
     id: '/api/public/ascension/publish',
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRoutesByTo {
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRoutesById {
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRouteTypes {
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
     | '/live'
+    | '/.lovable/oauth/consent'
     | '/api/public/ascension/publish'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
     | '/live'
+    | '/.lovable/oauth/consent'
     | '/api/public/ascension/publish'
   id:
     | '__root__'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/live'
+    | '/.lovable/oauth/consent'
     | '/api/public/ascension/publish'
   fileRoutesById: FileRoutesById
 }
@@ -166,6 +178,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   PathwaysRoute: typeof PathwaysRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   ApiPublicAscensionPublishRoute: typeof ApiPublicAscensionPublishRoute
 }
 
@@ -241,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLiveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ascension/publish': {
       id: '/api/public/ascension/publish'
       path: '/api/public/ascension/publish'
@@ -273,6 +293,7 @@ const rootRouteChildren: RootRouteChildren = {
   PathwaysRoute: PathwaysRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   ApiPublicAscensionPublishRoute: ApiPublicAscensionPublishRoute,
 }
 export const routeTree = rootRouteImport

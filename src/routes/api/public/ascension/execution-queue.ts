@@ -33,7 +33,7 @@ function json(body: unknown, status: number) {
   });
 }
 
-function authorize(request: Request): Response | string {
+function authorize(request: Request): Response | null {
   const expected = process.env["ASCENSION_PUBLISH_TOKEN"];
   if (!expected) return json({ error: "publish_token_not_configured" }, 503);
   const header =
@@ -41,7 +41,7 @@ function authorize(request: Request): Response | string {
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
     null;
   if (!tokenMatches(header, expected)) return json({ error: "unauthorized" }, 401);
-  return "ok";
+  return null;
 }
 
 const optionalString = (value: unknown, max = 2000) =>
@@ -51,8 +51,8 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const auth = authorize(request);
-        if (auth !== "ok") return auth;
+        const denied = authorize(request);
+        if (denied) return denied;
 
         const runner =
           optionalString(new URL(request.url).searchParams.get("runner"), 200) ?? "ascension-runtime";
@@ -89,8 +89,8 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
       },
 
       POST: async ({ request }) => {
-        const auth = authorize(request);
-        if (auth !== "ok") return auth;
+        const denied = authorize(request);
+        if (denied) return denied;
 
         let body: Record<string, unknown>;
         try {

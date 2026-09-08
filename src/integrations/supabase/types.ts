@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      ascension_execution_requests: {
+        Row: {
+          accepted_delta: Json | null
+          claimed_at: string | null
+          claimed_by: string | null
+          completed_at: string | null
+          constraints: Json | null
+          created_at: string
+          error: string | null
+          evidence: Json | null
+          guardian_verdict: string | null
+          id: string
+          objective: string
+          outcome_status: string | null
+          result: Json | null
+          runtime_revision: number | null
+          stage: string | null
+          status: string
+          submitted_by: string
+          submitted_via: string
+          transition_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_delta?: Json | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          completed_at?: string | null
+          constraints?: Json | null
+          created_at?: string
+          error?: string | null
+          evidence?: Json | null
+          guardian_verdict?: string | null
+          id?: string
+          objective: string
+          outcome_status?: string | null
+          result?: Json | null
+          runtime_revision?: number | null
+          stage?: string | null
+          status?: string
+          submitted_by?: string
+          submitted_via?: string
+          transition_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_delta?: Json | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          completed_at?: string | null
+          constraints?: Json | null
+          created_at?: string
+          error?: string | null
+          evidence?: Json | null
+          guardian_verdict?: string | null
+          id?: string
+          objective?: string
+          outcome_status?: string | null
+          result?: Json | null
+          runtime_revision?: number | null
+          stage?: string | null
+          status?: string
+          submitted_by?: string
+          submitted_via?: string
+          transition_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ascension_publications: {
         Row: {
           content_hash: string | null

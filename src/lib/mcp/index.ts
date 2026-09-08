@@ -19,6 +19,11 @@ export default defineMcp({
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
+    // Request offline_access so Supabase issues a refresh token to the MCP
+    // client. Without it, ChatGPT's connector fails with
+    // run_with_credentials_failed_token_refresh_not_supported once the
+    // initial access token expires.
+    requiredScopes: ["offline_access"],
   }),
   instructions:
     "Observation and objective-intake tools for the ASCENSION console. Callers must sign in as an operator of this app. The observation tools (ascension_chamber, ascension_knowledgeverse, ascension_pathways, ascension_governance, ascension_ledger, ascension_library_card) return bundled published DEMO state with a source_classification field. ascension_execute submits an objective to the operator's governed runtime queue and ascension_run_status reports the run; neither executes the cycle here. Nothing in this layer can write to or reinterpret the governed ASCENSION core (Knowledgeverse runtime, DTF, Galaxy Bridge, Guardian, AutoSync, ID/SID, Meaning Elements, Verified Δ, Unreal, CAD) — decomposition, branching, evaluation, Guardian, selection, execution, AutoSync verification, Δ and persistence all happen inside the governed core. Absent fields are absent, never inferred. Start with ascension_chamber for Destiny and current state; to give ASCENSION work, call ascension_execute then poll ascension_run_status with the returned request_id.",

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 
 /**
  * Authenticated reads of the mirrored LIVE_GOVERNED publication.
@@ -17,7 +18,7 @@ export interface GovernedSurface {
   source_classification: string;
   snapshot_hash: string | null;
   content_hash: string | null;
-  payload: unknown;
+  payload: Json;
   published_at: string | null;
   received_at: string;
 }

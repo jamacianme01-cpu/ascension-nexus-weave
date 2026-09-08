@@ -36,8 +36,9 @@ export function observation(payload: unknown) {
     note: "Bundled ASCENSION published demo state. Not LIVE_GOVERNED. Absent fields are absent, never inferred.",
     data: payload,
   };
+  const text = JSON.stringify(body, null, 2);
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(body, null, 2) }],
-    structuredContent: body as Record<string, unknown>,
+    content: [{ type: "text" as const, text }],
+    structuredContent: JSON.parse(text) as never,
   };
 }

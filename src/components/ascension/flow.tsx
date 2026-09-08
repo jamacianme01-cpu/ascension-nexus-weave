@@ -246,6 +246,24 @@ export function BranchFan({
             <g
               key={b.branch_id}
               onClick={() => onSelect?.(b.branch_id)}
+              onKeyDown={
+                onSelect
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelect(b.branch_id);
+                      }
+                    }
+                  : undefined
+              }
+              {...(onSelect
+                ? {
+                    role: "button" as const,
+                    tabIndex: 0,
+                    "aria-label": `Inspect branch ${b.branch_id}`,
+                    "aria-pressed": active,
+                  }
+                : {})}
               className={onSelect ? "cursor-pointer" : undefined}
             >
               <path

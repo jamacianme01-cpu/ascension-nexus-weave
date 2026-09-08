@@ -109,9 +109,11 @@ function Chamber() {
         <div className="relative px-5 py-12 sm:px-10 sm:py-20">
           <p className="label-eyebrow">Ascension · Entry</p>
           <h1 className="text-etched mt-3 font-display text-3xl leading-tight text-foreground uppercase sm:text-5xl">
-            Everything is connected
-            <span className="mt-1 block text-gold">Evolution is key</span>
+            Ascension Chamber — live governed state observation
           </h1>
+          <p className="text-etched mt-3 font-display text-lg tracking-[0.2em] text-gold uppercase sm:text-xl">
+            Everything is connected · Evolution is key
+          </p>
           <p className="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground">
             The chamber is observing itself. Below is what ASCENSION is doing right now —
             every underlying hash, receipt and constraint stays one layer deeper.

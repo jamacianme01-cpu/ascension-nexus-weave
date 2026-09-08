@@ -76,6 +76,24 @@ export function ResonanceField({
             <g
               key={id}
               onClick={() => onSelect?.(id)}
+              onKeyDown={
+                onSelect
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelect(id);
+                      }
+                    }
+                  : undefined
+              }
+              {...(onSelect
+                ? {
+                    role: "button" as const,
+                    tabIndex: 0,
+                    "aria-label": `Select ${id}`,
+                    "aria-pressed": active,
+                  }
+                : {})}
               className={onSelect ? "cursor-pointer" : undefined}
             >
               <circle

@@ -10,16 +10,29 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as KnowledgeverseRouteImport } from './routes/knowledgeverse'
 import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PathwaysRouteImport } from './routes/pathways'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
+import { Route as ApiPublicAscensionPublishRouteImport } from './routes/api/public/ascension/publish'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GovernanceRoute = GovernanceRouteImport.update({
@@ -53,73 +66,107 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedLiveRoute = AuthenticatedLiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiPublicAscensionPublishRoute =
+  ApiPublicAscensionPublishRouteImport.update({
+    id: '/api/public/ascension/publish',
+    path: '/api/public/ascension/publish',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/ledger': typeof LedgerRoute
   '/mcp': typeof McpRoute
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/live': typeof AuthenticatedLiveRoute
+  '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/ledger': typeof LedgerRoute
   '/mcp': typeof McpRoute
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/live': typeof AuthenticatedLiveRoute
+  '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/ledger': typeof LedgerRoute
   '/mcp': typeof McpRoute
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/_authenticated/live': typeof AuthenticatedLiveRoute
+  '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/governance'
     | '/knowledgeverse'
     | '/ledger'
     | '/mcp'
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
+    | '/live'
+    | '/api/public/ascension/publish'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/governance'
     | '/knowledgeverse'
     | '/ledger'
     | '/mcp'
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
+    | '/live'
+    | '/api/public/ascension/publish'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
+    | '/auth'
     | '/governance'
     | '/knowledgeverse'
     | '/ledger'
     | '/mcp'
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
+    | '/_authenticated/live'
+    | '/api/public/ascension/publish'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
   GovernanceRoute: typeof GovernanceRoute
   KnowledgeverseRoute: typeof KnowledgeverseRoute
   LedgerRoute: typeof LedgerRoute
   McpRoute: typeof McpRoute
   PathwaysRoute: typeof PathwaysRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  ApiPublicAscensionPublishRoute: typeof ApiPublicAscensionPublishRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -129,6 +176,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/governance': {
@@ -173,11 +234,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/live': {
+      id: '/_authenticated/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof AuthenticatedLiveRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/ascension/publish': {
+      id: '/api/public/ascension/publish'
+      path: '/api/public/ascension/publish'
+      fullPath: '/api/public/ascension/publish'
+      preLoaderRoute: typeof ApiPublicAscensionPublishRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedLiveRoute: AuthenticatedLiveRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
   GovernanceRoute: GovernanceRoute,
   KnowledgeverseRoute: KnowledgeverseRoute,
   LedgerRoute: LedgerRoute,
@@ -185,6 +273,7 @@ const rootRouteChildren: RootRouteChildren = {
   PathwaysRoute: PathwaysRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  ApiPublicAscensionPublishRoute: ApiPublicAscensionPublishRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

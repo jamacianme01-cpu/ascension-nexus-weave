@@ -12,6 +12,7 @@ const NAV = [
   { to: "/governance", label: "Governance" },
   { to: "/ledger", label: "Verified Δ" },
   { to: "/live", label: "Live · Signed in" },
+  { to: "/objectives", label: "Objectives" },
 ] as const;
 
 /**

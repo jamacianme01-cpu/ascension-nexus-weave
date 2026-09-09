@@ -28,6 +28,9 @@ export function surfaceQuery(surface: AscensionSurfaceName) {
       return source[surface]();
     },
     staleTime: 15_000,
+    // No payload survives past its own use, so a DEMO read can never be
+    // re-served once the gateway answers LIVE_GOVERNED again (and vice versa).
+    gcTime: 0,
     // Each refetch attempts the governed gateway first, so the console
     // returns to LIVE_GOVERNED on its own once the gateway answers again.
     refetchInterval: 20_000,

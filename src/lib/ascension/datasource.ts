@@ -263,12 +263,98 @@ function liveState(live: LiveObservation): AscensionState {
 }
 
 /* ------------------------------------------------------------------ */
-/* Mode resolution — production may never silently serve fixtures      */
+/* Active-mode store — what the chrome must declare, never guessed     */
+/* ------------------------------------------------------------------ */
+
+export type ActiveSourceMode = "live" | "demo" | "unknown";
+
+let activeMode: ActiveSourceMode = "unknown";
+const modeListeners = new Set<() => void>();
+
+export function getActiveSourceMode(): ActiveSourceMode {
+  return activeMode;
+}
+
+export function subscribeActiveSourceMode(listener: () => void): () => void {
+  modeListeners.add(listener);
+  return () => modeListeners.delete(listener);
+}
+
+function setActiveSourceMode(next: ActiveSourceMode) {
+  if (activeMode === next) return;
+  activeMode = next;
+  for (const listener of modeListeners) listener();
+}
+
+/* ------------------------------------------------------------------ */
+/* Resilient source — LIVE_GOVERNED first, clearly-labelled DEMO only  */
+/* when the gateway is unreachable. The two are never mixed.           */
+/* ------------------------------------------------------------------ */
+
+/** Only an unreachable/unconfigured gateway falls back; integrity faults surface. */
+function gatewayUnreachable(error: unknown): boolean {
+  const known = asAscensionError(error);
+  return (
+    known?.code === "LIVE_STATE_UNAVAILABLE" || known?.code === "LIVE_GATEWAY_NOT_CONFIGURED"
+  );
+}
+
+/**
+ * Reads LIVE_GOVERNED state whenever the Observation Gateway answers. When the
+ * gateway cannot be reached at all, the whole surface is served from bundled
+ * DEMO fixtures — never a per-field blend — and the active mode flips to "demo"
+ * so the chrome shows the permanent DEMO MODE banner. Each read retries live
+ * first, so the console returns to LIVE_GOVERNED by itself.
+ */
+export class ResilientAscensionDataSource implements AscensionDataSource {
+  readonly mode = "live" as const;
+  readonly label = `ASCENSION Observation Gateway · ${gatewayBaseUrl()} (DEMO fixtures only while unreachable)`;
+
+  private readonly live = new LiveAscensionDataSource();
+  private readonly demo = new FixtureAscensionDataSource();
+
+  private async read<T>(live: () => Promise<T>, demo: () => Promise<T>): Promise<T> {
+    try {
+      const value = await live();
+      setActiveSourceMode("live");
+      return value;
+    } catch (error) {
+      if (!gatewayUnreachable(error)) throw error;
+      setActiveSourceMode("demo");
+      return demo();
+    }
+  }
+
+  chamber() {
+    return this.read(() => this.live.chamber(), () => this.demo.chamber());
+  }
+  knowledgeverse() {
+    return this.read(() => this.live.knowledgeverse(), () => this.demo.knowledgeverse());
+  }
+  pathways() {
+    return this.read(() => this.live.pathways(), () => this.demo.pathways());
+  }
+  governance() {
+    return this.read(() => this.live.governance(), () => this.demo.governance());
+  }
+  ledger() {
+    return this.read(() => this.live.ledger(), () => this.demo.ledger());
+  }
+  libraryCard(entityId: string) {
+    return this.read(
+      () => this.live.libraryCard(entityId),
+      () => this.demo.libraryCard(entityId),
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Mode resolution                                                     */
 /* ------------------------------------------------------------------ */
 
 const env = import.meta.env as Record<string, string | boolean | undefined>;
 
-/** Fixtures are explicit development/test data only. */
+/** Fixtures-only mode stays an explicit development/test opt-in. */
 export function fixturesPermitted(): boolean {
   if (env["VITE_ASCENSION_SOURCE"] !== "fixture") return false;
   return env["DEV"] === true || env["VITE_ASCENSION_ALLOW_FIXTURES"] === "true";
@@ -278,7 +364,12 @@ let source: AscensionDataSource | undefined;
 
 export function getAscensionDataSource(): AscensionDataSource {
   if (source) return source;
-  source = fixturesPermitted() ? new FixtureAscensionDataSource() : new LiveAscensionDataSource();
+  if (fixturesPermitted()) {
+    setActiveSourceMode("demo");
+    source = new FixtureAscensionDataSource();
+  } else {
+    source = new ResilientAscensionDataSource();
+  }
   return source;
 }
 

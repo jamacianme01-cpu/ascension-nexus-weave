@@ -110,7 +110,7 @@ export function Shell({ children }: { children: ReactNode }) {
               </span>
             </Link>
             <div className="flex shrink-0 items-center gap-2 lg:order-3">
-              <SourceBadge className="hidden sm:inline-flex" />
+              <SourceBadge />
               <button
                 type="button"
                 onClick={() => setCardOpen((v) => !v)}

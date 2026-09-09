@@ -19,6 +19,7 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PathwaysRouteImport } from './routes/pathways'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
+import { Route as AuthenticatedObjectivesRouteImport } from './routes/_authenticated/objectives'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicAscensionExecutionQueueRouteImport } from './routes/api/public/ascension/execution-queue'
 import { Route as ApiPublicAscensionPublishRouteImport } from './routes/api/public/ascension/publish'
@@ -73,6 +74,11 @@ const AuthenticatedLiveRoute = AuthenticatedLiveRouteImport.update({
   path: '/live',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedObjectivesRoute = AuthenticatedObjectivesRouteImport.update({
+  id: '/objectives',
+  path: '/objectives',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
+  '/objectives': typeof AuthenticatedObjectivesRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
+  '/objectives': typeof AuthenticatedObjectivesRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/pathways': typeof PathwaysRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
+  '/_authenticated/objectives': typeof AuthenticatedObjectivesRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
     | '/live'
+    | '/objectives'
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
     | '/live'
+    | '/objectives'
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/pathways'
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/live'
+    | '/_authenticated/objectives'
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
@@ -268,6 +280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLiveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/objectives': {
+      id: '/_authenticated/objectives'
+      path: '/objectives'
+      fullPath: '/objectives'
+      preLoaderRoute: typeof AuthenticatedObjectivesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
       path: '/.lovable/oauth/consent'
@@ -294,10 +313,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
+  AuthenticatedObjectivesRoute: typeof AuthenticatedObjectivesRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
+  AuthenticatedObjectivesRoute: AuthenticatedObjectivesRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

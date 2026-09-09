@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "crypto";
 
-import type { Json } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
+
+type QueuePatch = Database["public"]["Tables"]["ascension_execution_requests"]["Update"];
 
 /**
  * Secured bridge between the objective queue and the operator's governed
@@ -110,19 +112,27 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         const revision = body["runtime_revision"];
         const terminal = status === "verified" || status === "rejected" || status === "failed";
 
-        const patch = {
-          status,
-          stage: optionalString(body["stage"], 200),
-          runtime_revision:
-            typeof revision === "number" && Number.isInteger(revision) ? revision : null,
-          transition_id: optionalString(body["transition_id"], 200),
-          guardian_verdict: optionalString(body["guardian_verdict"], 200),
-          outcome_status: optionalString(body["outcome_status"], 200),
-          accepted_delta: (body["accepted_delta"] ?? null) as Json,
-          result: (body["result"] ?? null) as Json,
-          error: optionalString(body["error"], 4000),
-          completed_at: terminal ? new Date().toISOString() : null,
-        };
+        // Only fields the runtime actually sent are written. A progressive
+        // report (stage → stage → verified) must never blank out values an
+        // earlier report already published.
+        const patch: QueuePatch = { status };
+        const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
+        if (has("stage")) patch["stage"] = optionalString(body["stage"], 200);
+        if (has("runtime_revision")) {
+          patch["runtime_revision"] =
+            typeof revision === "number" && Number.isInteger(revision) ? revision : null;
+        }
+        if (has("transition_id")) patch["transition_id"] = optionalString(body["transition_id"], 200);
+        if (has("guardian_verdict")) {
+          patch["guardian_verdict"] = optionalString(body["guardian_verdict"], 200);
+        }
+        if (has("outcome_status")) {
+          patch["outcome_status"] = optionalString(body["outcome_status"], 200);
+        }
+        if (has("accepted_delta")) patch["accepted_delta"] = (body["accepted_delta"] ?? null) as Json;
+        if (has("result")) patch["result"] = (body["result"] ?? null) as Json;
+        if (has("error")) patch["error"] = optionalString(body["error"], 4000);
+        if (terminal) patch["completed_at"] = new Date().toISOString();
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data, error } = await supabaseAdmin

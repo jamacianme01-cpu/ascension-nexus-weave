@@ -283,7 +283,13 @@ export function subscribeActiveSourceMode(listener: () => void): () => void {
 function setActiveSourceMode(next: ActiveSourceMode) {
   if (activeMode === next) return;
   activeMode = next;
-  for (const listener of modeListeners) listener();
+  // Notified on a later tick: the surface that triggered the read is still
+  // suspended, and updating subscribers mid-suspense warns in React.
+  const notify = () => {
+    for (const listener of modeListeners) listener();
+  };
+  if (typeof setTimeout === "function") setTimeout(notify, 0);
+  else notify();
 }
 
 /* ------------------------------------------------------------------ */

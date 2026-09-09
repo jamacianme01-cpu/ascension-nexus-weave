@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { SourceBadge } from "@/components/ascension/states";
+import { DemoModeBanner, SourceBadge } from "@/components/ascension/states";
 import { cn } from "@/lib/utils";
 
 
@@ -146,6 +146,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </nav>
           </div>
           <div className="gold-rule h-px opacity-60" />
+          <DemoModeBanner />
         </header>
 
         {cardOpen && (

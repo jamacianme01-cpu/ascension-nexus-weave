@@ -27,7 +27,11 @@ export function surfaceQuery(surface: AscensionSurfaceName) {
       const source: AscensionDataSource = getAscensionDataSource();
       return source[surface]();
     },
-    staleTime: 30_000,
+    staleTime: 15_000,
+    // Each refetch attempts the governed gateway first, so the console
+    // returns to LIVE_GOVERNED on its own once the gateway answers again.
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 }

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "crypto";
 
-import type { Json } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
+
+type QueuePatch = Database["public"]["Tables"]["ascension_execution_requests"]["Update"];
 
 /**
  * Secured bridge between the objective queue and the operator's governed
@@ -113,8 +115,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         // Only fields the runtime actually sent are written. A progressive
         // report (stage → stage → verified) must never blank out values an
         // earlier report already published.
-        type Patch = Record<string, string | number | boolean | Json | null | undefined>;
-        const patch: Patch = { status };
+        const patch: QueuePatch = { status };
         const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
         if (has("stage")) patch["stage"] = optionalString(body["stage"], 200);
         if (has("runtime_revision")) {

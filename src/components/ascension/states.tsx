@@ -196,21 +196,23 @@ export function StaleSource({ updatedAt }: { updatedAt?: string | undefined }) {
 /** Always-visible provenance of the current data source. */
 export function SourceBadge({ className }: { className?: string | undefined }) {
   const source = getAscensionDataSource();
-  const live = source.mode === "live";
+  const mode = useActiveSourceMode();
+  const live = mode === "live";
+  const label = mode === "live" ? "live governed" : mode === "demo" ? "demo state" : "reading source";
   return (
     <span
       title={source.label}
       className={cn(
         "inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 font-mono text-[0.6rem] tracking-[0.2em] uppercase",
-        live ? "border-primary/50 bg-primary/10 text-primary" : "border-gold/50 bg-gold/10 text-gold",
+        live ? "border-primary/50 bg-primary/10 text-primary" : "border-warn/60 bg-warn/15 text-warn",
         className,
       )}
     >
       <span
         aria-hidden="true"
-        className={cn("size-1.5 rounded-full", live ? "bg-primary alive" : "bg-gold")}
+        className={cn("size-1.5 rounded-full", live ? "bg-primary alive" : "bg-warn")}
       />
-      {live ? "live source" : "demo state"}
+      {label}
     </span>
   );
 }

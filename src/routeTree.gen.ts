@@ -23,6 +23,8 @@ import { Route as AuthenticatedObjectivesRouteImport } from './routes/_authentic
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicAscensionExecutionQueueRouteImport } from './routes/api/public/ascension/execution-queue'
 import { Route as ApiPublicAscensionPublishRouteImport } from './routes/api/public/ascension/publish'
+import { Route as ApiPublicAscensionRelayRouteImport } from './routes/api/public/ascension/relay'
+import { Route as ApiPublicAscensionV1SplatRouteImport } from './routes/api/public/ascension/v1/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -96,6 +98,17 @@ const ApiPublicAscensionPublishRoute =
     path: '/api/public/ascension/publish',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAscensionRelayRoute = ApiPublicAscensionRelayRouteImport.update({
+  id: '/api/public/ascension/relay',
+  path: '/api/public/ascension/relay',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAscensionV1SplatRoute =
+  ApiPublicAscensionV1SplatRouteImport.update({
+    id: '/api/public/ascension/v1/$',
+    path: '/api/public/ascension/v1/$',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -111,6 +124,8 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
+  '/api/public/ascension/relay': typeof ApiPublicAscensionRelayRoute
+  '/api/public/ascension/v1/$': typeof ApiPublicAscensionV1SplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +141,8 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
+  '/api/public/ascension/relay': typeof ApiPublicAscensionRelayRoute
+  '/api/public/ascension/v1/$': typeof ApiPublicAscensionV1SplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +160,8 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
+  '/api/public/ascension/relay': typeof ApiPublicAscensionRelayRoute
+  '/api/public/ascension/v1/$': typeof ApiPublicAscensionV1SplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,6 +179,8 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
+    | '/api/public/ascension/relay'
+    | '/api/public/ascension/v1/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,6 +196,8 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
+    | '/api/public/ascension/relay'
+    | '/api/public/ascension/v1/$'
   id:
     | '__root__'
     | '/'
@@ -191,6 +214,8 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
+    | '/api/public/ascension/relay'
+    | '/api/public/ascension/v1/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -206,6 +231,8 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   ApiPublicAscensionExecutionQueueRoute: typeof ApiPublicAscensionExecutionQueueRoute
   ApiPublicAscensionPublishRoute: typeof ApiPublicAscensionPublishRoute
+  ApiPublicAscensionRelayRoute: typeof ApiPublicAscensionRelayRoute
+  ApiPublicAscensionV1SplatRoute: typeof ApiPublicAscensionV1SplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -308,6 +335,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAscensionPublishRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ascension/relay': {
+      id: '/api/public/ascension/relay'
+      path: '/api/public/ascension/relay'
+      fullPath: '/api/public/ascension/relay'
+      preLoaderRoute: typeof ApiPublicAscensionRelayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ascension/v1/$': {
+      id: '/api/public/ascension/v1/$'
+      path: '/api/public/ascension/v1/$'
+      fullPath: '/api/public/ascension/v1/$'
+      preLoaderRoute: typeof ApiPublicAscensionV1SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -338,6 +379,8 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   ApiPublicAscensionExecutionQueueRoute: ApiPublicAscensionExecutionQueueRoute,
   ApiPublicAscensionPublishRoute: ApiPublicAscensionPublishRoute,
+  ApiPublicAscensionRelayRoute: ApiPublicAscensionRelayRoute,
+  ApiPublicAscensionV1SplatRoute: ApiPublicAscensionV1SplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

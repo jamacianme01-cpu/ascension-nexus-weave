@@ -16,7 +16,7 @@ import {
   toLiveObservation,
   type LiveObservation,
 } from "./gateway";
-import { AscensionSourceError } from "./errors";
+import { AscensionSourceError, asAscensionError } from "./errors";
 
 /**
  * Data-source boundary for the ASCENSION observation console.

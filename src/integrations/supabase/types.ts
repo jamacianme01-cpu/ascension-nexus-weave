@@ -119,6 +119,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ascension_relay_documents: {
+        Row: {
+          body: string
+          http_status: number
+          path: string
+          received_at: string
+          revision: number | null
+          source_classification: string | null
+        }
+        Insert: {
+          body: string
+          http_status?: number
+          path: string
+          received_at?: string
+          revision?: number | null
+          source_classification?: string | null
+        }
+        Update: {
+          body?: string
+          http_status?: number
+          path?: string
+          received_at?: string
+          revision?: number | null
+          source_classification?: string | null
+        }
+        Relationships: []
+      }
       ascension_user_observations: {
         Row: {
           created_at: string

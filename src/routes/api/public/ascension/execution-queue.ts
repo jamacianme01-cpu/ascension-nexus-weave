@@ -113,7 +113,8 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         // Only fields the runtime actually sent are written. A progressive
         // report (stage → stage → verified) must never blank out values an
         // earlier report already published.
-        const patch: Record<string, unknown> = { status };
+        type Patch = Record<string, string | number | boolean | Json | null | undefined>;
+        const patch: Patch = { status };
         const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
         if (has("stage")) patch["stage"] = optionalString(body["stage"], 200);
         if (has("runtime_revision")) {

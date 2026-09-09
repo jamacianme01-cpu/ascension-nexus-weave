@@ -1,7 +1,49 @@
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { asAscensionError, getAscensionDataSource } from "@/lib/ascension/datasource";
+import {
+  asAscensionError,
+  getActiveSourceMode,
+  getAscensionDataSource,
+  subscribeActiveSourceMode,
+  type ActiveSourceMode,
+} from "@/lib/ascension/datasource";
+
+/** Live subscription to which source the console is currently reading. */
+export function useActiveSourceMode(): ActiveSourceMode {
+  return useSyncExternalStore(
+    subscribeActiveSourceMode,
+    getActiveSourceMode,
+    () => "unknown" as const,
+  );
+}
+
+/**
+ * Permanent, unmistakable notice that the console is showing bundled DEMO
+ * fixtures because the governed gateway is unreachable. It is never shown while
+ * LIVE_GOVERNED state is being read.
+ */
+export function DemoModeBanner() {
+  const mode = useActiveSourceMode();
+  if (mode !== "demo") return null;
+  return (
+    <div
+      role="alert"
+      aria-live="polite"
+      className="border-y-2 border-warn bg-warn/20 px-4 py-3 sm:px-6"
+    >
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="font-display text-[0.8rem] font-bold tracking-[0.2em] text-warn uppercase sm:text-sm sm:tracking-[0.26em]">
+          Demo mode — not live Ascension state
+        </span>
+        <span className="font-mono text-[0.66rem] tracking-[0.12em] text-warn/90 uppercase">
+          Observation gateway unreachable · bundled fixtures shown · nothing is written
+        </span>
+      </div>
+    </div>
+  );
+}
+
 
 /**
  * Chamber-language states: loading, unavailable live source, malformed source,

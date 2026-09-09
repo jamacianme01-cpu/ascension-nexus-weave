@@ -146,6 +146,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </nav>
           </div>
           <div className="gold-rule h-px opacity-60" />
+          <DemoModeBanner />
         </header>
 
         {cardOpen && (

@@ -7,7 +7,7 @@
  * fallback value is invented, and no mutating method exists.
  */
 import {
-  fetchChamber,
+  
   verifySnapshotText,
   type ChamberResponse,
   type Json,
@@ -20,13 +20,47 @@ import { AscensionSourceError } from "./errors";
 
 const env = import.meta.env as Record<string, string | boolean | undefined>;
 
-/** Configurable; defaults to the documented loopback gateway. */
-export function gatewayBaseUrl(): string {
-  const configured = env["VITE_ASCENSION_GATEWAY_URL"];
-  return (typeof configured === "string" && configured.trim()) || "http://localhost:8765";
+const DEFAULT_API_PREFIX = "/api/ascension/v1";
+/** Same-origin relay of the operator's gateway; reachable from the internet. */
+const RELAY_API_PREFIX = "/api/public/ascension/v1";
+
+function trimEnd(value: string): string {
+  return value.replace(/\/+$/, "");
 }
 
-const API = "/api/ascension/v1";
+function configuredApiBase(): string | undefined {
+  const configured = env["VITE_ASCENSION_GATEWAY_URL"];
+  if (typeof configured !== "string" || !configured.trim()) return undefined;
+  const prefix = env["VITE_ASCENSION_GATEWAY_API_PREFIX"];
+  const suffix = typeof prefix === "string" && prefix.trim() ? trimEnd(prefix.trim()) : DEFAULT_API_PREFIX;
+  const base = trimEnd(configured.trim());
+  // A configured URL that already carries the API prefix is used as given.
+  return base.endsWith(suffix) ? base : `${base}${suffix}`;
+}
+
+/**
+ * Ordered read candidates. The hosted relay is what makes LIVE_GOVERNED state
+ * reachable from the published site; the documented loopback gateway stays a
+ * candidate so the operator's own browser reads their runtime directly.
+ */
+function apiCandidates(): string[] {
+  const candidates: string[] = [];
+  const configured = configuredApiBase();
+  if (configured) candidates.push(configured);
+  if (typeof window !== "undefined") {
+    candidates.push(`${trimEnd(window.location.origin)}${RELAY_API_PREFIX}`);
+  }
+  const loopback = `http://localhost:8765${DEFAULT_API_PREFIX}`;
+  if (!candidates.includes(loopback)) candidates.push(loopback);
+  return candidates;
+}
+
+/** The API base last proven to serve a published snapshot. Never guessed. */
+let activeApiBase: string | undefined;
+
+export function gatewayBaseUrl(): string {
+  return activeApiBase ?? apiCandidates()[0] ?? `http://localhost:8765${DEFAULT_API_PREFIX}`;
+}
 
 function unreachable(detail: string): never {
   throw new AscensionSourceError(
@@ -36,25 +70,51 @@ function unreachable(detail: string): never {
   );
 }
 
+async function tryGet(base: string, path: string): Promise<{ text: string; status: number } | string> {
+  try {
+    const response = await fetch(`${base}${path}`, { method: "GET", credentials: "omit" });
+    if (!response.ok && response.status !== 503) {
+      return `Observation HTTP ${response.status} at ${base}${path}`;
+    }
+    return { text: await response.text(), status: response.status };
+  } catch (cause) {
+    return `${base} not reachable (${cause instanceof Error ? cause.message : String(cause)})`;
+  }
+}
+
 async function getText(path: string): Promise<{ text: string; status: number }> {
   if (typeof window === "undefined") {
     unreachable("Observation reads are browser-direct; the gateway is not read during server render.");
   }
-  let response: Response;
-  try {
-    response = await fetch(`${gatewayBaseUrl().replace(/\/$/, "")}${API}${path}`, {
-      method: "GET",
-      credentials: "omit",
-    });
-  } catch (cause) {
-    unreachable(
-      `Gateway not reachable at ${gatewayBaseUrl()} (${cause instanceof Error ? cause.message : String(cause)}).`,
-    );
+  if (activeApiBase) {
+    const result = await tryGet(activeApiBase, path);
+    if (typeof result !== "string") return result;
+    activeApiBase = undefined;
+    // fall through and re-resolve; a candidate may have come back.
   }
-  if (!response.ok && response.status !== 503) {
-    unreachable(`Observation HTTP ${response.status} for ${API}${path}`);
+  const failures: string[] = [];
+  let softest: { base: string; result: { text: string; status: number } } | undefined;
+  for (const base of apiCandidates()) {
+    const result = await tryGet(base, path);
+    if (typeof result === "string") {
+      failures.push(result);
+      continue;
+    }
+    // A 503 means that candidate answered but has no published state; keep it
+    // only as a last resort so another candidate with real state can win.
+    if (result.status === 503) {
+      softest ??= { base, result };
+      failures.push(`${base} reported no published state (HTTP 503)`);
+      continue;
+    }
+    activeApiBase = base;
+    return result;
   }
-  return { text: await response.text(), status: response.status };
+  if (softest) {
+    activeApiBase = softest.base;
+    return softest.result;
+  }
+  unreachable(failures.join("; "));
 }
 
 async function getSurface<T = Json>(path: string): Promise<SurfaceResponse<T>> {
@@ -66,7 +126,7 @@ async function getSurface<T = Json>(path: string): Promise<SurfaceResponse<T>> {
     throw new AscensionSourceError(
       "MALFORMED_SOURCE",
       "Gateway response was not valid JSON.",
-      `${API}${path}`,
+      `${gatewayBaseUrl()}${path}`,
     );
   }
   const record = value as Record<string, unknown>;
@@ -74,7 +134,7 @@ async function getSurface<T = Json>(path: string): Promise<SurfaceResponse<T>> {
     throw new AscensionSourceError(
       "MALFORMED_SOURCE",
       "Gateway response did not carry schema ascension.observation.v1.",
-      `${API}${path}`,
+      `${gatewayBaseUrl()}${path}`,
     );
   }
   return value as SurfaceResponse<T>;
@@ -124,7 +184,18 @@ export async function getLedger(): Promise<LedgerResponse> {
 export async function getController(): Promise<ChamberResponse | { error: string }> {
   if (typeof window === "undefined") return { error: "not read during server render" };
   try {
-    return await fetchChamber(gatewayBaseUrl());
+    const { text } = await getText("/chamber");
+    const value = JSON.parse(text) as ChamberResponse;
+    if (value?.schema_version !== "ascension.observation.v1") {
+      return { error: "chamber response schema mismatch" };
+    }
+    if (value.source_revision !== null || value.source_integrity !== "unversioned_unverified") {
+      return { error: "invalid chamber contract" };
+    }
+    if (value.availability === "available" && value.source_classification !== "LIVE_CONTROLLER") {
+      return { error: "invalid chamber source classification" };
+    }
+    return value;
   } catch (cause) {
     return { error: cause instanceof Error ? cause.message : String(cause) };
   }

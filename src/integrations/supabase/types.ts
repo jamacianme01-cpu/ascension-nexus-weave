@@ -22,6 +22,9 @@ export type Database = {
           completed_at: string | null
           constraints: Json | null
           created_at: string
+          engine: string
+          engine_status: string | null
+          epistemic_label: string | null
           error: string | null
           evidence: Json | null
           guardian_verdict: string | null
@@ -44,6 +47,9 @@ export type Database = {
           completed_at?: string | null
           constraints?: Json | null
           created_at?: string
+          engine?: string
+          engine_status?: string | null
+          epistemic_label?: string | null
           error?: string | null
           evidence?: Json | null
           guardian_verdict?: string | null
@@ -66,6 +72,9 @@ export type Database = {
           completed_at?: string | null
           constraints?: Json | null
           created_at?: string
+          engine?: string
+          engine_status?: string | null
+          epistemic_label?: string | null
           error?: string | null
           evidence?: Json | null
           guardian_verdict?: string | null
@@ -145,6 +154,65 @@ export type Database = {
           source_classification?: string | null
         }
         Relationships: []
+      }
+      ascension_run_stages: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          engine_label: string
+          engine_model: string | null
+          error: string | null
+          id: string
+          ordinal: number
+          request_id: string
+          request_payload: Json | null
+          response_payload: Json | null
+          response_text: string | null
+          stage: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          engine_label: string
+          engine_model?: string | null
+          error?: string | null
+          id?: string
+          ordinal: number
+          request_id: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          response_text?: string | null
+          stage: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          engine_label?: string
+          engine_model?: string | null
+          error?: string | null
+          id?: string
+          ordinal?: number
+          request_id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          response_text?: string | null
+          stage?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ascension_run_stages_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "ascension_execution_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ascension_user_observations: {
         Row: {

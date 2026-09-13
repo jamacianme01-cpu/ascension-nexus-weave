@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ConsoleRouteImport } from './routes/console'
 import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as KnowledgeverseRouteImport } from './routes/knowledgeverse'
 import { Route as LedgerRouteImport } from './routes/ledger'
@@ -20,6 +21,7 @@ import { Route as PathwaysRouteImport } from './routes/pathways'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedObjectivesRouteImport } from './routes/_authenticated/objectives'
+import { Route as ConsoleKnowledgeverseRouteImport } from './routes/console/knowledgeverse'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicAscensionExecutionQueueRouteImport } from './routes/api/public/ascension/execution-queue'
 import { Route as ApiPublicAscensionPublishRouteImport } from './routes/api/public/ascension/publish'
@@ -38,6 +40,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsoleRoute = ConsoleRouteImport.update({
+  id: '/console',
+  path: '/console',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GovernanceRoute = GovernanceRouteImport.update({
@@ -81,6 +88,11 @@ const AuthenticatedObjectivesRoute = AuthenticatedObjectivesRouteImport.update({
   path: '/objectives',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ConsoleKnowledgeverseRoute = ConsoleKnowledgeverseRouteImport.update({
+  id: '/knowledgeverse',
+  path: '/knowledgeverse',
+  getParentRoute: () => ConsoleRoute,
+} as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   id: '/.lovable/oauth/consent',
   path: '/.lovable/oauth/consent',
@@ -113,6 +125,7 @@ const ApiPublicAscensionV1SplatRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/console': typeof ConsoleRouteWithChildren
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/ledger': typeof LedgerRoute
@@ -121,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
   '/objectives': typeof AuthenticatedObjectivesRoute
+  '/console/knowledgeverse': typeof ConsoleKnowledgeverseRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -130,6 +144,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/console': typeof ConsoleRouteWithChildren
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/ledger': typeof LedgerRoute
@@ -138,6 +153,7 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
   '/objectives': typeof AuthenticatedObjectivesRoute
+  '/console/knowledgeverse': typeof ConsoleKnowledgeverseRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -149,6 +165,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/console': typeof ConsoleRouteWithChildren
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
   '/ledger': typeof LedgerRoute
@@ -157,6 +174,7 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/objectives': typeof AuthenticatedObjectivesRoute
+  '/console/knowledgeverse': typeof ConsoleKnowledgeverseRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -168,6 +186,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/console'
     | '/governance'
     | '/knowledgeverse'
     | '/ledger'
@@ -176,6 +195,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/live'
     | '/objectives'
+    | '/console/knowledgeverse'
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
@@ -185,6 +205,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/console'
     | '/governance'
     | '/knowledgeverse'
     | '/ledger'
@@ -193,6 +214,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/live'
     | '/objectives'
+    | '/console/knowledgeverse'
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
@@ -203,6 +225,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/console'
     | '/governance'
     | '/knowledgeverse'
     | '/ledger'
@@ -211,6 +234,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/live'
     | '/_authenticated/objectives'
+    | '/console/knowledgeverse'
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/publish'
@@ -222,6 +246,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ConsoleRoute: typeof ConsoleRouteWithChildren
   GovernanceRoute: typeof GovernanceRoute
   KnowledgeverseRoute: typeof KnowledgeverseRoute
   LedgerRoute: typeof LedgerRoute
@@ -256,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/console': {
+      id: '/console'
+      path: '/console'
+      fullPath: '/console'
+      preLoaderRoute: typeof ConsoleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/governance': {
@@ -314,6 +346,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedObjectivesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/console/knowledgeverse': {
+      id: '/console/knowledgeverse'
+      path: '/knowledgeverse'
+      fullPath: '/console/knowledgeverse'
+      preLoaderRoute: typeof ConsoleKnowledgeverseRouteImport
+      parentRoute: typeof ConsoleRoute
+    }
     '/.lovable/oauth/consent': {
       id: '/.lovable/oauth/consent'
       path: '/.lovable/oauth/consent'
@@ -365,10 +404,22 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface ConsoleRouteChildren {
+  ConsoleKnowledgeverseRoute: typeof ConsoleKnowledgeverseRoute
+}
+
+const ConsoleRouteChildren: ConsoleRouteChildren = {
+  ConsoleKnowledgeverseRoute: ConsoleKnowledgeverseRoute,
+}
+
+const ConsoleRouteWithChildren =
+  ConsoleRoute._addFileChildren(ConsoleRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ConsoleRoute: ConsoleRouteWithChildren,
   GovernanceRoute: GovernanceRoute,
   KnowledgeverseRoute: KnowledgeverseRoute,
   LedgerRoute: LedgerRoute,

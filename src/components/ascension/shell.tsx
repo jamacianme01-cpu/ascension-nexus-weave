@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { DemoModeBanner, SourceBadge } from "@/components/ascension/states";
@@ -6,14 +6,30 @@ import { cn } from "@/lib/utils";
 
 
 const NAV = [
-  { to: "/", label: "Chamber" },
+  { to: "/", label: "Ascension" },
   { to: "/knowledgeverse", label: "Knowledgeverse" },
+  { to: "/console", label: "Inspect" },
+] as const;
+
+/** Console surfaces live behind the optional Inspect area. */
+const INSPECT_NAV = [
+  { to: "/console", label: "Chamber" },
+  { to: "/console/knowledgeverse", label: "Knowledgeverse" },
   { to: "/pathways", label: "Pathways" },
   { to: "/governance", label: "Governance" },
   { to: "/ledger", label: "Verified Δ" },
-  { to: "/live", label: "Live · Signed in" },
-  { to: "/objectives", label: "Objectives" },
+  { to: "/live", label: "Live" },
+  { to: "/objectives", label: "Runs" },
 ] as const;
+
+const INSPECT_PREFIXES = [
+  "/console",
+  "/pathways",
+  "/governance",
+  "/ledger",
+  "/live",
+  "/objectives",
+];
 
 /**
  * Library Card entries describe the vocabulary of the source contracts.
@@ -85,6 +101,10 @@ const GLOSSARY: { term: string; gloss: string; source: string }[] = [
 export function Shell({ children }: { children: ReactNode }) {
   const [cardOpen, setCardOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const inspecting = INSPECT_PREFIXES.some(
+    (prefix) => location.pathname === prefix || location.pathname.startsWith(prefix + "/"),
+  );
 
   // Escape closes the Library Card; opening moves focus into it.
   useEffect(() => {
@@ -148,6 +168,32 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="gold-rule h-px opacity-60" />
           <DemoModeBanner />
         </header>
+
+        {inspecting && (
+          <nav
+            aria-label="Inspect surfaces"
+            className="sticky top-[4.6rem] z-20 border-b border-border/40 bg-void/70 backdrop-blur-lg"
+          >
+            <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-4 py-2 sm:px-6">
+              <span className="mr-2 font-mono text-[0.58rem] tracking-[0.24em] text-muted-foreground/70 uppercase">
+                Inspect ·
+              </span>
+              {INSPECT_NAV.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  activeOptions={{ exact: item.to === "/console" }}
+                  className="shrink-0 rounded-sm border border-transparent px-2 py-1 font-mono text-[0.6rem] tracking-[0.16em] text-muted-foreground uppercase transition-colors hover:border-primary/25 hover:text-foreground"
+                  activeProps={{
+                    className: "text-primary bg-primary/10 border-primary/40",
+                  }}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+        )}
 
         {cardOpen && (
           <aside

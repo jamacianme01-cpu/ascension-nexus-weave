@@ -75,6 +75,7 @@ function RunCard({ run }: { run: ObjectiveRun }) {
           {run.status}
         </span>
       </div>
+      <a href={`/?run=${encodeURIComponent(run.id)}`} className="mt-3 inline-block text-sm text-primary underline">Open result</a>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="request id" value={run.id} />
         <Field label="stage" value={run.stage} />
@@ -265,3 +266,4 @@ function ObjectivesPage() {
     </div>
   );
 }
+

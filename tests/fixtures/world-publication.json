@@ -1,0 +1,623 @@
+{
+  "forms": [
+    {
+      "entity_id": "FORM:knowledge_observer:6596be14",
+      "persistent_entity_id": "PERSIST:knowledge_observer:6596be14",
+      "sid": "SID:knowledge_observer:1:001",
+      "destiny_id": "GEN:6596be14d66a",
+      "objective_id": "GEN:6596be14d66a",
+      "chromosome": {
+        "chromosome_id": "CHR:6596be14d66a",
+        "genesis_id": "GEN:6596be14d66a",
+        "genesis_type": "semantic_genesis"
+      },
+      "developmental_state": "RESTING",
+      "phenotype": {
+        "active_capabilities": [
+          "capability:knowledge_observer",
+          "capability:digital",
+          "capability:knowledge",
+          "capability:service"
+        ],
+        "developmental_stage": "RESTING",
+        "dormant_traits": [],
+        "expression_descriptors": [
+          "digital",
+          "knowledge",
+          "knowledge_observer",
+          "service"
+        ],
+        "maturity": 0.6,
+        "phenotype_id": "PHENO:FORM:knowledge_observer:6596be14:bfa054df1186"
+      },
+      "active_meaning_elements": [
+        "ME:identity",
+        "ME:read_only"
+      ],
+      "key_relationships": [
+        {
+          "created_at": "2026-09-08T11:48:02+00:00",
+          "relation_type": "INTERACTS_WITH",
+          "relationship_id": "REL:dcbde6538961",
+          "scope": "direct",
+          "source": "FORM:observation_gateway:b4407ff5",
+          "target": "FORM:knowledge_observer:6596be14"
+        }
+      ],
+      "lineage": {
+        "ancestry": [],
+        "events": []
+      },
+      "verified_delta": {
+        "references": [],
+        "summary": {
+          "K": 0,
+          "U": 0,
+          "W": 0
+        }
+      },
+      "emergence_detected": true,
+      "dtf_transverse_available": true,
+      "manifestation_readiness": "READY",
+      "environment_context": {
+        "constraints": [],
+        "descriptors": {},
+        "environment_id": ""
+      },
+      "library_card_reference": {
+        "available": true,
+        "form_id": "FORM:knowledge_observer:6596be14",
+        "labels_enabled_by_default": false
+      }
+    },
+    {
+      "entity_id": "FORM:objective_runtime:cdc4383b",
+      "persistent_entity_id": "PERSIST:objective_runtime:cdc4383b",
+      "sid": "SID:objective_runtime:1:001",
+      "destiny_id": "GEN:cdc4383b0a32",
+      "objective_id": "GEN:cdc4383b0a32",
+      "chromosome": {
+        "chromosome_id": "CHR:cdc4383b0a32",
+        "genesis_id": "GEN:cdc4383b0a32",
+        "genesis_type": "semantic_genesis"
+      },
+      "developmental_state": "RESTING",
+      "phenotype": {
+        "active_capabilities": [
+          "capability:objective_runtime",
+          "capability:governed",
+          "capability:objective",
+          "capability:execution",
+          "capability:service"
+        ],
+        "developmental_stage": "RESTING",
+        "dormant_traits": [],
+        "expression_descriptors": [
+          "execution",
+          "governed",
+          "objective",
+          "objective_runtime",
+          "service"
+        ],
+        "maturity": 0.75,
+        "phenotype_id": "PHENO:FORM:objective_runtime:cdc4383b:a8137d516b91"
+      },
+      "active_meaning_elements": [
+        "ME:identity",
+        "ME:objective_execution"
+      ],
+      "key_relationships": [],
+      "lineage": {
+        "ancestry": [],
+        "events": [
+          {
+            "at": "2026-09-12T15:38:00+00:00",
+            "delta_id": "DELTA:cc4b3179b180",
+            "transition_id": "TR:EXEC:BR:destiny880e255dc619:00:2026-09-12T15:38:00+00:00"
+          },
+          {
+            "at": "2026-09-13T14:52:51+00:00",
+            "delta_id": "DELTA:0967c5f9754a",
+            "transition_id": "TR:EXEC:BR:destinyaf2a1a5c08ba:00:2026-09-13T14:52:51+00:00"
+          }
+        ]
+      },
+      "verified_delta": {
+        "references": [
+          "TR:EXEC:BR:destiny880e255dc619:00:2026-09-12T15:38:00+00:00",
+          "TR:EXEC:BR:destinyaf2a1a5c08ba:00:2026-09-13T14:52:51+00:00"
+        ],
+        "summary": {
+          "K": 2,
+          "U": 0,
+          "W": 2
+        }
+      },
+      "emergence_detected": false,
+      "dtf_transverse_available": false,
+      "manifestation_readiness": "READY",
+      "environment_context": {
+        "constraints": [],
+        "descriptors": {},
+        "environment_id": ""
+      },
+      "library_card_reference": {
+        "available": true,
+        "form_id": "FORM:objective_runtime:cdc4383b",
+        "labels_enabled_by_default": false
+      }
+    },
+    {
+      "entity_id": "FORM:observation_gateway:b4407ff5",
+      "persistent_entity_id": "PERSIST:observation_gateway:b4407ff5",
+      "sid": "SID:observation_gateway:1:001",
+      "destiny_id": "GEN:b4407ff573e6",
+      "objective_id": "GEN:b4407ff573e6",
+      "chromosome": {
+        "chromosome_id": "CHR:b4407ff573e6",
+        "genesis_id": "GEN:b4407ff573e6",
+        "genesis_type": "semantic_genesis"
+      },
+      "developmental_state": "RESTING",
+      "phenotype": {
+        "active_capabilities": [
+          "capability:observation_gateway",
+          "capability:digital",
+          "capability:knowledge",
+          "capability:service"
+        ],
+        "developmental_stage": "RESTING",
+        "dormant_traits": [],
+        "expression_descriptors": [
+          "digital",
+          "knowledge",
+          "observation_gateway",
+          "service"
+        ],
+        "maturity": 0.6,
+        "phenotype_id": "PHENO:FORM:observation_gateway:b4407ff5:1f457b2d06f2"
+      },
+      "active_meaning_elements": [
+        "ME:identity",
+        "ME:verified_observation"
+      ],
+      "key_relationships": [
+        {
+          "created_at": "2026-09-08T11:48:02+00:00",
+          "relation_type": "INTERACTS_WITH",
+          "relationship_id": "REL:dcbde6538961",
+          "scope": "direct",
+          "source": "FORM:observation_gateway:b4407ff5",
+          "target": "FORM:knowledge_observer:6596be14"
+        }
+      ],
+      "lineage": {
+        "ancestry": [],
+        "events": [
+          {
+            "at": "2026-09-06T16:10:00+00:00",
+            "delta_id": "DELTA:7e23ca41fcde",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-06T16:10:00+00:00"
+          },
+          {
+            "at": "2026-09-06T16:10:00+00:00",
+            "delta_id": "DELTA:06152fae9618",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-06T16:10:00+00:00"
+          },
+          {
+            "at": "2026-09-06T17:34:44+00:00",
+            "delta_id": "DELTA:8a41faeb4c2f",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-06T17:34:44+00:00"
+          },
+          {
+            "at": "2026-09-06T17:34:44+00:00",
+            "delta_id": "DELTA:eb91f500f8e6",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-06T17:34:44+00:00"
+          },
+          {
+            "at": "2026-09-07T11:35:53+00:00",
+            "delta_id": "DELTA:b36abd17a24a",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-07T11:35:53+00:00"
+          },
+          {
+            "at": "2026-09-07T19:48:26+00:00",
+            "delta_id": "DELTA:28369b7b4c50",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-07T19:48:26+00:00"
+          },
+          {
+            "at": "2026-09-07T19:58:19+00:00",
+            "delta_id": "DELTA:23eeb4e1f2a6",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-07T19:58:19+00:00"
+          },
+          {
+            "at": "2026-09-08T05:26:29+00:00",
+            "delta_id": "DELTA:59308c0796de",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T05:26:29+00:00"
+          },
+          {
+            "at": "2026-09-08T05:26:29+00:00",
+            "delta_id": "DELTA:d0f5c08868f6",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T05:26:29+00:00"
+          },
+          {
+            "at": "2026-09-08T11:45:11+00:00",
+            "delta_id": "DELTA:0c5799e7df2e",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T11:45:11+00:00"
+          },
+          {
+            "at": "2026-09-08T11:45:11+00:00",
+            "delta_id": "DELTA:21984e75e1e9",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T11:45:11+00:00"
+          },
+          {
+            "at": "2026-09-08T11:48:02+00:00",
+            "delta_id": "DELTA:04bec35f6f91",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T11:48:02+00:00"
+          },
+          {
+            "at": "2026-09-08T11:48:02+00:00",
+            "delta_id": "DELTA:2d3d366d89bc",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T11:48:02+00:00"
+          },
+          {
+            "at": "2026-09-09T15:38:27+00:00",
+            "delta_id": "DELTA:31cb3d72d24b",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-09T15:38:27+00:00"
+          },
+          {
+            "at": "2026-09-09T16:28:16+00:00",
+            "delta_id": "DELTA:b99238669520",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-09T16:28:16+00:00"
+          },
+          {
+            "at": "2026-09-09T16:28:41+00:00",
+            "delta_id": "DELTA:fa46f67cbe55",
+            "transition_id": "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-09T16:28:41+00:00"
+          }
+        ]
+      },
+      "verified_delta": {
+        "references": [
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-06T16:10:00+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-06T17:34:44+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-07T11:35:53+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-07T19:48:26+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-07T19:58:19+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T05:26:29+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T11:45:11+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-08T11:48:02+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-09T15:38:27+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-09T16:28:16+00:00",
+          "TR:EXEC:BR:destinyascensionliveobservatio:00:2026-09-09T16:28:41+00:00"
+        ],
+        "summary": {
+          "K": 16,
+          "U": 5,
+          "W": 16
+        }
+      },
+      "emergence_detected": true,
+      "dtf_transverse_available": true,
+      "manifestation_readiness": "READY",
+      "environment_context": {
+        "constraints": [],
+        "descriptors": {},
+        "environment_id": ""
+      },
+      "library_card_reference": {
+        "available": true,
+        "form_id": "FORM:observation_gateway:b4407ff5",
+        "labels_enabled_by_default": false
+      }
+    }
+  ],
+  "governedState": {
+    "library_cards": {
+      "FORM:knowledge_observer:6596be14": {
+        "active_me_ids": [
+          "ME:identity",
+          "ME:read_only"
+        ],
+        "ancestry": [],
+        "chromosome_genesis_type": "semantic_genesis",
+        "constraints": [],
+        "current_purpose": "read committed knowledge without changing governed state",
+        "current_sid": "SID:knowledge_observer:1:001",
+        "developmental_state": "RESTING",
+        "emerged_trait_reasons": {},
+        "emerged_traits": [],
+        "entity_type": "knowledge_form",
+        "environmental_influences": [],
+        "inherited_traits": [],
+        "name": "FORM:knowledge_observer:6596be14",
+        "persistent_id": "PERSIST:knowledge_observer:6596be14",
+        "phenotype_active_capabilities": [
+          "capability:knowledge_observer",
+          "capability:digital",
+          "capability:knowledge",
+          "capability:service"
+        ],
+        "phenotype_expressed_traits": [
+          "digital",
+          "knowledge",
+          "knowledge_observer",
+          "service"
+        ],
+        "relationships": [
+          {
+            "created_at": "2026-09-08T11:48:02+00:00",
+            "relation_type": "INTERACTS_WITH",
+            "relationship_id": "REL:dcbde6538961",
+            "scope": "direct",
+            "source": "FORM:observation_gateway:b4407ff5",
+            "target": "FORM:knowledge_observer:6596be14"
+          }
+        ],
+        "verified_delta": {
+          "K": 0,
+          "U": 0,
+          "W": 0
+        },
+        "what": "digital knowledge service",
+        "who": "knowledge_observer",
+        "why": "read committed knowledge without changing governed state"
+      },
+      "FORM:objective_runtime:cdc4383b": {
+        "active_me_ids": [
+          "ME:identity",
+          "ME:objective_execution"
+        ],
+        "ancestry": [],
+        "chromosome_genesis_type": "semantic_genesis",
+        "constraints": [],
+        "current_purpose": "process submitted objectives through governed ASCENSION execution",
+        "current_sid": "SID:objective_runtime:1:001",
+        "developmental_state": "RESTING",
+        "emerged_trait_reasons": {},
+        "emerged_traits": [],
+        "entity_type": "knowledge_form",
+        "environmental_influences": [],
+        "inherited_traits": [],
+        "name": "FORM:objective_runtime:cdc4383b",
+        "persistent_id": "PERSIST:objective_runtime:cdc4383b",
+        "phenotype_active_capabilities": [
+          "capability:objective_runtime",
+          "capability:governed",
+          "capability:objective",
+          "capability:execution",
+          "capability:service"
+        ],
+        "phenotype_expressed_traits": [
+          "execution",
+          "governed",
+          "objective",
+          "objective_runtime",
+          "service"
+        ],
+        "relationships": [],
+        "verified_delta": {
+          "K": 2,
+          "U": 0,
+          "W": 2
+        },
+        "what": "governed objective execution service",
+        "who": "objective_runtime",
+        "why": "process submitted objectives through governed ASCENSION execution"
+      },
+      "FORM:observation_gateway:b4407ff5": {
+        "active_me_ids": [
+          "ME:identity",
+          "ME:verified_observation"
+        ],
+        "ancestry": [],
+        "chromosome_genesis_type": "semantic_genesis",
+        "constraints": [],
+        "current_purpose": "publish committed ASCENSION knowledge for read-only observation",
+        "current_sid": "SID:observation_gateway:1:001",
+        "developmental_state": "RESTING",
+        "emerged_trait_reasons": {},
+        "emerged_traits": [],
+        "entity_type": "knowledge_form",
+        "environmental_influences": [],
+        "inherited_traits": [],
+        "name": "FORM:observation_gateway:b4407ff5",
+        "persistent_id": "PERSIST:observation_gateway:b4407ff5",
+        "phenotype_active_capabilities": [
+          "capability:observation_gateway",
+          "capability:digital",
+          "capability:knowledge",
+          "capability:service"
+        ],
+        "phenotype_expressed_traits": [
+          "digital",
+          "knowledge",
+          "observation_gateway",
+          "service"
+        ],
+        "relationships": [
+          {
+            "created_at": "2026-09-08T11:48:02+00:00",
+            "relation_type": "INTERACTS_WITH",
+            "relationship_id": "REL:dcbde6538961",
+            "scope": "direct",
+            "source": "FORM:observation_gateway:b4407ff5",
+            "target": "FORM:knowledge_observer:6596be14"
+          }
+        ],
+        "verified_delta": {
+          "K": 16,
+          "U": 5,
+          "W": 16
+        },
+        "what": "digital knowledge service",
+        "who": "observation_gateway",
+        "why": "publish committed ASCENSION knowledge for read-only observation"
+      }
+    },
+    "knowledgeverse": {
+      "chromosomes": {
+        "CHR:6596be14d66a": {
+          "chromosome_id": "CHR:6596be14d66a",
+          "content_hash": "6596be14d66a",
+          "developmental_constraints": [],
+          "environmental_requirements": [],
+          "evidence_refs": [
+            "genesis:knowledge_observer"
+          ],
+          "genesis_type": "semantic_genesis",
+          "identity_elements": [
+            "changing",
+            "committed",
+            "governed",
+            "knowledge",
+            "read",
+            "state",
+            "without"
+          ],
+          "inherited_me_ids": [],
+          "lineage": [
+            {
+              "at": "2026-09-06T16:10:00+00:00",
+              "stage": "CANDIDATE"
+            }
+          ],
+          "mutable_me_ids": [],
+          "parent_chromosome_ids": [],
+          "potential_traits": [
+            "knowledge_observer",
+            "digital",
+            "knowledge",
+            "service"
+          ],
+          "relationship_priors": [],
+          "structural_me_ids": [
+            "ME:identity",
+            "ME:read_only"
+          ],
+          "suppressed_traits": []
+        },
+        "CHR:b4407ff573e6": {
+          "chromosome_id": "CHR:b4407ff573e6",
+          "content_hash": "b4407ff573e6",
+          "developmental_constraints": [],
+          "environmental_requirements": [],
+          "evidence_refs": [
+            "genesis:observation_gateway"
+          ],
+          "genesis_type": "semantic_genesis",
+          "identity_elements": [
+            "ascension",
+            "committed",
+            "knowledge",
+            "observation",
+            "publish",
+            "read-only"
+          ],
+          "inherited_me_ids": [],
+          "lineage": [
+            {
+              "at": "2026-09-06T16:10:00+00:00",
+              "stage": "CANDIDATE"
+            }
+          ],
+          "mutable_me_ids": [],
+          "parent_chromosome_ids": [],
+          "potential_traits": [
+            "observation_gateway",
+            "digital",
+            "knowledge",
+            "service"
+          ],
+          "relationship_priors": [],
+          "structural_me_ids": [
+            "ME:identity",
+            "ME:verified_observation"
+          ],
+          "suppressed_traits": []
+        },
+        "CHR:cdc4383b0a32": {
+          "chromosome_id": "CHR:cdc4383b0a32",
+          "content_hash": "cdc4383b0a32",
+          "developmental_constraints": [],
+          "developmental_provenance": {},
+          "environmental_requirements": [],
+          "evidence_refs": [
+            "genesis:objective_runtime"
+          ],
+          "genesis_type": "semantic_genesis",
+          "identity_elements": [
+            "ascension",
+            "execution",
+            "governed",
+            "objectives",
+            "process",
+            "submitted",
+            "through"
+          ],
+          "inherited_me_ids": [],
+          "lineage": [
+            {
+              "at": "2026-09-12T15:38:00+00:00",
+              "stage": "CANDIDATE"
+            }
+          ],
+          "mutable_me_ids": [],
+          "parent_chromosome_ids": [],
+          "potential_traits": [
+            "objective_runtime",
+            "governed",
+            "objective",
+            "execution",
+            "service"
+          ],
+          "relationship_priors": [],
+          "structural_me_ids": [
+            "ME:identity",
+            "ME:objective_execution"
+          ],
+          "suppressed_traits": []
+        }
+      },
+      "emergences": {
+        "EMERG:bd4e3fd4e613": {
+          "causal_refs": [],
+          "developmental_state_hash": "HASH:f3b931360766dc50",
+          "emergence_id": "EMERG:bd4e3fd4e613",
+          "environment_id": "default",
+          "evidence_ids": [],
+          "interaction_refs": [
+            "INTX:cdda6671f5ea",
+            "INTX:b3729858732c",
+            "INTX:4897a7ef5973",
+            "INTX:7bdcf4fb1cfb",
+            "INTX:f85bf99defbc"
+          ],
+          "new_capability": "composition of 1+1 MEs",
+          "new_property": "emergent:ME:verified_observation+ME:read_only",
+          "participating_form_ids": [
+            "FORM:observation_gateway:b4407ff5",
+            "FORM:knowledge_observer:6596be14"
+          ],
+          "participating_me_ids": [
+            "ME:identity",
+            "ME:read_only",
+            "ME:verified_observation"
+          ],
+          "prior_capabilities": [
+            "FORM:observation_gateway:b4407ff5:['ME:identity', 'ME:verified_observation']",
+            "FORM:knowledge_observer:6596be14:['ME:identity', 'ME:read_only']"
+          ],
+          "relationship_refs": [
+            "REL:dcbde6538961"
+          ],
+          "relationships_used": [
+            "REL:dcbde6538961"
+          ],
+          "source_cycle_revision": 16,
+          "status": "OBSERVED"
+        }
+      }
+    }
+  },
+  "publicationRevision": 18
+}

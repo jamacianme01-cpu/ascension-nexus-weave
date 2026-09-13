@@ -38,7 +38,7 @@ const INSPECT_PREFIXES = [
 const GLOSSARY: { term: string; gloss: string; source: string }[] = [
   {
     term: "ID / SID",
-    gloss: "Entity identity and its state identity at a given cycle.",
+    gloss: "ID preserves entity identity and continuity. SID is the current embodiment or signature through which the entity experiences.",
     source: "state/entities.json → entity_id, sid",
   },
   {
@@ -255,3 +255,4 @@ export function Shell({ children }: { children: ReactNode }) {
     </div>
   );
 }
+

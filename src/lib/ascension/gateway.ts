@@ -72,7 +72,7 @@ function unreachable(detail: string): never {
 
 async function tryGet(base: string, path: string): Promise<{ text: string; status: number } | string> {
   try {
-    const response = await fetch(`${base}${path}`, { method: "GET", credentials: "omit" });
+    const response = await fetch(`${base}${path}`, { method: "GET", credentials: "omit", signal: AbortSignal.timeout(8000) });
     if (!response.ok && response.status !== 503) {
       return `Observation HTTP ${response.status} at ${base}${path}`;
     }
@@ -258,3 +258,4 @@ export function toLiveObservation(snapshot: Snapshot): LiveObservation {
     gatewayUrl: gatewayBaseUrl(),
   };
 }
+

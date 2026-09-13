@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, Outlet, useLocation } from "@tanstack/react-router";
 
 import {
   Field,
@@ -55,8 +55,13 @@ export const Route = createFileRoute("/console")({
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Chamber" />,
   pendingComponent: () => <ChamberLoading surface="Chamber" />,
   notFoundComponent: () => <p className="font-mono text-sm">No chamber state published.</p>,
-  component: Chamber,
+  component: ConsoleRoute,
 });
+
+function ConsoleRoute() {
+  const location = useLocation();
+  return location.pathname === "/console" || location.pathname === "/console/" ? <Chamber /> : <Outlet />;
+}
 
 function Chamber() {
   const { data } = useSuspenseQuery(surfaceQuery("chamber"));
@@ -517,3 +522,4 @@ function Chamber() {
     </>
   );
 }
+

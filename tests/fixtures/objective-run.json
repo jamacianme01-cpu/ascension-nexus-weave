@@ -1,0 +1,254 @@
+{
+  "id": "085f63a3-904f-41b7-907a-7c8f420a7e88",
+  "engine": "governed_runtime",
+  "objective": "Create a community archive guide",
+  "evidence": [],
+  "constraints": [],
+  "status": "verified",
+  "guardian_verdict": "PASS",
+  "created_at": "2026-09-13T14:52:50.691060+00:00",
+  "result": {
+    "authorization_id": "AUTH:local-objective-runtime",
+    "autosync_verdict": "VERIFIED",
+    "balance_overall": "NO_MEASURED_CHANGE",
+    "branch_id": "BR:destinyaf2a1a5c08ba:00",
+    "delta_id": "DELTA:0967c5f9754a",
+    "delta_k": 1,
+    "delta_u": 0,
+    "delta_w": 1,
+    "destiny_ref": "DESTINY:af2a1a5c08ba",
+    "evidence_ids": [
+      "EV:5360461ae6ba"
+    ],
+    "execution_id": "EXEC:BR:destinyaf2a1a5c08ba:00:2026-09-13T14:52:51+00:00",
+    "execution_receipts": [
+      {
+        "artifact_ref": "knowledgeform_community-archive.md",
+        "capability": "objective_artifact_writer",
+        "files": [
+          {
+            "bytes": 1214,
+            "path": "knowledgeform_community-archive.md",
+            "sha256": "2a670aaecb637dbacef870fba2a5a81f7eae7e420079abe012799637f158f4ca"
+          },
+          {
+            "bytes": 6068,
+            "path": "governed_objective.json",
+            "sha256": "452cb508dd795119afb90e2a2c3707e80cd29aa2974b0ebd3284ff35f45335a5"
+          }
+        ],
+        "intervention_id": "INT:ACT:intake:REQ:085f63a3-904f-41b7-907a-7c8f420a7e88",
+        "measurement": "objective artifacts persisted then read back byte-for-byte",
+        "performed": true,
+        "physical_effects": [],
+        "reversibility": "reversible",
+        "sha256": "35871238424d75761b4b6fefc85bbaf1d60a7ace3ff6aea9e57d22f4daff1726",
+        "size_bytes": 7282
+      }
+    ],
+    "governed_status": "COMPLETED_VERIFIED",
+    "guardian": [
+      {
+        "result": "PASS",
+        "step_id": "STEP:INT:ACT:intake:REQ:085f63a3-904f-41b7-907a-7c8f420a7e88:0"
+      }
+    ],
+    "lineage_record_hash": "sha256:b9d7168e86bc0bbb30a8d969f0ed1afa5ea2bc988c8df0afec2db607cdfae167",
+    "objective_planning": {
+      "branches": [
+        {
+          "actions": [
+            "compose knowledge form 'knowledgeform_rebuild-the-ascension-app-around-the.md' from 10 meaning elements",
+            "write artifact in one governed pass"
+          ],
+          "approach": "single_pass_construct",
+          "branch_id": "BR:rebuild-the-ascension-app-around-the:single-pass",
+          "capability": "digital_artifact_writer",
+          "confidence": 0.78,
+          "evaluation": {
+            "confidence": 0.78,
+            "contradictions": [],
+            "guardian": "PASS",
+            "inherited_constraint": null,
+            "inherited_relation": null,
+            "maturity_bonus": 0.0,
+            "outcome_predictor": 0.72,
+            "relevance_bonus": 0.0,
+            "violations": []
+          },
+          "expected": {
+            "artifact_name": "knowledgeform_rebuild-the-ascension-app-around-the.md",
+            "min_bytes": 256,
+            "required_sections": [
+              "rebuild",
+              "around",
+              "user",
+              "purpose_too_difficult_to_use"
+            ]
+          },
+          "risks": [
+            "single write: partial content loss if interrupted"
+          ],
+          "status": "simulated"
+        },
+        {
+          "actions": [
+            "write staging section set ['rebuild', 'around']",
+            "verify staging sections then append remaining sections"
+          ],
+          "approach": "staged_construct",
+          "branch_id": "BR:rebuild-the-ascension-app-around-the:staged",
+          "capability": "digital_artifact_writer",
+          "confidence": 0.84,
+          "evaluation": {
+            "confidence": 0.84,
+            "contradictions": [],
+            "guardian": "PASS",
+            "inherited_constraint": null,
+            "inherited_relation": null,
+            "maturity_bonus": 0.0,
+            "outcome_predictor": 0.775,
+            "recommended_by": "CLARITY",
+            "relevance_bonus": 0.0,
+            "violations": []
+          },
+          "expected": {
+            "artifact_name": "knowledgeform_rebuild-the-ascension-app-around-the.md",
+            "min_bytes": 200,
+            "required_sections": [
+              "rebuild",
+              "around",
+              "user"
+            ]
+          },
+          "risks": [
+            "staging adds an extra failure surface"
+          ],
+          "status": "recommended"
+        },
+        {
+          "actions": [
+            "write a minimal seed artifact with the primary section only"
+          ],
+          "approach": "minimal_seeded_construct",
+          "branch_id": "BR:rebuild-the-ascension-app-around-the:minimal-seed",
+          "capability": "digital_artifact_writer",
+          "confidence": 0.55,
+          "evaluation": {
+            "confidence": 0.55,
+            "contradictions": [],
+            "guardian": "PASS",
+            "inherited_constraint": null,
+            "inherited_relation": null,
+            "maturity_bonus": 0.0,
+            "outcome_predictor": 0.475,
+            "relevance_bonus": 0.0,
+            "violations": []
+          },
+          "expected": {
+            "artifact_name": "knowledgeform_rebuild-the-ascension-app-around-the.md",
+            "min_bytes": 40,
+            "required_sections": [
+              "rebuild"
+            ]
+          },
+          "risks": [
+            "thin artifact may under-represent the Destiny MEs"
+          ],
+          "status": "simulated"
+        }
+      ],
+      "meaning_elements": [
+        {
+          "aliases": [],
+          "ambiguous": false,
+          "candidates": [],
+          "canonical_concept": null,
+          "category": "form",
+          "definition": null,
+          "me_id": "ME:v1-text:result:form:fedc770e",
+          "semantic_type": null,
+          "sense": null,
+          "source": "destiny",
+          "text": "result",
+          "v1_text_id": null
+        },
+        {
+          "aliases": [],
+          "ambiguous": false,
+          "candidates": [],
+          "canonical_concept": null,
+          "category": "form",
+          "definition": null,
+          "me_id": "ME:v1-text:current:form:c9f7a64b",
+          "semantic_type": null,
+          "sense": null,
+          "source": "destiny",
+          "text": "current",
+          "v1_text_id": null
+        },
+        {
+          "aliases": [],
+          "ambiguous": false,
+          "candidates": [],
+          "canonical_concept": null,
+          "category": "form",
+          "definition": null,
+          "me_id": "ME:v1-text:engines:form:3afff9f7",
+          "semantic_type": null,
+          "sense": null,
+          "source": "destiny",
+          "text": "engines",
+          "v1_text_id": null
+        }
+      ],
+      "selected_branch": {
+        "actions": [
+          "write staging section set ['rebuild', 'around']",
+          "verify staging sections then append remaining sections"
+        ],
+        "approach": "staged_construct",
+        "branch_id": "BR:rebuild-the-ascension-app-around-the:staged",
+        "capability": "digital_artifact_writer",
+        "confidence": 0.84,
+        "evaluation": {
+          "confidence": 0.84,
+          "contradictions": [],
+          "guardian": "PASS",
+          "inherited_constraint": null,
+          "inherited_relation": null,
+          "maturity_bonus": 0.0,
+          "outcome_predictor": 0.775,
+          "recommended_by": "CLARITY",
+          "relevance_bonus": 0.0,
+          "violations": []
+        },
+        "expected": {
+          "artifact_name": "knowledgeform_rebuild-the-ascension-app-around-the.md",
+          "min_bytes": 200,
+          "required_sections": [
+            "rebuild",
+            "around",
+            "user"
+          ]
+        },
+        "risks": [
+          "staging adds an extra failure surface"
+        ],
+        "status": "recommended"
+      }
+    },
+    "objective_text": "Create a community archive guide",
+    "publication": {
+      "content_hash": "sha256:6a5d56a97eb1de7d4f5832f76f42b17365e111d98d1f1b6776fc7924e142a761",
+      "delta_in_persisted_ledger": true,
+      "publication_id": "PUB:6a5d56a97eb1de7d4f5832f76f42b17365e111d98d1f1b6776fc7924e142a761",
+      "publication_revision": 18,
+      "published_at": "2026-09-13T14:52:51.582401+00:00"
+    },
+    "runtime_revision": 18,
+    "selection_id": "SEL:87ff85d78365",
+    "transaction": "PERSISTED",
+    "transition_id": "TR:EXEC:BR:destinyaf2a1a5c08ba:00:2026-09-13T14:52:51+00:00"
+  }
+}

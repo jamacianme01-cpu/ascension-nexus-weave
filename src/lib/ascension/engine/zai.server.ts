@@ -7,7 +7,7 @@
  * never invents a value and never rewrites an engine error.
  *
  * Calls are streamed so bytes keep flowing during long reasoning runs; the
- * accumulated text is returned once the stream completes. No timer aborts.
+ * accumulated text is returned once the stream completes. Requests are bounded to 90 seconds.
  */
 
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
@@ -66,28 +66,39 @@ async function readStream(response: Response): Promise<string> {
   let buffer = "";
   let text = "";
 
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const raw of lines) {
-      const line = raw.trim();
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        const parsed = JSON.parse(payload) as {
-          choices?: Array<{ delta?: { content?: string | null }; message?: { content?: string | null } }>;
-        };
-        for (const choice of parsed.choices ?? []) {
-          text += choice.delta?.content ?? choice.message?.content ?? "";
-        }
-      } catch {
-        // Ignore keep-alive / non-JSON frames.
-      }
+  function consume(raw: string) {
+    const line = raw.trim();
+    if (!line.startsWith("data:")) return;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === "[DONE]") return;
+    let parsed;
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      return;
     }
+    if (parsed.error)
+      throw new ZaiEngineError(
+        String(parsed.error.message ?? "Z.AI stream failed"),
+        response.status,
+      );
+    for (const choice of parsed.choices ?? []) {
+      const fragment = choice.delta?.content ?? choice.message?.content;
+      if (typeof fragment === "string") text += fragment;
+    }
+  }
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const raw of lines) consume(raw);
+    }
+    consume(buffer + decoder.decode());
+  } finally {
+    reader.releaseLock();
   }
   return text;
 }
@@ -111,6 +122,7 @@ export async function callZai(input: {
   try {
     response = await fetch(`${zaiBaseUrl()}/chat/completions`, {
       method: "POST",
+      signal: AbortSignal.timeout(90000),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,

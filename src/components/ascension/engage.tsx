@@ -1,505 +1,505 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getObjectiveStatus,
+  listMyObjectives,
   submitObjective,
   type ObjectiveRun,
 } from "@/lib/ascension/objectives.functions";
-import { cn } from "@/lib/utils";
-
-/**
- * The ASCENSION engage flow — the product surface.
- *
- * What do you want to accomplish → ASCENSION works → the RESULT.
- * The engines, Guardian fields, branch data and revisions live behind the
- * optional reasoning/pathways/verification reveals and the Inspect area.
- * Every value shown below is read from the run's own recorded result;
- * nothing is invented here.
- */
-
-type RunJson = Record<string, unknown> | null;
-
-function asJson(value: unknown): RunJson {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as RunJson)
-    : null;
-}
-
-function runPlanning(run: ObjectiveRun): RunJson {
-  return asJson(run.result)?.["objective_planning"] as RunJson | undefined ?? null;
-}
-
-function runBranches(run: ObjectiveRun): Record<string, unknown>[] {
-  const planning = runPlanning(run);
-  const branches = planning?.["branches"];
-  return Array.isArray(branches) ? (branches as Record<string, unknown>[]) : [];
-}
-
-function branchLabel(branch: Record<string, unknown>, index: number): string {
-  const pathway =
-    (typeof branch["pathway"] === "string" && branch["pathway"]) ||
-    (typeof branch["action"] === "string" && branch["action"]) ||
-    (typeof branch["name"] === "string" && branch["name"]) ||
-    null;
-  const id = typeof branch["id"] === "string" ? branch["id"] : `future-${index + 1}`;
-  return pathway ? String(pathway) : id;
-}
-
-function selectedBranch(run: ObjectiveRun): { label: string; why?: string } | null {
-  const planning = runPlanning(run);
-  const selected = planning?.["selected_branch"];
-  if (!selected) return null;
-  if (typeof selected === "string") return { label: selected };
-  const obj = asJson(selected);
-  if (obj) {
-    const why =
-      (typeof obj["why_selected"] === "string" && obj["why_selected"]) ||
-      (typeof obj["rationale"] === "string" && obj["rationale"]) ||
-      undefined;
-    const id =
-      (typeof obj["branch_id"] === "string" && obj["branch_id"]) ||
-      (typeof obj["id"] === "string" && obj["id"]) ||
-      undefined;
-    const pathways = runBranches(run);
-    const match = id ? pathways.find((b) => b["id"] === id) : undefined;
-    const label =
-      (match ? branchLabel(match, 0) : null) ??
-      (typeof obj["pathway"] === "string" ? String(obj["pathway"]) : null) ??
-      id ??
-      "selected future";
-    return { label, why };
-  }
-  return null;
-}
-
-function deltaTotals(run: ObjectiveRun): { K: number; U: number; W: number } | null {
-  const result = asJson(run.result);
-  const fromResult =
-    typeof result?.["delta_k"] === "number" ||
-    typeof result?.["delta_w"] === "number" ||
-    typeof result?.["delta_u"] === "number";
-  if (fromResult) {
-    return {
-      K: Number(result?.["delta_k"] ?? 0),
-      U: Number(result?.["delta_u"] ?? 0),
-      W: Number(result?.["delta_w"] ?? 0),
-    };
-  }
-  const accepted = asJson(run.accepted_delta);
-  if (accepted) {
-    return {
-      K: Number(accepted["K"] ?? 0),
-      U: Number(accepted["U"] ?? 0),
-      W: Number(accepted["W"] ?? 0),
-    };
-  }
-  return null;
-}
-
-function guardianPassed(run: ObjectiveRun): boolean {
-  return run.guardian_verdict?.toLowerCase() === "pass";
-}
-
-/** Plain-language statement of what the run actually produced. */
-function resultStatement(run: ObjectiveRun): { headline: string; detail: string } | null {
-  const result = asJson(run.result);
-  if (!result) return null;
-  const chosen = selectedBranch(run);
-  const delta = deltaTotals(run);
-  const publication = asJson(result["publication"]);
-  const receipts = result["execution_receipts"];
-
-  const deltaText = delta
-    ? `Verified Δ — knowledge +${delta.K}, understanding +${delta.U}, wisdom +${delta.W}.`
-    : "";
-  const revisionText =
-    typeof result["runtime_revision"] === "number"
-      ? ` Persisted in the Knowledgeverse at revision ${result["runtime_revision"]}.`
-      : publication && typeof publication["publication_revision"] === "number"
-        ? ` Persisted in the Knowledgeverse at revision ${publication["publication_revision"]}.`
-        : "";
-
-  const headline = chosen
-    ? chosen.label
-    : "Objective verified and persisted into the Knowledgeverse.";
-
-  let receiptText = "";
-  if (Array.isArray(receipts) && receipts.length > 0) {
-    const lines = receipts
-      .map((receipt) => {
-        const r = asJson(receipt);
-        const action =
-          (typeof r?.["action"] === "string" && r["action"]) ||
-          (typeof r?.["step"] === "string" && r["step"]) ||
-          null;
-        return action ? String(action) : null;
-      })
-      .filter((x): x is string => Boolean(x))
-      .slice(0, 4);
-    if (lines.length) receiptText = ` Performed: ${lines.join("; ")}.`;
-  }
-
-  const whyText = chosen?.why ? ` Selected because ${chosen.why}.` : "";
-  return {
-    headline,
-    detail: `${deltaText}${revisionText}${whyText}${receiptText}`.trim(),
-  };
-}
+import { getObjectiveDelivery, prepareObjectiveDelivery } from "@/lib/ascension/delivery.functions";
+import {
+  governedPersisted,
+  planningFor,
+  branchTitle,
+  receiptFiles,
+  record,
+  strings,
+  parseDelivery,
+  type ObjectiveDelivery,
+} from "@/lib/ascension/result-model";
+import { ConnectedKnowledgeWorld } from "./knowledge-world";
+import chamberPlate from "@/assets/chamber.png.asset.json";
 
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
+const ACTIVE = "ascension.active-objective";
+const DRAFT = "ascension.objective.draft";
+type FollowUp = "continue" | "refine" | "execute";
 
-function statusLine(run: ObjectiveRun | null): string {
-  if (!run) return "";
-  if (run.status === "verified") return "Complete";
-  if (run.status === "rejected") return "Rejected by governance";
-  if (run.status === "failed") return "Run failed";
-  if (run.status === "queued") return "Engaged · waiting for the runtime";
-  const stage = run.stage?.replace(/_/g, " ") ?? "working";
-  return `ASCENSION is working · ${stage}`;
+function save(key: string, value: string) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* Storage can be disabled. */
+  }
+}
+function read(key: string) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function download(name: string, content: string) {
+  const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function Reveal({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <details className="rounded-lg border border-border/70 px-4 py-3">
+      <summary className="cursor-pointer text-sm text-muted-foreground">{label}</summary>
+      <div className="mt-4 space-y-3 text-sm leading-relaxed">{children}</div>
+    </details>
+  );
 }
 
-function Disclosure({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
+export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
   return (
-    <div className="rounded-sm border border-border/70">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left"
-      >
-        <span className="font-mono text-[0.66rem] tracking-[0.2em] text-muted-foreground uppercase transition-colors hover:text-foreground">
-          {label}
-        </span>
-        <span
-          className={cn(
-            "font-mono text-[0.9rem] text-primary transition-transform duration-200",
-            open && "rotate-90",
-          )}
-          aria-hidden
+    <div className="space-y-4">
+      <h3 className="text-xl font-medium text-foreground">{delivery.title}</h3>
+      <p className="whitespace-pre-wrap break-words text-[0.95rem] leading-relaxed text-foreground/90">
+        {delivery.body}
+      </p>
+      {delivery.files.map((file) => (
+        <div
+          key={file.name}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 p-4"
         >
-          ›
-        </span>
-      </button>
-      {open && (
-        <div className="border-t border-border/60 px-4 py-4 text-sm leading-relaxed text-foreground/85">
-          {children}
+          <span className="break-all text-sm text-primary">{file.name}</span>
+          <button
+            type="button"
+            onClick={() => download(file.name, file.content)}
+            className="min-h-11 rounded-full border border-primary/40 px-4 text-sm text-primary"
+          >
+            Download file
+          </button>
+        </div>
+      ))}
+      {delivery.limitations.length > 0 && (
+        <div className="rounded-lg border border-gold/20 p-4">
+          <p className="text-xs text-gold">What remains</p>
+          <ul className="mt-2 list-disc space-y-2 pl-4 text-sm text-muted-foreground">
+            {delivery.limitations.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
         </div>
       )}
+      <p className="text-xs text-muted-foreground">
+        {delivery.kind === "artifact" ? "Created draft" : "Generated response"} · awaiting
+        independent verification
+      </p>
     </div>
   );
 }
 
-function ResultPanel({ run }: { run: ObjectiveRun }) {
-  const statement = resultStatement(run);
-  const delta = deltaTotals(run);
-  const futures = runBranches(run);
-  const chosen = selectedBranch(run);
-  const result = asJson(run.result);
-  const verified = run.status === "verified";
-
+function RuntimeDetails({ run }: { run: ObjectiveRun }) {
+  const p = planningFor(run.result),
+    result = record(run.result);
+  const persisted = governedPersisted(run);
+  const files = receiptFiles(run.result);
   return (
-    <section
-      aria-label="Result"
-      className="glass-inset relative overflow-hidden rounded-md border border-primary/25 px-5 py-6 sm:px-8 sm:py-8"
-    >
-      <div className="pointer-events-none absolute -top-24 left-1/2 h-48 w-[36rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
-      <p className="font-mono text-[0.62rem] tracking-[0.3em] text-primary uppercase">
-        Result
-      </p>
-
-      {verified ? (
-        <>
-          <p className="mt-3 max-w-2xl text-lg leading-snug font-medium text-foreground sm:text-xl">
-            {statement?.headline ?? "Objective verified and persisted."}
+    <div className="grid gap-2">
+      <Reveal label="View reasoning">
+        <p>
+          {p.elements.length
+            ? `${p.elements.length} Meaning Elements were recorded from this objective.`
+            : "Reasoning has not been published for this run."}
+        </p>
+        {p.elements.map((m, i) => (
+          <p key={i} className="text-muted-foreground">
+            {String(m["text"] ?? m["me_id"] ?? "")}
           </p>
-          {statement?.detail && (
-            <p className="mt-3 max-w-2xl text-[0.92rem] leading-relaxed text-muted-foreground">
-              {statement.detail}
-            </p>
-          )}
-          <div className="mt-4 flex flex-wrap items-center gap-2 font-mono text-[0.64rem] tracking-[0.14em] uppercase">
-            <span className="rounded-sm border border-primary/40 bg-primary/10 px-2 py-1 text-primary">
-              ASCENSION · Verified / Persisted
-            </span>
-            {guardianPassed(run) && (
-              <span className="rounded-sm border border-border px-2 py-1 text-muted-foreground">
-                Guardian · pass
-              </span>
-            )}
-            {delta && (
-              <span className="rounded-sm border border-gold/40 bg-gold/10 px-2 py-1 text-gold">
-                Δ K+{delta.K} · U+{delta.U} · W+{delta.W}
-              </span>
-            )}
-          </div>
-        </>
-      ) : run.status === "rejected" ? (
-        <>
-          <p className="mt-3 max-w-2xl text-lg font-medium text-foreground">
-            ASCENSION's governance did not allow this objective to proceed.
-          </p>
-          <p className="mt-2 max-w-2xl text-[0.92rem] text-muted-foreground">
-            {run.error ?? "Guardian review blocked the pathways available for this objective."}
-          </p>
-        </>
-      ) : run.status === "failed" ? (
-        <>
-          <p className="mt-3 max-w-2xl text-lg font-medium text-foreground">
-            This run failed.
-          </p>
-          <p className="mt-2 max-w-2xl text-[0.92rem] text-muted-foreground">
-            {run.error ?? "The runtime reported a failure. Nothing was persisted."}
-          </p>
-        </>
-      ) : (
-        <div className="mt-4 flex items-center gap-3" aria-live="polite">
-          <span className="alive size-2.5 rounded-full bg-primary photon-glow" />
-          <p className="font-mono text-[0.78rem] tracking-[0.14em] text-muted-foreground uppercase">
-            {statusLine(run)}
-          </p>
-        </div>
-      )}
-
-      {verified && (
-        <div className="mt-6 grid gap-2">
-          <p className="font-mono text-[0.6rem] tracking-[0.24em] text-muted-foreground/70 uppercase">
-            Optional
-          </p>
-          <Disclosure label="View reasoning">
-            <p className="text-[0.92rem] text-foreground/85">
-              {chosen
-                ? `From your objective, ASCENSION formed meaning, compared ${futures.length || "several"} possible futures, and moved down: “${chosen.label}”.${chosen.why ? ` ${chosen.why}` : ""}`
-                : "ASCENSION decomposed your objective into meaning elements, compared possible futures, and executed the pathway governance allowed."}
-            </p>
-            {Array.isArray(result?.["meaning_elements"]) ||
-            (runPlanning(run)?.["meaning_elements"] as unknown[] | undefined) ? (
-              <p className="mt-2 text-[0.85rem] text-muted-foreground">
-                The meaning ASCENSION found in your words now lives in the Knowledgeverse —
-                visible on the{" "}
-                <a href="/knowledgeverse" className="text-primary underline underline-offset-4">
-                  Knowledgeverse page
-                </a>
-                .
+        ))}
+      </Reveal>
+      <Reveal label="View pathways">
+        {p.branches.length ? (
+          p.branches.map((b, i) => (
+            <div key={String(b["branch_id"] ?? i)} className="rounded-lg border border-border p-3">
+              <p className="text-primary">
+                {branchTitle(b)}
+                {b["branch_id"] === p.selected["branch_id"] && (
+                  <span className="ml-2 text-xs text-gold">Selected</span>
+                )}
               </p>
-            ) : null}
-          </Disclosure>
-          <Disclosure label="View pathways">
-            {futures.length > 0 ? (
-              <ul className="space-y-2">
-                {futures.map((branch, index) => {
-                  const label = branchLabel(branch, index);
-                  const isChosen =
-                    chosen !== null && label === chosen.label;
-                  return (
-                    <li
-                      key={index}
-                      className={cn(
-                        "rounded-sm border px-3 py-2 text-[0.9rem]",
-                        isChosen
-                          ? "border-primary/40 bg-primary/10 text-foreground"
-                          : "border-border/70 text-muted-foreground",
-                      )}
-                    >
-                      {isChosen && (
-                        <span className="mr-2 font-mono text-[0.6rem] tracking-[0.2em] text-primary uppercase">
-                          chosen ·
-                        </span>
-                      )}
-                      {label}
-                    </li>
-                  );
-                })}
+              <ul className="mt-2 space-y-1 text-muted-foreground">
+                {strings(b["actions"]).map((a, j) => (
+                  <li key={j}>{a}</li>
+                ))}
               </ul>
-            ) : (
-              <p className="text-muted-foreground">
-                The compared futures for this run were not published to your view.
-              </p>
-            )}
-          </Disclosure>
-          <Disclosure label="View verification">
-            <p className="text-[0.92rem] text-foreground/85">
-              Guardian {guardianPassed(run) ? "passed" : (run.guardian_verdict ?? "unavailable")} ·
-              AutoSync verified the outcome against submitted evidence · the accepted Δ is
-              recorded in the persisted ledger
-              {typeof result?.["runtime_revision"] === "number"
-                ? ` (revision ${result["runtime_revision"]})`
-                : ""}
-              .
-            </p>
-          </Disclosure>
-        </div>
-      )}
-    </section>
+              {strings(b["risks"]).length > 0 && (
+                <p className="mt-2 text-xs text-gold">{strings(b["risks"]).join(" · ")}</p>
+              )}
+            </div>
+          ))
+        ) : (
+          <p className="text-muted-foreground">
+            Alternative futures have not been published for this run.
+          </p>
+        )}
+      </Reveal>
+      <Reveal label="View verification">
+        <p>
+          {persisted
+            ? "The runtime verified its recorded artifacts and persisted the associated Δ."
+            : "Governed persistence has not been confirmed for this run."}
+        </p>
+        <p className="text-muted-foreground">
+          The generated answer above is external output. This runtime receipt does not verify that
+          answer or establish that the whole objective was accomplished.
+        </p>
+        <p>
+          Guardian: {run.guardian_verdict ?? "not published"} · AutoSync:{" "}
+          {String(result["autosync_verdict"] ?? "not published")}
+        </p>
+        {persisted && (
+          <p className="text-gold">
+            Verified Δ · K {String(result["delta_k"] ?? "—")} · W {String(result["delta_w"] ?? "—")}{" "}
+            · U {String(result["delta_u"] ?? "—")}
+          </p>
+        )}
+        {files.map((file, i) => (
+          <p key={i} className="break-all text-muted-foreground">
+            Recorded artifact: {file.name}
+            {file.bytes !== null ? ` (${file.bytes} bytes)` : ""}
+          </p>
+        ))}
+      </Reveal>
+    </div>
   );
 }
 
 export function Engage() {
-  const queryClient = useQueryClient();
+  const client = useQueryClient();
   const [objective, setObjective] = useState("");
-  const [activeRunId, setActiveRunId] = useState<string | null>(null);
-  const [authRedirect, setAuthRedirect] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const draftKey = "ascension.objective.draft";
-
+  const [evidence, setEvidence] = useState("");
+  const [constraints, setConstraints] = useState("");
+  const [active, setActive] = useState<string | null>(null);
+  const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const input = useRef<HTMLTextAreaElement>(null);
+  const generated = useRef(new Set<string>());
+  const refreshed = useRef(new Set<string>());
   useEffect(() => {
-    const draft = sessionStorage.getItem(draftKey);
-    if (draft) {
-      setObjective(draft);
-      sessionStorage.removeItem(draftKey);
-    }
+    const id = new URL(window.location.href).searchParams.get("run") ?? read(ACTIVE);
+    if (id && /^[a-f0-9-]{36}$/i.test(id)) setActive(id);
+    const draft = read(DRAFT);
+    if (draft) setObjective(draft);
   }, []);
-
-  const { data: run } = useQuery({
-    queryKey: ["ascension", "run", activeRunId],
-    enabled: Boolean(activeRunId),
-    queryFn: async () => {
-      if (!activeRunId) return null;
-      const { request } = await getObjectiveStatus({ data: { requestId: activeRunId } });
-      return request;
-    },
-    refetchInterval: (query) => {
-      const current = query.state.data;
-      return current && TERMINAL.has(current.status) ? false : 3000;
+  const runQuery = useQuery({
+    queryKey: ["ascension", "run", active],
+    enabled: Boolean(active),
+    queryFn: async () => (await getObjectiveStatus({ data: { requestId: active! } })).request,
+    refetchInterval: (q) => (q.state.data && TERMINAL.has(q.state.data.status) ? false : 3000),
+    retry: false,
+  });
+  const deliveryQuery = useQuery({
+    queryKey: ["ascension", "delivery", active],
+    enabled: Boolean(active),
+    queryFn: () => getObjectiveDelivery({ data: { requestId: active! } }),
+    refetchInterval: (q) => (q.state.data && q.state.data.status !== "running" ? false : 3000),
+    retry: false,
+  });
+  const history = useQuery({
+    queryKey: ["ascension", "my-objectives"],
+    enabled: historyOpen,
+    queryFn: listMyObjectives,
+    retry: false,
+  });
+  const prepare = useMutation({
+    mutationFn: ({ id, retry = false }: { id: string; retry?: boolean }) =>
+      prepareObjectiveDelivery({ data: { requestId: id, retry } }),
+    onSuccess: (_data, vars) => {
+      client.invalidateQueries({ queryKey: ["ascension", "delivery", vars.id] });
     },
   });
-
+  const run = runQuery.data;
+  const startDelivery = prepare.mutate;
+  useEffect(() => {
+    if (
+      run?.engine === "governed_runtime" &&
+      deliveryQuery.isSuccess &&
+      !deliveryQuery.data &&
+      !generated.current.has(run.id)
+    ) {
+      generated.current.add(run.id);
+      startDelivery({ id: run.id });
+    }
+  }, [run?.id, run?.engine, deliveryQuery.isSuccess, deliveryQuery.data, startDelivery]);
+  useEffect(() => {
+    if (run && governedPersisted(run) && !refreshed.current.has(run.id)) {
+      refreshed.current.add(run.id);
+      for (const surface of ["knowledgeverse", "chamber", "pathways", "ledger"])
+        client.invalidateQueries({ queryKey: ["ascension", surface] });
+    }
+  }, [run, client]);
   const engage = useMutation({
-    mutationFn: async (text: string) => {
-      const { request } = await submitObjective({
-        data: { objective: text },
-      });
-      return request;
+    mutationFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        save(DRAFT, objective);
+        window.location.href = `/auth?next=${encodeURIComponent("/")}`;
+        throw new Error("Sign in to submit your objective. Your words have been kept.");
+      }
+      return (
+        await submitObjective({
+          data: {
+            objective: objective.trim(),
+            evidence: evidence.split("\n").filter(Boolean),
+            constraints: constraints.split("\n").filter(Boolean),
+            ...(follow ? { parentRequestId: follow.id, followUp: follow.kind } : {}),
+          },
+        })
+      ).request;
     },
     onSuccess: (request) => {
+      client.setQueryData(["ascension", "run", request.id], request);
+      setActive(request.id);
+      save(ACTIVE, request.id);
+      save(DRAFT, "");
       setObjective("");
-      setActiveRunId(request.id);
-      queryClient.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
-    },
-    onError: async (error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      if (/auth|session|jwt|unauthorized/i.test(message)) {
-        sessionStorage.setItem(draftKey, objective);
-        const { data } = await supabase.auth.getUser();
-        if (!data.user) {
-          setAuthRedirect(true);
-          window.location.href = `/auth?next=${encodeURIComponent("/")}`;
-          return;
-        }
-      }
+      setEvidence("");
+      setConstraints("");
+      setFollow(null);
+      prepare.reset();
+      client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
+      window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
     },
   });
-
-  const followUp = useCallback(
-    (kind: "continue" | "refine" | "execute") => {
-      const base = run?.objective ?? objective;
-      if (!base) return;
-      const prefix =
-        kind === "continue"
-          ? "Continue: "
-          : kind === "refine"
-            ? ""
-            : "Execute the selected pathway for: ";
-      setObjective(kind === "refine" ? base : `${prefix}${base}`);
-      inputRef.current?.focus();
-    },
-    [run, objective],
-  );
-
-  const busy = engage.isPending;
-  const working = run !== undefined && run !== null && !TERMINAL.has(run.status);
-  const shown = run ?? null;
-  const canEngage = objective.trim().length > 0 && !busy && !working && !authRedirect;
-
-  const placeholder = useMemo(
-    () => "What do you want to accomplish?",
-    [],
-  );
-
+  let delivery: ObjectiveDelivery | null = null;
+  let invalidDelivery: string | null = null;
+  if (deliveryQuery.data?.status === "completed") {
+    try {
+      delivery = parseDelivery(deliveryQuery.data.response_payload);
+    } catch (e) {
+      invalidDelivery = e instanceof Error ? e.message : String(e);
+    }
+  }
+  const followUp = (kind: FollowUp) => {
+    if (!run) return;
+    setFollow({ id: run.id, kind });
+    setObjective(run.objective);
+    setEvidence(strings(run.evidence).join("\n"));
+    setConstraints(strings(run.constraints).join("\n"));
+    input.current?.focus();
+  };
+  const error = engage.error ?? runQuery.error ?? deliveryQuery.error ?? prepare.error;
+  const canEngage = Boolean(objective.trim()) && !engage.isPending;
+  const staleDelivery =
+    deliveryQuery.data?.status === "running" &&
+    Date.now() - Date.parse(deliveryQuery.data.created_at) > 180000;
+  const deliveryError =
+    deliveryQuery.data?.error ??
+    invalidDelivery ??
+    (staleDelivery ? "Result generation was interrupted. Retry to resume this objective." : null);
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
-      <section aria-label="Engage ASCENSION" className="space-y-4">
-        <h1 className="text-etched font-display text-2xl tracking-[0.34em] text-foreground uppercase sm:text-3xl">
-          Ascension
+    <div className="relative isolate mx-auto w-full max-w-6xl space-y-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-cover bg-center opacity-[0.08]"
+        style={{ backgroundImage: `url(${chamberPlate.url})` }}
+      />
+      <section aria-label="Engage ASCENSION" className="mx-auto max-w-3xl space-y-4">
+        <h1 className="text-etched font-display text-2xl tracking-[0.3em] text-foreground sm:text-3xl">
+          ASCENSION
         </h1>
-        <label
-          htmlFor="objective"
-          className="block text-[1.05rem] leading-relaxed text-foreground/90"
-        >
-          {placeholder}
+        <label htmlFor="objective" className="block text-lg text-foreground/90">
+          What do you want to accomplish?
         </label>
+        {follow && (
+          <p className="text-sm text-gold">
+            {follow.kind === "execute"
+              ? "Submit the selected result to the governed runtime"
+              : `${follow.kind === "refine" ? "Refine" : "Continue"} this result`}{" "}
+            · earlier context will be included.{" "}
+            <button onClick={() => setFollow(null)} className="underline">
+              Start separately
+            </button>
+          </p>
+        )}
         <textarea
           id="objective"
-          ref={inputRef}
+          ref={input}
           value={objective}
           onChange={(e) => setObjective(e.target.value)}
           onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canEngage) {
-              engage.mutate(objective.trim());
-            }
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && canEngage) engage.mutate();
           }}
           rows={4}
           maxLength={4000}
-          disabled={busy || working}
-          placeholder="Say it in your own words — ASCENSION will work it."
-          className="w-full resize-y rounded-md border border-border bg-void/60 px-4 py-3.5 text-[1rem] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:opacity-60"
+          disabled={engage.isPending}
+          placeholder="Say it in your own words."
+          className="w-full resize-y rounded-xl border border-primary/25 bg-void/60 px-5 py-4 text-base leading-relaxed focus:border-primary focus:outline-none"
         />
-        <div className="flex items-center justify-between gap-4">
-          <p className="font-mono text-[0.6rem] tracking-[0.2em] text-muted-foreground/70 uppercase">
-            {working ? statusLine(shown) : "Ctrl + Enter"}
-          </p>
+        <details className="text-sm text-muted-foreground">
+          <summary className="cursor-pointer">Add context or constraints</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label>
+              Supporting context
+              <textarea
+                value={evidence}
+                onChange={(e) => setEvidence(e.target.value)}
+                rows={3}
+                className="mt-2 w-full rounded-lg border border-border bg-void/60 p-3"
+                placeholder="One item per line"
+              />
+            </label>
+            <label>
+              Constraints
+              <textarea
+                value={constraints}
+                onChange={(e) => setConstraints(e.target.value)}
+                rows={3}
+                className="mt-2 w-full rounded-lg border border-border bg-void/60 p-3"
+                placeholder="One constraint per line"
+              />
+            </label>
+          </div>
+        </details>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="min-h-11 text-sm text-muted-foreground"
+          >
+            Past results
+          </button>
           <button
             type="button"
             disabled={!canEngage}
-            onClick={() => engage.mutate(objective.trim())}
-            className={cn(
-              "min-h-12 rounded-md border px-6 py-3 font-display text-[0.8rem] tracking-[0.26em] uppercase transition-all",
-              canEngage
-                ? "border-primary/60 bg-primary/15 text-primary photon-glow hover:bg-primary/25"
-                : "border-border text-muted-foreground/50",
-            )}
+            onClick={() => engage.mutate()}
+            className="min-h-12 rounded-full border border-primary/50 bg-primary/15 px-6 text-sm tracking-widest text-primary disabled:opacity-40"
           >
-            {busy ? "Engaging…" : "Engage Ascension"}
+            {engage.isPending ? "ENGAGING…" : "ENGAGE ASCENSION"}
           </button>
         </div>
-      </section>
-
-      {shown && <ResultPanel run={shown} />}
-
-      {shown?.status === "verified" && (
-        <section aria-label="Continue with this result" className="flex flex-wrap gap-2">
-          {(
-            [
-              ["continue", "Continue"],
-              ["refine", "Refine"],
-              ["execute", "Execute"],
-            ] as const
-          ).map(([kind, label]) => (
-            <button
-              key={kind}
-              type="button"
-              onClick={() => followUp(kind)}
-              className="min-h-10 rounded-sm border border-border px-4 py-2 font-mono text-[0.66rem] tracking-[0.2em] text-muted-foreground uppercase transition-colors hover:border-gold/50 hover:text-gold"
-            >
-              {label}
-            </button>
-          ))}
-          <a
-            href="/objectives"
-            className="min-h-10 rounded-sm border border-border px-4 py-2 font-mono text-[0.66rem] tracking-[0.2em] text-muted-foreground uppercase transition-colors hover:border-primary/40 hover:text-primary"
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/40 p-4 text-sm text-destructive"
           >
-            Past runs
-          </a>
-        </section>
-      )}
+            {error instanceof Error ? error.message : String(error)}
+            {active && (
+              <button
+                onClick={() => {
+                  runQuery.refetch();
+                  deliveryQuery.refetch();
+                }}
+                className="ml-3 underline"
+              >
+                Retry status
+              </button>
+            )}
+          </p>
+        )}
+        {active && runQuery.isSuccess && !run && (
+          <p role="alert" className="text-sm text-muted-foreground">
+            This saved objective is unavailable to your account.
+          </p>
+        )}
+        {historyOpen && (
+          <div className="rounded-xl border border-border p-4">
+            {history.isPending ? (
+              <p>Loading results…</p>
+            ) : history.error ? (
+              <p role="alert">Sign in to read your saved results.</p>
+            ) : history.data?.items.length ? (
+              history.data.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setActive(item.id);
+                    save(ACTIVE, item.id);
+                    setHistoryOpen(false);
+                    prepare.reset();
+                    window.history.replaceState(null, "", `/?run=${encodeURIComponent(item.id)}`);
+                  }}
+                  className="block w-full border-b border-border/50 py-3 text-left text-sm text-foreground"
+                >
+                  {item.objective.slice(0, 180)}
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {new Date(item.created_at).toLocaleString()}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No results yet.</p>
+            )}
+          </div>
+        )}
+        {run && (
+          <section
+            aria-label="Result"
+            className="glass-inset space-y-5 rounded-xl border border-primary/25 p-5 sm:p-7"
+          >
+            <p className="label-eyebrow text-primary">RESULT</p>
+            {delivery ? (
+              <ResultContent delivery={delivery} />
+            ) : deliveryError ? (
+              <div role="alert" className="space-y-3">
+                <p className="text-foreground">The answer could not be produced.</p>
+                <p className="text-sm text-muted-foreground">{deliveryError}</p>
+                <button
+                  type="button"
+                  disabled={prepare.isPending}
+                  onClick={() => prepare.mutate({ id: run.id, retry: true })}
+                  className="min-h-11 rounded-full border border-primary/40 px-4 text-sm text-primary"
+                >
+                  Retry result
+                </button>
+              </div>
+            ) : (
+              <p role="status" className="text-sm text-muted-foreground">
+                Preparing your answer or created solution…
+              </p>
+            )}
+            {delivery && (
+              <div className="flex flex-wrap gap-2">
+                {(["continue", "refine", "execute"] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => followUp(kind)}
+                    className="min-h-11 rounded-full border border-gold/30 px-5 text-sm capitalize text-gold"
+                  >
+                    {kind}
+                  </button>
+                ))}
+              </div>
+            )}
+            {run.status === "queued" && (
+              <p className="text-xs text-muted-foreground">
+                Your objective is queued for the local runtime. It has not been claimed yet.
+              </p>
+            )}
+            {(run.status === "claimed" || run.status === "running") && (
+              <p role="status" className="text-xs text-primary">
+                The local runtime is processing this objective.
+              </p>
+            )}
+            {(run.status === "rejected" || run.status === "failed") && (
+              <p role="alert" className="text-sm text-gold">
+                {run.status === "rejected"
+                  ? "The governed request was rejected."
+                  : "The governed request failed."}{" "}
+                {run.error}
+              </p>
+            )}
+            {governedPersisted(run) && (
+              <p className="text-xs text-primary">
+                Recorded runtime artifacts verified and persisted.
+              </p>
+            )}
+            <RuntimeDetails run={run} />
+          </section>
+        )}
+      </section>
+      <ConnectedKnowledgeWorld compact />
     </div>
   );
 }

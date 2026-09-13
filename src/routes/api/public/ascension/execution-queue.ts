@@ -63,6 +63,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         const { data: pending, error: readError } = await supabaseAdmin
           .from("ascension_execution_requests")
           .select("id, objective, evidence, constraints, submitted_by, submitted_via, created_at")
+          .eq("engine", "governed_runtime")
           .eq("status", "queued")
           .order("created_at", { ascending: true })
           .limit(1);
@@ -81,6 +82,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
             claimed_by: runner,
           })
           .eq("id", next.id)
+          .eq("engine", "governed_runtime")
           .eq("status", "queued")
           .select("id, objective, evidence, constraints, submitted_by, submitted_via, created_at")
           .maybeSingle();
@@ -101,6 +103,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
           return json({ error: "invalid_json" }, 400);
         }
 
+        if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "invalid_json_object" }, 400);
         const id = optionalString(body["request_id"], 64);
         if (!id) return json({ error: "request_id is required" }, 400);
 
@@ -139,6 +142,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
           .from("ascension_execution_requests")
           .update(patch)
           .eq("id", id)
+          .eq("engine", "governed_runtime")
           .select("id, status, stage, completed_at")
           .maybeSingle();
         if (error) return json({ error: "update_failed" }, 500);
@@ -149,3 +153,4 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
     },
   },
 });
+

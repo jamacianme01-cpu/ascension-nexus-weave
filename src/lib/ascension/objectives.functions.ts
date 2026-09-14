@@ -47,7 +47,8 @@ export const submitObjective = createServerFn({ method: "POST" })
       evidence?: string[];
       constraints?: string[];
       parentRequestId?: string;
-      followUp?: "continue" | "refine" | "execute";
+      followUp?: "continue" | "refine" | "simulate" | "execute";
+      selectedPathwayId?: string;
     }) => {
       const objective = input.objective?.trim();
       if (!objective) throw new Error("An objective statement is required.");
@@ -61,6 +62,7 @@ export const submitObjective = createServerFn({ method: "POST" })
       return {
         parentRequestId: input.parentRequestId ?? null,
         followUp: input.followUp ?? null,
+        selectedPathwayId: input.selectedPathwayId?.trim().slice(0, 200) || null,
         objective: objective.slice(0, 4000),
         evidence: clean(input.evidence, 2000),
         constraints: clean(input.constraints, 500),
@@ -72,7 +74,7 @@ export const submitObjective = createServerFn({ method: "POST" })
     if (data.parentRequestId) {
       if (
         !/^[a-f0-9-]{36}$/i.test(data.parentRequestId) ||
-        !["continue", "refine", "execute"].includes(data.followUp ?? "")
+        !["continue", "refine", "simulate", "execute"].includes(data.followUp ?? "")
       )
         throw new Error("Invalid follow-up reference.");
       const { data: parent, error: parentError } = await context.supabase
@@ -94,6 +96,8 @@ export const submitObjective = createServerFn({ method: "POST" })
       const contextText = JSON.stringify({
         parent_request_id: parent.id,
         requested_action: data.followUp,
+        user_selected_pathway_id: data.selectedPathwayId,
+        selection_authority: data.selectedPathwayId ? "USER_SELECTED" : "NO_USER_SELECTION",
         prior_objective: parent.objective,
         prior_result: delivery?.response_payload ?? null,
         verification: "External draft supplied as context only; not verified evidence.",

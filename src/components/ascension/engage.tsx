@@ -24,7 +24,7 @@ import chamberPlate from "@/assets/chamber.png.asset.json";
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
-type FollowUp = "continue" | "refine" | "execute";
+type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {
   try {
@@ -173,6 +173,77 @@ function RuntimeDetails({ run }: { run: ObjectiveRun }) {
   );
 }
 
+function PathwayChoices({
+  run,
+  selectedId,
+  onSelect,
+  onAction,
+}: {
+  run: ObjectiveRun;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onAction: (kind: FollowUp) => void;
+}) {
+  const pathways = planningFor(run.result);
+  if (!pathways.branches.length) return null;
+  const recommendedId = String(pathways.selected["branch_id"] ?? "");
+  return (
+    <section aria-label="Choose a pathway" className="space-y-4">
+      <div>
+        <p className="label-eyebrow text-primary">PATHWAYS</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          ASCENSION recommends the strongest supported pathway. You choose which valid pathway moves forward.
+        </p>
+      </div>
+      <div className="grid gap-3">
+        {pathways.branches.map((branch, index) => {
+          const id = String(branch["branch_id"] ?? index);
+          const selected = selectedId === id;
+          const recommended = recommendedId === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelect(id)}
+              aria-pressed={selected}
+              className={`rounded-xl border p-4 text-left transition ${
+                selected ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+              }`}
+            >
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-foreground">{branchTitle(branch)}</span>
+                {recommended && <span className="text-xs text-gold">RECOMMENDED</span>}
+                {selected && <span className="text-xs text-primary">YOUR SELECTION</span>}
+              </span>
+              {strings(branch["actions"]).length > 0 && (
+                <span className="mt-2 block text-sm text-muted-foreground">
+                  {strings(branch["actions"]).join(" · ")}
+                </span>
+              )}
+              {strings(branch["risks"]).length > 0 && (
+                <span className="mt-2 block text-xs text-gold">
+                  Risk/tradeoff: {strings(branch["risks"]).join(" · ")}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => onAction("simulate")} disabled={!selectedId} className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary disabled:opacity-40">
+          Simulate selected path
+        </button>
+        <button type="button" onClick={() => onAction("refine")} disabled={!selectedId} className="min-h-11 rounded-full border border-gold/30 px-5 text-sm text-gold disabled:opacity-40">
+          Refine selected path
+        </button>
+        <button type="button" onClick={() => onAction("execute")} disabled={!selectedId} className="min-h-11 rounded-full border border-gold/50 bg-gold/10 px-5 text-sm text-gold disabled:opacity-40">
+          Execute selected path
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function Engage() {
   const client = useQueryClient();
   const [objective, setObjective] = useState("");
@@ -180,6 +251,7 @@ export function Engage() {
   const [constraints, setConstraints] = useState("");
   const [active, setActive] = useState<string | null>(null);
   const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
+  const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const generated = useRef(new Set<string>());
@@ -252,7 +324,7 @@ export function Engage() {
             objective: objective.trim(),
             evidence: evidence.split("\n").filter(Boolean),
             constraints: constraints.split("\n").filter(Boolean),
-            ...(follow ? { parentRequestId: follow.id, followUp: follow.kind } : {}),
+            ...(follow ? { parentRequestId: follow.id, followUp: follow.kind, selectedPathwayId: selectedPathwayId ?? undefined } : {}),
           },
         })
       ).request;
@@ -266,6 +338,7 @@ export function Engage() {
       setEvidence("");
       setConstraints("");
       setFollow(null);
+      setSelectedPathwayId(null);
       prepare.reset();
       client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
@@ -461,17 +534,18 @@ export function Engage() {
             )}
             {delivery && (
               <div className="flex flex-wrap gap-2">
-                {(["continue", "refine", "execute"] as const).map((kind) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => followUp(kind)}
-                    className="min-h-11 rounded-full border border-gold/30 px-5 text-sm capitalize text-gold"
-                  >
-                    {kind}
-                  </button>
-                ))}
+                <button type="button" onClick={() => followUp("continue")} className="min-h-11 rounded-full border border-gold/30 px-5 text-sm text-gold">
+                  Continue
+                </button>
               </div>
+            )}
+            {delivery && (
+              <PathwayChoices
+                run={run}
+                selectedId={selectedPathwayId ?? String(planningFor(run.result).selected["branch_id"] ?? "") || null}
+                onSelect={setSelectedPathwayId}
+                onAction={followUp}
+              />
             )}
             {run.status === "queued" && (
               <p className="text-xs text-muted-foreground">

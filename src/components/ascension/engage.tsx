@@ -222,6 +222,7 @@ export function Engage() {
   useEffect(() => {
     if (
       run?.engine === "governed_runtime" &&
+      run.status === "verified" &&
       deliveryQuery.isSuccess &&
       !deliveryQuery.data &&
       !generated.current.has(run.id)
@@ -229,7 +230,7 @@ export function Engage() {
       generated.current.add(run.id);
       startDelivery({ id: run.id });
     }
-  }, [run?.id, run?.engine, deliveryQuery.isSuccess, deliveryQuery.data, startDelivery]);
+  }, [run?.id, run?.engine, run?.status, deliveryQuery.isSuccess, deliveryQuery.data, startDelivery]);
   useEffect(() => {
     if (run && governedPersisted(run) && !refreshed.current.has(run.id)) {
       refreshed.current.add(run.id);

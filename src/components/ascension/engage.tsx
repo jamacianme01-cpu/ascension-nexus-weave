@@ -196,9 +196,9 @@ function PathwayChoices({
       <div className="relative min-h-[430px] overflow-hidden rounded-2xl border border-primary/25 bg-void/70">
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(80,228,221,.16),transparent_24%),radial-gradient(circle_at_80%_50%,rgba(201,155,98,.10),transparent_35%)]" />
         <div className="relative z-10 px-5 pt-5">
-          <p className="label-eyebrow text-primary">KNOWLEDGE TAKING FORM</p>
+          <p className="label-eyebrow text-primary">KNOWLEDGEVERSE</p>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Meaning from your objective is relating into possible futures. ASCENSION recommends one; every valid future remains yours to choose.
+            Watch meaning become relationships, Knowledge Forms, and possible futures. ASCENSION recommends one future; every valid future remains yours to choose.
           </p>
         </div>
         <svg viewBox="0 0 900 390" className="relative z-10 mt-1 w-full" role="group" aria-label="Meaning Elements forming connected pathway futures">
@@ -510,6 +510,14 @@ export function Engage() {
             )}
           </div>
         )}
+        {run && run.status === "verified" && (
+          <PathwayChoices
+            run={run}
+            selectedId={(selectedPathwayId ?? String(planningFor(run.result).selected["branch_id"] ?? "")) || null}
+            onSelect={setSelectedPathwayId}
+            onAction={followUp}
+          />
+        )}
         {run && (
           <section
             aria-label="Result"
@@ -543,14 +551,6 @@ export function Engage() {
                 </button>
               </div>
             )}
-            {delivery && (
-              <PathwayChoices
-                run={run}
-                selectedId={(selectedPathwayId ?? String(planningFor(run.result).selected["branch_id"] ?? "")) || null}
-                onSelect={setSelectedPathwayId}
-                onAction={followUp}
-              />
-            )}
             {run.status === "queued" && (
               <p className="text-xs text-muted-foreground">
                 Your objective is queued for the local runtime. It has not been claimed yet.
@@ -578,7 +578,7 @@ export function Engage() {
           </section>
         )}
       </section>
-      <ConnectedKnowledgeWorld compact />
+      <ConnectedKnowledgeWorld />
     </div>
   );
 }

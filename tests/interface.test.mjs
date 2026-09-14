@@ -37,6 +37,7 @@ try {
   check("complete answer and file content is retained", () => assert.deepEqual(model.parseDelivery(valid), valid));
   check("path traversal and duplicate file names are refused", () => { assert.throws(() => model.parseDelivery({ ...valid, files: [{ name: "../secret", content: "x" }] })); assert.throws(() => model.parseDelivery({ ...valid, files: [...valid.files, ...valid.files] })); });
   check("empty or partial generated output is refused", () => { assert.throws(() => model.parseDelivery({ ...valid, body: "" })); assert.throws(() => model.parseDelivery({ ...valid, files: [] })); });
+  check("canned Knowledgeverse template is refused", () => { assert.throws(() => model.parseDelivery({ kind: "answer", title: "Solution", body: "The Knowledgeverse has mapped 6 relevant entities. **Identity Phase:** Establish your objective\'s unique chromosome. **Development Phase:** Cultivate relationships. **Emergence Phase:** Allow verified deltas to guide natural evolution.", files: [], limitations: [] }), /generic architecture template/); });
   const original = globalThis.fetch;
   const priorKey = process.env.ZAI_API_KEY;
   process.env.ZAI_API_KEY = "test-only";

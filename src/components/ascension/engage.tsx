@@ -184,61 +184,65 @@ function PathwayChoices({
   onSelect: (id: string) => void;
   onAction: (kind: FollowUp) => void;
 }) {
-  const pathways = planningFor(run.result);
-  if (!pathways.branches.length) return null;
-  const recommendedId = String(pathways.selected["branch_id"] ?? "");
+  const pathwayState = planningFor(run.result);
+  if (!pathwayState.branches.length && !pathwayState.elements.length) return null;
+  const recommendedId = String(pathwayState.selected["branch_id"] ?? "");
+  const activeId = selectedId || recommendedId;
+  const active = pathwayState.branches.find(
+    (branch, index) => String(branch["branch_id"] ?? index) === activeId,
+  );
   return (
-    <section aria-label="Choose a pathway" className="space-y-4">
-      <div>
-        <p className="label-eyebrow text-primary">PATHWAYS</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          ASCENSION recommends the strongest supported pathway. You choose which valid pathway moves forward.
-        </p>
-      </div>
-      <div className="grid gap-3">
-        {pathways.branches.map((branch, index) => {
-          const id = String(branch["branch_id"] ?? index);
-          const selected = selectedId === id;
-          const recommended = recommendedId === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onSelect(id)}
-              aria-pressed={selected}
-              className={`rounded-xl border p-4 text-left transition ${
-                selected ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-              }`}
-            >
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="text-foreground">{branchTitle(branch)}</span>
-                {recommended && <span className="text-xs text-gold">RECOMMENDED</span>}
-                {selected && <span className="text-xs text-primary">YOUR SELECTION</span>}
-              </span>
-              {strings(branch["actions"]).length > 0 && (
-                <span className="mt-2 block text-sm text-muted-foreground">
-                  {strings(branch["actions"]).join(" · ")}
-                </span>
-              )}
-              {strings(branch["risks"]).length > 0 && (
-                <span className="mt-2 block text-xs text-gold">
-                  Risk/tradeoff: {strings(branch["risks"]).join(" · ")}
-                </span>
-              )}
-            </button>
-          );
-        })}
+    <section aria-label="Knowledge taking form" className="space-y-4">
+      <div className="relative min-h-[430px] overflow-hidden rounded-2xl border border-primary/25 bg-void/70">
+        <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(80,228,221,.16),transparent_24%),radial-gradient(circle_at_80%_50%,rgba(201,155,98,.10),transparent_35%)]" />
+        <div className="relative z-10 px-5 pt-5">
+          <p className="label-eyebrow text-primary">KNOWLEDGE TAKING FORM</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Meaning from your objective is relating into possible futures. ASCENSION recommends one; every valid future remains yours to choose.
+          </p>
+        </div>
+        <svg viewBox="0 0 900 390" className="relative z-10 mt-1 w-full" role="group" aria-label="Meaning Elements forming connected pathway futures">
+          <defs>
+            <filter id="formation-glow"><feGaussianBlur stdDeviation="5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            <linearGradient id="formation-flow"><stop stopColor="#50e4dd" /><stop offset="1" stopColor="#c99b62" /></linearGradient>
+          </defs>
+          {pathwayState.elements.slice(0, 8).map((element, index) => {
+            const y = 45 + index * (285 / Math.max(1, Math.min(8, pathwayState.elements.length) - 1));
+            return <g key={String(element["me_id"] ?? index)}>
+              <path d={`M145 ${y} Q310 ${y} 420 195`} fill="none" stroke="#50e4dd" strokeOpacity=".38" strokeDasharray="4 7" />
+              <circle cx="130" cy={y} r="8" fill="#50e4dd" filter="url(#formation-glow)" />
+              <text x="150" y={y + 4} fill="#a9cdca" fontSize="10">{String(element["text"] ?? element["me_id"] ?? "Meaning").slice(0, 34)}</text>
+            </g>;
+          })}
+          <circle cx="450" cy="195" r="74" fill="#07151d" stroke="url(#formation-flow)" strokeWidth="2" filter="url(#formation-glow)" />
+          <circle cx="450" cy="195" r="55" fill="none" stroke="#50e4dd" strokeOpacity=".35" strokeDasharray="5 7" />
+          <text x="450" y="187" textAnchor="middle" fill="#dcebea" fontSize="13">OBJECTIVE</text>
+          <text x="450" y="208" textAnchor="middle" fill="#78d8d2" fontSize="10">{run.status.toUpperCase()}</text>
+          {pathwayState.branches.slice(0, 6).map((branch, index) => {
+            const id = String(branch["branch_id"] ?? index);
+            const y = 48 + index * (285 / Math.max(1, Math.min(6, pathwayState.branches.length) - 1));
+            const chosen = id === activeId;
+            const recommended = id === recommendedId;
+            return <g key={id} role="button" tabIndex={0} aria-label={`Choose ${branchTitle(branch)}`} aria-pressed={chosen} onClick={() => onSelect(id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(id); } }} className="cursor-pointer outline-none">
+              <path d={`M520 195 Q635 ${y} 735 ${y}`} fill="none" stroke={chosen ? "#d5b879" : "#50e4dd"} strokeWidth={chosen ? 3 : 1.25} strokeOpacity={chosen ? ".9" : ".35"} />
+              <circle cx="755" cy={y} r={chosen ? 20 : 14} fill={chosen ? "#42351f" : "#102c36"} stroke={chosen ? "#d5b879" : "#50e4dd"} filter={chosen ? "url(#formation-glow)" : undefined} />
+              <text x="785" y={y - 3} fill={chosen ? "#e6c98b" : "#c4dedb"} fontSize="11">{branchTitle(branch).slice(0, 28)}</text>
+              <text x="785" y={y + 12} fill={recommended ? "#d5b879" : "#789492"} fontSize="9">{recommended ? "RECOMMENDED" : "ALTERNATIVE FUTURE"}</text>
+            </g>;
+          })}
+        </svg>
+        {active && (
+          <div className="relative z-10 border-t border-primary/15 bg-void/45 px-5 py-4">
+            <p className="text-sm text-gold">{branchTitle(active)}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{strings(active["actions"]).join(" · ")}</p>
+            {strings(active["risks"]).length > 0 && <p className="mt-2 text-xs text-gold/80">Risk/tradeoff: {strings(active["risks"]).join(" · ")}</p>}
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => onAction("simulate")} disabled={!selectedId} className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary disabled:opacity-40">
-          Simulate selected path
-        </button>
-        <button type="button" onClick={() => onAction("refine")} disabled={!selectedId} className="min-h-11 rounded-full border border-gold/30 px-5 text-sm text-gold disabled:opacity-40">
-          Refine selected path
-        </button>
-        <button type="button" onClick={() => onAction("execute")} disabled={!selectedId} className="min-h-11 rounded-full border border-gold/50 bg-gold/10 px-5 text-sm text-gold disabled:opacity-40">
-          Execute selected path
-        </button>
+        <button type="button" onClick={() => onAction("simulate")} disabled={!activeId} className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary disabled:opacity-40">Simulate selected future</button>
+        <button type="button" onClick={() => onAction("refine")} disabled={!activeId} className="min-h-11 rounded-full border border-gold/30 px-5 text-sm text-gold disabled:opacity-40">Refine selected future</button>
+        <button type="button" onClick={() => onAction("execute")} disabled={!activeId} className="min-h-11 rounded-full border border-gold/50 bg-gold/10 px-5 text-sm text-gold disabled:opacity-40">Execute selected future</button>
       </div>
     </section>
   );

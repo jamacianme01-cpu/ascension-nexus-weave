@@ -93,10 +93,34 @@ export const submitObjective = createServerFn({ method: "POST" })
         .eq("status", "completed")
         .maybeSingle();
       if (deliveryError) throw new Error(deliveryError.message);
+      const parentResult =
+        parent.result && typeof parent.result === "object" && !Array.isArray(parent.result)
+          ? (parent.result as Record<string, Json | undefined>)
+          : {};
+      const planning =
+        parentResult["objective_planning"] &&
+        typeof parentResult["objective_planning"] === "object" &&
+        !Array.isArray(parentResult["objective_planning"])
+          ? (parentResult["objective_planning"] as Record<string, Json | undefined>)
+          : {};
+      const branches = Array.isArray(planning["branches"]) ? planning["branches"] : [];
+      const selectedPathway = data.selectedPathwayId
+        ? branches.find(
+            (branch) =>
+              branch &&
+              typeof branch === "object" &&
+              !Array.isArray(branch) &&
+              String((branch as Record<string, Json | undefined>)["branch_id"] ?? "") ===
+                data.selectedPathwayId,
+          )
+        : null;
+      if (data.selectedPathwayId && !selectedPathway)
+        throw new Error("The selected pathway is not part of this governed objective.");
       const contextText = JSON.stringify({
         parent_request_id: parent.id,
         requested_action: data.followUp,
         user_selected_pathway_id: data.selectedPathwayId,
+        user_selected_pathway: selectedPathway,
         selection_authority: data.selectedPathwayId ? "USER_SELECTED" : "NO_USER_SELECTION",
         prior_objective: parent.objective,
         prior_result: delivery?.response_payload ?? null,

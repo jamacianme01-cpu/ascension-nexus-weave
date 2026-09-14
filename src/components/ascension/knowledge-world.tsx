@@ -131,56 +131,6 @@ function EntityCard({ node }: { node: WorldNode }) {
   );
 }
 
-function FormationSequence({ world }: { world: KnowledgeWorld }) {
-  const meaningCount = new Set(world.nodes.flatMap((node) => node.mes)).size;
-  const lineageCount = world.nodes.reduce((total, node) => total + node.events.length, 0);
-  const stages = [
-    { label: "Meaning received", value: meaningCount, active: meaningCount > 0 },
-    { label: "Relationships formed", value: world.edges.length, active: world.edges.length > 0 },
-    { label: "Knowledge took form", value: world.nodes.length, active: world.nodes.length > 0 },
-    { label: "Emergence", value: world.emergences.length, active: world.emergences.length > 0 },
-    { label: "Verified evolution", value: lineageCount, active: lineageCount > 0 },
-  ];
-  return (
-    <div className="overflow-hidden rounded-2xl border border-primary/20 bg-void/50 p-4 sm:p-5">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="label-eyebrow text-primary">KNOWLEDGE FORMATION</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Published meaning becoming relationships, forms, emergence, and retained evolution.
-          </p>
-        </div>
-        <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-primary shadow-[0_0_18px_rgba(80,228,221,.9)]" />
-      </div>
-      <div className="relative grid grid-cols-1 gap-3 sm:grid-cols-5">
-        <div aria-hidden="true" className="absolute left-[8%] right-[8%] top-5 hidden h-px bg-gradient-to-r from-primary/10 via-primary/80 to-gold/50 sm:block" />
-        {stages.map((stage, index) => (
-          <div key={stage.label} className="relative z-10 flex items-center gap-3 sm:block sm:text-center">
-            <span
-              className={cn(
-                "grid h-10 w-10 shrink-0 place-items-center rounded-full border bg-void text-sm",
-                stage.active
-                  ? "border-primary text-primary shadow-[0_0_22px_rgba(80,228,221,.35)]"
-                  : "border-border text-muted-foreground",
-              )}
-            >
-              {stage.value}
-            </span>
-            <div className="sm:mt-3">
-              <p className={cn("text-xs", stage.active ? "text-foreground" : "text-muted-foreground")}>
-                {stage.label}
-              </p>
-              {index < stages.length - 1 && (
-                <span aria-hidden="true" className="mt-1 block text-xs text-primary/60 sm:hidden">↓</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /** Tree geometry is presentation; cyan links only depict published relationships. */
 export function KnowledgeWorldView({
   world,
@@ -247,7 +197,6 @@ export function KnowledgeWorldView({
           )}
         </div>
       </div>
-      <FormationSequence world={world} />
       <div
         className={cn(
           "grid items-start gap-5",

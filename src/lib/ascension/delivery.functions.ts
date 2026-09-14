@@ -39,7 +39,7 @@ export const prepareObjectiveDelivery = createServerFn({ method: "POST" })
     // Resolve ownership with the caller's RLS session before using the admin client.
     const { data: run, error } = await context.supabase
       .from("ascension_execution_requests")
-      .select("id, objective, evidence, constraints, result, engine, submitted_by")
+      .select("id, objective, evidence, constraints, result, engine, status, submitted_by")
       .eq("id", data.requestId)
       .eq("submitted_by", context.userId)
       .maybeSingle();
@@ -47,6 +47,8 @@ export const prepareObjectiveDelivery = createServerFn({ method: "POST" })
     if (!run) throw new Error("This objective is unavailable to your account.");
     if (run.engine !== "governed_runtime")
       throw new Error("This run uses a different result workflow.");
+    if (!["verified", "rejected", "failed"].includes(run.status))
+      throw new Error("ASCENSION is still processing this objective.");
     const { prepareDelivery } = await import("./engine/delivery.server");
     return prepareDelivery(run, data.retry);
   });

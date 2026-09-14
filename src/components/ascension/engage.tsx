@@ -546,7 +546,7 @@ export function Engage() {
             {delivery && (
               <PathwayChoices
                 run={run}
-                selectedId={selectedPathwayId ?? String(planningFor(run.result).selected["branch_id"] ?? "") || null}
+                selectedId={(selectedPathwayId ?? String(planningFor(run.result).selected["branch_id"] ?? "")) || null}
                 onSelect={setSelectedPathwayId}
                 onAction={followUp}
               />

@@ -104,6 +104,23 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
   ) {
     throw new Error("The answer engine returned an incomplete result. Retry this result.");
   }
+  const normalizedBody = v["body"].toLowerCase();
+  const cannedArchitectureMarkers = [
+    "the knowledgeverse has mapped",
+    "**identity phase:**",
+    "**development phase:**",
+    "**emergence phase:**",
+    "objective's unique chromosome",
+    "verified deltas to guide natural evolution",
+  ];
+  const cannedMarkerCount = cannedArchitectureMarkers.filter((marker) =>
+    normalizedBody.includes(marker),
+  ).length;
+  if (cannedMarkerCount >= 2) {
+    throw new Error(
+      "The answer engine returned a generic architecture template instead of answering the objective. Retry this result.",
+    );
+  }
   const names = new Set<string>();
   const files = v["files"].map((raw) => {
     const f = record(raw);

@@ -244,6 +244,7 @@ function PathwayChoices({
   );
 }
 
+/** Primary result-first interface rendered inside the living Knowledgeverse. */
 export function Engage() {
   const client = useQueryClient();
   const [objective, setObjective] = useState("");

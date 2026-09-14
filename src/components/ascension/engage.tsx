@@ -328,7 +328,13 @@ export function Engage() {
             objective: objective.trim(),
             evidence: evidence.split("\n").filter(Boolean),
             constraints: constraints.split("\n").filter(Boolean),
-            ...(follow\n              ? {\n                  parentRequestId: follow.id,\n                  followUp: follow.kind,\n                  ...(selectedPathwayId ? { selectedPathwayId } : {}),\n                }\n              : {}),
+            ...(follow
+              ? {
+                  parentRequestId: follow.id,
+                  followUp: follow.kind,
+                  ...(selectedPathwayId ? { selectedPathwayId } : {}),
+                }
+              : {}),
           },
         })
       ).request;

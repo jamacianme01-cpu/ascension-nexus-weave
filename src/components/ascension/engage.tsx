@@ -185,7 +185,6 @@ function PathwayChoices({
   onAction: (kind: FollowUp) => void;
 }) {
   const pathwayState = planningFor(run.result);
-  if (!pathwayState.branches.length && !pathwayState.elements.length) return null;
   const recommendedId = String(pathwayState.selected["branch_id"] ?? "");
   const activeId = selectedId || recommendedId;
   const active = pathwayState.branches.find(
@@ -218,6 +217,7 @@ function PathwayChoices({
           <circle cx="450" cy="195" r="55" fill="none" stroke="#50e4dd" strokeOpacity=".35" strokeDasharray="5 7" />
           <text x="450" y="187" textAnchor="middle" fill="#dcebea" fontSize="13">OBJECTIVE</text>
           <text x="450" y="208" textAnchor="middle" fill="#78d8d2" fontSize="10">{run.status.toUpperCase()}</text>
+          <text x="450" y="292" textAnchor="middle" fill="#93aaa9" fontSize="10">{run.objective.slice(0, 72)}</text>
           {pathwayState.branches.slice(0, 6).map((branch, index) => {
             const id = String(branch["branch_id"] ?? index);
             const y = 48 + index * (285 / Math.max(1, Math.min(6, pathwayState.branches.length) - 1));
@@ -510,7 +510,7 @@ export function Engage() {
             )}
           </div>
         )}
-        {run && run.status === "verified" && (
+        {run && (
           <PathwayChoices
             run={run}
             selectedId={(selectedPathwayId ?? String(planningFor(run.result).selected["branch_id"] ?? "")) || null}

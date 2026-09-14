@@ -89,10 +89,6 @@ export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
           </ul>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">
-        {delivery.kind === "artifact" ? "Created draft" : "Generated response"} · awaiting
-        independent verification
-      </p>
     </div>
   );
 }
@@ -381,13 +377,13 @@ export function Engage() {
     invalidDelivery ??
     (staleDelivery ? "Result generation was interrupted. Retry to resume this objective." : null);
   return (
-    <div className="relative isolate mx-auto w-full max-w-6xl space-y-10">
+    <div className="ascension-world relative isolate mx-auto w-full max-w-none">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-cover bg-center opacity-[0.08]"
+        className="ascension-world-backdrop pointer-events-none absolute inset-0 -z-10 bg-cover bg-center"
         style={{ backgroundImage: `url(${chamberPlate.url})` }}
       />
-      <section aria-label="Engage ASCENSION" className="mx-auto max-w-3xl space-y-4">
+      <section aria-label="Engage ASCENSION" className="ascension-command mx-auto max-w-3xl space-y-4">
         <h1 className="text-etched font-display text-2xl tracking-[0.3em] text-foreground sm:text-3xl">
           ASCENSION
         </h1>

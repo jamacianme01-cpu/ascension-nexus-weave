@@ -31,12 +31,11 @@ export const getObjectiveDelivery = createServerFn({ method: "GET" })
     return row as unknown as DeliveryState | null;
   });
 
-/** External answer/draft only. Never changes a governed request or awards Δ. */
+/** External answer/draft. Governance continues independently. */
 export const prepareObjectiveDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
-    // Resolve ownership with the caller's RLS session before using the admin client.
     const { data: run, error } = await context.supabase
       .from("ascension_execution_requests")
       .select("id, objective, evidence, constraints, result, engine, status, submitted_by")
@@ -45,10 +44,6 @@ export const prepareObjectiveDelivery = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!run) throw new Error("This objective is unavailable to your account.");
-    if (run.engine !== "governed_runtime")
-      throw new Error("This run uses a different result workflow.");
-    if (run.status !== "verified")
-      throw new Error("ASCENSION has not verified this objective.");
     const { prepareDelivery } = await import("./engine/delivery.server");
     return prepareDelivery(run, data.retry);
   });

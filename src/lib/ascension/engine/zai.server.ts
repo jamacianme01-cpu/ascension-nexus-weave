@@ -5,10 +5,8 @@
  * state: every response returned by this module is raw external output and must
  * be labelled as such by the caller. This module never writes governed state,
  * never invents a value and never rewrites an engine error.
- *
- * Calls are streamed so bytes keep flowing during long reasoning runs; the
- * accumulated text is returned once the stream completes. Requests are bounded to 90 seconds.
  */
+import { formatKnowledgeEvidence, retrieveKnowledge } from "./knowledge.server";
 
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_MODEL = "glm-4.6";
@@ -16,7 +14,6 @@ const DEFAULT_MODEL = "glm-4.6";
 export interface ZaiCallResult {
   model: string;
   text: string;
-  /** Parsed JSON object when the engine returned one, otherwise null. */
   json: Record<string, unknown> | null;
   duration_ms: number;
 }
@@ -52,7 +49,7 @@ function extractJson(text: string): Record<string, unknown> | null {
         return parsed as Record<string, unknown>;
       }
     } catch {
-      // fall through — the raw text is still returned verbatim
+      // Raw external text is still returned verbatim.
     }
   }
   return null;
@@ -87,6 +84,7 @@ async function readStream(response: Response): Promise<string> {
       if (typeof fragment === "string") text += fragment;
     }
   }
+
   try {
     for (;;) {
       const { value, done } = await reader.read();
@@ -103,7 +101,7 @@ async function readStream(response: Response): Promise<string> {
   return text;
 }
 
-/** One streamed Z.AI chat call. Throws ZaiEngineError verbatim on failure. */
+/** One streamed Z.AI call with live external knowledge supplied as evidence. */
 export async function callZai(input: {
   system: string;
   user: string;
@@ -115,6 +113,21 @@ export async function callZai(input: {
       "ZAI_API_KEY is not configured; the hosted Z.AI engine is unavailable.",
     );
   }
+
+  let knowledgeText = "External knowledge retrieval unavailable for this call.";
+  try {
+    const knowledge = await retrieveKnowledge(input.user, 6);
+    knowledgeText = formatKnowledgeEvidence(knowledge);
+  } catch (cause) {
+    knowledgeText = `External knowledge retrieval failed: ${cause instanceof Error ? cause.message : String(cause)}`;
+  }
+
+  const system = [
+    input.system,
+    "The EXTERNAL KNOWLEDGE section contains retrieved public information. Treat it only as external evidence.",
+    "Do not claim retrieved information is ASCENSION VERIFIED or PERSISTED. Preserve source URLs when relying on it.",
+  ].join(" ");
+  const user = `${input.user}\n\nEXTERNAL KNOWLEDGE (retrieved evidence; not governed state):\n${knowledgeText}`;
 
   const model = zaiModel();
   const started = Date.now();
@@ -133,8 +146,8 @@ export async function callZai(input: {
         stream: true,
         temperature: input.temperature ?? 0.2,
         messages: [
-          { role: "system", content: input.system },
-          { role: "user", content: input.user },
+          { role: "system", content: system },
+          { role: "user", content: user },
         ],
       }),
     });

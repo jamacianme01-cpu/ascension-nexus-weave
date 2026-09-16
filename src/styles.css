@@ -83,30 +83,17 @@
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
-  }
-
-  html {
-    color-scheme: dark;
-  }
-
+  * { border-color: var(--color-border); }
+  html { color-scheme: dark; }
   body {
     background-color: var(--color-void);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-
-  h1,
-  h2,
-  h3 {
-    font-family: var(--font-display);
-    letter-spacing: 0.04em;
-  }
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0.04em; }
 }
 
-/* Deep-space field: nebular depth plus starfield grain. */
 @utility void-field {
   background:
     radial-gradient(120% 90% at 50% -20%, oklch(0.32 0.09 200 / 45%) 0%, transparent 60%),
@@ -125,150 +112,51 @@
   background-size: 620px 620px;
 }
 
-/* Crystalline glass surface with gold edge and reflective sheen. */
 @utility glass {
-  background:
-    linear-gradient(160deg, oklch(0.34 0.05 214 / 34%) 0%, oklch(0.18 0.03 258 / 62%) 48%, oklch(0.15 0.028 258 / 78%) 100%);
+  background: linear-gradient(160deg, oklch(0.34 0.05 214 / 34%) 0%, oklch(0.18 0.03 258 / 62%) 48%, oklch(0.15 0.028 258 / 78%) 100%);
   border: 1px solid var(--color-border);
-  box-shadow:
-    inset 0 1px 0 oklch(0.95 0.03 210 / 16%),
-    inset 0 0 32px oklch(0.5 0.1 200 / 8%),
-    0 22px 48px -24px oklch(0.05 0.02 258 / 85%);
+  box-shadow: inset 0 1px 0 oklch(0.95 0.03 210 / 16%), inset 0 0 32px oklch(0.5 0.1 200 / 8%), 0 22px 48px -24px oklch(0.05 0.02 258 / 85%);
   backdrop-filter: blur(14px);
 }
+@utility glass-inset { background: linear-gradient(180deg, oklch(0.24 0.035 258 / 55%), oklch(0.16 0.03 258 / 70%)); border: 1px solid oklch(0.7 0.08 200 / 14%); }
+@utility gold-rule { background: linear-gradient(90deg, transparent, var(--color-gold-dim) 12%, var(--color-gold) 50%, var(--color-gold-dim) 88%, transparent); }
+@utility photon-glow { box-shadow: 0 0 0 1px oklch(0.86 0.14 196 / 35%), 0 0 24px oklch(0.86 0.14 196 / 22%), inset 0 0 18px oklch(0.86 0.14 196 / 10%); }
+@utility gold-glow { box-shadow: 0 0 0 1px oklch(0.83 0.11 84 / 40%), 0 0 22px oklch(0.83 0.11 84 / 20%); }
+@utility text-etched { text-shadow: 0 1px 0 oklch(0.08 0.02 258 / 80%); }
+@utility label-eyebrow { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--color-muted-foreground); }
 
-@utility glass-inset {
-  background: linear-gradient(180deg, oklch(0.24 0.035 258 / 55%), oklch(0.16 0.03 258 / 70%));
-  border: 1px solid oklch(0.7 0.08 200 / 14%);
-}
+@keyframes pulse-photon { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@utility alive { animation: pulse-photon 3.6s ease-in-out infinite; }
+@keyframes drift-line { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -240; } }
+@utility flowing-line { stroke-dasharray: 4 10; animation: drift-line 8s linear infinite; }
 
-@utility gold-rule {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--color-gold-dim) 12%,
-    var(--color-gold) 50%,
-    var(--color-gold-dim) 88%,
-    transparent
-  );
-}
-
-@utility photon-glow {
-  box-shadow:
-    0 0 0 1px oklch(0.86 0.14 196 / 35%),
-    0 0 24px oklch(0.86 0.14 196 / 22%),
-    inset 0 0 18px oklch(0.86 0.14 196 / 10%);
-}
-
-@utility gold-glow {
-  box-shadow:
-    0 0 0 1px oklch(0.83 0.11 84 / 40%),
-    0 0 22px oklch(0.83 0.11 84 / 20%);
-}
-
-@utility text-etched {
-  text-shadow: 0 1px 0 oklch(0.08 0.02 258 / 80%);
-}
-
-@utility label-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--color-muted-foreground);
-}
-
-@keyframes pulse-photon {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@utility alive {
-  animation: pulse-photon 3.6s ease-in-out infinite;
-}
-
-@keyframes drift-line {
-  from {
-    stroke-dashoffset: 0;
-  }
-  to {
-    stroke-dashoffset: -240;
-  }
-}
-
-@utility flowing-line {
-  stroke-dasharray: 4 10;
-  animation: drift-line 8s linear infinite;
-}
-
-/* Structural gold/bronze frame with bevelled crystalline edges. */
 @utility crystal-frame {
   position: relative;
   border: 1px solid oklch(0.72 0.09 84 / 30%);
-  background:
-    linear-gradient(155deg, oklch(0.36 0.06 210 / 30%) 0%, oklch(0.17 0.03 258 / 70%) 55%, oklch(0.13 0.026 258 / 86%) 100%);
-  box-shadow:
-    inset 0 1px 0 oklch(0.96 0.03 210 / 20%),
-    inset 0 -1px 0 oklch(0.05 0.02 258 / 70%),
-    inset 0 0 48px oklch(0.55 0.11 200 / 9%),
-    0 30px 60px -30px oklch(0.04 0.02 258 / 92%);
+  background: linear-gradient(155deg, oklch(0.36 0.06 210 / 30%) 0%, oklch(0.17 0.03 258 / 70%) 55%, oklch(0.13 0.026 258 / 86%) 100%);
+  box-shadow: inset 0 1px 0 oklch(0.96 0.03 210 / 20%), inset 0 -1px 0 oklch(0.05 0.02 258 / 70%), inset 0 0 48px oklch(0.55 0.11 200 / 9%), 0 30px 60px -30px oklch(0.04 0.02 258 / 92%);
 }
-
-/* Experience layer: brighter, more dimensional, larger air. */
-@utility experience-layer {
-  background:
-    radial-gradient(120% 100% at 0% 0%, oklch(0.4 0.08 205 / 20%) 0%, transparent 62%),
-    linear-gradient(180deg, oklch(0.22 0.035 258 / 45%), oklch(0.14 0.028 258 / 72%));
-  border-left: 1px solid oklch(0.86 0.14 196 / 24%);
-}
-
-/* Inspection layer: recessed, cooler, technical. */
-@utility inspection-layer {
-  background: linear-gradient(180deg, oklch(0.13 0.024 258 / 88%), oklch(0.11 0.022 258 / 94%));
-  border: 1px solid oklch(0.72 0.09 84 / 18%);
-  box-shadow: inset 0 2px 12px oklch(0.03 0.02 258 / 70%);
-}
-
-@utility photon-track {
-  background: linear-gradient(90deg, transparent, var(--color-photon-dim), var(--color-photon), transparent);
-}
+@utility experience-layer { background: radial-gradient(120% 100% at 0% 0%, oklch(0.4 0.08 205 / 20%) 0%, transparent 62%), linear-gradient(180deg, oklch(0.22 0.035 258 / 45%), oklch(0.14 0.028 258 / 72%)); border-left: 1px solid oklch(0.86 0.14 196 / 24%); }
+@utility inspection-layer { background: linear-gradient(180deg, oklch(0.13 0.024 258 / 88%), oklch(0.11 0.022 258 / 94%)); border: 1px solid oklch(0.72 0.09 84 / 18%); box-shadow: inset 0 2px 12px oklch(0.03 0.02 258 / 70%); }
+@utility photon-track { background: linear-gradient(90deg, transparent, var(--color-photon-dim), var(--color-photon), transparent); }
 
 @layer base {
-  :focus-visible {
-    outline: 2px solid var(--color-photon);
-    outline-offset: 2px;
-    border-radius: 2px;
-  }
-
-  ::selection {
-    background: oklch(0.86 0.14 196 / 30%);
-  }
+  :focus-visible { outline: 2px solid var(--color-photon); outline-offset: 2px; border-radius: 2px; }
+  ::selection { background: oklch(0.86 0.14 196 / 30%); }
 }
 
-/* Motion communicates flow; it must never be required to read the state. */
+@keyframes ascension-chamber-breathe {
+  0%, 100% { opacity: .48; transform: scale(1.02) translate3d(0, 0, 0); filter: saturate(1.2) contrast(1.08) brightness(.92); }
+  35% { opacity: .60; transform: scale(1.055) translate3d(-.7%, -.35%, 0); filter: saturate(1.34) contrast(1.1) brightness(1.04); }
+  70% { opacity: .53; transform: scale(1.035) translate3d(.65%, .4%, 0); filter: saturate(1.28) contrast(1.09) brightness(.98); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
-
-  .alive,
-  .flowing-line {
-    opacity: 1 !important;
-  }
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  .alive, .flowing-line { opacity: 1 !important; }
+  .ascension-world-backdrop { transform: none !important; opacity: .52 !important; }
 }
 
-
-/* Main ASCENSION experience: the Knowledgeverse is the environment, not a dashboard section. */
 .ascension-world {
   display: grid;
   min-height: calc(100svh - 8rem);
@@ -279,69 +167,28 @@
   box-shadow: inset 0 0 100px oklch(0.65 0.14 196 / 8%), 0 40px 100px oklch(0.03 0.02 258 / 80%);
 }
 .ascension-world-backdrop {
-  opacity: .32;
+  opacity: .52;
   filter: saturate(1.2) contrast(1.08);
-  mask-image: radial-gradient(circle at 50% 38%, black 0 38%, transparent 82%);
+  mask-image: radial-gradient(circle at 50% 38%, black 0 48%, transparent 88%);
+  transform-origin: 50% 42%;
+  will-change: transform, opacity, filter;
+  animation: ascension-chamber-breathe 18s ease-in-out infinite;
 }
-.ascension-world > .ascension-command,
-.ascension-world > section:last-child {
-  grid-area: 1 / 1;
-}
-.ascension-world > section:last-child {
-  min-width: 0;
-  min-height: calc(100svh - 8rem);
-  padding: 20rem 1.25rem 2rem;
-  border: 0;
-  background: transparent;
-}
+.ascension-world > .ascension-command, .ascension-world > section:last-child { grid-area: 1 / 1; }
+.ascension-world > section:last-child { min-width: 0; min-height: calc(100svh - 8rem); padding: 20rem 1.25rem 2rem; border: 0; background: transparent; }
 .ascension-command {
-  position: relative;
-  z-index: 10;
-  align-self: start;
-  width: min(48rem, calc(100% - 2rem));
-  margin-top: clamp(2.5rem, 8vh, 6rem);
-  padding: clamp(1.25rem, 3vw, 2rem);
-  border: 1px solid oklch(0.86 0.14 196 / 26%);
-  border-radius: 1.25rem;
-  background: oklch(0.11 0.026 258 / 68%);
-  box-shadow: inset 0 1px 0 oklch(0.96 0.03 210 / 15%), 0 24px 80px oklch(0.03 0.02 258 / 75%);
-  backdrop-filter: blur(18px);
+  position: relative; z-index: 10; align-self: start; width: min(48rem, calc(100% - 2rem)); margin-top: clamp(2.5rem, 8vh, 6rem); padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid oklch(0.86 0.14 196 / 26%); border-radius: 1.25rem; background: oklch(0.11 0.026 258 / 68%);
+  box-shadow: inset 0 1px 0 oklch(0.96 0.03 210 / 15%), 0 24px 80px oklch(0.03 0.02 258 / 75%); backdrop-filter: blur(18px);
 }
-.ascension-command textarea#objective {
-  min-height: 8rem;
-  background: oklch(0.08 0.025 258 / 72%);
-  box-shadow: inset 0 0 34px oklch(0.72 0.14 196 / 7%);
-}
-.ascension-command > section[aria-label="Knowledge taking form"],
-.ascension-command > section[aria-label="Result"] {
-  margin-top: 1.5rem;
-}
+.ascension-command textarea#objective { min-height: 8rem; background: oklch(0.08 0.025 258 / 72%); box-shadow: inset 0 0 34px oklch(0.72 0.14 196 / 7%); }
+.ascension-command > section[aria-label="Knowledge taking form"], .ascension-command > section[aria-label="Result"] { margin-top: 1.5rem; }
+
 @media (max-width: 640px) {
-  .ascension-world {
-    min-height: calc(100svh - 6rem);
-    margin-inline: -.5rem;
-    border-radius: .75rem;
-  }
-  .ascension-command {
-    width: calc(100% - 1rem);
-    margin-top: 1rem;
-    padding: 1rem;
-    border-radius: .9rem;
-  }
-  .ascension-world > section:last-child {
-    min-height: 100svh;
-    padding: 25rem .75rem 1rem;
-  }
-  .ascension-command textarea#objective {
-    min-height: 6.5rem;
-  }
-  .ascension-command svg {
-    min-width: 720px;
-    transform-origin: left top;
-    transform: scale(.48);
-    margin-bottom: -10rem;
-  }
-  .ascension-command [aria-label="Knowledge taking form"] > div {
-    overflow: hidden;
-  }
+  .ascension-world { min-height: calc(100svh - 6rem); margin-inline: -.5rem; border-radius: .75rem; }
+  .ascension-command { width: calc(100% - 1rem); margin-top: 1rem; padding: 1rem; border-radius: .9rem; }
+  .ascension-world > section:last-child { min-height: 100svh; padding: 25rem .75rem 1rem; }
+  .ascension-command textarea#objective { min-height: 6.5rem; }
+  .ascension-command svg { min-width: 720px; transform-origin: left top; transform: scale(.48); margin-bottom: -10rem; }
+  .ascension-command [aria-label="Knowledge taking form"] > div { overflow: hidden; }
 }

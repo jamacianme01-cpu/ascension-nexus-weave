@@ -10,6 +10,8 @@ try {
   const model = await server.ssrLoadModule("/src/lib/ascension/result-model.ts");
   const { knowledgeWorld } = await server.ssrLoadModule("/src/lib/ascension/world-model.ts");
   const { callZai } = await server.ssrLoadModule("/src/lib/ascension/engine/zai.server.ts");
+  const access = await server.ssrLoadModule("/src/lib/ascension/source-access.ts");
+  const codeWalker = await server.ssrLoadModule("/src/lib/ascension/code-walker.ts");
   const run = JSON.parse(await readFile("tests/fixtures/objective-run.json", "utf8"));
   const live = JSON.parse(await readFile("tests/fixtures/world-publication.json", "utf8"));
   const base = { entities: {}, worldModel: {}, chamber: {}, live };
@@ -33,6 +35,30 @@ try {
   check("governed persistence requires the core receipt", () => { assert.equal(model.governedPersisted(run), true); assert.equal(model.governedPersisted({ ...run, result: {} }), false); });
   check("external verified status never becomes ASCENSION verification", () => { assert.equal(model.governedPersisted({ ...run, engine: "zai" }), false); });
   check("missing persisted delta fails closed", () => { const x = structuredClone(run); delete x.result.publication.delta_in_persisted_ledger; assert.equal(model.governedPersisted(x), false); });
+  check("general questions do not require a Library Card", () => {
+    assert.equal(access.libraryCardAccess("general_question", false).allowed, true);
+    assert.equal(access.libraryCardAccess("general_question", false).libraryCardRequired, false);
+  });
+  check("personalized pathway access requires a Library Card first", () => {
+    assert.equal(access.libraryCardAccess("personalized_pathway", false).allowed, false);
+    assert.equal(access.libraryCardAccess("personalized_pathway", true).allowed, true);
+  });
+  check("Code Walker refuses to treat missing permission as access", () => {
+    const source = { id: "game-1", kind: "game_project", label: "Game", connected: true, grantedByUser: true, permissions: ["read"] };
+    const plan = codeWalker.buildCodeWalkerPlan({ objective: "Add companion AI", desiredCapability: "adaptive companion", surface: { source, systemType: "game", technologies: ["Unreal"], entryPoints: ["project"], extensionPoints: ["plugin API"], runtimeSignals: ["logs"], protectedAreas: [] } });
+    assert.equal(plan.canInspect, true);
+    assert.equal(plan.canModify, false);
+    assert.equal(plan.canExecute, false);
+    assert.ok(plan.blockers.some(x => x.includes("Write/create/control")));
+  });
+  check("Code Walker recognizes fully authorized extension flow", () => {
+    const source = { id: "game-2", kind: "game_project", label: "Game", connected: true, grantedByUser: true, permissions: ["read", "search", "write", "execute"] };
+    const plan = codeWalker.buildCodeWalkerPlan({ objective: "Add companion AI", desiredCapability: "adaptive companion", surface: { source, systemType: "game", technologies: ["Unreal"], entryPoints: ["project"], extensionPoints: ["plugin API"], runtimeSignals: ["logs"], protectedAreas: [] } });
+    assert.equal(plan.canInspect, true);
+    assert.equal(plan.canModify, true);
+    assert.equal(plan.canExecute, true);
+    assert.equal(plan.steps.at(-1).stage, "verify");
+  });
   const valid = { kind: "artifact", title: "Archive guide", body: "Created guide for review.", files: [{ name: "guide.md", content: "# Guide\nComplete draft." }], limitations: ["Draft requires review."] };
   check("complete answer and file content is retained", () => assert.deepEqual(model.parseDelivery(valid), valid));
   check("path traversal and duplicate file names are refused", () => { assert.throws(() => model.parseDelivery({ ...valid, files: [{ name: "../secret", content: "x" }] })); assert.throws(() => model.parseDelivery({ ...valid, files: [...valid.files, ...valid.files] })); });

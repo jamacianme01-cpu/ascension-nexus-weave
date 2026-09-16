@@ -3,6 +3,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { parseDelivery, type ObjectiveDelivery } from "../result-model";
 
 const ORDINAL = 100;
+const ARTIFACT_ORDINAL = 101;
 const LABEL = "GOVERNED_RUNTIME_RESULT";
 const MODEL = "governed-runtime";
 
@@ -26,10 +27,36 @@ function branchTitle(branch: Record<string, unknown>): string {
   return names[approach] ?? String((branch["name"] ?? branch["pathway"] ?? approach) || "Selected pathway");
 }
 
-function governedDelivery(run: {
-  objective: string;
-  result: Json | null;
-}): ObjectiveDelivery | null {
+function artifactFiles(value: unknown): { name: string; content: string }[] {
+  const payload = record(value);
+  if (!Array.isArray(payload["files"])) return [];
+  const names = new Set<string>();
+  return payload["files"].flatMap((raw) => {
+    const file = record(raw);
+    const name = typeof file["name"] === "string" ? file["name"].trim() : "";
+    const content = typeof file["content"] === "string" ? file["content"] : "";
+    const key = name.toLowerCase();
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(name) ||
+      name.includes("..") ||
+      !content ||
+      content.length > 100000 ||
+      names.has(key)
+    ) {
+      return [];
+    }
+    names.add(key);
+    return [{ name, content }];
+  });
+}
+
+function governedDelivery(
+  run: {
+    objective: string;
+    result: Json | null;
+  },
+  transportedFiles: { name: string; content: string }[],
+): ObjectiveDelivery | null {
   if (run.result === null) return null;
 
   const result = record(run.result);
@@ -81,14 +108,20 @@ function governedDelivery(run: {
       ? result["objective_text"].trim()
       : run.objective.trim();
 
+  const transportedNames = new Set(transportedFiles.map((file) => file.name.toLowerCase()));
+  const missingReceipts = receipts.filter((receipt) => {
+    const basename = receipt.path.split(/[\\/]/).at(-1)?.toLowerCase() ?? "";
+    return basename && !transportedNames.has(basename);
+  });
+
   return parseDelivery({
-    kind: "recommendation",
+    kind: transportedFiles.length ? "artifact" : "recommendation",
     title: titleSource.slice(0, 200) || "ASCENSION result",
     body: body.join("\n\n").slice(0, 40000),
-    files: [],
-    limitations: receipts.length
+    files: transportedFiles,
+    limitations: missingReceipts.length
       ? [
-          "The governed runtime recorded artifact receipts, but the hosted queue does not yet carry the artifact file bodies for download.",
+          `${missingReceipts.length} recorded artifact${missingReceipts.length === 1 ? " has" : "s have"} a verified receipt but its file body has not been transported to the website yet.`,
         ]
       : [],
   });
@@ -115,9 +148,24 @@ export async function prepareDelivery(
     if (error) throw new Error(error.message);
     return data;
   };
+  const readArtifacts = async () => {
+    const { data, error } = await table()
+      .select("status, response_payload")
+      .eq("request_id", run.id)
+      .eq("ordinal", ARTIFACT_ORDINAL)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  };
 
-  const current = await read();
-  const delivery = governedDelivery(run);
+  const [current, artifactStage] = await Promise.all([read(), readArtifacts()]);
+  const files = artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
+
+  // Once the governed projection is complete, leave it alone until artifact
+  // transport arrives. This avoids rewriting the same result on every poll.
+  if (current?.status === "completed" && current.engine_label === LABEL && files.length === 0) return current;
+
+  const delivery = governedDelivery(run, files);
 
   if (delivery) {
     const completedAt = new Date().toISOString();

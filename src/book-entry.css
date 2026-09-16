@@ -2,6 +2,12 @@
   display: none !important;
 }
 
+/* The Book is the opening interface. The living world does not appear behind it
+   until an objective has actually produced a run/pathway surface. */
+.ascension-world:not(:has(.ascension-command section[aria-label="Knowledge taking form"])) > section[aria-label="Living Knowledgeverse"] {
+  display: none !important;
+}
+
 .ascension-world:has(.ascension-command) {
   background:
     radial-gradient(circle at 50% 44%, oklch(0.13 0.03 258 / 54%), transparent 42%),
@@ -11,36 +17,44 @@
 .ascension-command {
   position: relative;
   z-index: 12;
-  perspective: 1800px;
   isolation: isolate;
   overflow: visible;
-  border-color: oklch(0.83 0.11 84 / 42%) !important;
+  perspective: 1800px;
+  padding: clamp(1.4rem, 3vw, 2.5rem) !important;
+  border: 1px solid oklch(0.83 0.11 84 / 42%) !important;
   border-radius: .7rem 1.35rem 1.35rem .7rem !important;
   background:
-    linear-gradient(90deg, oklch(0.08 0.025 258 / 92%) 0 4%, transparent 4.2%),
-    linear-gradient(105deg, oklch(0.20 0.035 74 / 88%), oklch(0.12 0.028 258 / 88%) 46%, oklch(0.18 0.035 74 / 82%)) !important;
+    linear-gradient(90deg, oklch(0.045 0.02 258 / 96%) 0 3.5%, transparent 3.8%),
+    radial-gradient(circle at 25% 24%, oklch(0.31 0.035 74 / 28%), transparent 32%),
+    radial-gradient(circle at 75% 76%, oklch(0.24 0.03 74 / 24%), transparent 34%),
+    linear-gradient(105deg, oklch(0.19 0.034 74 / 92%), oklch(0.10 0.027 258 / 94%) 49%, oklch(0.18 0.034 74 / 90%)) !important;
   box-shadow:
-    inset 14px 0 22px oklch(0.03 0.02 258 / 75%),
-    inset -1px 0 0 oklch(0.83 0.11 84 / 35%),
+    inset 18px 0 26px oklch(0.02 0.02 258 / 78%),
+    inset -2px 0 0 oklch(0.83 0.11 84 / 30%),
     inset 0 1px 0 oklch(0.96 0.03 84 / 18%),
-    0 32px 90px oklch(0.03 0.02 258 / 88%) !important;
+    0 36px 100px oklch(0.02 0.02 258 / 90%) !important;
   transform-origin: 0 50%;
 }
 
+/* Page block beneath the cover. */
 .ascension-command::before {
   content: "";
   position: absolute;
   z-index: -1;
-  inset: .55rem -1rem -.7rem 1.1rem;
+  inset: .55rem -1rem -.8rem 1.1rem;
   border: 1px solid oklch(0.83 0.11 84 / 28%);
   border-radius: .45rem 1rem 1rem .45rem;
   background:
     repeating-linear-gradient(0deg, oklch(0.83 0.04 84 / 16%) 0 1px, transparent 1px 5px),
-    oklch(0.14 0.025 74 / 92%);
-  box-shadow: 9px 8px 0 -5px oklch(0.76 0.05 84 / 30%), 16px 14px 34px oklch(0.02 0.02 258 / 72%);
+    oklch(0.14 0.025 74 / 94%);
+  box-shadow:
+    8px 7px 0 -4px oklch(0.76 0.05 84 / 24%),
+    14px 13px 0 -8px oklch(0.76 0.05 84 / 18%),
+    18px 18px 36px oklch(0.02 0.02 258 / 74%);
   transform: translateZ(-12px);
 }
 
+/* Spine / fold. */
 .ascension-command::after {
   content: "";
   position: absolute;
@@ -51,7 +65,13 @@
   left: 50%;
   width: 2px;
   opacity: .38;
-  background: linear-gradient(transparent, var(--color-gold-dim) 12%, var(--color-gold) 50%, var(--color-gold-dim) 88%, transparent);
+  background: linear-gradient(
+    transparent,
+    var(--color-gold-dim) 12%,
+    var(--color-gold) 50%,
+    var(--color-gold-dim) 88%,
+    transparent
+  );
   box-shadow: 0 0 18px oklch(0.83 0.11 84 / 28%);
 }
 
@@ -71,7 +91,7 @@
   border-color: oklch(0.83 0.11 84 / 30%) !important;
   background:
     repeating-linear-gradient(0deg, transparent 0 30px, oklch(0.83 0.11 84 / 10%) 30px 31px),
-    oklch(0.10 0.025 258 / 68%) !important;
+    oklch(0.10 0.025 258 / 72%) !important;
   box-shadow: inset 0 0 38px oklch(0.83 0.11 84 / 7%) !important;
 }
 
@@ -91,6 +111,7 @@
   100% { opacity: .72; transform: scale(1.03); filter: blur(0) brightness(1.08); }
 }
 
+/* Page flutter begins from ENGAGE. */
 .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before {
   content: "";
   position: absolute;
@@ -105,7 +126,10 @@
   animation: ascension-book-flutter 1.35s cubic-bezier(.2,.72,.22,1) both;
 }
 
-.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
+/* The Tree may flash into view during ENGAGE, then stays present once the
+   objective has become a live pathway surface. */
+.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after,
+.ascension-world:has(.ascension-command section[aria-label="Knowledge taking form"])::after {
   content: "";
   position: absolute;
   z-index: 8;
@@ -116,15 +140,23 @@
 }
 
 @media (max-width: 640px) {
-  .ascension-command::after { left: 49%; opacity: .22; }
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
+  .ascension-command {
+    padding: 1.1rem !important;
+  }
+  .ascension-command::after {
+    left: 49%;
+    opacity: .22;
+  }
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after,
+  .ascension-world:has(.ascension-command section[aria-label="Knowledge taking form"])::after {
     background-size: 115vw auto;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before,
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after,
+  .ascension-world:has(.ascension-command section[aria-label="Knowledge taking form"])::after {
     animation: none !important;
   }
 }

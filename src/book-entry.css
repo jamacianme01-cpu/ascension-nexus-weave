@@ -1,4 +1,16 @@
+.ascension-world:has(.ascension-command) > .ascension-world-backdrop {
+  display: none !important;
+}
+
+.ascension-world:has(.ascension-command) {
+  background:
+    radial-gradient(circle at 50% 44%, oklch(0.13 0.03 258 / 54%), transparent 42%),
+    oklch(0.055 0.018 258 / 98%) !important;
+}
+
 .ascension-command {
+  position: relative;
+  z-index: 12;
   perspective: 1800px;
   isolation: isolate;
   overflow: visible;
@@ -76,10 +88,10 @@
 @keyframes ascension-tree-reveal {
   0% { opacity: 0; transform: scale(.86); filter: blur(12px) brightness(.55); }
   38% { opacity: .22; }
-  100% { opacity: .58; transform: scale(1.03); filter: blur(0) brightness(1); }
+  100% { opacity: .72; transform: scale(1.03); filter: blur(0) brightness(1.08); }
 }
 
-.ascension-world:has(.ascension-command button:last-child:active)::before {
+.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before {
   content: "";
   position: absolute;
   z-index: 18;
@@ -93,7 +105,7 @@
   animation: ascension-book-flutter 1.35s cubic-bezier(.2,.72,.22,1) both;
 }
 
-.ascension-world:has(.ascension-command button:last-child:active)::after {
+.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
   content: "";
   position: absolute;
   z-index: 8;
@@ -105,14 +117,14 @@
 
 @media (max-width: 640px) {
   .ascension-command::after { left: 49%; opacity: .22; }
-  .ascension-world:has(.ascension-command button:last-child:active)::after {
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
     background-size: 115vw auto;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ascension-world:has(.ascension-command button:last-child:active)::before,
-  .ascension-world:has(.ascension-command button:last-child:active)::after {
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before,
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
     animation: none !important;
   }
 }

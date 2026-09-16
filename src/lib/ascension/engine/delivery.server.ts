@@ -23,7 +23,7 @@ function branchTitle(branch: Record<string, unknown>): string {
     minimal_seeded_construct: "Start with a small working seed",
   };
   const approach = String(branch["approach"] ?? "");
-  return names[approach] ?? String(branch["name"] ?? branch["pathway"] ?? approach || "Selected pathway");
+  return names[approach] ?? String((branch["name"] ?? branch["pathway"] ?? approach) || "Selected pathway");
 }
 
 function governedDelivery(run: {

@@ -6,6 +6,7 @@ import governanceTool from "./tools/governance";
 import ledgerTool from "./tools/ledger";
 import libraryCardTool from "./tools/library-card";
 import executeTool from "./tools/execute";
+import codeWalkerTool from "./tools/code-walker";
 import runStatusTool from "./tools/run-status";
 
 // The OAuth issuer must be the direct Supabase auth host: the published runtime
@@ -15,7 +16,7 @@ const projectRef = import.meta.env["VITE_SUPABASE_PROJECT_ID"] ?? "project-ref-u
 export default defineMcp({
   name: "ascension-weaver",
   title: "Ascension Weaver",
-  version: "0.1.0",
+  version: "0.2.0",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
@@ -26,7 +27,7 @@ export default defineMcp({
     requiredScopes: ["offline_access"],
   }),
   instructions:
-    "Observation and objective-intake tools for the ASCENSION console. Callers must sign in as an operator of this app. The observation tools (ascension_chamber, ascension_knowledgeverse, ascension_pathways, ascension_governance, ascension_ledger, ascension_library_card) return bundled published DEMO state with a source_classification field. ascension_execute submits an objective to the operator's governed runtime queue and ascension_run_status reports the run; neither executes the cycle here. Nothing in this layer can write to or reinterpret the governed ASCENSION core (Knowledgeverse runtime, DTF, Galaxy Bridge, Guardian, AutoSync, ID/SID, Meaning Elements, Verified Δ, Unreal, CAD) — decomposition, branching, evaluation, Guardian, selection, execution, AutoSync verification, Δ and persistence all happen inside the governed core. Absent fields are absent, never inferred. Start with ascension_chamber for Destiny and current state; to give ASCENSION work, call ascension_execute then poll ascension_run_status with the returned request_id.",
+    "Observation and objective-intake tools for the ASCENSION console. Callers must sign in as an operator of this app. The observation tools (ascension_chamber, ascension_knowledgeverse, ascension_pathways, ascension_governance, ascension_ledger, ascension_library_card) return published state with a source_classification field. ascension_execute submits a normal objective. ascension_code_walker submits a permission-scoped capability-extension objective for an existing authorized game/app/project/system. ascension_run_status reports either kind of run. These web tools record and observe requests; they do not themselves access a user's device, modify files, execute the governed cycle, or write governed ASCENSION state. Device/app/file actions belong to the authorized ASCENSION runtime / ExecutionEngine, and no change is Verified or Persisted until the governed core publishes the receipt. Absent fields and permissions are absent, never inferred.",
   tools: [
     chamberTool,
     knowledgeverseTool,
@@ -35,6 +36,7 @@ export default defineMcp({
     ledgerTool,
     libraryCardTool,
     executeTool,
+    codeWalkerTool,
     runStatusTool,
   ],
 });

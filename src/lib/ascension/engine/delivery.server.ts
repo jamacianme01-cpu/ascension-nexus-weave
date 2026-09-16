@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
-import { parseDelivery, type ObjectiveDelivery } from "../result-model";
+import { parseDelivery } from "../result-model";
 
 const ORDINAL = 100;
 const ARTIFACT_ORDINAL = 101;
@@ -56,7 +56,7 @@ function governedDelivery(
     result: Json | null;
   },
   transportedFiles: { name: string; content: string }[],
-): ObjectiveDelivery | null {
+) {
   if (run.result === null) return null;
 
   const result = record(run.result);

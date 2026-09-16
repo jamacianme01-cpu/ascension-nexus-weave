@@ -71,6 +71,7 @@ export const submitObjective = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     let evidence = data.evidence;
+
     if (data.parentRequestId) {
       if (
         !/^[a-f0-9-]{36}$/i.test(data.parentRequestId) ||
@@ -132,6 +133,36 @@ export const submitObjective = createServerFn({ method: "POST" })
         );
       evidence = [...(evidence ?? []), contextText];
     }
+
+    // If the user has established a Library Card, carry that source of truth
+    // into every objective automatically. The Book never has to recollect it.
+    const { data: cardRow, error: cardError } = await context.supabase
+      .from("ascension_user_observations")
+      .select("note, updated_at")
+      .eq("user_id", context.userId)
+      .eq("surface", "library_card_profile")
+      .eq("label", "ASCENSION_LIBRARY_CARD_V1")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (cardError) throw new Error(cardError.message);
+    if (cardRow?.note) {
+      let card: unknown;
+      try {
+        card = JSON.parse(cardRow.note);
+      } catch {
+        throw new Error("The saved Library Card is unreadable and must be re-established before personalized use.");
+      }
+      const libraryCardContext = JSON.stringify({
+        source: "LIBRARY_CARD",
+        provenance: "user_supplied",
+        observed_at: cardRow.updated_at,
+        verification: "User-supplied identity context; not ASCENSION VERIFIED state by itself.",
+        card,
+      });
+      evidence = [...(evidence ?? []), libraryCardContext];
+    }
+
     const { data: row, error } = await context.supabase
       .from("ascension_execution_requests")
       .insert({

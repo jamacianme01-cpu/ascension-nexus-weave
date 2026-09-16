@@ -1,0 +1,118 @@
+.ascension-command {
+  perspective: 1800px;
+  isolation: isolate;
+  overflow: visible;
+  border-color: oklch(0.83 0.11 84 / 42%) !important;
+  border-radius: .7rem 1.35rem 1.35rem .7rem !important;
+  background:
+    linear-gradient(90deg, oklch(0.08 0.025 258 / 92%) 0 4%, transparent 4.2%),
+    linear-gradient(105deg, oklch(0.20 0.035 74 / 88%), oklch(0.12 0.028 258 / 88%) 46%, oklch(0.18 0.035 74 / 82%)) !important;
+  box-shadow:
+    inset 14px 0 22px oklch(0.03 0.02 258 / 75%),
+    inset -1px 0 0 oklch(0.83 0.11 84 / 35%),
+    inset 0 1px 0 oklch(0.96 0.03 84 / 18%),
+    0 32px 90px oklch(0.03 0.02 258 / 88%) !important;
+  transform-origin: 0 50%;
+}
+
+.ascension-command::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: .55rem -1rem -.7rem 1.1rem;
+  border: 1px solid oklch(0.83 0.11 84 / 28%);
+  border-radius: .45rem 1rem 1rem .45rem;
+  background:
+    repeating-linear-gradient(0deg, oklch(0.83 0.04 84 / 16%) 0 1px, transparent 1px 5px),
+    oklch(0.14 0.025 74 / 92%);
+  box-shadow: 9px 8px 0 -5px oklch(0.76 0.05 84 / 30%), 16px 14px 34px oklch(0.02 0.02 258 / 72%);
+  transform: translateZ(-12px);
+}
+
+.ascension-command::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 30;
+  top: 2%;
+  bottom: 2%;
+  left: 50%;
+  width: 2px;
+  opacity: .38;
+  background: linear-gradient(transparent, var(--color-gold-dim) 12%, var(--color-gold) 50%, var(--color-gold-dim) 88%, transparent);
+  box-shadow: 0 0 18px oklch(0.83 0.11 84 / 28%);
+}
+
+.ascension-command h1 {
+  text-align: center;
+  color: var(--color-gold);
+  text-shadow: 0 0 24px oklch(0.83 0.11 84 / 18%);
+}
+
+.ascension-command > label[for="objective"] {
+  text-align: center;
+  font-family: var(--font-display);
+  letter-spacing: .08em;
+}
+
+.ascension-command textarea#objective {
+  border-color: oklch(0.83 0.11 84 / 30%) !important;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 30px, oklch(0.83 0.11 84 / 10%) 30px 31px),
+    oklch(0.10 0.025 258 / 68%) !important;
+  box-shadow: inset 0 0 38px oklch(0.83 0.11 84 / 7%) !important;
+}
+
+@keyframes ascension-book-flutter {
+  0% { transform: rotateY(0deg) scaleX(1); opacity: 0; }
+  10% { opacity: .86; }
+  28% { transform: rotateY(-72deg) scaleX(.72); }
+  46% { transform: rotateY(58deg) scaleX(.82); }
+  66% { transform: rotateY(-34deg) scaleX(.9); }
+  84% { transform: rotateY(18deg) scaleX(.96); opacity: .55; }
+  100% { transform: rotateY(0deg) scaleX(1); opacity: 0; }
+}
+
+@keyframes ascension-tree-reveal {
+  0% { opacity: 0; transform: scale(.86); filter: blur(12px) brightness(.55); }
+  38% { opacity: .22; }
+  100% { opacity: .58; transform: scale(1.03); filter: blur(0) brightness(1); }
+}
+
+.ascension-world:has(.ascension-command button:last-child:active)::before {
+  content: "";
+  position: absolute;
+  z-index: 18;
+  inset: 4% 8%;
+  pointer-events: none;
+  transform-origin: left center;
+  border-radius: 1rem;
+  background:
+    linear-gradient(90deg, oklch(0.91 0.035 84 / 72%), oklch(0.66 0.04 74 / 42%) 48%, oklch(0.92 0.03 84 / 68%));
+  box-shadow: 0 0 45px oklch(0.83 0.11 84 / 22%);
+  animation: ascension-book-flutter 1.35s cubic-bezier(.2,.72,.22,1) both;
+}
+
+.ascension-world:has(.ascension-command button:last-child:active)::after {
+  content: "";
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  pointer-events: none;
+  background: center 42% / min(72vw, 760px) auto no-repeat url('/__l5e/assets-v1/458aed97-60ee-4cbb-8742-0c7149512cc0/engines-tree.png');
+  animation: ascension-tree-reveal 1.4s ease-out both;
+}
+
+@media (max-width: 640px) {
+  .ascension-command::after { left: 49%; opacity: .22; }
+  .ascension-world:has(.ascension-command button:last-child:active)::after {
+    background-size: 115vw auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ascension-world:has(.ascension-command button:last-child:active)::before,
+  .ascension-world:has(.ascension-command button:last-child:active)::after {
+    animation: none !important;
+  }
+}

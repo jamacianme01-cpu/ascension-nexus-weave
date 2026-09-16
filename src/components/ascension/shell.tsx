@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DemoModeBanner, SourceBadge } from "@/components/ascension/states";
 import { cn } from "@/lib/utils";
 
-
 const NAV = [
   { to: "/", label: "Ascension" },
   { to: "/knowledgeverse", label: "Knowledgeverse" },
@@ -31,10 +30,7 @@ const INSPECT_PREFIXES = [
   "/objectives",
 ];
 
-/**
- * Library Card entries describe the vocabulary of the source contracts.
- * They are interface glossary copy only — no state values are derived here.
- */
+/** Contract vocabulary glossary. This is deliberately separate from the user's Library Card. */
 const GLOSSARY: { term: string; gloss: string; source: string }[] = [
   {
     term: "ID / SID",
@@ -99,23 +95,22 @@ const GLOSSARY: { term: string; gloss: string; source: string }[] = [
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
-  const [cardOpen, setCardOpen] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const glossaryRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const inspecting = INSPECT_PREFIXES.some(
     (prefix) => location.pathname === prefix || location.pathname.startsWith(prefix + "/"),
   );
 
-  // Escape closes the Library Card; opening moves focus into it.
   useEffect(() => {
-    if (!cardOpen) return;
-    cardRef.current?.focus();
+    if (!glossaryOpen) return;
+    glossaryRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setCardOpen(false);
+      if (e.key === "Escape") setGlossaryOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cardOpen]);
+  }, [glossaryOpen]);
 
   return (
     <div className="void-field relative min-h-screen">
@@ -131,19 +126,25 @@ export function Shell({ children }: { children: ReactNode }) {
             </Link>
             <div className="flex shrink-0 items-center gap-2 lg:order-3">
               <SourceBadge />
-              <button
-                type="button"
-                onClick={() => setCardOpen((v) => !v)}
-                aria-expanded={cardOpen}
-                aria-controls="library-card"
-                className={cn(
-                  "min-h-9 rounded-sm border px-3 py-1.5 font-mono text-[0.62rem] tracking-[0.18em] uppercase transition-all duration-200 sm:text-[0.68rem] sm:tracking-[0.2em]",
-                  cardOpen
-                    ? "border-gold/60 bg-gold/15 text-gold gold-glow"
-                    : "border-border text-muted-foreground hover:border-gold/50 hover:text-gold",
-                )}
+              <a
+                href="/?library=1"
+                className="min-h-9 rounded-sm border border-gold/35 px-3 py-2 font-mono text-[0.62rem] tracking-[0.18em] text-gold uppercase transition-colors hover:border-gold/65 hover:bg-gold/10 sm:text-[0.68rem] sm:tracking-[0.2em]"
               >
                 Library Card
+              </a>
+              <button
+                type="button"
+                onClick={() => setGlossaryOpen((v) => !v)}
+                aria-expanded={glossaryOpen}
+                aria-controls="ascension-glossary"
+                className={cn(
+                  "min-h-9 rounded-sm border px-3 py-1.5 font-mono text-[0.62rem] tracking-[0.18em] uppercase transition-all duration-200 sm:text-[0.68rem] sm:tracking-[0.2em]",
+                  glossaryOpen
+                    ? "border-primary/60 bg-primary/10 text-primary photon-glow"
+                    : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary",
+                )}
+              >
+                Glossary
               </button>
             </div>
             <nav
@@ -195,27 +196,27 @@ export function Shell({ children }: { children: ReactNode }) {
           </nav>
         )}
 
-        {cardOpen && (
+        {glossaryOpen && (
           <aside
-            id="library-card"
-            aria-label="Library Card glossary"
+            id="ascension-glossary"
+            aria-label="ASCENSION glossary"
             className="border-b border-border/60 bg-void/85 backdrop-blur-xl"
           >
             <div
-              ref={cardRef}
+              ref={glossaryRef}
               tabIndex={-1}
               className="mx-auto max-w-7xl px-4 py-6 outline-none sm:px-6"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="label-eyebrow">Library Card · Glossary</p>
+                  <p className="label-eyebrow">Glossary</p>
                   <h2 className="text-etched mt-1 font-display text-base text-gold uppercase sm:text-lg">
                     Vocabulary of the governed contracts
                   </h2>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setCardOpen(false)}
+                  onClick={() => setGlossaryOpen(false)}
                   className="min-h-9 rounded-sm border border-border px-3 py-1.5 font-mono text-[0.62rem] tracking-[0.2em] text-muted-foreground uppercase transition-colors hover:border-gold/50 hover:text-gold"
                 >
                   Close · esc
@@ -224,7 +225,6 @@ export function Shell({ children }: { children: ReactNode }) {
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {GLOSSARY.map((entry) => (
                   <div key={entry.term} className="glass-inset rounded-md px-3 py-3">
-
                     <p className="font-display text-sm tracking-wide text-primary">{entry.term}</p>
                     <p className="mt-1 text-[0.82rem] leading-relaxed text-muted-foreground">
                       {entry.gloss}
@@ -244,7 +244,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <footer className="border-t border-border/60 px-4 py-6 sm:px-6">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
             <p className="font-mono text-[0.65rem] tracking-[0.24em] text-muted-foreground uppercase">
-              Observation only · read-only projection of published state
+              Published state · governed objective intake · verification remains core-authoritative
             </p>
             <p className="font-display text-[0.7rem] tracking-[0.3em] text-gold/80 uppercase">
               Everything is connected · Evolution is key
@@ -255,4 +255,3 @@ export function Shell({ children }: { children: ReactNode }) {
     </div>
   );
 }
-

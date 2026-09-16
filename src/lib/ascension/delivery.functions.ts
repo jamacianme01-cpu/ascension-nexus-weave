@@ -17,12 +17,19 @@ function validate(input: { requestId: string; retry?: boolean }) {
   return { requestId: input.requestId, retry: input.retry === true };
 }
 
+function hasDownloadableFiles(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const files = (value as Record<string, unknown>)["files"];
+  return Array.isArray(files) && files.length > 0;
+}
+
 /**
  * Read the user-facing projection of the governed runtime result.
  *
  * While the runtime is still working, the delivery remains running and this
  * endpoint is polled. Once the runtime publishes its result, that recorded
- * result becomes the delivery. No hosted answer engine is required.
+ * result becomes the delivery. If artifact transport arrives after the result,
+ * a later read re-projects the same governed result with downloadable files.
  */
 export const getObjectiveDelivery = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -35,7 +42,9 @@ export const getObjectiveDelivery = createServerFn({ method: "GET" })
       .eq("ordinal", DELIVERY_ORDINAL)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (row?.status === "completed") return row as unknown as DeliveryState;
+    if (row?.status === "completed" && hasDownloadableFiles(row.response_payload)) {
+      return row as unknown as DeliveryState;
+    }
 
     const { data: run, error: runError } = await context.supabase
       .from("ascension_execution_requests")

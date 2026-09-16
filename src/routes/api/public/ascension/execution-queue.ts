@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { timingSafeEqual } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 
 import type { Database, Json } from "@/integrations/supabase/types";
 
@@ -10,15 +10,30 @@ type QueuePatch = Database["public"]["Tables"]["ascension_execution_requests"]["
  * ASCENSION runtime.
  *
  *   GET  — claim the oldest queued submission (marks it 'claimed').
- *   POST — report stage / result for a claimed submission.
+ *   POST — report stage / result for a claimed submission. A runtime may also
+ *           attach the exact UTF-8 artifact bodies produced by that governed
+ *           run; those are stored separately from the core result so the web
+ *           layer never mutates the governed result payload.
  *
  * Only the shared ASCENSION_PUBLISH_TOKEN holder (the operator's runtime) may
  * call either. This endpoint never decides anything: it stores verbatim what
- * the governed core reports. The web layer cannot execute the cycle.
+ * the governed core reports plus a separately labelled artifact transport
+ * record. The web layer cannot execute the cycle.
  */
 
 const STATUSES = ["claimed", "running", "verified", "rejected", "failed"] as const;
 type Status = (typeof STATUSES)[number];
+const ARTIFACT_ORDINAL = 101;
+const ARTIFACT_LABEL = "GOVERNED_RUNTIME_ARTIFACTS";
+const MAX_ARTIFACTS = 8;
+const MAX_ARTIFACT_CHARS = 100000;
+
+type ArtifactPayload = {
+  name: string;
+  content: string;
+  bytes: number;
+  sha256: string;
+};
 
 function tokenMatches(provided: string | null, expected: string): boolean {
   if (!provided) return false;
@@ -48,6 +63,42 @@ function authorize(request: Request): Response | null {
 
 const optionalString = (value: unknown, max = 2000) =>
   typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
+
+function normalizeArtifacts(value: unknown): { files: ArtifactPayload[] } | { error: string } {
+  if (!Array.isArray(value)) return { error: "artifacts must be an array" };
+  if (value.length > MAX_ARTIFACTS) return { error: `artifacts may contain at most ${MAX_ARTIFACTS} files` };
+
+  const names = new Set<string>();
+  const files: ArtifactPayload[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { error: "each artifact must be an object" };
+    const artifact = raw as Record<string, unknown>;
+    const name = typeof artifact["name"] === "string" ? artifact["name"].trim() : "";
+    const content = typeof artifact["content"] === "string" ? artifact["content"] : "";
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(name) || name.includes("..")) {
+      return { error: "artifact name is invalid" };
+    }
+    const lower = name.toLowerCase();
+    if (names.has(lower)) return { error: "artifact names must be unique" };
+    if (!content || content.length > MAX_ARTIFACT_CHARS) return { error: "artifact content is empty or too large" };
+
+    const bytes = Buffer.byteLength(content, "utf8");
+    const digest = createHash("sha256").update(content, "utf8").digest("hex");
+    const reportedBytes = artifact["bytes"];
+    if (reportedBytes !== undefined && reportedBytes !== null && reportedBytes !== bytes) {
+      return { error: `artifact byte count mismatch for ${name}` };
+    }
+    const reportedHash =
+      typeof artifact["sha256"] === "string"
+        ? artifact["sha256"].trim().toLowerCase().replace(/^sha256:/, "")
+        : null;
+    if (reportedHash && reportedHash !== digest) return { error: `artifact sha256 mismatch for ${name}` };
+
+    names.add(lower);
+    files.push({ name, content, bytes, sha256: `sha256:${digest}` });
+  }
+  return { files };
+}
 
 export const Route = createFileRoute("/api/public/ascension/execution-queue")({
   server: {
@@ -112,6 +163,10 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
           return json({ error: `status must be one of ${STATUSES.join(", ")}` }, 400);
         }
 
+        const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
+        const normalizedArtifacts = has("artifacts") ? normalizeArtifacts(body["artifacts"]) : null;
+        if (normalizedArtifacts && "error" in normalizedArtifacts) return json({ error: normalizedArtifacts.error }, 400);
+
         const revision = body["runtime_revision"];
         const terminal = status === "verified" || status === "rejected" || status === "failed";
 
@@ -119,7 +174,6 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         // report (stage → stage → verified) must never blank out values an
         // earlier report already published.
         const patch: QueuePatch = { status };
-        const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
         if (has("stage")) patch["stage"] = optionalString(body["stage"], 200);
         if (has("runtime_revision")) {
           patch["runtime_revision"] =
@@ -148,9 +202,29 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         if (error) return json({ error: "update_failed" }, 500);
         if (!data) return json({ error: "unknown_request_id" }, 404);
 
-        return json({ ok: true, request: data }, 200);
+        if (normalizedArtifacts && "files" in normalizedArtifacts) {
+          const now = new Date().toISOString();
+          const { error: artifactError } = await supabaseAdmin.from("ascension_run_stages").upsert(
+            {
+              request_id: id,
+              ordinal: ARTIFACT_ORDINAL,
+              stage: "runtime_artifacts",
+              engine_label: ARTIFACT_LABEL,
+              engine_model: "governed-runtime",
+              status: "completed",
+              response_payload: { files: normalizedArtifacts.files } as unknown as Json,
+              response_text: null,
+              duration_ms: 0,
+              error: null,
+              completed_at: now,
+            },
+            { onConflict: "request_id,ordinal" },
+          );
+          if (artifactError) return json({ error: "artifact_transport_failed" }, 500);
+        }
+
+        return json({ ok: true, request: data, artifacts: normalizedArtifacts && "files" in normalizedArtifacts ? normalizedArtifacts.files.length : 0 }, 200);
       },
     },
   },
 });
-

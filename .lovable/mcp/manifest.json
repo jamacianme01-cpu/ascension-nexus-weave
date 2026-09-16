@@ -15,7 +15,7 @@
   "mcp": {
     "server": {
       "name": "ascension-weaver",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "title": "Ascension Weaver"
     },
     "tools": [
@@ -175,9 +175,64 @@
         "outputSchema": null
       },
       {
+        "name": "ascension_code_walker",
+        "title": "Code Walker",
+        "description": "Submit a permission-scoped capability-extension objective for an existing game, app, website, CAD project, automation, robotics system, or other software surface. Code Walker traces the authorized system, maps dependencies and extension points, adds or connects the requested capability through the governed ASCENSION runtime, tests the real system, and requires observed evidence before verification. This web tool only records the request; it never assumes device/file/app access that was not explicitly granted.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "target": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The game, app, project, repository, device-side software, or other system to extend."
+            },
+            "desired_capability": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The capability ASCENSION should add or connect."
+            },
+            "system_type": {
+              "type": "string",
+              "enum": ["game", "application", "website", "cad", "music", "robotics", "automation", "custom_software"],
+              "description": "Known system type, when available."
+            },
+            "source_reference": {
+              "type": "string",
+              "description": "Authorized project/repository/folder/app/runtime reference. Do not include secrets."
+            },
+            "permissions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["read", "search", "write", "create", "execute", "control"]
+              },
+              "description": "Permissions the user has granted ASCENSION for this source. Absence is not treated as permission."
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional known engine, framework, plugin/API, build, log, or runtime details."
+            }
+          },
+          "required": [
+            "target",
+            "desired_capability"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
         "name": "ascension_run_status",
         "title": "Run status",
-        "description": "Read the status of objectives submitted with ascension_execute: queued / claimed / running / verified / rejected / failed, the current stage reported by the governed runtime, Guardian verdict, outcome status, accepted Δ, transition id and runtime revision. Only the caller's own submissions are visible. Absent fields are absent, never inferred.",
+        "description": "Read the status of objectives submitted with ascension_execute or ascension_code_walker: queued / claimed / running / verified / rejected / failed, the current stage reported by the governed runtime, Guardian verdict, outcome status, accepted Δ, transition id and runtime revision. Only the caller's own submissions are visible. Absent fields are absent, never inferred.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -188,7 +243,7 @@
           "type": "object",
           "properties": {
             "request_id": {
-              "description": "Optional request_id returned by ascension_execute. Omit to list recent submissions.",
+              "description": "Optional request_id returned by ascension_execute or ascension_code_walker. Omit to list recent submissions.",
               "type": "string"
             },
             "limit": {

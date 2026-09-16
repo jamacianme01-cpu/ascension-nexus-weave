@@ -18,12 +18,11 @@ function validate(input: { requestId: string; retry?: boolean }) {
 }
 
 /**
- * Result-first read.
+ * Read the user-facing projection of the governed runtime result.
  *
- * A user-facing answer is external output and does not wait for the governed
- * runtime to finish. If no delivery exists yet, the first authenticated read
- * starts one for the caller's own objective. The governed runtime continues
- * independently and remains the only authority for Verified / Persisted state.
+ * While the runtime is still working, the delivery remains running and this
+ * endpoint is polled. Once the runtime publishes its result, that recorded
+ * result becomes the delivery. No hosted answer engine is required.
  */
 export const getObjectiveDelivery = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -36,7 +35,7 @@ export const getObjectiveDelivery = createServerFn({ method: "GET" })
       .eq("ordinal", DELIVERY_ORDINAL)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (row) return row as unknown as DeliveryState;
+    if (row?.status === "completed") return row as unknown as DeliveryState;
 
     const { data: run, error: runError } = await context.supabase
       .from("ascension_execution_requests")
@@ -45,13 +44,13 @@ export const getObjectiveDelivery = createServerFn({ method: "GET" })
       .eq("submitted_by", context.userId)
       .maybeSingle();
     if (runError) throw new Error(runError.message);
-    if (!run) return null;
+    if (!run) return row as unknown as DeliveryState | null;
 
     const { prepareDelivery } = await import("./engine/delivery.server");
-    return (await prepareDelivery(run, false)) as unknown as DeliveryState | null;
+    return (await prepareDelivery(run, row?.status === "failed")) as unknown as DeliveryState | null;
   });
 
-/** External answer/draft. Governance continues independently. */
+/** Re-project the latest governed runtime result for this objective. */
 export const prepareObjectiveDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)

@@ -17,6 +17,14 @@ function validate(input: { requestId: string; retry?: boolean }) {
   return { requestId: input.requestId, retry: input.retry === true };
 }
 
+/**
+ * Result-first read.
+ *
+ * A user-facing answer is external output and does not wait for the governed
+ * runtime to finish. If no delivery exists yet, the first authenticated read
+ * starts one for the caller's own objective. The governed runtime continues
+ * independently and remains the only authority for Verified / Persisted state.
+ */
 export const getObjectiveDelivery = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
@@ -28,7 +36,19 @@ export const getObjectiveDelivery = createServerFn({ method: "GET" })
       .eq("ordinal", DELIVERY_ORDINAL)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return row as unknown as DeliveryState | null;
+    if (row) return row as unknown as DeliveryState;
+
+    const { data: run, error: runError } = await context.supabase
+      .from("ascension_execution_requests")
+      .select("id, objective, evidence, constraints, result, submitted_by")
+      .eq("id", data.requestId)
+      .eq("submitted_by", context.userId)
+      .maybeSingle();
+    if (runError) throw new Error(runError.message);
+    if (!run) return null;
+
+    const { prepareDelivery } = await import("./engine/delivery.server");
+    return (await prepareDelivery(run, false)) as unknown as DeliveryState | null;
   });
 
 /** External answer/draft. Governance continues independently. */

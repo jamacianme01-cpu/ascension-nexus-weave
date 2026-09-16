@@ -173,7 +173,7 @@ function ObjectivesPage() {
 
       <section className="rounded-lg border border-primary/20 bg-background/40 p-4">
         <form
-          className="space-y-3"
+          className="space-y-5"
           onSubmit={(event) => {
             event.preventDefault();
             if (!objective.trim()) return;
@@ -185,39 +185,50 @@ function ObjectivesPage() {
           }}
         >
           <label className="block">
-            <span className="font-mono text-[0.6rem] tracking-[0.2em] text-muted-foreground uppercase">
-              objective
+            <span className="font-mono text-[0.6rem] tracking-[0.2em] text-primary uppercase">
+              OBJECTIVE
+            </span>
+            <span className="mt-2 block text-sm leading-relaxed text-foreground/90">
+              What do you want ASCENSION to accomplish?
             </span>
             <textarea
               value={objective}
               onChange={(event) => setObjective(event.target.value)}
               rows={3}
               required
-              className="mt-1 w-full rounded border border-primary/25 bg-background/70 p-2 text-sm text-foreground outline-none focus:border-primary/60"
-              placeholder="State the objective in your own words."
+              aria-label="What do you want ASCENSION to accomplish?"
+              className="mt-3 w-full rounded border border-primary/25 bg-background/70 p-2 text-sm text-foreground outline-none focus:border-primary/60"
             />
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <label className="block">
-              <span className="font-mono text-[0.6rem] tracking-[0.2em] text-muted-foreground uppercase">
-                evidence · one per line
+              <span className="font-mono text-[0.6rem] tracking-[0.2em] text-primary uppercase">
+                SOURCE EVIDENCE
+              </span>
+              <span className="mt-2 block text-sm leading-relaxed text-foreground/90">
+                What evidence, facts, observations, files, or context should ASCENSION use? Put one item per line.
               </span>
               <textarea
                 value={evidence}
                 onChange={(event) => setEvidence(event.target.value)}
                 rows={4}
-                className="mt-1 w-full rounded border border-primary/25 bg-background/70 p-2 text-sm text-foreground outline-none focus:border-primary/60"
+                aria-label="What evidence, facts, observations, files, or context should ASCENSION use?"
+                className="mt-3 w-full rounded border border-primary/25 bg-background/70 p-2 text-sm text-foreground outline-none focus:border-primary/60"
               />
             </label>
             <label className="block">
-              <span className="font-mono text-[0.6rem] tracking-[0.2em] text-muted-foreground uppercase">
-                constraints · one per line
+              <span className="font-mono text-[0.6rem] tracking-[0.2em] text-primary uppercase">
+                CONSTRAINTS
+              </span>
+              <span className="mt-2 block text-sm leading-relaxed text-foreground/90">
+                What limits, requirements, boundaries, or conditions must ASCENSION preserve? Put one item per line.
               </span>
               <textarea
                 value={constraints}
                 onChange={(event) => setConstraints(event.target.value)}
                 rows={4}
-                className="mt-1 w-full rounded border border-primary/25 bg-background/70 p-2 text-sm text-foreground outline-none focus:border-primary/60"
+                aria-label="What limits, requirements, boundaries, or conditions must ASCENSION preserve?"
+                className="mt-3 w-full rounded border border-primary/25 bg-background/70 p-2 text-sm text-foreground outline-none focus:border-primary/60"
               />
             </label>
           </div>

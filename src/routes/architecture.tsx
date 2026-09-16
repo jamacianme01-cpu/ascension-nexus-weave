@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SystemArchitecture } from "@/components/ascension/system-architecture";
 
-export const Route = createFileRoute("/architecture")({
+export const Route = createFileRoute("/architecture" as any)({
   head: () => ({
     meta: [
       { title: "Architecture — ASCENSION" },

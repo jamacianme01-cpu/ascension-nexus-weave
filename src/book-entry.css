@@ -40,36 +40,27 @@ body:has(.ascension-world > .ascension-command) .starfield {
 
 /* The circular presentation podium is part of the stage, not an interface panel. */
 .ascension-world::before {
-  content: "ASCENSION   ·   KNOWLEDGEVERSE";
+  content: "";
   position: absolute;
-  z-index: 4;
+  z-index: 5;
   left: 50%;
-  bottom: 2.5vh;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  bottom: -145px;
   width: min(1220px, 88vw);
-  height: clamp(250px, 31vh, 340px);
-  padding-bottom: clamp(22px, 3vh, 34px);
-  transform: translateX(-50%) perspective(1000px) rotateX(67deg);
+  height: 430px;
+  transform: translateX(-50%) scaleY(.52);
   transform-origin: center center;
   pointer-events: none;
-  border: 2px solid rgba(229, 194, 112, .48);
+  border: 3px solid rgba(226, 190, 108, .48);
   border-radius: 50%;
-  color: rgba(239, 204, 124, .92);
-  font-family: Cinzel, serif;
-  font-size: clamp(.78rem, 1.1vw, 1rem);
-  letter-spacing: .34em;
-  text-shadow: 0 0 18px rgba(226, 179, 77, .42);
   background:
-    radial-gradient(ellipse at center, rgba(16, 27, 39, .96) 0 32%, rgba(7, 12, 19, .99) 33% 52%, rgba(35, 35, 38, .99) 53% 65%, rgba(5, 7, 11, 1) 66% 100%),
-    repeating-radial-gradient(ellipse at center, rgba(224,184,93,.18) 0 1px, transparent 2px 16px);
+    radial-gradient(ellipse at 50% 42%, rgba(52, 78, 99, .26) 0 28%, rgba(10, 15, 22, .97) 29% 53%, rgba(41, 38, 36, .98) 54% 66%, rgba(7, 9, 13, 1) 67% 100%),
+    repeating-radial-gradient(ellipse at center, rgba(225,186,97,.19) 0 2px, transparent 3px 24px);
   box-shadow:
-    0 0 0 9px rgba(10, 15, 23, .96),
-    0 0 0 12px rgba(219, 177, 84, .22),
-    0 -22px 80px rgba(216, 170, 70, .18),
-    0 34px 90px rgba(0, 0, 0, .94),
-    inset 0 0 88px rgba(79, 150, 189, .1);
+    0 0 0 12px rgba(8, 12, 18, .98),
+    0 0 0 15px rgba(226, 187, 97, .22),
+    0 -24px 90px rgba(218, 172, 76, .22),
+    0 38px 120px rgba(0,0,0,.96),
+    inset 0 0 90px rgba(72, 171, 216, .12);
 }
 
 /* Stage light / opening flash. */
@@ -103,25 +94,26 @@ body:has(.ascension-world > .ascension-command) .starfield {
   transform-style: preserve-3d;
 }
 
-/* Closed Unreal Book. It sits physically over the podium rather than filling the whole screen. */
+/* Closed Unreal Book. Zoom the actual Unreal capture around the Book and dissolve its floor into the stage. */
 .ascension-command::before {
   content: "";
   position: absolute;
   z-index: 8;
   left: 50%;
-  top: 53%;
-  width: min(980px, 74vw);
-  height: min(500px, 48vh);
+  top: 50.5%;
+  width: min(1080px, 82vw);
+  height: min(610px, 61vh);
   pointer-events: none;
   background-image: url('/unreal-book/KnowledgeBook_Textured_Runtime.png');
   background-repeat: no-repeat;
-  background-size: 292% auto;
-  background-position: 50% 64%;
-  clip-path: polygon(12% 31%, 50% 10%, 88% 31%, 93% 68%, 73% 91%, 28% 91%, 7% 68%);
+  background-size: 214% auto;
+  background-position: 50% 60%;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 54%, #000 0 55%, rgba(0,0,0,.96) 67%, rgba(0,0,0,.52) 78%, transparent 91%);
+  mask-image: radial-gradient(ellipse at 50% 54%, #000 0 55%, rgba(0,0,0,.96) 67%, rgba(0,0,0,.52) 78%, transparent 91%);
   opacity: 1;
   transform-origin: 50% 68%;
-  transform: translate(-50%, -50%) perspective(1600px) rotateX(4deg) scale(1.12);
-  filter: brightness(1.06) contrast(1.08) saturate(1.03) drop-shadow(0 24px 26px rgba(0,0,0,.62));
+  transform: translate(-50%, -50%) perspective(1600px) rotateX(3deg) scale(1.08);
+  filter: brightness(1.06) contrast(1.08) saturate(1.03) drop-shadow(0 30px 30px rgba(0,0,0,.68));
   will-change: transform, opacity, filter;
   transition: opacity .38s ease, transform .5s ease, filter .38s ease;
 }
@@ -207,15 +199,15 @@ body:has(.ascension-world > .ascension-command) .starfield {
 .ascension-command > label[for="objective"] {
   position: absolute !important;
   z-index: 30;
-  top: 15.5%;
+  top: 8.5%;
   left: 50%;
-  width: min(860px, 76vw);
+  width: min(1320px, 92vw);
   transform: translateX(-50%) !important;
   text-align: center;
-  color: rgba(241, 225, 185, .78);
-  font-size: clamp(1rem, 1.55vw, 1.45rem);
-  line-height: 1.35;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, .95);
+  color: rgba(241, 225, 185, .86);
+  font-size: clamp(1.15rem, 1.8vw, 1.8rem);
+  line-height: 1.25;
+  text-shadow: 0 2px 18px rgba(0,0,0,.96);
 }
 
 .ascension-command textarea#objective {
@@ -223,18 +215,19 @@ body:has(.ascension-world > .ascension-command) .starfield {
   z-index: 32;
   top: 42.5%;
   left: 50%;
-  width: min(470px, 38vw) !important;
-  min-height: 88px !important;
-  max-height: 100px;
+  width: min(460px, 36vw) !important;
+  min-height: 74px !important;
+  max-height: 88px;
   transform: translateX(-50%) !important;
   resize: none !important;
-  color: #f4ead1 !important;
-  caret-color: #e9c873;
-  background: rgba(2, 6, 10, .18) !important;
-  border: 1px solid rgba(229, 198, 126, .18) !important;
-  border-radius: .25rem !important;
-  box-shadow: inset 0 0 25px rgba(0, 0, 0, .45) !important;
-  backdrop-filter: blur(1px);
+  padding: 12px 16px !important;
+  color: #f5ead1 !important;
+  caret-color: #f0ce78;
+  background: rgba(1, 5, 9, .12) !important;
+  border: 1px solid rgba(229, 198, 126, .13) !important;
+  border-radius: .35rem !important;
+  box-shadow: inset 0 0 18px rgba(0,0,0,.22) !important;
+  backdrop-filter: blur(.5px);
 }
 
 .ascension-command textarea#objective:focus {
@@ -245,7 +238,7 @@ body:has(.ascension-world > .ascension-command) .starfield {
 .ascension-command > div.flex {
   position: absolute !important;
   z-index: 34;
-  top: 78%;
+  top: 79.5%;
   left: 50%;
   width: auto;
   transform: translateX(-50%) !important;
@@ -259,12 +252,15 @@ body:has(.ascension-world > .ascension-command) .starfield {
 }
 
 .ascension-command > div.flex > button:last-child {
-  min-width: 320px;
-  min-height: 58px;
-  border: 1px solid rgba(229, 194, 112, .42) !important;
-  background: rgba(4, 8, 12, .44) !important;
-  color: #e9ca82 !important;
-  box-shadow: 0 0 24px rgba(215, 176, 88, .08);
+  min-width: 330px;
+  min-height: 60px;
+  border: 1px solid rgba(229, 194, 112, .58) !important;
+  border-radius: 999px !important;
+  background: rgba(3, 7, 11, .78) !important;
+  color: #ebcb82 !important;
+  box-shadow:
+    0 0 28px rgba(215, 176, 88, .13),
+    inset 0 0 18px rgba(215,176,88,.05);
   backdrop-filter: blur(2px);
 }
 

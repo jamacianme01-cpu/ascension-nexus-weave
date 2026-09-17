@@ -73,6 +73,56 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+function BookSequenceController() {
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const onClick = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest("button") : null;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const label = target.textContent?.trim().toUpperCase() ?? "";
+      if (!label.includes("ENGAGE ASCENSION")) return;
+
+      const world = target.closest(".ascension-world");
+      if (!(world instanceof HTMLElement)) return;
+
+      const holdTop = Math.max(0, window.scrollY + world.getBoundingClientRect().top - 72);
+      world.dataset.bookSequence = "opening";
+      const started = performance.now();
+
+      const holdBookInView = (now: number) => {
+        if (now - started < 2100) {
+          window.scrollTo({ top: holdTop, behavior: "auto" });
+          animationFrame = window.requestAnimationFrame(holdBookInView);
+          return;
+        }
+        world.dataset.bookSequence = "tree";
+      };
+
+      animationFrame = window.requestAnimationFrame(holdBookInView);
+    };
+
+    const onInput = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLTextAreaElement) || target.id !== "objective") return;
+      const world = target.closest(".ascension-world");
+      if (world instanceof HTMLElement && world.dataset.bookSequence === "tree") {
+        delete world.dataset.bookSequence;
+      }
+    };
+
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("input", onInput, true);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("input", onInput, true);
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, []);
+
+  return null;
+}
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -125,6 +175,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <BookSequenceController />
       <Shell>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />

@@ -2,43 +2,70 @@
   display: none !important;
 }
 
-/* The Book is the opening interface. The living world does not appear behind it
-   until an objective has actually produced a run/pathway surface. */
+/* BOOK PASS ONLY.
+   Keep the Knowledgeverse hidden while the Book itself is being verified. */
 .ascension-world:not(:has(.ascension-command section[aria-label="Knowledge taking form"])) > section[aria-label="Living Knowledgeverse"] {
   display: none !important;
 }
 
 .ascension-world:has(.ascension-command) {
+  position: relative;
+  min-height: 760px;
+  perspective: 2200px;
   background:
-    radial-gradient(circle at 50% 44%, oklch(0.13 0.03 258 / 54%), transparent 42%),
-    oklch(0.055 0.018 258 / 98%) !important;
+    radial-gradient(ellipse at 50% 42%, oklch(0.16 0.035 258 / 42%), transparent 33%),
+    radial-gradient(ellipse at 50% 78%, oklch(0.08 0.025 258 / 68%), transparent 42%),
+    oklch(0.035 0.012 258 / 99%) !important;
 }
 
 @keyframes ascension-book-arrival {
   0% {
-    transform: perspective(1800px) rotateY(-88deg) translateX(-8%) scale(.92);
-    transform-origin: left center;
-    opacity: .12;
-    filter: brightness(.38) blur(3px);
+    transform: perspective(2200px) rotateX(22deg) rotateY(-34deg) translateY(64px) scale(.88);
+    opacity: 0;
+    filter: brightness(.35) blur(5px);
   }
-  34% {
-    opacity: .8;
-    filter: brightness(.7) blur(1px);
-  }
-  72% {
-    transform: perspective(1800px) rotateY(-12deg) translateX(-1%) scale(.995);
+  46% {
     opacity: 1;
+    filter: brightness(.72) blur(1px);
+  }
+  78% {
+    transform: perspective(2200px) rotateX(10deg) rotateY(-9deg) translateY(8px) scale(.99);
   }
   100% {
-    transform: perspective(1800px) rotateY(0deg) translateX(0) scale(1);
+    transform: perspective(2200px) rotateX(8deg) rotateY(-5deg) translateY(0) scale(1);
     opacity: 1;
     filter: brightness(1) blur(0);
   }
 }
 
-@keyframes ascension-page-content-reveal {
-  0%, 48% { opacity: 0; transform: translateY(12px); }
-  100% { opacity: 1; transform: translateY(0); }
+@keyframes ascension-cover-breathe {
+  0%, 100% { box-shadow: inset 0 0 0 1px oklch(0.84 0.12 84 / 32%), inset 0 0 42px oklch(0.02 0.02 258 / 72%), 0 42px 110px oklch(0.01 0.01 258 / 90%); }
+  50% { box-shadow: inset 0 0 0 1px oklch(0.89 0.13 84 / 48%), inset 0 0 56px oklch(0.02 0.02 258 / 76%), 0 48px 135px oklch(0.01 0.01 258 / 96%); }
+}
+
+@keyframes ascension-page-one {
+  0%   { opacity: 0; transform: rotateY(0deg) translateZ(18px); }
+  8%   { opacity: .98; }
+  26%  { transform: rotateY(-74deg) translateZ(24px); }
+  45%  { transform: rotateY(-154deg) translateZ(18px); }
+  58%  { opacity: .96; transform: rotateY(-181deg) translateZ(12px); }
+  100% { opacity: 0; transform: rotateY(-181deg) translateZ(12px); }
+}
+
+@keyframes ascension-page-two {
+  0%, 14% { opacity: 0; transform: rotateY(0deg) translateZ(28px); }
+  20% { opacity: .92; }
+  41% { transform: rotateY(-82deg) translateZ(32px); }
+  62% { transform: rotateY(-162deg) translateZ(20px); }
+  76% { opacity: .9; transform: rotateY(-181deg) translateZ(14px); }
+  100% { opacity: 0; transform: rotateY(-181deg) translateZ(14px); }
+}
+
+@keyframes ascension-book-engage {
+  0% { transform: perspective(2200px) rotateX(8deg) rotateY(-5deg) scale(1); }
+  26% { transform: perspective(2200px) rotateX(11deg) rotateY(-9deg) scale(1.012); }
+  56% { transform: perspective(2200px) rotateX(6deg) rotateY(-2deg) scale(1.018); }
+  100% { transform: perspective(2200px) rotateX(8deg) rotateY(-5deg) scale(1); }
 }
 
 .ascension-command {
@@ -46,152 +73,166 @@
   z-index: 12;
   isolation: isolate;
   overflow: visible;
-  perspective: 1800px;
-  transform-style: preserve-3d;
-  padding: clamp(1.4rem, 3vw, 2.5rem) !important;
-  border: 1px solid oklch(0.83 0.11 84 / 42%) !important;
-  border-radius: .7rem 1.35rem 1.35rem .7rem !important;
+  width: min(880px, calc(100vw - 2rem));
+  min-height: 560px;
+  margin-top: clamp(2rem, 6vh, 5rem) !important;
+  padding: clamp(2rem, 4vw, 3.4rem) clamp(2rem, 5vw, 4.2rem) !important;
+  border: 2px solid oklch(0.80 0.10 84 / 52%) !important;
+  border-radius: 1.1rem 2rem 2rem 1.1rem !important;
   background:
-    linear-gradient(90deg, oklch(0.045 0.02 258 / 96%) 0 3.5%, transparent 3.8%),
-    radial-gradient(circle at 25% 24%, oklch(0.31 0.035 74 / 28%), transparent 32%),
-    radial-gradient(circle at 75% 76%, oklch(0.24 0.03 74 / 24%), transparent 34%),
-    linear-gradient(105deg, oklch(0.19 0.034 74 / 92%), oklch(0.10 0.027 258 / 94%) 49%, oklch(0.18 0.034 74 / 90%)) !important;
-  box-shadow:
-    inset 18px 0 26px oklch(0.02 0.02 258 / 78%),
-    inset -2px 0 0 oklch(0.83 0.11 84 / 30%),
-    inset 0 1px 0 oklch(0.96 0.03 84 / 18%),
-    0 36px 100px oklch(0.02 0.02 258 / 90%) !important;
-  transform-origin: 0 50%;
-  animation: ascension-book-arrival 1.15s cubic-bezier(.16,.82,.22,1) both;
+    linear-gradient(90deg, oklch(0.025 0.012 258 / 100%) 0 4.8%, transparent 5.1%),
+    radial-gradient(circle at 22% 16%, oklch(0.34 0.055 74 / 24%), transparent 28%),
+    radial-gradient(circle at 80% 82%, oklch(0.29 0.05 74 / 18%), transparent 30%),
+    repeating-linear-gradient(100deg, oklch(0.17 0.028 58 / 16%) 0 2px, transparent 2px 7px),
+    linear-gradient(120deg, oklch(0.145 0.038 48 / 98%), oklch(0.065 0.022 258 / 99%) 47%, oklch(0.13 0.035 48 / 98%)) !important;
+  transform-style: preserve-3d;
+  transform-origin: 8% 50%;
+  animation:
+    ascension-book-arrival 1.2s cubic-bezier(.16,.82,.22,1) both,
+    ascension-cover-breathe 5.5s ease-in-out 1.25s infinite;
 }
 
-.ascension-command > * {
-  animation: ascension-page-content-reveal 1.2s ease-out both;
-}
-
-/* Page block beneath the cover. */
+/* The page block is physically behind the cover instead of painted onto it. */
 .ascension-command::before {
   content: "";
   position: absolute;
-  z-index: -1;
-  inset: .55rem -1rem -.8rem 1.1rem;
-  border: 1px solid oklch(0.83 0.11 84 / 28%);
-  border-radius: .45rem 1rem 1rem .45rem;
+  z-index: -2;
+  inset: .9rem -1.2rem -1.15rem 1.45rem;
+  border: 1px solid oklch(0.84 0.055 84 / 38%);
+  border-radius: .7rem 1.65rem 1.65rem .65rem;
   background:
-    repeating-linear-gradient(0deg, oklch(0.83 0.04 84 / 16%) 0 1px, transparent 1px 5px),
-    oklch(0.14 0.025 74 / 94%);
+    repeating-linear-gradient(0deg, oklch(0.66 0.035 84 / 32%) 0 1px, transparent 1px 5px),
+    linear-gradient(90deg, oklch(0.52 0.04 84 / 76%), oklch(0.77 0.045 84 / 90%) 18%, oklch(0.61 0.04 84 / 82%));
   box-shadow:
-    8px 7px 0 -4px oklch(0.76 0.05 84 / 24%),
-    14px 13px 0 -8px oklch(0.76 0.05 84 / 18%),
-    18px 18px 36px oklch(0.02 0.02 258 / 74%);
-  transform: translateZ(-12px);
+    5px 5px 0 -1px oklch(0.62 0.04 84 / 42%),
+    10px 10px 0 -3px oklch(0.46 0.035 84 / 44%),
+    17px 17px 34px oklch(0.01 0.01 258 / 82%);
+  transform: translateZ(-26px);
 }
 
-/* Spine / fold. */
+/* Thick spine and hinge. */
 .ascension-command::after {
   content: "";
   position: absolute;
   pointer-events: none;
-  z-index: 30;
-  top: 2%;
-  bottom: 2%;
-  left: 50%;
-  width: 2px;
-  opacity: .38;
-  background: linear-gradient(
-    transparent,
-    var(--color-gold-dim) 12%,
-    var(--color-gold) 50%,
-    var(--color-gold-dim) 88%,
-    transparent
-  );
-  box-shadow: 0 0 18px oklch(0.83 0.11 84 / 28%);
+  z-index: 28;
+  top: -2px;
+  bottom: -2px;
+  left: 3.2%;
+  width: 8.5%;
+  border-left: 1px solid oklch(0.88 0.12 84 / 38%);
+  border-right: 1px solid oklch(0.02 0.02 258 / 88%);
+  border-radius: .8rem .25rem .25rem .8rem;
+  background:
+    linear-gradient(90deg, oklch(0.04 0.02 258 / 96%), oklch(0.23 0.055 58 / 88%) 42%, oklch(0.055 0.022 258 / 96%));
+  box-shadow:
+    inset -9px 0 14px oklch(0.01 0.01 258 / 72%),
+    8px 0 20px oklch(0.01 0.01 258 / 56%);
+  transform: translateZ(10px);
+}
+
+.ascension-command > * {
+  position: relative;
+  z-index: 2;
+  transform: translateZ(16px);
 }
 
 .ascension-command h1 {
   text-align: center;
   color: var(--color-gold);
-  text-shadow: 0 0 24px oklch(0.83 0.11 84 / 18%);
+  text-shadow:
+    0 1px 0 oklch(0.98 0.04 84 / 28%),
+    0 0 20px oklch(0.83 0.11 84 / 24%),
+    0 6px 22px oklch(0.01 0.01 258 / 72%);
 }
 
 .ascension-command > label[for="objective"] {
   text-align: center;
   font-family: var(--font-display);
-  letter-spacing: .08em;
+  letter-spacing: .06em;
 }
 
 .ascension-command textarea#objective {
-  border-color: oklch(0.83 0.11 84 / 30%) !important;
+  border-color: oklch(0.83 0.11 84 / 34%) !important;
   background:
-    repeating-linear-gradient(0deg, transparent 0 30px, oklch(0.83 0.11 84 / 10%) 30px 31px),
-    oklch(0.10 0.025 258 / 72%) !important;
-  box-shadow: inset 0 0 38px oklch(0.83 0.11 84 / 7%) !important;
+    repeating-linear-gradient(0deg, transparent 0 30px, oklch(0.83 0.11 84 / 8%) 30px 31px),
+    oklch(0.055 0.02 258 / 84%) !important;
+  box-shadow:
+    inset 0 0 40px oklch(0.01 0.01 258 / 42%),
+    0 1px 0 oklch(0.92 0.05 84 / 8%) !important;
 }
 
-@keyframes ascension-book-flutter {
-  0% { transform: rotateY(0deg) scaleX(1); opacity: 0; }
-  10% { opacity: .86; }
-  28% { transform: rotateY(-72deg) scaleX(.72); }
-  46% { transform: rotateY(58deg) scaleX(.82); }
-  66% { transform: rotateY(-34deg) scaleX(.9); }
-  84% { transform: rotateY(18deg) scaleX(.96); opacity: .55; }
-  100% { transform: rotateY(0deg) scaleX(1); opacity: 0; }
+/* ENGAGE makes the physical Book react and sends two page leaves across the hinge.
+   This is deliberately only the Book motion; the Tree/portal pass comes after Book approval. */
+.ascension-world:has(.ascension-command button:last-child:is(:active, :focus)) .ascension-command {
+  animation:
+    ascension-book-engage 1.45s cubic-bezier(.2,.72,.22,1) both,
+    ascension-cover-breathe 5.5s ease-in-out 1.45s infinite;
 }
 
-@keyframes ascension-tree-reveal {
-  0% { opacity: 0; transform: scale(.86); filter: blur(12px) brightness(.55); }
-  38% { opacity: .22; }
-  100% { opacity: .72; transform: scale(1.03); filter: blur(0) brightness(1.08); }
-}
-
-/* Page flutter begins from ENGAGE. */
-.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before {
+.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before,
+.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
   content: "";
   position: absolute;
-  z-index: 18;
-  inset: 4% 8%;
+  z-index: 20;
+  top: clamp(170px, 24vh, 245px);
+  left: 50%;
+  width: min(41vw, 405px);
+  height: min(52vw, 485px);
+  max-height: 485px;
   pointer-events: none;
   transform-origin: left center;
-  border-radius: 1rem;
+  backface-visibility: hidden;
+  border: 1px solid oklch(0.82 0.055 84 / 54%);
+  border-radius: .35rem 1.2rem 1.2rem .35rem;
   background:
-    linear-gradient(90deg, oklch(0.91 0.035 84 / 72%), oklch(0.66 0.04 74 / 42%) 48%, oklch(0.92 0.03 84 / 68%));
-  box-shadow: 0 0 45px oklch(0.83 0.11 84 / 22%);
-  animation: ascension-book-flutter 1.35s cubic-bezier(.2,.72,.22,1) both;
+    repeating-linear-gradient(0deg, transparent 0 25px, oklch(0.32 0.03 74 / 14%) 25px 26px),
+    radial-gradient(circle at 40% 28%, oklch(0.94 0.045 84 / 96%), oklch(0.77 0.045 84 / 96%) 72%);
+  box-shadow:
+    inset 10px 0 20px oklch(0.22 0.02 74 / 18%),
+    0 18px 45px oklch(0.01 0.01 258 / 44%);
 }
 
-/* The Tree may flash into view during ENGAGE, then stays present once the
-   objective has become a live pathway surface. */
-.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after,
-.ascension-world:has(.ascension-command section[aria-label="Knowledge taking form"])::after {
-  content: "";
-  position: absolute;
-  z-index: 8;
-  inset: 0;
-  pointer-events: none;
-  background: center 42% / min(72vw, 760px) auto no-repeat url('/__l5e/assets-v1/458aed97-60ee-4cbb-8742-0c7149512cc0/engines-tree.png');
-  animation: ascension-tree-reveal 1.4s ease-out both;
+.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before {
+  animation: ascension-page-one 1.35s cubic-bezier(.22,.7,.2,1) both;
+}
+
+.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
+  z-index: 21;
+  animation: ascension-page-two 1.35s .12s cubic-bezier(.22,.7,.2,1) both;
 }
 
 @media (max-width: 640px) {
+  .ascension-world:has(.ascension-command) {
+    min-height: 680px;
+  }
+
   .ascension-command {
-    padding: 1.1rem !important;
+    min-height: 520px;
+    margin-top: 1.6rem !important;
+    padding: 1.35rem 1.25rem 1.55rem 1.75rem !important;
+    transform-origin: 7% 50%;
   }
+
   .ascension-command::after {
-    left: 49%;
-    opacity: .22;
+    left: 2.4%;
+    width: 7.8%;
   }
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after,
-  .ascension-world:has(.ascension-command section[aria-label="Knowledge taking form"])::after {
-    background-size: 115vw auto;
+
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before,
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
+    top: 190px;
+    left: 49%;
+    width: 46vw;
+    height: 55vw;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ascension-command,
-  .ascension-command > *,
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus)) .ascension-command,
   .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before,
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after,
-  .ascension-world:has(.ascension-command section[aria-label="Knowledge taking form"])::after {
+  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
     animation: none !important;
   }
 }

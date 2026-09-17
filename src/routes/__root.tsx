@@ -106,14 +106,14 @@ function BookSequenceController() {
       const holdTop = Math.max(0, window.scrollY + world.getBoundingClientRect().top);
       const started = performance.now();
       const holdBookInView = (now: number) => {
-        if (now - started < 4300) {
+        if (now - started < 5200) {
           window.scrollTo({ top: holdTop, behavior: "auto" });
           animationFrame = window.requestAnimationFrame(holdBookInView);
         }
       };
       animationFrame = window.requestAnimationFrame(holdBookInView);
 
-      [520, 1080, 1640, 2200, 2760, 3320].forEach((delay, index) => {
+      [640, 1280, 1920, 2560, 3200, 3840].forEach((delay, index) => {
         timers.push(
           window.setTimeout(() => {
             world.dataset["bookStep"] = String(index + 1);
@@ -125,7 +125,7 @@ function BookSequenceController() {
         window.setTimeout(() => {
           world.dataset["bookSequence"] = "tree";
           world.dataset["bookStep"] = "6";
-        }, 3920),
+        }, 4700),
       );
     };
 

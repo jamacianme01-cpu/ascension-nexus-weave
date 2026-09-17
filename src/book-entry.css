@@ -1,4 +1,4 @@
-/* BOOK PASS ONLY: the Unreal Book is the entire opening stage. */
+/* BOOK PASS ONLY: the Unreal Book is the opening stage and main character. */
 
 body:has(.ascension-world > .ascension-command) header,
 body:has(.ascension-world > .ascension-command) footer {
@@ -13,7 +13,7 @@ body:has(.ascension-world > .ascension-command) main {
 }
 
 body:has(.ascension-world > .ascension-command) .starfield {
-  opacity: .22 !important;
+  opacity: .08 !important;
 }
 
 .ascension-world:has(.ascension-command) {
@@ -25,68 +25,121 @@ body:has(.ascension-world > .ascension-command) .starfield {
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden;
-  perspective: 1900px;
+  isolation: isolate;
+  perspective: 1800px;
   background:
-    radial-gradient(circle at 50% 46%, rgba(14, 31, 48, .32), transparent 42%),
-    #010409 !important;
+    radial-gradient(ellipse at 50% 36%, rgba(46, 72, 95, .18), transparent 34%),
+    radial-gradient(ellipse at 50% 74%, rgba(106, 78, 35, .12), transparent 30%),
+    linear-gradient(180deg, #010308 0%, #02060c 54%, #010205 100%) !important;
 }
 
-/* During this pass nothing except the Book stage is allowed on screen. */
+/* Nothing else gets to compete with the Book during this opening. */
 .ascension-world > :not(.ascension-command) {
   display: none !important;
+}
+
+/* Stone/metal presentation podium. It is stage furniture, not another interface panel. */
+.ascension-world::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: clamp(-24px, -2vh, -8px);
+  width: min(980px, 76vw);
+  height: clamp(130px, 18vh, 205px);
+  transform: translateX(-50%);
+  pointer-events: none;
+  clip-path: polygon(15% 0, 85% 0, 100% 34%, 91% 100%, 9% 100%, 0 34%);
+  background:
+    radial-gradient(ellipse at 50% 9%, rgba(231, 194, 112, .22) 0 12%, transparent 48%),
+    linear-gradient(180deg, rgba(120, 104, 81, .74) 0 9%, rgba(43, 46, 51, .98) 10% 39%, rgba(19, 23, 29, .99) 40% 100%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 11px);
+  border-top: 1px solid rgba(231, 201, 139, .28);
+  box-shadow:
+    0 -10px 42px rgba(212, 174, 89, .08),
+    0 32px 80px rgba(0, 0, 0, .88),
+    inset 0 12px 22px rgba(255, 237, 190, .04),
+    inset 0 -20px 35px rgba(0,0,0,.55);
+  transition: opacity .55s ease, transform .55s ease;
+}
+
+/* Focus light and floor falloff. */
+.ascension-world::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 31%, rgba(111, 161, 193, .12) 0 16%, transparent 46%),
+    radial-gradient(ellipse at 50% 71%, rgba(226, 181, 88, .11) 0 10%, transparent 34%),
+    radial-gradient(ellipse at 50% 92%, rgba(0, 0, 0, .1) 0 18%, rgba(0, 0, 0, .78) 70%);
 }
 
 .ascension-command {
   position: relative;
   z-index: 10;
   isolation: isolate;
-  overflow: hidden;
-  width: min(1600px, 98vw) !important;
-  height: min(1000px, 96svh);
-  min-height: 760px;
-  margin: 0 auto !important;
+  overflow: visible;
+  width: 100vw !important;
+  height: 100svh;
+  min-height: 720px;
+  margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  transform: none !important;
+  transform-style: preserve-3d;
 }
 
-/* The actual Unreal Book. Zoomed so it is the centerpiece, not a small prop. */
+/* The actual Unreal Book. Large, low enough to feel physically seated on the podium. */
 .ascension-command::before {
   content: "";
   position: absolute;
-  inset: 0;
-  z-index: 0;
+  z-index: 4;
+  inset: -7%;
   pointer-events: none;
   background:
-    url('/unreal-book/KnowledgeBook_Textured_Runtime.png') center 47% / 138% auto no-repeat;
+    url('/unreal-book/KnowledgeBook_Textured_Runtime.png') center 40% / 202% auto no-repeat;
   opacity: 1;
-  transform: translateZ(0) scale(1);
-  filter: brightness(1.03) contrast(1.04);
+  transform-origin: 50% 64%;
+  transform: perspective(1700px) rotateX(7deg) rotateY(0deg) translateY(-1.5vh) scale(1.02);
+  filter: brightness(1.05) contrast(1.07) saturate(1.02);
+  will-change: transform, opacity, filter;
   transition: opacity .34s ease, filter .34s ease, transform .34s ease;
 }
 
-/* The exact canonical Tree/engines/crystal scene. Each flutter reveals more of it. */
+/* Canonical Tree / engines / crystal scene grows through the Book as the pages advance. */
 .ascension-command::after {
   content: "";
   position: absolute;
-  inset: 3.5% 3%;
-  z-index: 5;
+  z-index: 6;
+  inset: 1.5%;
   pointer-events: none;
   background:
-    url('/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png') center center / 114% auto no-repeat;
+    url('/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png') center center / 116% auto no-repeat;
   opacity: 0;
-  transform: scale(.992);
-  filter: brightness(.55) contrast(1.02) saturate(.82);
+  transform: scale(.97);
+  filter: brightness(.52) contrast(1.04) saturate(.76);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 46%, rgba(0,0,0,.84) 60%, transparent 78%);
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: 16% 16%;
+  mask-image: radial-gradient(circle at 50% 50%, #000 0 46%, rgba(0,0,0,.84) 60%, transparent 78%);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 16% 16%;
+  will-change: opacity, transform, filter, -webkit-mask-size, mask-size;
   transition:
-    opacity .32s ease,
-    transform .32s ease,
-    filter .32s ease;
+    opacity .42s ease,
+    transform .42s ease,
+    filter .42s ease,
+    -webkit-mask-size .42s ease,
+    mask-size .42s ease;
 }
 
-/* Keep only the command itself on the Book. Everything else is removed from the stage. */
+/* Remove all normal app furniture from this shot. Keep only objective intake embedded in the Book. */
 .ascension-command > .text-center,
 .ascension-command > details,
 .ascension-command > p,
@@ -97,47 +150,48 @@ body:has(.ascension-world > .ascension-command) .starfield {
 .ascension-command > label[for="objective"] {
   position: absolute !important;
   z-index: 30;
-  top: 39%;
+  top: 39.5%;
   left: 50%;
-  width: min(640px, 54vw);
+  width: min(500px, 38vw);
   transform: translateX(-50%) !important;
   text-align: center;
-  color: rgba(244, 230, 190, .9);
-  font-size: clamp(.85rem, 1.3vw, 1.05rem);
-  line-height: 1.4;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, .92);
+  color: rgba(241, 225, 185, .76);
+  font-size: clamp(.72rem, 1vw, .92rem);
+  letter-spacing: .03em;
+  line-height: 1.35;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .95);
 }
 
 .ascension-command textarea#objective {
   position: absolute !important;
   z-index: 32;
-  top: 47%;
+  top: 45.5%;
   left: 50%;
-  width: min(640px, 54vw) !important;
-  min-height: 138px !important;
-  max-height: 180px;
+  width: min(520px, 40vw) !important;
+  min-height: 132px !important;
+  max-height: 150px;
   transform: translateX(-50%) !important;
   resize: none !important;
   color: #f4ead1 !important;
-  caret-color: #e7c77d;
-  background: rgba(2, 7, 12, .58) !important;
-  border: 1px solid rgba(225, 190, 111, .5) !important;
-  border-radius: .35rem !important;
+  caret-color: #e9c873;
+  background: rgba(2, 6, 10, .42) !important;
+  border: 1px solid rgba(229, 198, 126, .34) !important;
+  border-radius: .22rem !important;
   box-shadow:
-    inset 0 0 34px rgba(0, 0, 0, .42),
-    0 8px 26px rgba(0, 0, 0, .32) !important;
-  backdrop-filter: blur(2px);
+    inset 0 0 26px rgba(0, 0, 0, .42),
+    0 7px 24px rgba(0, 0, 0, .22) !important;
+  backdrop-filter: blur(1.5px);
 }
 
 .ascension-command textarea#objective:focus {
-  outline: 1px solid rgba(99, 238, 232, .68) !important;
-  outline-offset: 2px;
+  outline: 1px solid rgba(94, 227, 224, .5) !important;
+  outline-offset: 1px;
 }
 
 .ascension-command > div.flex {
   position: absolute !important;
   z-index: 34;
-  top: 68%;
+  top: 64.5%;
   left: 50%;
   width: auto;
   transform: translateX(-50%) !important;
@@ -151,66 +205,35 @@ body:has(.ascension-world > .ascension-command) .starfield {
 }
 
 .ascension-command > div.flex > button:last-child {
-  min-width: 210px;
-  min-height: 50px;
-  border: 1px solid rgba(229, 194, 112, .62) !important;
-  background: rgba(4, 10, 15, .68) !important;
+  min-width: 188px;
+  min-height: 46px;
+  border: 1px solid rgba(229, 194, 112, .48) !important;
+  background: rgba(5, 9, 12, .5) !important;
   color: #e9ca82 !important;
-  box-shadow: 0 0 30px rgba(215, 176, 88, .12);
-  backdrop-filter: blur(3px);
+  box-shadow:
+    0 0 24px rgba(215, 176, 88, .09),
+    inset 0 0 16px rgba(215,176,88,.035);
+  backdrop-filter: blur(2px);
 }
 
-/* Flutter leaves use the Unreal Book image itself instead of fake paper. */
-.ascension-world::before,
-.ascension-world::after {
-  content: "";
-  position: absolute;
-  z-index: 70;
-  top: 13%;
-  left: 50%;
-  width: min(42vw, 660px);
-  height: 72%;
-  pointer-events: none;
-  opacity: 0;
-  transform-origin: left center;
-  backface-visibility: hidden;
-  background:
-    url('/unreal-book/KnowledgeBook_Textured_Runtime.png') 72% 47% / 276% auto no-repeat;
-  filter: brightness(1.08) contrast(1.04);
-  clip-path: polygon(0 1%, 100% 5%, 100% 95%, 0 99%);
-}
-
-.ascension-world::after {
-  z-index: 72;
-  width: min(41vw, 645px);
-  background-position: 74% 47%;
-  filter: brightness(1.13) contrast(1.03);
-}
-
-@keyframes actual-book-flutter-a {
-  0%   { opacity: 0; transform: perspective(1700px) rotateY(0deg) translateZ(5px); }
-  5%   { opacity: .96; }
-  22%  { transform: perspective(1700px) rotateY(-84deg) translateZ(30px); }
-  43%  { transform: perspective(1700px) rotateY(-10deg) translateZ(10px); }
-  63%  { transform: perspective(1700px) rotateY(-98deg) translateZ(34px); }
-  83%  { transform: perspective(1700px) rotateY(-16deg) translateZ(12px); }
-  96%  { opacity: .94; }
-  100% { opacity: 0; transform: perspective(1700px) rotateY(-112deg) translateZ(20px); }
-}
-
-@keyframes actual-book-flutter-b {
-  0%   { opacity: 0; transform: perspective(1700px) rotateY(0deg) translateZ(16px); }
-  8%   { opacity: .9; }
-  25%  { transform: perspective(1700px) rotateY(-72deg) translateZ(42px); }
-  46%  { transform: perspective(1700px) rotateY(-7deg) translateZ(18px); }
-  66%  { transform: perspective(1700px) rotateY(-92deg) translateZ(45px); }
-  86%  { transform: perspective(1700px) rotateY(-13deg) translateZ(21px); }
-  100% { opacity: 0; transform: perspective(1700px) rotateY(-106deg) translateZ(26px); }
-}
-
-@keyframes book-stage-breathe {
-  0%, 100% { transform: scale(1); filter: brightness(1.03) contrast(1.04); }
-  50% { transform: scale(1.012); filter: brightness(1.09) contrast(1.05); }
+/*
+  No fake paper rectangles. The Book itself moves on its hinge in repeated, decreasing
+  back-and-forth pulses while the canonical scene becomes more visible after each pulse.
+*/
+@keyframes unreal-book-hinge-flutter {
+  0%   { transform: perspective(1700px) rotateX(7deg) rotateY(0deg) translateY(-1.5vh) scale(1.02); filter: brightness(1.04) contrast(1.07); }
+  8%   { transform: perspective(1700px) rotateX(8deg) rotateY(-10deg) translateY(-1.7vh) scale(1.035); filter: brightness(1.13) contrast(1.08); }
+  16%  { transform: perspective(1700px) rotateX(6deg) rotateY(7deg) translateY(-1.3vh) scale(1.026); filter: brightness(1.05) contrast(1.07); }
+  24%  { transform: perspective(1700px) rotateX(8deg) rotateY(-9deg) translateY(-1.8vh) scale(1.04); filter: brightness(1.15) contrast(1.09); }
+  32%  { transform: perspective(1700px) rotateX(6deg) rotateY(6deg) translateY(-1.25vh) scale(1.03); filter: brightness(1.06) contrast(1.07); }
+  40%  { transform: perspective(1700px) rotateX(8deg) rotateY(-8deg) translateY(-1.8vh) scale(1.045); filter: brightness(1.14) contrast(1.08); }
+  48%  { transform: perspective(1700px) rotateX(6deg) rotateY(5deg) translateY(-1.25vh) scale(1.034); filter: brightness(1.06) contrast(1.07); }
+  56%  { transform: perspective(1700px) rotateX(7deg) rotateY(-7deg) translateY(-1.75vh) scale(1.05); filter: brightness(1.13) contrast(1.08); }
+  64%  { transform: perspective(1700px) rotateX(6deg) rotateY(4deg) translateY(-1.3vh) scale(1.04); filter: brightness(1.07) contrast(1.07); }
+  72%  { transform: perspective(1700px) rotateX(7deg) rotateY(-5deg) translateY(-1.7vh) scale(1.055); filter: brightness(1.12) contrast(1.08); }
+  80%  { transform: perspective(1700px) rotateX(6deg) rotateY(3deg) translateY(-1.35vh) scale(1.048); filter: brightness(1.07) contrast(1.07); }
+  90%  { transform: perspective(1700px) rotateX(6deg) rotateY(-3deg) translateY(-1.55vh) scale(1.058); filter: brightness(1.1) contrast(1.08); }
+  100% { transform: perspective(1700px) rotateX(5deg) rotateY(0deg) translateY(-1.2vh) scale(1.06); filter: brightness(1.08) contrast(1.08); }
 }
 
 @keyframes book-controls-away {
@@ -219,85 +242,90 @@ body:has(.ascension-world > .ascension-command) .starfield {
 }
 
 .ascension-world[data-book-sequence="opening"] .ascension-command::before {
-  animation: book-stage-breathe 1.12s ease-in-out 3;
-}
-
-.ascension-world[data-book-sequence="opening"]::before {
-  animation: actual-book-flutter-a 1.08s cubic-bezier(.2, .72, .18, 1) 3 both;
-}
-
-.ascension-world[data-book-sequence="opening"]::after {
-  animation: actual-book-flutter-b 1.08s .18s cubic-bezier(.2, .72, .18, 1) 3 both;
+  animation: unreal-book-hinge-flutter 4.55s cubic-bezier(.28, .58, .22, 1) both;
 }
 
 .ascension-world[data-book-sequence="opening"] .ascension-command > label[for="objective"],
 .ascension-world[data-book-sequence="opening"] .ascension-command textarea#objective,
 .ascension-world[data-book-sequence="opening"] .ascension-command > div.flex {
-  animation: book-controls-away .22s ease forwards;
+  animation: book-controls-away .18s ease forwards;
   pointer-events: none !important;
 }
 
-/* Each flutter exposes more of the canonical image. */
+/* Every flutter exposes more of the Tree / engines / crystal image. */
 .ascension-world[data-book-step="1"] .ascension-command::after {
-  opacity: .13;
-  transform: scale(.991);
-  filter: brightness(.62) contrast(1.02) saturate(.86);
+  opacity: .11;
+  transform: scale(.975);
+  filter: brightness(.58) contrast(1.04) saturate(.8);
+  -webkit-mask-size: 28% 28%;
+  mask-size: 28% 28%;
 }
-
 .ascension-world[data-book-step="2"] .ascension-command::after {
-  opacity: .28;
-  transform: scale(.994);
-  filter: brightness(.7) contrast(1.03) saturate(.9);
+  opacity: .23;
+  transform: scale(.98);
+  filter: brightness(.66) contrast(1.04) saturate(.85);
+  -webkit-mask-size: 44% 44%;
+  mask-size: 44% 44%;
 }
-
 .ascension-world[data-book-step="3"] .ascension-command::after {
-  opacity: .46;
-  transform: scale(.996);
-  filter: brightness(.78) contrast(1.04) saturate(.94);
+  opacity: .39;
+  transform: scale(.986);
+  filter: brightness(.75) contrast(1.05) saturate(.9);
+  -webkit-mask-size: 66% 66%;
+  mask-size: 66% 66%;
 }
-
 .ascension-world[data-book-step="4"] .ascension-command::after {
-  opacity: .64;
-  transform: scale(.998);
-  filter: brightness(.86) contrast(1.04) saturate(.97);
+  opacity: .58;
+  transform: scale(.992);
+  filter: brightness(.84) contrast(1.05) saturate(.94);
+  -webkit-mask-size: 94% 94%;
+  mask-size: 94% 94%;
 }
-
 .ascension-world[data-book-step="5"] .ascension-command::after {
-  opacity: .83;
-  transform: scale(1);
-  filter: brightness(.94) contrast(1.04) saturate(1);
+  opacity: .79;
+  transform: scale(.997);
+  filter: brightness(.93) contrast(1.05) saturate(.98);
+  -webkit-mask-size: 132% 132%;
+  mask-size: 132% 132%;
 }
-
 .ascension-world[data-book-step="6"] .ascension-command::after {
   opacity: 1;
   transform: scale(1);
-  filter: brightness(1) contrast(1.04) saturate(1);
+  filter: brightness(1) contrast(1.05) saturate(1);
+  -webkit-mask-size: 190% 190%;
+  mask-size: 190% 190%;
 }
 
-.ascension-world[data-book-step="1"] .ascension-command::before { opacity: .95; }
-.ascension-world[data-book-step="2"] .ascension-command::before { opacity: .84; }
-.ascension-world[data-book-step="3"] .ascension-command::before { opacity: .70; }
-.ascension-world[data-book-step="4"] .ascension-command::before { opacity: .54; }
-.ascension-world[data-book-step="5"] .ascension-command::before { opacity: .36; }
-.ascension-world[data-book-step="6"] .ascension-command::before { opacity: .18; }
+.ascension-world[data-book-step="1"] .ascension-command::before { opacity: .98; }
+.ascension-world[data-book-step="2"] .ascension-command::before { opacity: .92; }
+.ascension-world[data-book-step="3"] .ascension-command::before { opacity: .82; }
+.ascension-world[data-book-step="4"] .ascension-command::before { opacity: .67; }
+.ascension-world[data-book-step="5"] .ascension-command::before { opacity: .48; }
+.ascension-world[data-book-step="6"] .ascension-command::before { opacity: .24; }
 
-/* Final stop: the Book lands on the Tree of Knowledge / engines / crystal scene. */
-.ascension-world[data-book-sequence="tree"]::before,
-.ascension-world[data-book-sequence="tree"]::after {
-  opacity: 0 !important;
-  animation: none !important;
-}
+.ascension-world[data-book-step="4"]::before { opacity: .82; }
+.ascension-world[data-book-step="5"]::before { opacity: .58; }
+.ascension-world[data-book-step="6"]::before { opacity: .24; transform: translateX(-50%) translateY(18px) scale(.96); }
 
+/* Final lock: the visual resolves into the Tree of Knowledge / engines / crystal scene. */
 .ascension-world[data-book-sequence="tree"] .ascension-command::before {
-  opacity: .13;
-  transform: scale(1.01);
-  filter: brightness(.62) contrast(1.02);
+  animation: none !important;
+  opacity: .08;
+  transform: perspective(1700px) rotateX(4deg) rotateY(0deg) translateY(-1vh) scale(1.065);
+  filter: brightness(.58) contrast(1.04);
 }
 
 .ascension-world[data-book-sequence="tree"] .ascension-command::after {
   opacity: 1;
   transform: scale(1);
-  filter: brightness(1) contrast(1.04) saturate(1);
+  filter: brightness(1) contrast(1.05) saturate(1);
+  -webkit-mask-size: 220% 220%;
+  mask-size: 220% 220%;
+}
+
+.ascension-world[data-book-sequence="tree"]::before {
+  opacity: 0;
+  transform: translateX(-50%) translateY(28px) scale(.94);
 }
 
 .ascension-world[data-book-sequence="tree"] .ascension-command > label[for="objective"],
@@ -310,56 +338,47 @@ body:has(.ascension-world > .ascension-command) .starfield {
 
 @media (max-width: 760px) {
   .ascension-command {
-    width: 100vw !important;
-    height: 100svh;
     min-height: 640px;
   }
 
   .ascension-command::before {
-    background-size: 185% auto;
+    inset: -10%;
+    background-size: 250% auto;
+    background-position: center 39%;
   }
 
   .ascension-command::after {
-    inset: 5% 1%;
-    background-size: 145% auto;
+    inset: 2%;
+    background-size: 150% auto;
   }
 
-  .ascension-command > label[for="objective"],
-  .ascension-command textarea#objective {
-    width: min(84vw, 560px) !important;
+  .ascension-world::before {
+    width: 90vw;
+    height: 15vh;
   }
 
   .ascension-command > label[for="objective"] {
-    top: 38%;
+    top: 39%;
+    width: min(76vw, 470px);
   }
 
   .ascension-command textarea#objective {
-    top: 46%;
-    min-height: 128px !important;
+    top: 45%;
+    width: min(78vw, 500px) !important;
+    min-height: 118px !important;
   }
 
   .ascension-command > div.flex {
-    top: 68%;
-  }
-
-  .ascension-world::before,
-  .ascension-world::after {
-    top: 17%;
-    width: 48vw;
-    height: 66%;
-    background-size: 340% auto;
+    top: 64%;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ascension-world[data-book-sequence="opening"] .ascension-command::before,
-  .ascension-world[data-book-sequence="opening"]::before,
-  .ascension-world[data-book-sequence="opening"]::after,
   .ascension-world[data-book-sequence="opening"] .ascension-command > label[for="objective"],
   .ascension-world[data-book-sequence="opening"] .ascension-command textarea#objective,
   .ascension-world[data-book-sequence="opening"] .ascension-command > div.flex {
     animation-duration: .01ms !important;
     animation-delay: 0ms !important;
-    animation-iteration-count: 1 !important;
   }
 }

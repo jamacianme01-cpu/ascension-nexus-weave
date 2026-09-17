@@ -1,238 +1,87 @@
-.ascension-world:has(.ascension-command) > .ascension-world-backdrop {
-  display: none !important;
-}
+/* BOOK PASS ONLY: use the actual Unreal Knowledge Book visual already exported from ASCENSION_UNREAL. */
 
-/* BOOK PASS ONLY.
-   Keep the Knowledgeverse hidden while the Book itself is being verified. */
-.ascension-world:not(:has(.ascension-command section[aria-label="Knowledge taking form"])) > section[aria-label="Living Knowledgeverse"] {
+.ascension-world:has(.ascension-command) > .ascension-world-backdrop {
   display: none !important;
 }
 
 .ascension-world:has(.ascension-command) {
   position: relative;
   min-height: 760px;
-  perspective: 2200px;
-  background:
-    radial-gradient(ellipse at 50% 42%, oklch(0.16 0.035 258 / 42%), transparent 33%),
-    radial-gradient(ellipse at 50% 78%, oklch(0.08 0.025 258 / 68%), transparent 42%),
-    oklch(0.035 0.012 258 / 99%) !important;
-}
-
-@keyframes ascension-book-arrival {
-  0% {
-    transform: perspective(2200px) rotateX(22deg) rotateY(-34deg) translateY(64px) scale(.88);
-    opacity: 0;
-    filter: brightness(.35) blur(5px);
-  }
-  46% {
-    opacity: 1;
-    filter: brightness(.72) blur(1px);
-  }
-  78% {
-    transform: perspective(2200px) rotateX(10deg) rotateY(-9deg) translateY(8px) scale(.99);
-  }
-  100% {
-    transform: perspective(2200px) rotateX(8deg) rotateY(-5deg) translateY(0) scale(1);
-    opacity: 1;
-    filter: brightness(1) blur(0);
-  }
-}
-
-@keyframes ascension-cover-breathe {
-  0%, 100% { box-shadow: inset 0 0 0 1px oklch(0.84 0.12 84 / 32%), inset 0 0 42px oklch(0.02 0.02 258 / 72%), 0 42px 110px oklch(0.01 0.01 258 / 90%); }
-  50% { box-shadow: inset 0 0 0 1px oklch(0.89 0.13 84 / 48%), inset 0 0 56px oklch(0.02 0.02 258 / 76%), 0 48px 135px oklch(0.01 0.01 258 / 96%); }
-}
-
-@keyframes ascension-page-one {
-  0%   { opacity: 0; transform: rotateY(0deg) translateZ(18px); }
-  8%   { opacity: .98; }
-  26%  { transform: rotateY(-74deg) translateZ(24px); }
-  45%  { transform: rotateY(-154deg) translateZ(18px); }
-  58%  { opacity: .96; transform: rotateY(-181deg) translateZ(12px); }
-  100% { opacity: 0; transform: rotateY(-181deg) translateZ(12px); }
-}
-
-@keyframes ascension-page-two {
-  0%, 14% { opacity: 0; transform: rotateY(0deg) translateZ(28px); }
-  20% { opacity: .92; }
-  41% { transform: rotateY(-82deg) translateZ(32px); }
-  62% { transform: rotateY(-162deg) translateZ(20px); }
-  76% { opacity: .9; transform: rotateY(-181deg) translateZ(14px); }
-  100% { opacity: 0; transform: rotateY(-181deg) translateZ(14px); }
-}
-
-@keyframes ascension-book-engage {
-  0% { transform: perspective(2200px) rotateX(8deg) rotateY(-5deg) scale(1); }
-  26% { transform: perspective(2200px) rotateX(11deg) rotateY(-9deg) scale(1.012); }
-  56% { transform: perspective(2200px) rotateX(6deg) rotateY(-2deg) scale(1.018); }
-  100% { transform: perspective(2200px) rotateX(8deg) rotateY(-5deg) scale(1); }
+  background: #02050a !important;
 }
 
 .ascension-command {
   position: relative;
-  z-index: 12;
+  z-index: 10;
   isolation: isolate;
-  overflow: visible;
-  width: min(880px, calc(100vw - 2rem));
-  min-height: 560px;
-  margin-top: clamp(2rem, 6vh, 5rem) !important;
-  padding: clamp(2rem, 4vw, 3.4rem) clamp(2rem, 5vw, 4.2rem) !important;
-  border: 2px solid oklch(0.80 0.10 84 / 52%) !important;
-  border-radius: 1.1rem 2rem 2rem 1.1rem !important;
+  overflow: hidden;
+  width: min(1180px, calc(100vw - 2rem));
+  min-height: 700px;
+  margin: 1.5rem auto 0 !important;
+  padding: clamp(2rem, 4vw, 4rem) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
   background:
-    linear-gradient(90deg, oklch(0.025 0.012 258 / 100%) 0 4.8%, transparent 5.1%),
-    radial-gradient(circle at 22% 16%, oklch(0.34 0.055 74 / 24%), transparent 28%),
-    radial-gradient(circle at 80% 82%, oklch(0.29 0.05 74 / 18%), transparent 30%),
-    repeating-linear-gradient(100deg, oklch(0.17 0.028 58 / 16%) 0 2px, transparent 2px 7px),
-    linear-gradient(120deg, oklch(0.145 0.038 48 / 98%), oklch(0.065 0.022 258 / 99%) 47%, oklch(0.13 0.035 48 / 98%)) !important;
-  transform-style: preserve-3d;
-  transform-origin: 8% 50%;
-  animation:
-    ascension-book-arrival 1.2s cubic-bezier(.16,.82,.22,1) both,
-    ascension-cover-breathe 5.5s ease-in-out 1.25s infinite;
+    linear-gradient(rgba(2,5,10,.18), rgba(2,5,10,.28)),
+    url('/unreal-book/KnowledgeBook_Textured_Runtime.png') center center / contain no-repeat,
+    #02050a !important;
+  box-shadow: none !important;
+  transform: none !important;
+  animation: none !important;
 }
 
-/* The page block is physically behind the cover instead of painted onto it. */
-.ascension-command::before {
-  content: "";
-  position: absolute;
-  z-index: -2;
-  inset: .9rem -1.2rem -1.15rem 1.45rem;
-  border: 1px solid oklch(0.84 0.055 84 / 38%);
-  border-radius: .7rem 1.65rem 1.65rem .65rem;
-  background:
-    repeating-linear-gradient(0deg, oklch(0.66 0.035 84 / 32%) 0 1px, transparent 1px 5px),
-    linear-gradient(90deg, oklch(0.52 0.04 84 / 76%), oklch(0.77 0.045 84 / 90%) 18%, oklch(0.61 0.04 84 / 82%));
-  box-shadow:
-    5px 5px 0 -1px oklch(0.62 0.04 84 / 42%),
-    10px 10px 0 -3px oklch(0.46 0.035 84 / 44%),
-    17px 17px 34px oklch(0.01 0.01 258 / 82%);
-  transform: translateZ(-26px);
+/* Do not place any synthetic cover, spine, paper, or page geometry over the Unreal Book. */
+.ascension-command::before,
+.ascension-command::after,
+.ascension-world:has(.ascension-command)::before,
+.ascension-world:has(.ascension-command)::after {
+  content: none !important;
+  display: none !important;
 }
 
-/* Thick spine and hinge. */
-.ascension-command::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-  z-index: 28;
-  top: -2px;
-  bottom: -2px;
-  left: 3.2%;
-  width: 8.5%;
-  border-left: 1px solid oklch(0.88 0.12 84 / 38%);
-  border-right: 1px solid oklch(0.02 0.02 258 / 88%);
-  border-radius: .8rem .25rem .25rem .8rem;
-  background:
-    linear-gradient(90deg, oklch(0.04 0.02 258 / 96%), oklch(0.23 0.055 58 / 88%) 42%, oklch(0.055 0.022 258 / 96%));
-  box-shadow:
-    inset -9px 0 14px oklch(0.01 0.01 258 / 72%),
-    8px 0 20px oklch(0.01 0.01 258 / 56%);
-  transform: translateZ(10px);
-}
-
+/* Keep the real controls fully interactive above the Unreal visual. */
 .ascension-command > * {
   position: relative;
-  z-index: 2;
-  transform: translateZ(16px);
+  z-index: 20;
+  transform: none !important;
+  pointer-events: auto;
 }
 
-.ascension-command h1 {
-  text-align: center;
-  color: var(--color-gold);
-  text-shadow:
-    0 1px 0 oklch(0.98 0.04 84 / 28%),
-    0 0 20px oklch(0.83 0.11 84 / 24%),
-    0 6px 22px oklch(0.01 0.01 258 / 72%);
-}
-
-.ascension-command > label[for="objective"] {
-  text-align: center;
-  font-family: var(--font-display);
-  letter-spacing: .06em;
+.ascension-command textarea,
+.ascension-command input,
+.ascension-command button,
+.ascension-command details,
+.ascension-command summary,
+.ascension-command a {
+  position: relative;
+  z-index: 30;
+  pointer-events: auto !important;
 }
 
 .ascension-command textarea#objective {
-  border-color: oklch(0.83 0.11 84 / 34%) !important;
-  background:
-    repeating-linear-gradient(0deg, transparent 0 30px, oklch(0.83 0.11 84 / 8%) 30px 31px),
-    oklch(0.055 0.02 258 / 84%) !important;
-  box-shadow:
-    inset 0 0 40px oklch(0.01 0.01 258 / 42%),
-    0 1px 0 oklch(0.92 0.05 84 / 8%) !important;
+  min-height: 170px;
+  color: var(--color-foreground) !important;
+  caret-color: var(--color-gold);
+  background: rgba(2, 5, 10, .82) !important;
+  border: 1px solid rgba(217, 176, 91, .48) !important;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.35), inset 0 0 28px rgba(0,0,0,.38) !important;
 }
 
-/* ENGAGE makes the physical Book react and sends two page leaves across the hinge.
-   This is deliberately only the Book motion; the Tree/portal pass comes after Book approval. */
-.ascension-world:has(.ascension-command button:last-child:is(:active, :focus)) .ascension-command {
-  animation:
-    ascension-book-engage 1.45s cubic-bezier(.2,.72,.22,1) both,
-    ascension-cover-breathe 5.5s ease-in-out 1.45s infinite;
+.ascension-command textarea#objective:focus {
+  outline: 2px solid rgba(80, 230, 225, .45) !important;
+  outline-offset: 2px;
 }
 
-.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before,
-.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
-  content: "";
-  position: absolute;
-  z-index: 20;
-  top: clamp(170px, 24vh, 245px);
-  left: 50%;
-  width: min(41vw, 405px);
-  height: min(52vw, 485px);
-  max-height: 485px;
-  pointer-events: none;
-  transform-origin: left center;
-  backface-visibility: hidden;
-  border: 1px solid oklch(0.82 0.055 84 / 54%);
-  border-radius: .35rem 1.2rem 1.2rem .35rem;
-  background:
-    repeating-linear-gradient(0deg, transparent 0 25px, oklch(0.32 0.03 74 / 14%) 25px 26px),
-    radial-gradient(circle at 40% 28%, oklch(0.94 0.045 84 / 96%), oklch(0.77 0.045 84 / 96%) 72%);
-  box-shadow:
-    inset 10px 0 20px oklch(0.22 0.02 74 / 18%),
-    0 18px 45px oklch(0.01 0.01 258 / 44%);
+.ascension-command details,
+.ascension-command > div:last-of-type {
+  background: rgba(2, 5, 10, .68);
+  backdrop-filter: blur(4px);
 }
 
-.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before {
-  animation: ascension-page-one 1.35s cubic-bezier(.22,.7,.2,1) both;
-}
-
-.ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
-  z-index: 21;
-  animation: ascension-page-two 1.35s .12s cubic-bezier(.22,.7,.2,1) both;
-}
-
-@media (max-width: 640px) {
-  .ascension-world:has(.ascension-command) {
-    min-height: 680px;
-  }
-
+@media (max-width: 760px) {
   .ascension-command {
-    min-height: 520px;
-    margin-top: 1.6rem !important;
-    padding: 1.35rem 1.25rem 1.55rem 1.75rem !important;
-    transform-origin: 7% 50%;
-  }
-
-  .ascension-command::after {
-    left: 2.4%;
-    width: 7.8%;
-  }
-
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before,
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
-    top: 190px;
-    left: 49%;
-    width: 46vw;
-    height: 55vw;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ascension-command,
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus)) .ascension-command,
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::before,
-  .ascension-world:has(.ascension-command button:last-child:is(:active, :focus))::after {
-    animation: none !important;
+    min-height: 620px;
+    padding: 1.25rem !important;
+    background-size: cover !important;
   }
 }

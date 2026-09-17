@@ -76,6 +76,19 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 function BookSequenceController() {
   useEffect(() => {
     let animationFrame = 0;
+    let timers: number[] = [];
+
+    const clearSequenceTimers = () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers = [];
+      window.cancelAnimationFrame(animationFrame);
+    };
+
+    const resetBook = (world: HTMLElement) => {
+      clearSequenceTimers();
+      delete world.dataset["bookSequence"];
+      delete world.dataset["bookStep"];
+    };
 
     const onClick = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target.closest("button") : null;
@@ -86,20 +99,34 @@ function BookSequenceController() {
       const world = target.closest(".ascension-world");
       if (!(world instanceof HTMLElement)) return;
 
-      const holdTop = Math.max(0, window.scrollY + world.getBoundingClientRect().top - 72);
+      clearSequenceTimers();
       world.dataset["bookSequence"] = "opening";
-      const started = performance.now();
+      world.dataset["bookStep"] = "0";
 
+      const holdTop = Math.max(0, window.scrollY + world.getBoundingClientRect().top);
+      const started = performance.now();
       const holdBookInView = (now: number) => {
-        if (now - started < 2100) {
+        if (now - started < 4300) {
           window.scrollTo({ top: holdTop, behavior: "auto" });
           animationFrame = window.requestAnimationFrame(holdBookInView);
-          return;
         }
-        world.dataset["bookSequence"] = "tree";
       };
-
       animationFrame = window.requestAnimationFrame(holdBookInView);
+
+      [520, 1080, 1640, 2200, 2760, 3320].forEach((delay, index) => {
+        timers.push(
+          window.setTimeout(() => {
+            world.dataset["bookStep"] = String(index + 1);
+          }, delay),
+        );
+      });
+
+      timers.push(
+        window.setTimeout(() => {
+          world.dataset["bookSequence"] = "tree";
+          world.dataset["bookStep"] = "6";
+        }, 3920),
+      );
     };
 
     const onInput = (event: Event) => {
@@ -107,7 +134,7 @@ function BookSequenceController() {
       if (!(target instanceof HTMLTextAreaElement) || target.id !== "objective") return;
       const world = target.closest(".ascension-world");
       if (world instanceof HTMLElement && world.dataset["bookSequence"] === "tree") {
-        delete world.dataset["bookSequence"];
+        resetBook(world);
       }
     };
 
@@ -116,7 +143,7 @@ function BookSequenceController() {
     return () => {
       document.removeEventListener("click", onClick, true);
       document.removeEventListener("input", onInput, true);
-      window.cancelAnimationFrame(animationFrame);
+      clearSequenceTimers();
     };
   }, []);
 

@@ -100,23 +100,36 @@ function BookSequenceController() {
       if (!(world instanceof HTMLElement)) return;
 
       clearSequenceTimers();
-      world.dataset["bookSequence"] = "opening";
+      world.dataset["bookSequence"] = "rocking";
       world.dataset["bookStep"] = "0";
 
       const holdTop = Math.max(0, window.scrollY + world.getBoundingClientRect().top);
       const started = performance.now();
       const holdBookInView = (now: number) => {
-        if (now - started < 5200) {
+        if (now - started < 5900) {
           window.scrollTo({ top: holdTop, behavior: "auto" });
           animationFrame = window.requestAnimationFrame(holdBookInView);
         }
       };
       animationFrame = window.requestAnimationFrame(holdBookInView);
 
-      [640, 1280, 1920, 2560, 3200, 3840].forEach((delay, index) => {
+      timers.push(
+        window.setTimeout(() => {
+          world.dataset["bookSequence"] = "opening";
+        }, 1650),
+      );
+
+      timers.push(
+        window.setTimeout(() => {
+          world.dataset["bookSequence"] = "emerging";
+          world.dataset["bookStep"] = "1";
+        }, 2450),
+      );
+
+      [2920, 3390, 3860, 4330, 4800].forEach((delay, index) => {
         timers.push(
           window.setTimeout(() => {
-            world.dataset["bookStep"] = String(index + 1);
+            world.dataset["bookStep"] = String(index + 2);
           }, delay),
         );
       });
@@ -125,7 +138,7 @@ function BookSequenceController() {
         window.setTimeout(() => {
           world.dataset["bookSequence"] = "tree";
           world.dataset["bookStep"] = "6";
-        }, 4700),
+        }, 5350),
       );
     };
 

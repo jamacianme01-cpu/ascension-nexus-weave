@@ -87,7 +87,7 @@ function BookSequenceController() {
       if (!(world instanceof HTMLElement)) return;
 
       const holdTop = Math.max(0, window.scrollY + world.getBoundingClientRect().top - 72);
-      world.dataset.bookSequence = "opening";
+      world.dataset["bookSequence"] = "opening";
       const started = performance.now();
 
       const holdBookInView = (now: number) => {
@@ -96,7 +96,7 @@ function BookSequenceController() {
           animationFrame = window.requestAnimationFrame(holdBookInView);
           return;
         }
-        world.dataset.bookSequence = "tree";
+        world.dataset["bookSequence"] = "tree";
       };
 
       animationFrame = window.requestAnimationFrame(holdBookInView);
@@ -106,8 +106,8 @@ function BookSequenceController() {
       const target = event.target;
       if (!(target instanceof HTMLTextAreaElement) || target.id !== "objective") return;
       const world = target.closest(".ascension-world");
-      if (world instanceof HTMLElement && world.dataset.bookSequence === "tree") {
-        delete world.dataset.bookSequence;
+      if (world instanceof HTMLElement && world.dataset["bookSequence"] === "tree") {
+        delete world.dataset["bookSequence"];
       }
     };
 

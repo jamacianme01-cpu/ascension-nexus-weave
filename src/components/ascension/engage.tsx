@@ -310,6 +310,8 @@ export function Engage() {
       sequenceTimers.current = [];
       setBookSequence("idle");
       setBookStep(0);
+      setBookOpen(Boolean(run));
+      setRevealed(Boolean(run));
     },
     onSuccess: (request) => {
       client.setQueryData(["ascension", "run", request.id], request);
@@ -358,6 +360,8 @@ export function Engage() {
     const later = (delay: number, fn: () => void) => {
       sequenceTimers.current.push(window.setTimeout(fn, delay));
     };
+    setBookOpen(false);
+    setRevealed(false);
     setBookStep(0);
     setBookSequence("rocking");
     // The real governed objective run starts on the single press. The Book
@@ -476,6 +480,8 @@ export function Engage() {
                   type="button"
                   onClick={() => {
                     setActive(item.id);
+                    setBookOpen(true);
+                    setRevealed(true);
                     save(ACTIVE, item.id);
                     setHistoryOpen(false);
                     window.history.replaceState(null, "", `/?run=${encodeURIComponent(item.id)}`);
@@ -500,7 +506,7 @@ export function Engage() {
         )}
       </section>
 
-      {run && (
+      {run && revealed && (
         <section ref={answerRef} aria-label="Answer" className="mx-auto max-w-4xl scroll-mt-24 space-y-5 rounded-2xl border border-primary/30 bg-void/80 p-5 shadow-2xl sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -544,11 +550,30 @@ export function Engage() {
         </section>
       )}
 
-      {run && planning?.branches.length ? (
+      {run && revealed && planning?.branches.length ? (
         <div className="mx-auto max-w-4xl">
           <Pathways run={run} selectedId={selectedPathwayId} onSelect={setSelectedPathwayId} onAction={followUp} />
         </div>
       ) : null}
+
+      {run && revealed && (
+        <section className="mx-auto max-w-4xl rounded-2xl border border-primary/20 bg-void/65 p-4 sm:p-5">
+          <p className="label-eyebrow text-primary">HOW TO USE ASCENSION</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            {[
+              ["1", "TYPE", "Ask a question or state exactly what you want accomplished."],
+              ["2", "ENGAGE", "Press ENGAGE ASCENSION once. The governed runtime takes it from there."],
+              ["3", "ANSWER", "Your answer or created solution appears directly below the Book."],
+            ].map(([n, title, copy]) => (
+              <div key={n} className="rounded-xl border border-primary/15 bg-background/20 p-4">
+                <p className="text-xs text-gold">STEP {n}</p>
+                <p className="mt-1 font-display text-sm tracking-wide text-foreground">{title}</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{copy}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

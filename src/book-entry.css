@@ -35,9 +35,25 @@ body:has(.ascension-world > .ascension-command) main {
 }
 
 .ascension-world[data-has-run="true"] {
+  display: block;
   height: auto;
   overflow: visible;
+  padding-bottom: 4rem !important;
 }
+
+/* With an active run the Book shrinks so YOUR ANSWER sits directly beneath it. */
+.ascension-world[data-has-run="true"] .ascension-command {
+  height: 68svh;
+  min-height: 420px;
+}
+
+.ascension-world[data-has-run="true"] > section:not(.ascension-command),
+.ascension-world[data-has-run="true"] > div {
+  width: min(64rem, calc(100% - 2rem));
+  margin-inline: auto;
+  margin-top: 1.5rem;
+}
+
 
 .ascension-command {
   position: relative;
@@ -263,6 +279,19 @@ body:has(.ascension-world > .ascension-command) main {
 .ascension-world[data-book-sequence="tree"] .ascension-book-scene-closed {
   opacity: 0;
 }
+
+/* After the sequence finishes the Book stays open and the controls come back,
+   so Continue / Refine / Simulate / Execute follow-ups remain usable. */
+.ascension-world[data-book-open="true"] .ascension-book-scene-open {
+  opacity: 1;
+  transform: scale(1);
+  clip-path: ellipse(120% 120% at 50% 50%);
+}
+
+.ascension-world[data-book-open="true"] .ascension-book-scene-closed {
+  opacity: 0;
+}
+
 
 @media (max-width: 820px) {
   .ascension-world:has(.ascension-command),

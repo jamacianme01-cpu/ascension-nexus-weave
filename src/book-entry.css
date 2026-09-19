@@ -17,17 +17,26 @@ body:has(.ascension-world > .ascension-command) main {
 .ascension-world:has(.ascension-command) {
   position: relative;
   width: 100vw;
-  height: 100svh;
-  min-height: 680px;
+  min-height: 100svh;
   margin: 0 !important;
   padding: 0 !important;
-  overflow: hidden;
   isolation: isolate;
   background: #01040a !important;
 }
 
-.ascension-world > :not(.ascension-command) {
+.ascension-world:not([data-has-run="true"]) {
+  height: 100svh;
+  min-height: 680px;
+  overflow: hidden;
+}
+
+.ascension-world:not([data-has-run="true"]) > :not(.ascension-command) {
   display: none !important;
+}
+
+.ascension-world[data-has-run="true"] {
+  height: auto;
+  overflow: visible;
 }
 
 .ascension-command {

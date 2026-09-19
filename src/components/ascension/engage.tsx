@@ -360,6 +360,9 @@ export function Engage() {
     };
     setBookStep(0);
     setBookSequence("rocking");
+    // The real governed objective run starts on the single press. The Book
+    // sequence is presentation only and never gates submission.
+    engage.mutate();
     later(1350, () => setBookSequence("opening"));
     later(2050, () => {
       setBookSequence("emerging");
@@ -371,7 +374,17 @@ export function Engage() {
     later(4050, () => {
       setBookSequence("tree");
       setBookStep(6);
-      engage.mutate();
+    });
+    // Return the Book to an open, usable state and reveal YOUR ANSWER below it.
+    later(4650, () => {
+      setBookSequence("idle");
+      setBookStep(0);
+      setBookOpen(true);
+      setRevealed(true);
+      window.setTimeout(
+        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        120,
+      );
     });
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;

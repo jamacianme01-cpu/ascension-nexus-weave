@@ -305,6 +305,9 @@ export function Engage() {
       ).request;
     },
     onError: () => {
+      // Return the Book to a usable state so the objective can be sent again.
+      sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+      sequenceTimers.current = [];
       setBookSequence("idle");
       setBookStep(0);
     },
@@ -321,9 +324,7 @@ export function Engage() {
       prepare.reset();
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
-      window.setTimeout(() => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     },
-  });
 
   let delivery: ObjectiveDelivery | null = null;
   let invalidDelivery: string | null = null;

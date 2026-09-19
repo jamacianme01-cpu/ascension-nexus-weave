@@ -215,6 +215,8 @@ export function Engage() {
   const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [bookSequence, setBookSequence] = useState<"idle" | "rocking" | "opening" | "emerging" | "tree">("idle");
+  const [bookOpen, setBookOpen] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const [bookStep, setBookStep] = useState(0);
   const sequenceTimers = useRef<number[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -222,7 +224,11 @@ export function Engage() {
 
   useEffect(() => {
     const id = new URL(window.location.href).searchParams.get("run") ?? read(ACTIVE);
-    if (id && /^[a-f0-9-]{36}$/i.test(id)) setActive(id);
+    if (id && /^[a-f0-9-]{36}$/i.test(id)) {
+      setActive(id);
+      setBookOpen(true);
+      setRevealed(true);
+    }
     const draft = read(DRAFT);
     if (draft) setObjective(draft);
   }, []);
@@ -244,9 +250,14 @@ export function Engage() {
     enabled: Boolean(active),
     queryFn: () => getObjectiveDelivery({ data: { requestId: active! } }),
     refetchInterval: (q) => {
+      if (!active) return false;
       const payload = q.state.data?.response_payload;
-      if (q.state.data?.status === "completed" && payload?.files?.length) return false;
-      return active ? 3000 : false;
+      if (q.state.data?.status !== "completed") return 3000;
+      if (payload?.files?.length) return false;
+      // The governed run is finished and its readable answer is projected.
+      // Keep one slower poll only while artifact transport could still arrive.
+      const status = runQuery.data?.status ?? "";
+      return TERMINAL.has(status) ? false : 4000;
     },
     retry: false,
   });
@@ -294,6 +305,9 @@ export function Engage() {
       ).request;
     },
     onError: () => {
+      // Return the Book to a usable state so the objective can be sent again.
+      sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+      sequenceTimers.current = [];
       setBookSequence("idle");
       setBookStep(0);
     },
@@ -310,9 +324,10 @@ export function Engage() {
       prepare.reset();
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
-      window.setTimeout(() => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     },
   });
+
+
 
   let delivery: ObjectiveDelivery | null = null;
   let invalidDelivery: string | null = null;
@@ -345,6 +360,9 @@ export function Engage() {
     };
     setBookStep(0);
     setBookSequence("rocking");
+    // The real governed objective run starts on the single press. The Book
+    // sequence is presentation only and never gates submission.
+    engage.mutate();
     later(1350, () => setBookSequence("opening"));
     later(2050, () => {
       setBookSequence("emerging");
@@ -356,30 +374,31 @@ export function Engage() {
     later(4050, () => {
       setBookSequence("tree");
       setBookStep(6);
-      engage.mutate();
+    });
+    // Return the Book to an open, usable state and reveal YOUR ANSWER below it.
+    later(4650, () => {
+      setBookSequence("idle");
+      setBookStep(0);
+      setBookOpen(true);
+      setRevealed(true);
+      window.setTimeout(
+        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        120,
+      );
     });
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
   const planning = useMemo(() => (run ? planningFor(run.result) : null), [run]);
 
   return (
-    <div className="ascension-world relative isolate mx-auto w-full max-w-none space-y-7" data-book-sequence={bookSequence === "idle" ? undefined : bookSequence} data-book-step={bookStep || undefined} data-has-run={run ? "true" : undefined}>
-      <section className="mx-auto max-w-4xl rounded-2xl border border-primary/20 bg-void/65 p-4 sm:p-5">
-        <p className="label-eyebrow text-primary">HOW TO USE ASCENSION</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {[
-            ["1", "TYPE", "Ask a question or state exactly what you want accomplished."],
-            ["2", "ENGAGE", "Press ENGAGE ASCENSION once. The governed runtime takes it from there."],
-            ["3", "ANSWER", "Your answer or created solution appears directly below the Book."],
-          ].map(([n, title, copy]) => (
-            <div key={n} className="rounded-xl border border-primary/15 bg-background/20 p-4">
-              <p className="text-xs text-gold">STEP {n}</p>
-              <p className="mt-1 font-display text-sm tracking-wide text-foreground">{title}</p>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{copy}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    <div
+      className="ascension-world relative isolate mx-auto w-full max-w-none"
+      data-book-sequence={bookSequence === "idle" ? undefined : bookSequence}
+      data-book-step={bookStep || undefined}
+      data-book-open={bookOpen ? "true" : undefined}
+      data-has-run={run && revealed ? "true" : undefined}
+    >
+
 
       <section aria-label="Engage ASCENSION" className="ascension-command mx-auto max-w-4xl space-y-5">
         <div className="ascension-book-scene" aria-hidden="true">

@@ -215,6 +215,8 @@ export function Engage() {
   const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [bookSequence, setBookSequence] = useState<"idle" | "rocking" | "opening" | "emerging" | "tree">("idle");
+  const [bookOpen, setBookOpen] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const [bookStep, setBookStep] = useState(0);
   const sequenceTimers = useRef<number[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -222,7 +224,11 @@ export function Engage() {
 
   useEffect(() => {
     const id = new URL(window.location.href).searchParams.get("run") ?? read(ACTIVE);
-    if (id && /^[a-f0-9-]{36}$/i.test(id)) setActive(id);
+    if (id && /^[a-f0-9-]{36}$/i.test(id)) {
+      setActive(id);
+      setBookOpen(true);
+      setRevealed(true);
+    }
     const draft = read(DRAFT);
     if (draft) setObjective(draft);
   }, []);

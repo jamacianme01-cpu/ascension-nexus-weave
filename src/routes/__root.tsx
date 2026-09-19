@@ -73,96 +73,6 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-function BookSequenceController() {
-  useEffect(() => {
-    let animationFrame = 0;
-    let timers: number[] = [];
-
-    const clearSequenceTimers = () => {
-      timers.forEach((timer) => window.clearTimeout(timer));
-      timers = [];
-      window.cancelAnimationFrame(animationFrame);
-    };
-
-    const resetBook = (world: HTMLElement) => {
-      clearSequenceTimers();
-      delete world.dataset["bookSequence"];
-      delete world.dataset["bookStep"];
-    };
-
-    const onClick = (event: MouseEvent) => {
-      const target = event.target instanceof Element ? event.target.closest("button") : null;
-      if (!(target instanceof HTMLButtonElement)) return;
-      const label = target.textContent?.trim().toUpperCase() ?? "";
-      if (!label.includes("ENGAGE ASCENSION")) return;
-
-      const world = target.closest(".ascension-world");
-      if (!(world instanceof HTMLElement)) return;
-
-      clearSequenceTimers();
-      world.dataset["bookSequence"] = "rocking";
-      world.dataset["bookStep"] = "0";
-
-      const holdTop = Math.max(0, window.scrollY + world.getBoundingClientRect().top);
-      const started = performance.now();
-      const holdBookInView = (now: number) => {
-        if (now - started < 5900) {
-          window.scrollTo({ top: holdTop, behavior: "auto" });
-          animationFrame = window.requestAnimationFrame(holdBookInView);
-        }
-      };
-      animationFrame = window.requestAnimationFrame(holdBookInView);
-
-      timers.push(
-        window.setTimeout(() => {
-          world.dataset["bookSequence"] = "opening";
-        }, 1650),
-      );
-
-      timers.push(
-        window.setTimeout(() => {
-          world.dataset["bookSequence"] = "emerging";
-          world.dataset["bookStep"] = "1";
-        }, 2450),
-      );
-
-      [2920, 3390, 3860, 4330, 4800].forEach((delay, index) => {
-        timers.push(
-          window.setTimeout(() => {
-            world.dataset["bookStep"] = String(index + 2);
-          }, delay),
-        );
-      });
-
-      timers.push(
-        window.setTimeout(() => {
-          world.dataset["bookSequence"] = "tree";
-          world.dataset["bookStep"] = "6";
-        }, 5350),
-      );
-    };
-
-    const onInput = (event: Event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLTextAreaElement) || target.id !== "objective") return;
-      const world = target.closest(".ascension-world");
-      if (world instanceof HTMLElement && world.dataset["bookSequence"] === "tree") {
-        resetBook(world);
-      }
-    };
-
-    document.addEventListener("click", onClick, true);
-    document.addEventListener("input", onInput, true);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      document.removeEventListener("input", onInput, true);
-      clearSequenceTimers();
-    };
-  }, []);
-
-  return null;
-}
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -215,7 +125,6 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BookSequenceController />
       <Shell>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />

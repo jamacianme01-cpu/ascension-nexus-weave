@@ -77,7 +77,48 @@ body:has(.ascension-world > .ascension-command) main {
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  background: #01040a;
+  background:
+    radial-gradient(ellipse at 50% 58%, rgba(31, 151, 214, .18) 0 10%, rgba(9, 38, 61, .12) 28%, transparent 58%),
+    radial-gradient(ellipse at 50% 79%, rgba(221, 173, 74, .14) 0 8%, transparent 36%),
+    #01040a;
+}
+
+/* Built-in scene fallback: even if a visual asset fails, the Book surface never becomes a blank screen. */
+.ascension-book-scene::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 55%;
+  width: min(760px, 68vw);
+  height: min(360px, 38vh);
+  transform: translate(-50%, -50%) perspective(1100px) rotateX(56deg);
+  transform-origin: 50% 72%;
+  border: 2px solid rgba(212, 156, 63, .72);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(93, 213, 255, .88) 0 2%, rgba(17, 115, 183, .66) 3% 7%, transparent 13%),
+    linear-gradient(135deg, #0a1a31 0%, #06111f 42%, #081a31 68%, #02070f 100%);
+  box-shadow:
+    inset 0 0 0 8px rgba(197, 137, 48, .16),
+    inset 0 0 54px rgba(43, 170, 236, .14),
+    0 30px 48px rgba(0, 0, 0, .72),
+    0 0 36px rgba(42, 174, 236, .16);
+}
+
+.ascension-book-scene::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  bottom: 7%;
+  width: min(980px, 82vw);
+  height: min(260px, 25vh);
+  transform: translateX(-50%) perspective(900px) rotateX(70deg);
+  border: 2px solid rgba(224, 181, 83, .42);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(18, 54, 77, .34), rgba(5, 9, 14, .96) 58%, transparent 72%);
+  box-shadow: 0 0 50px rgba(44, 163, 221, .10), inset 0 0 44px rgba(225, 177, 70, .08);
 }
 
 .ascension-book-scene img {
@@ -120,18 +161,28 @@ body:has(.ascension-world > .ascension-command) main {
   display: none !important;
 }
 
-/* The heading is already part of the approved image. Preserve this label for accessibility. */
+/* Keep the functional prompt visible even if the scene artwork is unavailable. */
 .ascension-command > label[for="objective"] {
   position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  margin: -1px !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  clip: rect(0 0 0 0) !important;
-  clip-path: inset(50%) !important;
-  white-space: nowrap !important;
+  z-index: 13;
+  left: 50%;
+  top: 31.5%;
+  width: min(900px, 82vw) !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 1rem !important;
+  transform: translateX(-50%);
+  overflow: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  white-space: normal !important;
   border: 0 !important;
+  color: rgba(239, 220, 175, .92);
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: clamp(.95rem, 1.5vw, 1.35rem);
+  line-height: 1.35;
+  text-align: center;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .96);
 }
 
 /* Type directly on the Book without a black box covering it. */
@@ -188,13 +239,17 @@ body:has(.ascension-world > .ascension-command) main {
   height: 100%;
   min-width: 0 !important;
   min-height: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
+  padding: 0 1.25rem !important;
+  border: 1px solid rgba(229, 188, 95, .58) !important;
   border-radius: 999px !important;
   outline: 0 !important;
-  background: transparent !important;
-  color: transparent !important;
-  box-shadow: none !important;
+  background: linear-gradient(180deg, rgba(12, 16, 21, .72), rgba(2, 6, 10, .82)) !important;
+  color: #e7c37a !important;
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: clamp(.82rem, 1.1vw, 1.05rem);
+  letter-spacing: .14em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .95);
+  box-shadow: 0 0 26px rgba(224, 174, 70, .12), inset 0 0 16px rgba(226, 184, 94, .04) !important;
   cursor: pointer;
 }
 

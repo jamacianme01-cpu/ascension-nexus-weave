@@ -250,9 +250,14 @@ export function Engage() {
     enabled: Boolean(active),
     queryFn: () => getObjectiveDelivery({ data: { requestId: active! } }),
     refetchInterval: (q) => {
+      if (!active) return false;
       const payload = q.state.data?.response_payload;
-      if (q.state.data?.status === "completed" && payload?.files?.length) return false;
-      return active ? 3000 : false;
+      if (q.state.data?.status !== "completed") return 3000;
+      if (payload?.files?.length) return false;
+      // The governed run is finished and its readable answer is projected.
+      // Keep one slower poll only while artifact transport could still arrive.
+      const status = runQuery.data?.status ?? "";
+      return TERMINAL.has(status) ? false : 4000;
     },
     retry: false,
   });

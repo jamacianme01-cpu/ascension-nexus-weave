@@ -391,23 +391,14 @@ export function Engage() {
   const planning = useMemo(() => (run ? planningFor(run.result) : null), [run]);
 
   return (
-    <div className="ascension-world relative isolate mx-auto w-full max-w-none space-y-7" data-book-sequence={bookSequence === "idle" ? undefined : bookSequence} data-book-step={bookStep || undefined} data-has-run={run ? "true" : undefined}>
-      <section className="mx-auto max-w-4xl rounded-2xl border border-primary/20 bg-void/65 p-4 sm:p-5">
-        <p className="label-eyebrow text-primary">HOW TO USE ASCENSION</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {[
-            ["1", "TYPE", "Ask a question or state exactly what you want accomplished."],
-            ["2", "ENGAGE", "Press ENGAGE ASCENSION once. The governed runtime takes it from there."],
-            ["3", "ANSWER", "Your answer or created solution appears directly below the Book."],
-          ].map(([n, title, copy]) => (
-            <div key={n} className="rounded-xl border border-primary/15 bg-background/20 p-4">
-              <p className="text-xs text-gold">STEP {n}</p>
-              <p className="mt-1 font-display text-sm tracking-wide text-foreground">{title}</p>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{copy}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    <div
+      className="ascension-world relative isolate mx-auto w-full max-w-none"
+      data-book-sequence={bookSequence === "idle" ? undefined : bookSequence}
+      data-book-step={bookStep || undefined}
+      data-book-open={bookOpen ? "true" : undefined}
+      data-has-run={run && revealed ? "true" : undefined}
+    >
+
 
       <section aria-label="Engage ASCENSION" className="ascension-command mx-auto max-w-4xl space-y-5">
         <div className="ascension-book-scene" aria-hidden="true">

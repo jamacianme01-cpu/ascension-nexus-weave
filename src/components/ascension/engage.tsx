@@ -325,6 +325,9 @@ export function Engage() {
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
     },
+  });
+
+
 
   let delivery: ObjectiveDelivery | null = null;
   let invalidDelivery: string | null = null;

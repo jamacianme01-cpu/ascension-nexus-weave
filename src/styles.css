@@ -106,12 +106,7 @@
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; } .alive, .flowing-line { opacity: 1 !important; } .ascension-world-backdrop { transform: none !important; opacity: .52 !important; } }
 
-.ascension-world { display: grid; min-height: calc(100svh - 8rem); overflow: hidden; border: 1px solid oklch(0.83 0.11 84 / 22%); border-radius: 1.5rem; background: oklch(0.095 0.025 258 / 88%); box-shadow: inset 0 0 100px oklch(0.65 0.14 196 / 8%), 0 40px 100px oklch(0.03 0.02 258 / 80%); }
+/* The Book entry surface owns its own layout in book-entry.css. Only the
+   breathing backdrop treatment is shared here. */
 .ascension-world-backdrop { opacity: .52; filter: saturate(1.2) contrast(1.08); mask-image: radial-gradient(circle at 50% 38%, black 0 48%, transparent 88%); transform-origin: 50% 42%; will-change: transform, opacity, filter; animation: ascension-chamber-breathe 18s ease-in-out infinite; }
-.ascension-world > .ascension-command, .ascension-world > section:last-child { grid-area: 1 / 1; }
-.ascension-world > section:last-child { min-width: 0; min-height: calc(100svh - 8rem); padding: 20rem 1.25rem 2rem; border: 0; background: transparent; }
-.ascension-command { position: relative; z-index: 10; align-self: start; width: min(48rem, calc(100% - 2rem)); margin-top: clamp(2.5rem, 8vh, 6rem); padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid oklch(0.86 0.14 196 / 26%); border-radius: 1.25rem; background: oklch(0.11 0.026 258 / 68%); box-shadow: inset 0 1px 0 oklch(0.96 0.03 210 / 15%), 0 24px 80px oklch(0.03 0.02 258 / 75%); backdrop-filter: blur(18px); }
-.ascension-command textarea#objective { min-height: 8rem; background: oklch(0.08 0.025 258 / 72%); box-shadow: inset 0 0 34px oklch(0.72 0.14 196 / 7%); }
-.ascension-command > section[aria-label="Knowledge taking form"], .ascension-command > section[aria-label="Result"] { margin-top: 1.5rem; }
 
-@media (max-width: 640px) { .ascension-world { min-height: calc(100svh - 6rem); margin-inline: -.5rem; border-radius: .75rem; } .ascension-command { width: calc(100% - 1rem); margin-top: 1rem; padding: 1rem; border-radius: .9rem; } .ascension-world > section:last-child { min-height: 100svh; padding: 25rem .75rem 1rem; } .ascension-command textarea#objective { min-height: 6.5rem; } .ascension-command svg { min-width: 720px; transform-origin: left top; transform: scale(.48); margin-bottom: -10rem; } .ascension-command [aria-label="Knowledge taking form"] > div { overflow: hidden; } }

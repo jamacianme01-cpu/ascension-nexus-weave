@@ -1,9 +1,8 @@
-/* ASCENSION Book opening — approved scene only.
-   Closed Book on podium -> rock -> open -> Tree/engines/crystal emerge. */
+/* ASCENSION BOOK OPENING — rendered scene, no screenshot dependency.
+   Closed Book on circular podium -> rock -> open -> Tree/engines/crystal emerge. */
 
 body:has(.ascension-world > .ascension-command) header,
-body:has(.ascension-world > .ascension-command) footer,
-body:has(.ascension-world > .ascension-command) .starfield {
+body:has(.ascension-world > .ascension-command) footer {
   display: none !important;
 }
 
@@ -14,6 +13,10 @@ body:has(.ascension-world > .ascension-command) main {
   padding: 0 !important;
 }
 
+body:has(.ascension-world > .ascension-command) .starfield {
+  display: none !important;
+}
+
 .ascension-world:has(.ascension-command) {
   position: relative;
   width: 100vw;
@@ -21,358 +24,513 @@ body:has(.ascension-world > .ascension-command) main {
   margin: 0 !important;
   padding: 0 !important;
   isolation: isolate;
-  background: #01040a !important;
+  perspective: 1700px;
+  background:
+    radial-gradient(circle at 50% 27%, rgba(28,86,135,.22), transparent 22%),
+    radial-gradient(circle at 18% 28%, rgba(20,72,128,.13), transparent 19%),
+    radial-gradient(circle at 82% 28%, rgba(20,72,128,.13), transparent 19%),
+    linear-gradient(180deg,#01040a 0%,#030914 60%,#010308 100%) !important;
+}
+
+.ascension-world:has(.ascension-command)::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(64,147,219,.20) 0 1px, transparent 2px),
+    radial-gradient(circle at 28% 23%, rgba(86,165,227,.16) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 21%, rgba(86,165,227,.16) 0 1px, transparent 2px),
+    radial-gradient(circle at 36% 14%, rgba(255,255,255,.16) 0 1px, transparent 2px),
+    radial-gradient(circle at 64% 13%, rgba(255,255,255,.16) 0 1px, transparent 2px);
+  background-size: 300px 220px,360px 260px,420px 280px,500px 310px,620px 340px;
+  opacity:.8;
 }
 
 .ascension-world:not([data-has-run="true"]) {
-  height: 100svh;
-  min-height: 680px;
-  overflow: hidden;
+  height:100svh;
+  min-height:700px;
+  overflow:hidden;
 }
 
 .ascension-world:not([data-has-run="true"]) > :not(.ascension-command) {
-  display: none !important;
+  display:none !important;
 }
 
 .ascension-world[data-has-run="true"] {
-  display: block;
-  height: auto;
-  overflow: visible;
-  padding-bottom: 4rem !important;
-}
-
-/* With an active run the Book shrinks so YOUR ANSWER sits directly beneath it. */
-.ascension-world[data-has-run="true"] .ascension-command {
-  height: 68svh;
-  min-height: 420px;
+  height:auto;
+  overflow:visible;
+  padding-bottom:4rem !important;
 }
 
 .ascension-world[data-has-run="true"] > section:not(.ascension-command),
 .ascension-world[data-has-run="true"] > div {
-  width: min(64rem, calc(100% - 2rem));
-  margin-inline: auto;
-  margin-top: 1.5rem;
+  width:min(64rem, calc(100% - 2rem));
+  margin-inline:auto;
+  margin-top:1.5rem;
 }
-
 
 .ascension-command {
-  position: relative;
-  z-index: 1;
-  width: 100vw !important;
-  height: 100svh;
-  min-height: 680px;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #01040a !important;
-  box-shadow: none !important;
+  position:relative;
+  z-index:2;
+  width:100vw !important;
+  height:100svh;
+  min-height:700px;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:hidden;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
 }
 
-/* These are the two exact scenes approved in chat, embedded in engage.tsx. */
+.ascension-world[data-has-run="true"] .ascension-command {
+  height:78svh;
+  min-height:620px;
+}
+
+/* The rendered Book is authoritative. Do not show the temporary screenshot/image layer. */
 .ascension-book-scene {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 50% 58%, rgba(31, 151, 214, .18) 0 10%, rgba(9, 38, 61, .12) 28%, transparent 58%),
-    radial-gradient(ellipse at 50% 79%, rgba(221, 173, 74, .14) 0 8%, transparent 36%),
-    #01040a;
+  display:none !important;
 }
 
-/* Built-in scene fallback: even if a visual asset fails, the Book surface never becomes a blank screen. */
-.ascension-book-scene::before {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  left: 50%;
-  top: 55%;
-  width: min(760px, 68vw);
-  height: min(360px, 38vh);
-  transform: translate(-50%, -50%) perspective(1100px) rotateX(56deg);
-  transform-origin: 50% 72%;
-  border: 2px solid rgba(212, 156, 63, .72);
-  border-radius: 24px;
+/* circular ceremonial podium */
+.ascension-command::before {
+  content:"";
+  position:absolute;
+  z-index:3;
+  left:50%;
+  bottom:-10.5%;
+  width:min(1180px,82vw);
+  height:min(390px,34vh);
+  transform:translateX(-50%) perspective(1000px) rotateX(67deg);
+  transform-origin:center center;
+  border:3px solid rgba(228,188,91,.64);
+  border-radius:50%;
   background:
-    radial-gradient(circle at 50% 48%, rgba(93, 213, 255, .88) 0 2%, rgba(17, 115, 183, .66) 3% 7%, transparent 13%),
-    linear-gradient(135deg, #0a1a31 0%, #06111f 42%, #081a31 68%, #02070f 100%);
+    radial-gradient(ellipse at center,
+      rgba(34,78,105,.42) 0 20%,
+      rgba(11,20,29,.98) 21% 43%,
+      rgba(72,51,28,.96) 44% 46%,
+      rgba(8,12,18,.99) 47% 61%,
+      rgba(114,79,33,.92) 62% 64%,
+      rgba(4,7,11,1) 65% 100%),
+    repeating-radial-gradient(ellipse at center,
+      rgba(239,196,92,.22) 0 1px,
+      transparent 2px 18px);
   box-shadow:
-    inset 0 0 0 8px rgba(197, 137, 48, .16),
-    inset 0 0 54px rgba(43, 170, 236, .14),
-    0 30px 48px rgba(0, 0, 0, .72),
-    0 0 36px rgba(42, 174, 236, .16);
+    0 0 0 10px rgba(7,11,17,.96),
+    0 0 0 13px rgba(224,181,83,.22),
+    0 -12px 72px rgba(35,144,217,.14),
+    0 -6px 44px rgba(224,171,70,.18),
+    0 48px 120px rgba(0,0,0,.95),
+    inset 0 0 90px rgba(64,164,222,.10);
 }
 
-.ascension-book-scene::after {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  left: 50%;
-  bottom: 7%;
-  width: min(980px, 82vw);
-  height: min(260px, 25vh);
-  transform: translateX(-50%) perspective(900px) rotateX(70deg);
-  border: 2px solid rgba(224, 181, 83, .42);
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(18, 54, 77, .34), rgba(5, 9, 14, .96) 58%, transparent 72%);
-  box-shadow: 0 0 50px rgba(44, 163, 221, .10), inset 0 0 44px rgba(225, 177, 70, .08);
+/* glow emerging beneath the Book */
+.ascension-command::after {
+  content:"";
+  position:absolute;
+  z-index:4;
+  left:50%;
+  top:55%;
+  width:min(880px,68vw);
+  height:260px;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  opacity:.9;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(49,184,244,.30) 0 5%,
+      rgba(21,111,182,.18) 18%,
+      rgba(226,174,72,.12) 35%,
+      transparent 70%);
+  filter:blur(10px);
 }
 
-.ascension-book-scene img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: 50% 50%;
-  user-select: none;
-  -webkit-user-drag: none;
+/* use the existing heading container as the physical Book object */
+.ascension-command > .text-center {
+  display:block !important;
+  position:absolute !important;
+  z-index:8;
+  left:50%;
+  top:50.5%;
+  width:min(900px,68vw);
+  height:min(430px,42vh);
+  margin:0 !important;
+  padding:0 !important;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  transform-style:preserve-3d;
 }
 
-.ascension-book-scene-closed {
-  z-index: 1;
-  opacity: 1;
-  transform: scale(1);
-  transform-origin: 50% 60%;
-  will-change: transform, filter, opacity;
+.ascension-command > .text-center > * {
+  display:none !important;
 }
 
-.ascension-book-scene-open {
-  z-index: 2;
-  opacity: 0;
-  transform: scale(.985);
-  transform-origin: 50% 60%;
-  clip-path: ellipse(2% 2% at 50% 59%);
-  will-change: transform, opacity, clip-path;
-  transition:
-    opacity .34s ease,
-    transform .44s cubic-bezier(.16,.78,.2,1),
-    clip-path .44s cubic-bezier(.16,.78,.2,1);
+/* top cover */
+.ascension-command > .text-center::before {
+  content:"";
+  position:absolute;
+  left:50%;
+  top:47%;
+  width:84%;
+  height:72%;
+  transform:translate(-50%,-50%) perspective(1200px) rotateX(54deg) rotateZ(0deg);
+  transform-origin:50% 72%;
+  border:3px solid rgba(189,126,47,.78);
+  border-radius:24px 30px 20px 26px;
+  background:
+    radial-gradient(circle at 50% 47%,
+      rgba(111,229,255,.98) 0 2%,
+      rgba(23,139,222,.95) 3% 8%,
+      rgba(7,34,67,.94) 9% 14%,
+      rgba(192,143,59,.82) 15% 16%,
+      rgba(8,24,48,.98) 17% 25%,
+      rgba(12,39,74,.98) 26% 27%,
+      transparent 28%),
+    conic-gradient(from 45deg at 50% 47%,
+      transparent 0 10%,
+      rgba(42,178,244,.65) 11% 12%,
+      transparent 13% 23%,
+      rgba(222,174,82,.55) 24% 25%,
+      transparent 26% 36%,
+      rgba(42,178,244,.65) 37% 38%,
+      transparent 39% 49%,
+      rgba(222,174,82,.55) 50% 51%,
+      transparent 52% 62%,
+      rgba(42,178,244,.65) 63% 64%,
+      transparent 65% 75%,
+      rgba(222,174,82,.55) 76% 77%,
+      transparent 78% 88%,
+      rgba(42,178,244,.65) 89% 90%,
+      transparent 91% 100%),
+    linear-gradient(135deg,#09182c 0%,#06111f 36%,#07182d 68%,#020711 100%);
+  box-shadow:
+    inset 0 0 0 5px rgba(219,159,65,.16),
+    inset 0 0 0 11px rgba(7,18,34,.85),
+    inset 0 0 62px rgba(45,166,231,.16),
+    0 20px 18px rgba(0,0,0,.45),
+    0 35px 42px rgba(0,0,0,.62),
+    0 0 30px rgba(43,171,236,.16);
 }
 
-/* Keep only the functional controls over the approved artwork. */
-.ascension-command > .text-center,
-.ascension-command > details,
-.ascension-command > p,
-.ascension-command > div:not(.ascension-book-scene):not(.flex) {
-  display: none !important;
+/* page block + spine/front edge */
+.ascension-command > .text-center::after {
+  content:"ASCENSION     KNOWLEDGEVERSE";
+  position:absolute;
+  left:50%;
+  top:65.5%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:86%;
+  height:25%;
+  transform:translate(-50%,-50%) perspective(1200px) rotateX(12deg);
+  border:2px solid rgba(194,130,45,.78);
+  border-radius:0 0 24px 24px;
+  color:rgba(228,192,115,.90);
+  font-family:Cinzel,serif;
+  font-size:clamp(.8rem,1.15vw,1.15rem);
+  letter-spacing:.28em;
+  text-shadow:0 0 15px rgba(229,181,82,.28);
+  background:
+    repeating-linear-gradient(0deg,
+      rgba(219,178,92,.20) 0 1px,
+      rgba(5,9,14,.96) 2px 7px),
+    linear-gradient(90deg,#02050a,#11100f 16%,#05080d 50%,#11100f 84%,#02050a);
+  box-shadow:
+    inset 0 10px 18px rgba(0,0,0,.65),
+    0 18px 24px rgba(0,0,0,.5);
 }
 
-/* Keep the functional prompt visible even if the scene artwork is unavailable. */
+/* prompt above the Book */
 .ascension-command > label[for="objective"] {
-  position: absolute !important;
-  z-index: 13;
-  left: 50%;
-  top: 31.5%;
-  width: min(900px, 82vw) !important;
-  height: auto !important;
-  margin: 0 !important;
-  padding: 0 1rem !important;
-  transform: translateX(-50%);
-  overflow: visible !important;
-  clip: auto !important;
-  clip-path: none !important;
-  white-space: normal !important;
-  border: 0 !important;
-  color: rgba(239, 220, 175, .92);
-  font-family: "Cinzel", "Times New Roman", serif;
-  font-size: clamp(.95rem, 1.5vw, 1.35rem);
-  line-height: 1.35;
-  text-align: center;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, .96);
+  position:absolute !important;
+  z-index:20;
+  left:50%;
+  top:7.5%;
+  width:min(1350px,92vw);
+  transform:translateX(-50%) !important;
+  color:rgba(238,218,172,.92);
+  font-family:Cinzel,serif;
+  font-size:clamp(1.15rem,1.9vw,1.8rem);
+  line-height:1.25;
+  letter-spacing:.025em;
+  text-align:center;
+  text-shadow:0 2px 16px rgba(0,0,0,.96);
 }
 
-/* Type directly on the Book without a black box covering it. */
+/* input is functional but visually integrated into the cover */
 .ascension-command textarea#objective {
-  position: absolute !important;
-  z-index: 12;
-  left: 50%;
-  top: 42.5%;
-  width: min(470px, 37vw) !important;
-  min-height: 78px !important;
-  max-height: 92px !important;
-  padding: 12px 16px !important;
-  transform: translateX(-50%) !important;
-  resize: none !important;
-  overflow: auto !important;
-  border: 1px solid rgba(99, 199, 239, .10) !important;
-  border-radius: 12px !important;
-  outline: none !important;
-  background: rgba(0, 4, 10, .05) !important;
-  box-shadow: none !important;
-  color: rgba(247, 232, 198, .96) !important;
-  caret-color: #f1cd75 !important;
-  text-align: center;
-  text-shadow: 0 2px 8px rgba(0,0,0,.98);
-  backdrop-filter: none !important;
+  position:absolute !important;
+  z-index:22;
+  left:50%;
+  top:42.5%;
+  width:min(430px,34vw) !important;
+  min-height:74px !important;
+  max-height:88px !important;
+  padding:12px 16px !important;
+  transform:translateX(-50%) !important;
+  resize:none !important;
+  overflow:auto !important;
+  border:1px solid rgba(121,196,229,.11) !important;
+  border-radius:14px !important;
+  outline:none !important;
+  background:rgba(1,6,12,.10) !important;
+  box-shadow:none !important;
+  color:rgba(242,231,205,.95) !important;
+  caret-color:#f0c96f;
+  text-align:center;
+  text-shadow:0 2px 10px rgba(0,0,0,.98);
+  backdrop-filter:none !important;
 }
 
 .ascension-command textarea#objective:focus {
-  border-color: rgba(95, 205, 246, .30) !important;
-  background: rgba(0, 5, 12, .10) !important;
+  border-color:rgba(103,211,255,.28) !important;
+  background:rgba(1,7,14,.16) !important;
 }
 
-/* Functional ENGAGE hit area lies over the button already drawn into the approved scene. */
+/* hide everything from the old interface except objective + ENGAGE */
+.ascension-command > details,
+.ascension-command > p:not([role="alert"]) {
+  display:none !important;
+}
+
 .ascension-command > div.flex {
-  position: absolute !important;
-  z-index: 14;
-  left: 50%;
-  top: 78.2%;
-  width: min(430px, 38vw);
-  height: 86px;
-  margin: 0 !important;
-  transform: translateX(-50%) !important;
-  justify-content: center !important;
-  align-items: stretch !important;
-  background: transparent !important;
+  position:absolute !important;
+  z-index:24;
+  left:50%;
+  top:78%;
+  width:min(720px,82vw);
+  margin:0 !important;
+  transform:translateX(-50%) !important;
+  justify-content:center !important;
+  align-items:center !important;
+  gap:1rem !important;
+  background:transparent !important;
 }
 
 .ascension-command > div.flex > button:first-child {
-  display: none !important;
+  min-height:48px;
+  padding:0 18px !important;
+  border:1px solid rgba(101,190,232,.28) !important;
+  border-radius:999px !important;
+  background:rgba(2,8,14,.62) !important;
+  color:rgba(169,211,230,.82) !important;
+  font-family:Cinzel,serif;
+  letter-spacing:.08em;
 }
 
 .ascension-command > div.flex > button:last-child {
-  width: 100%;
-  height: 100%;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  padding: 0 1.25rem !important;
-  border: 1px solid rgba(229, 188, 95, .58) !important;
-  border-radius: 999px !important;
-  outline: 0 !important;
-  background: linear-gradient(180deg, rgba(12, 16, 21, .72), rgba(2, 6, 10, .82)) !important;
-  color: #e7c37a !important;
-  font-family: "Cinzel", "Times New Roman", serif;
-  font-size: clamp(.82rem, 1.1vw, 1.05rem);
-  letter-spacing: .14em;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, .95);
-  box-shadow: 0 0 26px rgba(224, 174, 70, .12), inset 0 0 16px rgba(226, 184, 94, .04) !important;
-  cursor: pointer;
+  min-width:340px;
+  min-height:62px;
+  padding:0 34px !important;
+  border:1px solid rgba(229,188,95,.62) !important;
+  border-radius:999px !important;
+  background:
+    linear-gradient(180deg,rgba(16,16,17,.90),rgba(3,5,8,.94)) !important;
+  color:#e7c37a !important;
+  font-family:Cinzel,serif;
+  font-size:clamp(1rem,1.25vw,1.2rem);
+  letter-spacing:.15em;
+  box-shadow:
+    0 0 28px rgba(224,174,70,.14),
+    inset 0 0 18px rgba(226,184,94,.05);
 }
 
-.ascension-command > div.flex > button:last-child:focus-visible {
-  outline: 2px solid rgba(238, 198, 103, .60) !important;
-  outline-offset: 3px !important;
-}
-
-@keyframes approved-book-rock {
-  0%   { transform: scale(1) rotateZ(0deg); filter: brightness(1); }
-  18%  { transform: scale(1.006) rotateZ(-.22deg); filter: brightness(1.04); }
-  36%  { transform: scale(1.003) rotateZ(.18deg); filter: brightness(1.015); }
-  54%  { transform: scale(1.007) rotateZ(-.16deg); filter: brightness(1.05); }
-  72%  { transform: scale(1.004) rotateZ(.11deg); filter: brightness(1.025); }
-  100% { transform: scale(1.004) rotateZ(0deg); filter: brightness(1.035); }
+@keyframes book-rock {
+  0%   { transform:translate(-50%,-50%) perspective(1200px) rotateX(54deg) rotateZ(0deg) scale(1); }
+  20%  { transform:translate(-50%,-51%) perspective(1200px) rotateX(55deg) rotateZ(-1.15deg) scale(1.012); }
+  40%  { transform:translate(-50%,-49.5%) perspective(1200px) rotateX(53deg) rotateZ(.9deg) scale(1.006); }
+  60%  { transform:translate(-50%,-51%) perspective(1200px) rotateX(55deg) rotateZ(-.75deg) scale(1.014); }
+  80%  { transform:translate(-50%,-49.7%) perspective(1200px) rotateX(53.5deg) rotateZ(.5deg) scale(1.008); }
+  100% { transform:translate(-50%,-50%) perspective(1200px) rotateX(54deg) rotateZ(0deg) scale(1.01); }
 }
 
 @keyframes controls-away {
-  to { opacity: 0; visibility: hidden; }
+  to { opacity:0; visibility:hidden; }
 }
 
-.ascension-world[data-book-sequence="rocking"] .ascension-book-scene-closed {
-  animation: approved-book-rock 1.35s cubic-bezier(.28,.62,.22,1) both;
+.ascension-world[data-book-sequence="rocking"] .ascension-command > .text-center::before {
+  animation:book-rock 1.65s cubic-bezier(.28,.62,.22,1) both;
 }
 
 .ascension-world[data-book-sequence] .ascension-command textarea#objective,
 .ascension-world[data-book-sequence] .ascension-command > div.flex {
-  animation: controls-away .14s ease forwards;
-  pointer-events: none !important;
+  animation:controls-away .14s ease forwards;
+  pointer-events:none !important;
 }
 
-/* The Book opens first from its center. */
-.ascension-world[data-book-sequence="opening"] .ascension-book-scene-open {
-  opacity: .96;
-  transform: scale(.99);
-  clip-path: ellipse(31% 24% at 50% 59%);
+/* open the Book after the rock */
+.ascension-world[data-book-sequence="opening"] .ascension-command > .text-center::before,
+.ascension-world[data-book-sequence="emerging"] .ascension-command > .text-center::before,
+.ascension-world[data-book-sequence="tree"] .ascension-command > .text-center::before {
+  width:41%;
+  height:62%;
+  left:29.5%;
+  top:53%;
+  transform:translate(-50%,-50%) perspective(1200px) rotateX(62deg) rotateZ(-9deg);
+  border-radius:24px 8px 10px 24px;
+  background:
+    linear-gradient(90deg,rgba(234,215,166,.18),transparent 8%),
+    repeating-linear-gradient(0deg,rgba(207,184,132,.16) 0 1px,transparent 1px 17px),
+    linear-gradient(135deg,#d7c28c,#ede2bd 48%,#b5965c);
+  filter:brightness(.73);
 }
 
-.ascension-world[data-book-sequence="opening"] .ascension-book-scene-closed {
-  opacity: .72;
+.ascension-world[data-book-sequence="opening"] .ascension-command > .text-center::after,
+.ascension-world[data-book-sequence="emerging"] .ascension-command > .text-center::after,
+.ascension-world[data-book-sequence="tree"] .ascension-command > .text-center::after {
+  content:"";
+  width:41%;
+  height:62%;
+  left:70.5%;
+  top:53%;
+  transform:translate(-50%,-50%) perspective(1200px) rotateX(62deg) rotateZ(9deg);
+  border-radius:8px 24px 24px 10px;
+  background:
+    linear-gradient(270deg,rgba(234,215,166,.18),transparent 8%),
+    repeating-linear-gradient(0deg,rgba(207,184,132,.16) 0 1px,transparent 1px 17px),
+    linear-gradient(225deg,#d7c28c,#ede2bd 48%,#b5965c);
+  filter:brightness(.73);
 }
 
-/* Tree + engines + crystal then reveal outward/upward from the Book. */
-.ascension-world[data-book-sequence="emerging"][data-book-step="1"] .ascension-book-scene-open {
-  opacity: .98;
-  transform: scale(.991);
-  clip-path: ellipse(36% 30% at 50% 59%);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="2"] .ascension-book-scene-open {
-  opacity: .985;
-  transform: scale(.993);
-  clip-path: ellipse(44% 39% at 50% 58%);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="3"] .ascension-book-scene-open {
-  opacity: .99;
-  transform: scale(.995);
-  clip-path: ellipse(56% 52% at 50% 56%);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="4"] .ascension-book-scene-open {
-  opacity: .995;
-  transform: scale(.997);
-  clip-path: ellipse(70% 67% at 50% 54%);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="5"] .ascension-book-scene-open {
-  opacity: 1;
-  transform: scale(.999);
-  clip-path: ellipse(88% 84% at 50% 52%);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="6"] .ascension-book-scene-open,
-.ascension-world[data-book-sequence="tree"] .ascension-book-scene-open {
-  opacity: 1;
-  transform: scale(1);
-  clip-path: ellipse(120% 120% at 50% 50%);
+/* Tree/engines/crystal emergence: reuse the canonical tree asset that already worked in the app. */
+.ascension-world[data-book-sequence="opening"] .ascension-command::after,
+.ascension-world[data-book-sequence="emerging"] .ascension-command::after,
+.ascension-world[data-book-sequence="tree"] .ascension-command::after {
+  z-index:12;
+  left:50%;
+  top:auto;
+  bottom:24%;
+  width:min(780px,58vw);
+  height:min(560px,56vh);
+  opacity:0;
+  transform:translateX(-50%) translateY(26%) scale(.48,.18);
+  transform-origin:50% 100%;
+  filter:drop-shadow(0 0 22px rgba(71,193,238,.28));
+  background:url('/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png') center bottom / contain no-repeat;
+  transition:transform .5s cubic-bezier(.16,.78,.2,1),opacity .38s ease;
 }
 
-.ascension-world[data-book-sequence="emerging"] .ascension-book-scene-closed,
-.ascension-world[data-book-sequence="tree"] .ascension-book-scene-closed {
-  opacity: .18;
-  transition: opacity .5s ease;
-}
+.ascension-world[data-book-sequence="emerging"][data-book-step="1"] .ascension-command::after { opacity:.18; transform:translateX(-50%) translateY(22%) scale(.56,.28); }
+.ascension-world[data-book-sequence="emerging"][data-book-step="2"] .ascension-command::after { opacity:.34; transform:translateX(-50%) translateY(17%) scale(.65,.42); }
+.ascension-world[data-book-sequence="emerging"][data-book-step="3"] .ascension-command::after { opacity:.52; transform:translateX(-50%) translateY(12%) scale(.74,.58); }
+.ascension-world[data-book-sequence="emerging"][data-book-step="4"] .ascension-command::after { opacity:.70; transform:translateX(-50%) translateY(7%) scale(.84,.74); }
+.ascension-world[data-book-sequence="emerging"][data-book-step="5"] .ascension-command::after { opacity:.88; transform:translateX(-50%) translateY(3%) scale(.93,.90); }
+.ascension-world[data-book-sequence="emerging"][data-book-step="6"] .ascension-command::after,
+.ascension-world[data-book-sequence="tree"] .ascension-command::after { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
 
-.ascension-world[data-book-sequence="tree"] .ascension-book-scene-closed {
-  opacity: 0;
-}
-
-/* After the sequence finishes the Book stays open and the controls come back,
-   so Continue / Refine / Simulate / Execute follow-ups remain usable. */
-.ascension-world[data-book-open="true"] .ascension-book-scene-open {
-  opacity: 1;
-  transform: scale(1);
-  clip-path: ellipse(120% 120% at 50% 50%);
-}
-
-.ascension-world[data-book-open="true"] .ascension-book-scene-closed {
-  opacity: 0;
-}
-
-
-@media (max-width: 820px) {
+@media (max-width:820px) {
   .ascension-world:has(.ascension-command),
-  .ascension-command {
-    min-height: 620px;
-  }
-
-  .ascension-command textarea#objective {
-    top: 42.5%;
-    width: min(68vw, 430px) !important;
-    min-height: 68px !important;
-  }
-
-  .ascension-command > div.flex {
-    top: 78%;
-    width: min(62vw, 390px);
-    height: 74px;
+  .ascension-command { min-height:640px; }
+  .ascension-command > .text-center { width:94vw; height:40vh; top:51%; }
+  .ascension-command > label[for="objective"] { top:6.5%; font-size:clamp(.9rem,4vw,1.25rem); }
+  .ascension-command textarea#objective { width:min(70vw,430px) !important; top:42%; }
+  .ascension-command > div.flex { top:78%; }
+  .ascension-command > div.flex > button:last-child { min-width:min(78vw,340px); }
+  .ascension-command::before { width:96vw; bottom:-6%; }
+  .ascension-world[data-book-sequence="opening"] .ascension-command::after,
+  .ascension-world[data-book-sequence="emerging"] .ascension-command::after,
+  .ascension-world[data-book-sequence="tree"] .ascension-command::after {
+    width:88vw;
+    height:52vh;
+    bottom:23%;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ascension-book-scene-closed,
-  .ascension-book-scene-open,
-  .ascension-world[data-book-sequence] .ascension-command textarea#objective,
-  .ascension-world[data-book-sequence] .ascension-command > div.flex {
-    animation-duration: .01ms !important;
-    transition-duration: .01ms !important;
+@media (prefers-reduced-motion:reduce) {
+  .ascension-world[data-book-sequence] * {
+    animation-duration:.01ms !important;
+    transition-duration:.01ms !important;
+  }
+}
+
+
+.ascension-command > div:not(.text-center):not(.flex):not(.ascension-book-scene) {
+  position:absolute !important;
+  z-index:30;
+  left:50%;
+  top:14%;
+  width:min(720px,86vw);
+  max-height:28vh;
+  overflow:auto;
+  transform:translateX(-50%);
+  background:rgba(2,7,13,.90) !important;
+  backdrop-filter:blur(16px);
+}
+
+.ascension-command > p[role="alert"] {
+  position:absolute;
+  z-index:31;
+  left:50%;
+  top:18%;
+  width:min(680px,86vw);
+  transform:translateX(-50%);
+  background:rgba(35,7,10,.90);
+}
+
+/* When the sequence has completed, preserve the open Book + living Tree while controls return. */
+.ascension-world[data-book-open="true"] .ascension-command > .text-center::before {
+  width:41%;
+  height:62%;
+  left:29.5%;
+  top:53%;
+  transform:translate(-50%,-50%) perspective(1200px) rotateX(62deg) rotateZ(-9deg);
+  border-radius:24px 8px 10px 24px;
+  background:
+    linear-gradient(90deg,rgba(234,215,166,.18),transparent 8%),
+    repeating-linear-gradient(0deg,rgba(207,184,132,.16) 0 1px,transparent 1px 17px),
+    linear-gradient(135deg,#d7c28c,#ede2bd 48%,#b5965c);
+  filter:brightness(.73);
+}
+
+.ascension-world[data-book-open="true"] .ascension-command > .text-center::after {
+  content:"";
+  width:41%;
+  height:62%;
+  left:70.5%;
+  top:53%;
+  transform:translate(-50%,-50%) perspective(1200px) rotateX(62deg) rotateZ(9deg);
+  border-radius:8px 24px 24px 10px;
+  background:
+    linear-gradient(270deg,rgba(234,215,166,.18),transparent 8%),
+    repeating-linear-gradient(0deg,rgba(207,184,132,.16) 0 1px,transparent 1px 17px),
+    linear-gradient(225deg,#d7c28c,#ede2bd 48%,#b5965c);
+  filter:brightness(.73);
+}
+
+.ascension-world[data-book-open="true"] .ascension-command::after {
+  z-index:12;
+  left:50%;
+  top:auto;
+  bottom:24%;
+  width:min(780px,58vw);
+  height:min(560px,56vh);
+  opacity:1;
+  transform:translateX(-50%) translateY(0) scale(1);
+  transform-origin:50% 100%;
+  filter:drop-shadow(0 0 22px rgba(71,193,238,.28));
+  background:url('/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png') center bottom / contain no-repeat;
+}
+
+@media (max-width:820px) {
+  .ascension-world[data-has-run="true"] .ascension-command {
+    height:76svh;
+    min-height:560px;
+  }
+  .ascension-command > div.flex {
+    width:min(92vw,620px);
+    gap:.55rem !important;
+  }
+  .ascension-command > div.flex > button:first-child {
+    padding-inline:12px !important;
+    font-size:.72rem;
+  }
+  .ascension-command > div.flex > button:last-child {
+    min-width:min(56vw,300px);
   }
 }

@@ -529,7 +529,8 @@ export function Engage() {
     >
 
 
-      <section aria-label="Engage ASCENSION" className="ascension-command">\n        <div className="ascension-stage">
+      <section aria-label="Engage ASCENSION" className="ascension-command">
+        <div className="ascension-stage">
         <div className="ascension-book-scene" aria-hidden="true">
           <img className="ascension-book-scene-closed" src={CLOSED_BOOK_SCENE} alt="" />
         </div>
@@ -641,6 +642,7 @@ export function Engage() {
             {error instanceof Error ? error.message : String(error)}
           </p>
         )}
+        </div>
       </section>
 
       {run && revealed && (

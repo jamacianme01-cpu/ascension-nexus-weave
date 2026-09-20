@@ -207,103 +207,112 @@ function Pathways({
 
 
 function MirroredKnowledgeTree() {
+  const halfBranches = [
+    "M350 500 C314 478 284 448 252 414 C222 382 186 360 136 342 C112 333 88 318 66 296",
+    "M348 448 C309 420 282 388 259 348 C238 311 208 281 170 252 C148 235 126 213 108 188",
+    "M348 388 C319 359 299 324 287 286 C275 249 254 215 226 182 C209 162 197 139 188 114",
+    "M350 330 C329 303 320 276 320 246 C320 214 310 183 294 151 C284 132 278 111 276 90",
+    "M302 435 C264 434 229 424 195 402 C163 382 130 372 96 370",
+    "M269 349 C231 342 198 326 170 302 C145 280 119 266 88 258",
+    "M286 285 C250 276 222 259 199 236 C178 215 155 202 130 194",
+    "M319 235 C292 222 272 205 256 182 C243 164 226 151 205 142",
+    "M213 381 C183 370 158 351 137 327 C121 309 102 299 79 293",
+    "M183 282 C155 270 134 252 118 229 C106 212 91 201 72 195",
+    "M232 205 C209 193 191 177 179 157 C169 141 156 131 138 125"
+  ];
+  const halfNodes = [
+    [66,296,9],[108,188,10],[188,114,11],[276,90,9],[96,370,8],
+    [88,258,8],[130,194,8],[205,142,8],[79,293,7],[72,195,7],[138,125,7],
+    [170,252,7],[226,182,7],[294,151,7]
+  ] as const;
+
   return (
-    <svg
-      className="ascension-mirrored-tree"
-      viewBox="0 0 520 620"
-      role="presentation"
-      aria-hidden="true"
-    >
+    <svg className="ascension-mirrored-tree" viewBox="0 0 700 650" role="presentation" aria-hidden="true">
       <defs>
-        <linearGradient id="treeMetal" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#7e6335" />
-          <stop offset=".18" stopColor="#d6b86c" />
-          <stop offset=".38" stopColor="#a9e9f3" />
-          <stop offset=".5" stopColor="#f4ffff" />
-          <stop offset=".62" stopColor="#7fdbea" />
-          <stop offset=".82" stopColor="#d6b86c" />
-          <stop offset="1" stopColor="#6d552f" />
+        <linearGradient id="treeMetal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#3b3021" />
+          <stop offset=".16" stopColor="#e0b85f" />
+          <stop offset=".34" stopColor="#8dd8e7" />
+          <stop offset=".5" stopColor="#eefcff" />
+          <stop offset=".67" stopColor="#68c8df" />
+          <stop offset=".84" stopColor="#d0a04c" />
+          <stop offset="1" stopColor="#33271a" />
         </linearGradient>
-        <linearGradient id="treeCore" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" stopColor="#1ad7ff" />
-          <stop offset=".56" stopColor="#9ff8ff" />
-          <stop offset="1" stopColor="#f6d77d" />
+        <linearGradient id="treeEnergy" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stopColor="#13bfe9" />
+          <stop offset=".52" stopColor="#a4f8ff" />
+          <stop offset="1" stopColor="#f2cd70" />
         </linearGradient>
         <radialGradient id="treeNode">
           <stop offset="0" stopColor="#ffffff" />
-          <stop offset=".3" stopColor="#9ff8ff" />
-          <stop offset=".66" stopColor="#24c7eb" />
-          <stop offset="1" stopColor="#d4a84f" stopOpacity=".35" />
+          <stop offset=".24" stopColor="#b8fbff" />
+          <stop offset=".58" stopColor="#2bd7ef" />
+          <stop offset=".82" stopColor="#d6aa53" />
+          <stop offset="1" stopColor="#4b351a" />
         </radialGradient>
-        <filter id="treeGlow" x="-80%" y="-80%" width="260%" height="260%">
-          <feGaussianBlur stdDeviation="6" result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
+        <filter id="treeGlow" x="-70%" y="-70%" width="240%" height="240%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
-        <filter id="treeSoftGlow" x="-80%" y="-80%" width="260%" height="260%">
-          <feGaussianBlur stdDeviation="12" />
+        <filter id="treeDeepGlow" x="-70%" y="-70%" width="240%" height="240%">
+          <feGaussianBlur stdDeviation="13" />
         </filter>
       </defs>
 
-      <g className="tree-aura" opacity=".7" filter="url(#treeSoftGlow)" fill="none" stroke="#42dcff" strokeWidth="8">
-        <path d="M260 590 C254 490 258 382 260 82" />
-        <path d="M260 430 C220 392 176 350 110 286" />
-        <path d="M260 430 C300 392 344 350 410 286" />
-        <path d="M260 330 C222 292 188 246 150 184" />
-        <path d="M260 330 C298 292 332 246 370 184" />
+      <g className="tree-shadow" fill="none" stroke="#0fbfe7" strokeLinecap="round" opacity=".34" filter="url(#treeDeepGlow)">
+        <path d="M350 625 C338 548 365 484 348 419 C330 353 364 292 348 232 C335 184 350 133 350 74" strokeWidth="30" />
+        {halfBranches.map((d, i) => <path key={"sl"+i} d={d} strokeWidth={i < 4 ? 19 : 12} />)}
+        {halfBranches.map((d, i) => <path key={"sr"+i} d={d} transform="translate(700 0) scale(-1 1)" strokeWidth={i < 4 ? 19 : 12} />)}
       </g>
 
-      <g className="tree-roots" fill="none" stroke="url(#treeMetal)" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M260 590 C234 568 206 566 166 594" strokeWidth="18" />
-        <path d="M260 590 C286 568 314 566 354 594" strokeWidth="18" />
-        <path d="M248 552 C208 552 164 570 118 610" strokeWidth="12" />
-        <path d="M272 552 C312 552 356 570 402 610" strokeWidth="12" />
-        <path d="M242 520 C204 508 168 512 132 536" strokeWidth="9" />
-        <path d="M278 520 C316 508 352 512 388 536" strokeWidth="9" />
+      <g className="tree-roots-metal" fill="none" stroke="url(#treeMetal)" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M350 614 C307 590 271 587 228 603 C185 619 139 623 84 611" strokeWidth="27" />
+        <path d="M350 614 C393 590 429 587 472 603 C515 619 561 623 616 611" strokeWidth="27" />
+        <path d="M340 586 C299 567 263 557 216 562 C176 567 141 557 109 539" strokeWidth="17" />
+        <path d="M360 586 C401 567 437 557 484 562 C524 567 559 557 591 539" strokeWidth="17" />
+        <path d="M333 553 C304 535 279 520 251 498" strokeWidth="12" />
+        <path d="M367 553 C396 535 421 520 449 498" strokeWidth="12" />
       </g>
 
-      <g className="tree-structure" fill="none" stroke="url(#treeMetal)" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M260 584 C252 520 250 458 260 392 C268 326 256 250 260 84" strokeWidth="26" />
-        <path d="M246 462 C214 434 184 402 150 360 C128 332 100 308 70 288" strokeWidth="18" />
-        <path d="M274 462 C306 434 336 402 370 360 C392 332 420 308 450 288" strokeWidth="18" />
-        <path d="M250 395 C220 366 194 330 176 292 C158 254 136 220 106 192" strokeWidth="14" />
-        <path d="M270 395 C300 366 326 330 344 292 C362 254 384 220 414 192" strokeWidth="14" />
-        <path d="M254 320 C228 286 214 248 208 212 C202 178 186 146 162 118" strokeWidth="11" />
-        <path d="M266 320 C292 286 306 248 312 212 C318 178 334 146 358 118" strokeWidth="11" />
-        <path d="M258 240 C244 208 244 174 254 142 C264 110 260 82 260 60" strokeWidth="10" />
+      <g className="tree-branch-metal" fill="none" stroke="url(#treeMetal)" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M350 615 C339 548 364 485 348 420 C332 354 364 292 348 233 C337 188 351 139 350 72" strokeWidth="34" />
+        {halfBranches.map((d, i) => <path key={"ml"+i} d={d} strokeWidth={i < 4 ? 22 : 13} />)}
+        {halfBranches.map((d, i) => <path key={"mr"+i} d={d} transform="translate(700 0) scale(-1 1)" strokeWidth={i < 4 ? 22 : 13} />)}
       </g>
 
-      <g className="tree-core" fill="none" stroke="url(#treeCore)" strokeLinecap="round" filter="url(#treeGlow)">
-        <path d="M260 590 C257 492 261 394 260 62" strokeWidth="6" />
-        <path d="M260 430 C220 392 176 350 82 286" strokeWidth="4" />
-        <path d="M260 430 C300 392 344 350 438 286" strokeWidth="4" />
-        <path d="M260 335 C224 298 194 252 156 184" strokeWidth="3.5" />
-        <path d="M260 335 C296 298 326 252 364 184" strokeWidth="3.5" />
+      <g className="tree-branch-energy" fill="none" stroke="url(#treeEnergy)" strokeLinecap="round" filter="url(#treeGlow)">
+        <path d="M350 618 C344 548 357 486 350 418 C343 350 357 294 350 231 C345 179 351 129 350 67" strokeWidth="5.5" />
+        {halfBranches.map((d, i) => <path key={"el"+i} d={d} strokeWidth={i < 4 ? 4 : 2.7} />)}
+        {halfBranches.map((d, i) => <path key={"er"+i} d={d} transform="translate(700 0) scale(-1 1)" strokeWidth={i < 4 ? 4 : 2.7} />)}
+        <path d="M350 612 C305 591 265 592 220 607 C172 623 126 625 78 613" strokeWidth="4" />
+        <path d="M350 612 C395 591 435 592 480 607 C528 623 574 625 622 613" strokeWidth="4" />
       </g>
 
       <g className="tree-nodes" filter="url(#treeGlow)">
-        {[
-          [260, 62, 15],
-          [162, 118, 12],
-          [358, 118, 12],
-          [106, 192, 11],
-          [414, 192, 11],
-          [70, 288, 10],
-          [450, 288, 10],
-          [176, 292, 9],
-          [344, 292, 9],
-          [150, 360, 8],
-          [370, 360, 8],
-          [260, 392, 11],
-          [260, 470, 9],
-          [260, 548, 8],
-        ].map(([cx, cy, r], index) => (
-          <g key={index}>
-            <circle cx={cx} cy={cy} r={(r ?? 0) + 6} fill="none" stroke="#d9b35c" strokeWidth="1.5" opacity=".48" />
-            <circle cx={cx} cy={cy} r={r ?? 0} fill="url(#treeNode)" />
+        <circle cx="350" cy="66" r="16" fill="url(#treeNode)" />
+        <circle cx="350" cy="232" r="10" fill="url(#treeNode)" />
+        <circle cx="350" cy="420" r="11" fill="url(#treeNode)" />
+        <circle cx="350" cy="548" r="10" fill="url(#treeNode)" />
+        {halfNodes.map(([cx, cy, r], i) => (
+          <g key={"nl"+i}>
+            <circle cx={cx} cy={cy} r={r+5} fill="none" stroke="#d6aa53" strokeWidth="1.4" opacity=".5" />
+            <circle cx={cx} cy={cy} r={r} fill="url(#treeNode)" />
           </g>
+        ))}
+        {halfNodes.map(([cx, cy, r], i) => (
+          <g key={"nr"+i} transform="translate(700 0) scale(-1 1)">
+            <circle cx={cx} cy={cy} r={r+5} fill="none" stroke="#d6aa53" strokeWidth="1.4" opacity=".5" />
+            <circle cx={cx} cy={cy} r={r} fill="url(#treeNode)" />
+          </g>
+        ))}
+      </g>
+
+      <g className="tree-leaf-light" fill="#98f4ff" opacity=".62">
+        {halfNodes.slice(0, 11).map(([cx, cy], i) => (
+          <ellipse key={"ll"+i} cx={cx+13} cy={cy-9} rx="5" ry="12" transform={`rotate(-38 ${cx+13} ${cy-9})`} />
+        ))}
+        {halfNodes.slice(0, 11).map(([cx, cy], i) => (
+          <ellipse key={"lr"+i} cx={700-cx-13} cy={cy-9} rx="5" ry="12" transform={`rotate(38 ${700-cx-13} ${cy-9})`} />
         ))}
       </g>
     </svg>
@@ -509,7 +518,7 @@ export function Engage() {
     >
 
 
-      <section aria-label="Engage ASCENSION" className="ascension-command mx-auto max-w-4xl space-y-5">
+      <section aria-label="Engage ASCENSION" className="ascension-command">\n        <div className="ascension-stage">
         <div className="ascension-book-scene" aria-hidden="true">
           <img className="ascension-book-scene-closed" src={CLOSED_BOOK_SCENE} alt="" />
         </div>
@@ -519,10 +528,8 @@ export function Engage() {
         </div>
         <div className="ascension-opening-light" aria-hidden="true" />
         <div className="ascension-open-book" aria-hidden="true">
-          <div className="book-page book-page-left" />
-          <div className="book-page book-page-right" />
-          <div className="book-page-stack book-page-stack-left" />
-          <div className="book-page-stack book-page-stack-right" />
+          <div className="book-page-surface book-page-surface-left" />
+          <div className="book-page-surface book-page-surface-right" />
           <div className="book-spine-glow" />
         </div>
         <div className="ascension-tree-emergence" aria-hidden="true">

@@ -393,6 +393,17 @@ export function Engage() {
 
   const run = runQuery.data;
 
+  useEffect(() => {
+    if (!run || !TERMINAL.has(run.status)) return;
+    setBookOpen(true);
+    setRevealed(true);
+    const timer = window.setTimeout(
+      () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      180,
+    );
+    return () => window.clearTimeout(timer);
+  }, [run?.id, run?.status]);
+
   const engage = useMutation({
     mutationFn: async () => {
       const { data } = await supabase.auth.getUser();

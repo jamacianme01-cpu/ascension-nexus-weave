@@ -24,7 +24,6 @@ const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
 const CLOSED_BOOK_SCENE = APPROVED_OPENING_SCENE;
-const TREE_EMERGENCE_SCENE = "/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {
@@ -203,6 +202,111 @@ function Pathways({
         <button type="button" onClick={() => onAction("execute")} disabled={!activeId} className="min-h-11 rounded-full border border-gold/50 bg-gold/10 px-5 text-sm text-gold disabled:opacity-40">EXECUTE</button>
       </div>
     </section>
+  );
+}
+
+
+function MirroredKnowledgeTree() {
+  return (
+    <svg
+      className="ascension-mirrored-tree"
+      viewBox="0 0 520 620"
+      role="presentation"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="treeMetal" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#7e6335" />
+          <stop offset=".18" stopColor="#d6b86c" />
+          <stop offset=".38" stopColor="#a9e9f3" />
+          <stop offset=".5" stopColor="#f4ffff" />
+          <stop offset=".62" stopColor="#7fdbea" />
+          <stop offset=".82" stopColor="#d6b86c" />
+          <stop offset="1" stopColor="#6d552f" />
+        </linearGradient>
+        <linearGradient id="treeCore" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stopColor="#1ad7ff" />
+          <stop offset=".56" stopColor="#9ff8ff" />
+          <stop offset="1" stopColor="#f6d77d" />
+        </linearGradient>
+        <radialGradient id="treeNode">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset=".3" stopColor="#9ff8ff" />
+          <stop offset=".66" stopColor="#24c7eb" />
+          <stop offset="1" stopColor="#d4a84f" stopOpacity=".35" />
+        </radialGradient>
+        <filter id="treeGlow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="6" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="treeSoftGlow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="12" />
+        </filter>
+      </defs>
+
+      <g className="tree-aura" opacity=".7" filter="url(#treeSoftGlow)" fill="none" stroke="#42dcff" strokeWidth="8">
+        <path d="M260 590 C254 490 258 382 260 82" />
+        <path d="M260 430 C220 392 176 350 110 286" />
+        <path d="M260 430 C300 392 344 350 410 286" />
+        <path d="M260 330 C222 292 188 246 150 184" />
+        <path d="M260 330 C298 292 332 246 370 184" />
+      </g>
+
+      <g className="tree-roots" fill="none" stroke="url(#treeMetal)" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M260 590 C234 568 206 566 166 594" strokeWidth="18" />
+        <path d="M260 590 C286 568 314 566 354 594" strokeWidth="18" />
+        <path d="M248 552 C208 552 164 570 118 610" strokeWidth="12" />
+        <path d="M272 552 C312 552 356 570 402 610" strokeWidth="12" />
+        <path d="M242 520 C204 508 168 512 132 536" strokeWidth="9" />
+        <path d="M278 520 C316 508 352 512 388 536" strokeWidth="9" />
+      </g>
+
+      <g className="tree-structure" fill="none" stroke="url(#treeMetal)" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M260 584 C252 520 250 458 260 392 C268 326 256 250 260 84" strokeWidth="26" />
+        <path d="M246 462 C214 434 184 402 150 360 C128 332 100 308 70 288" strokeWidth="18" />
+        <path d="M274 462 C306 434 336 402 370 360 C392 332 420 308 450 288" strokeWidth="18" />
+        <path d="M250 395 C220 366 194 330 176 292 C158 254 136 220 106 192" strokeWidth="14" />
+        <path d="M270 395 C300 366 326 330 344 292 C362 254 384 220 414 192" strokeWidth="14" />
+        <path d="M254 320 C228 286 214 248 208 212 C202 178 186 146 162 118" strokeWidth="11" />
+        <path d="M266 320 C292 286 306 248 312 212 C318 178 334 146 358 118" strokeWidth="11" />
+        <path d="M258 240 C244 208 244 174 254 142 C264 110 260 82 260 60" strokeWidth="10" />
+      </g>
+
+      <g className="tree-core" fill="none" stroke="url(#treeCore)" strokeLinecap="round" filter="url(#treeGlow)">
+        <path d="M260 590 C257 492 261 394 260 62" strokeWidth="6" />
+        <path d="M260 430 C220 392 176 350 82 286" strokeWidth="4" />
+        <path d="M260 430 C300 392 344 350 438 286" strokeWidth="4" />
+        <path d="M260 335 C224 298 194 252 156 184" strokeWidth="3.5" />
+        <path d="M260 335 C296 298 326 252 364 184" strokeWidth="3.5" />
+      </g>
+
+      <g className="tree-nodes" filter="url(#treeGlow)">
+        {[
+          [260, 62, 15],
+          [162, 118, 12],
+          [358, 118, 12],
+          [106, 192, 11],
+          [414, 192, 11],
+          [70, 288, 10],
+          [450, 288, 10],
+          [176, 292, 9],
+          [344, 292, 9],
+          [150, 360, 8],
+          [370, 360, 8],
+          [260, 392, 11],
+          [260, 470, 9],
+          [260, 548, 8],
+        ].map(([cx, cy, r], index) => (
+          <g key={index}>
+            <circle cx={cx} cy={cy} r={r + 6} fill="none" stroke="#d9b35c" strokeWidth="1.5" opacity=".48" />
+            <circle cx={cx} cy={cy} r={r} fill="url(#treeNode)" />
+          </g>
+        ))}
+      </g>
+    </svg>
   );
 }
 
@@ -414,8 +518,15 @@ export function Engage() {
           <h1 className="text-etched mt-2 font-display text-2xl tracking-[0.3em] text-foreground sm:text-3xl">ASCENSION</h1>
         </div>
         <div className="ascension-opening-light" aria-hidden="true" />
+        <div className="ascension-open-book" aria-hidden="true">
+          <div className="book-page book-page-left" />
+          <div className="book-page book-page-right" />
+          <div className="book-page-stack book-page-stack-left" />
+          <div className="book-page-stack book-page-stack-right" />
+          <div className="book-spine-glow" />
+        </div>
         <div className="ascension-tree-emergence" aria-hidden="true">
-          <img src={TREE_EMERGENCE_SCENE} alt="" />
+          <MirroredKnowledgeTree />
         </div>
 
         <label htmlFor="objective" className="block text-center font-display text-lg tracking-wide text-foreground/95">

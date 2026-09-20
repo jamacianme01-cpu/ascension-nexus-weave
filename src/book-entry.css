@@ -344,86 +344,103 @@ body:has(.ascension-world > .ascension-command) main {
   transform: translate(-50%, -50%) perspective(900px) rotateX(56deg) scale(1,.72);
 }
 
-/* Real color/depth Tree image, not the old line drawing. */
+/* Canonical Tree of Knowledge emergence.
+   Never substitute the ASCENSION infographic/schematic here. */
 .ascension-tree-emergence {
   position: absolute;
   z-index: 20;
   left: 50%;
-  bottom: 20%;
-  width: min(760px, 54vw);
-  height: min(520px, 54vh);
+  bottom: 18%;
+  width: min(860px, 62vw);
+  height: min(620px, 62vh);
   pointer-events: none;
   opacity: 0;
-  overflow: hidden;
-  transform: translateX(-50%) translateY(31%) scale(.42,.10);
+  overflow: visible;
+  transform: translateX(-50%) translateY(34%) perspective(1200px) rotateX(7deg) scale(.38,.10);
   transform-origin: 50% 100%;
-  clip-path: inset(78% 12% 0 12% round 22px);
-  -webkit-mask-image: radial-gradient(ellipse at 50% 54%, #000 0 52%, rgba(0,0,0,.92) 64%, transparent 84%);
-  mask-image: radial-gradient(ellipse at 50% 54%, #000 0 52%, rgba(0,0,0,.92) 64%, transparent 84%);
-  filter:
-    saturate(1.24)
-    contrast(1.10)
-    brightness(1.04)
-    drop-shadow(0 0 24px rgba(72,193,239,.36))
-    drop-shadow(0 0 52px rgba(224,174,72,.16));
   transition:
-    transform .54s cubic-bezier(.16,.78,.2,1),
+    transform .58s cubic-bezier(.16,.78,.2,1),
     opacity .38s ease,
-    clip-path .54s cubic-bezier(.16,.78,.2,1),
     filter .38s ease;
 }
 
-/* Crop the source to the dimensional central Tree only.
-   The full ASCENSION infographic, title, side panels and processing orbs never appear. */
-.ascension-tree-emergence img {
+/* Volumetric aura behind the canonical tree adds depth without replacing it. */
+.ascension-tree-emergence::before {
+  content: "";
   position: absolute;
-  display: block;
+  inset: -5%;
+  z-index: -2;
+  background: url('/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png') center bottom / contain no-repeat;
+  opacity: .62;
+  transform: scale(1.045) translateY(1.2%);
+  filter:
+    blur(14px)
+    brightness(1.55)
+    saturate(1.45)
+    drop-shadow(0 0 30px rgba(58,198,238,.42));
+}
+
+.ascension-tree-emergence::after {
+  content: "";
+  position: absolute;
+  z-index: -3;
   left: 50%;
-  top: 50%;
-  width: 205%;
+  bottom: 2%;
+  width: 76%;
+  height: 38%;
+  transform: translateX(-50%) perspective(900px) rotateX(66deg);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at center, rgba(178,250,255,.42) 0 5%, rgba(57,191,236,.22) 19%, rgba(220,173,75,.12) 38%, transparent 70%);
+  filter: blur(8px);
+}
+
+.ascension-tree-emergence img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
   max-width: none !important;
-  height: auto;
-  transform: translate(-50%, -50%);
-  object-fit: unset;
-  filter: saturate(1.08) contrast(1.04);
+  object-fit: contain;
+  object-position: center bottom;
+  transform: translateZ(0);
+  filter:
+    saturate(1.34)
+    contrast(1.10)
+    brightness(1.08)
+    drop-shadow(0 0 14px rgba(83,214,247,.40))
+    drop-shadow(0 0 34px rgba(222,176,78,.18));
 }
 
 .ascension-world[data-book-sequence="emerging"][data-book-step="1"] .ascension-tree-emergence {
-  opacity: .24;
-  transform: translateX(-50%) translateY(25%) scale(.52,.24);
-  clip-path: inset(68% 11% 0 11% round 20px);
+  opacity: .18;
+  transform: translateX(-50%) translateY(28%) perspective(1200px) rotateX(8deg) scale(.49,.22);
 }
 .ascension-world[data-book-sequence="emerging"][data-book-step="2"] .ascension-tree-emergence {
-  opacity: .40;
-  transform: translateX(-50%) translateY(20%) scale(.62,.39);
-  clip-path: inset(54% 9% 0 9% round 20px);
+  opacity: .34;
+  transform: translateX(-50%) translateY(23%) perspective(1200px) rotateX(7deg) scale(.60,.37);
 }
 .ascension-world[data-book-sequence="emerging"][data-book-step="3"] .ascension-tree-emergence {
-  opacity: .58;
-  transform: translateX(-50%) translateY(15%) scale(.72,.55);
-  clip-path: inset(40% 7% 0 7% round 18px);
+  opacity: .52;
+  transform: translateX(-50%) translateY(17%) perspective(1200px) rotateX(6deg) scale(.71,.54);
 }
 .ascension-world[data-book-sequence="emerging"][data-book-step="4"] .ascension-tree-emergence {
-  opacity: .74;
-  transform: translateX(-50%) translateY(10%) scale(.82,.71);
-  clip-path: inset(27% 5% 0 5% round 16px);
+  opacity: .70;
+  transform: translateX(-50%) translateY(11%) perspective(1200px) rotateX(5deg) scale(.82,.71);
 }
 .ascension-world[data-book-sequence="emerging"][data-book-step="5"] .ascension-tree-emergence {
-  opacity: .90;
-  transform: translateX(-50%) translateY(5%) scale(.92,.88);
-  clip-path: inset(13% 3% 0 3% round 14px);
+  opacity: .88;
+  transform: translateX(-50%) translateY(5%) perspective(1200px) rotateX(3deg) scale(.92,.88);
 }
 .ascension-world[data-book-sequence="emerging"][data-book-step="6"] .ascension-tree-emergence,
 .ascension-world[data-book-sequence="tree"] .ascension-tree-emergence,
 .ascension-world[data-book-open="true"] .ascension-tree-emergence {
   opacity: 1;
-  transform: translateX(-50%) translateY(0) scale(1);
-  clip-path: inset(0);
+  transform: translateX(-50%) translateY(0) perspective(1200px) rotateX(0deg) scale(1);
   filter:
-    saturate(1.24)
-    contrast(1.08)
-    drop-shadow(0 0 28px rgba(72,193,239,.42))
-    drop-shadow(0 0 56px rgba(224,174,72,.16));
+    drop-shadow(0 0 26px rgba(72,193,239,.36))
+    drop-shadow(0 0 52px rgba(224,174,72,.14));
 }
 
 /* After a result, the Book remains reusable. Focusing the objective returns it to the closed state. */
@@ -473,13 +490,9 @@ body:has(.ascension-world > .ascension-command) main {
   }
 
   .ascension-tree-emergence {
-    width: min(88vw, 680px);
-    height: min(50vh, 470px);
-    bottom: 23%;
-  }
-
-  .ascension-tree-emergence img {
-    width: 220%;
+    width: min(94vw, 720px);
+    height: min(54vh, 500px);
+    bottom: 21%;
   }
 }
 

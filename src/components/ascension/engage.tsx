@@ -24,7 +24,7 @@ const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
 const CLOSED_BOOK_SCENE = APPROVED_OPENING_SCENE;
-const TREE_EMERGENCE_SCENE = "/__l5e/assets-v1/458aed97-60ee-4cbb-8742-0c7149512cc0/engines-tree.png";
+const TREE_EMERGENCE_SCENE = "/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {

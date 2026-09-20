@@ -301,8 +301,8 @@ function MirroredKnowledgeTree() {
           [260, 548, 8],
         ].map(([cx, cy, r], index) => (
           <g key={index}>
-            <circle cx={cx} cy={cy} r={r + 6} fill="none" stroke="#d9b35c" strokeWidth="1.5" opacity=".48" />
-            <circle cx={cx} cy={cy} r={r} fill="url(#treeNode)" />
+            <circle cx={cx} cy={cy} r={(r ?? 0) + 6} fill="none" stroke="#d9b35c" strokeWidth="1.5" opacity=".48" />
+            <circle cx={cx} cy={cy} r={r ?? 0} fill="url(#treeNode)" />
           </g>
         ))}
       </g>

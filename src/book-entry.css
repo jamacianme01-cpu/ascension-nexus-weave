@@ -349,20 +349,23 @@ body:has(.ascension-world > .ascension-command) main {
   position: absolute;
   z-index: 20;
   left: 50%;
-  bottom: 19%;
-  width: min(780px, 58vw);
-  height: min(590px, 60vh);
+  bottom: 20%;
+  width: min(760px, 54vw);
+  height: min(520px, 54vh);
   pointer-events: none;
   opacity: 0;
   overflow: hidden;
   transform: translateX(-50%) translateY(31%) scale(.42,.10);
   transform-origin: 50% 100%;
-  clip-path: inset(78% 13% 0 13% round 20px);
+  clip-path: inset(78% 12% 0 12% round 22px);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 54%, #000 0 52%, rgba(0,0,0,.92) 64%, transparent 84%);
+  mask-image: radial-gradient(ellipse at 50% 54%, #000 0 52%, rgba(0,0,0,.92) 64%, transparent 84%);
   filter:
-    saturate(1.18)
-    contrast(1.06)
-    drop-shadow(0 0 22px rgba(72,193,239,.30))
-    drop-shadow(0 0 44px rgba(224,174,72,.12));
+    saturate(1.24)
+    contrast(1.10)
+    brightness(1.04)
+    drop-shadow(0 0 24px rgba(72,193,239,.36))
+    drop-shadow(0 0 52px rgba(224,174,72,.16));
   transition:
     transform .54s cubic-bezier(.16,.78,.2,1),
     opacity .38s ease,
@@ -370,12 +373,19 @@ body:has(.ascension-world > .ascension-command) main {
     filter .38s ease;
 }
 
+/* Crop the source to the dimensional central Tree only.
+   The full ASCENSION infographic, title, side panels and processing orbs never appear. */
 .ascension-tree-emergence img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
+  position: absolute;
   display: block;
+  left: 50%;
+  top: 50%;
+  width: 205%;
+  max-width: none !important;
+  height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: unset;
+  filter: saturate(1.08) contrast(1.04);
 }
 
 .ascension-world[data-book-sequence="emerging"][data-book-step="1"] .ascension-tree-emergence {
@@ -463,9 +473,13 @@ body:has(.ascension-world > .ascension-command) main {
   }
 
   .ascension-tree-emergence {
-    width: min(92vw, 680px);
-    height: min(56vh, 520px);
-    bottom: 22%;
+    width: min(88vw, 680px);
+    height: min(50vh, 470px);
+    bottom: 23%;
+  }
+
+  .ascension-tree-emergence img {
+    width: 220%;
   }
 }
 

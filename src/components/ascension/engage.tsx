@@ -428,6 +428,10 @@ export function Engage() {
           id="objective"
           ref={inputRef}
           value={objective}
+          placeholder="Tell ASCENSION what you want to answer, solve, build, analyze, simulate, or execute…"
+          onFocus={() => {
+            if (bookOpen && bookSequence === "idle") setBookOpen(false);
+          }}
           onChange={(event) => setObjective(event.target.value)}
           onKeyDown={(event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && canEngage) startBookSequence();

@@ -24,6 +24,7 @@ const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
 const CLOSED_BOOK_SCENE = APPROVED_OPENING_SCENE;
+const TREE_EMERGENCE_SCENE = "/__l5e/assets-v1/458aed97-60ee-4cbb-8742-0c7149512cc0/engines-tree.png";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {
@@ -368,19 +369,19 @@ export function Engage() {
     // sequence is presentation only and never gates submission.
     engage.mutate();
     later(1350, () => setBookSequence("opening"));
-    later(2050, () => {
+    later(2250, () => {
       setBookSequence("emerging");
       setBookStep(1);
     });
     [2, 3, 4, 5, 6].forEach((step, index) => {
-      later(2350 + index * 320, () => setBookStep(step));
+      later(2650 + index * 380, () => setBookStep(step));
     });
-    later(4050, () => {
+    later(5000, () => {
       setBookSequence("tree");
       setBookStep(6);
     });
-    // Return the Book to an open, usable state and reveal YOUR ANSWER below it.
-    later(4650, () => {
+    // Let the fully formed Tree remain visible before revealing the answer.
+    later(6900, () => {
       setBookSequence("idle");
       setBookStep(0);
       setBookOpen(true);
@@ -411,6 +412,10 @@ export function Engage() {
         <div className="text-center">
           <p className="label-eyebrow text-gold">THE BOOK</p>
           <h1 className="text-etched mt-2 font-display text-2xl tracking-[0.3em] text-foreground sm:text-3xl">ASCENSION</h1>
+        </div>
+        <div className="ascension-opening-light" aria-hidden="true" />
+        <div className="ascension-tree-emergence" aria-hidden="true">
+          <img src={TREE_EMERGENCE_SCENE} alt="" />
         </div>
 
         <label htmlFor="objective" className="block text-center font-display text-lg tracking-wide text-foreground/95">

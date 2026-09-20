@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { APPROVED_OPENING_SCENE } from "@/lib/ascension/approved-opening-scene";
 import {
   getObjectiveStatus,
   listMyObjectives,
@@ -22,8 +23,7 @@ import {
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
-const CLOSED_BOOK_SCENE = "/unreal-book/KnowledgeBook_Textured_Runtime.png";
-const OPEN_BOOK_SCENE = "/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png";
+const CLOSED_BOOK_SCENE = APPROVED_OPENING_SCENE;
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {
@@ -407,7 +407,6 @@ export function Engage() {
       <section aria-label="Engage ASCENSION" className="ascension-command mx-auto max-w-4xl space-y-5">
         <div className="ascension-book-scene" aria-hidden="true">
           <img className="ascension-book-scene-closed" src={CLOSED_BOOK_SCENE} alt="" />
-          <img className="ascension-book-scene-open" src={OPEN_BOOK_SCENE} alt="" />
         </div>
         <div className="text-center">
           <p className="label-eyebrow text-gold">THE BOOK</p>

@@ -80,19 +80,23 @@ function governedDelivery(
       })
     : [];
 
-  const body: string[] = [run.objective];
-  if (Object.keys(selected).length) body.push(`Selected future: ${branchTitle(selected)}`);
-  if (actions.length) body.push(`Actions:\n${actions.map((action) => `- ${action}`).join("\n")}`);
+  const primaryArtifact =
+    transportedFiles.find((file) => /\\.(md|txt)$/i.test(file.name)) ??
+    transportedFiles.find((file) => !/\\.json$/i.test(file.name)) ??
+    null;
+
+  const body: string[] = [];
+  if (primaryArtifact?.content.trim()) {
+    body.push(primaryArtifact.content.trim());
+  } else {
+    body.push(run.objective);
+    if (Object.keys(selected).length) body.push(`Selected future: ${branchTitle(selected)}`);
+    if (actions.length) body.push(`Actions:\n${actions.map((action) => `- ${action}`).join("\n")}`);
+  }
+
   if (receipts.length) {
     body.push(
-      `Recorded artifacts:\n${receipts
-        .map(
-          (file) =>
-            `- ${file.path}${file.bytes !== null ? ` (${file.bytes} bytes)` : ""}${
-              file.sha256 ? ` · sha256 ${file.sha256}` : ""
-            }`,
-        )
-        .join("\n")}`,
+      `Verification receipts: ${receipts.length} artifact${receipts.length === 1 ? "" : "s"} persisted and read back by the governed runtime.`,
     );
   }
 

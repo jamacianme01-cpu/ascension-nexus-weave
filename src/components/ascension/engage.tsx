@@ -23,8 +23,6 @@ const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
 const CLOSED_BOOK_SCENE = "/approved-scene/01-closed-book.png";
-const OPEN_BOOK_SCENE = "/approved-scene/02-open-book.png";
-const TREE_EMERGENCE_SCENE = "/approved-scene/03-tree-emergence.png";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {
@@ -248,12 +246,9 @@ export function Engage() {
   const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
   const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [bookSequence, setBookSequence] = useState<
-    "idle" | "rocking" | "opening" | "emerging" | "tree"
-  >("idle");
+  const [bookSequence, setBookSequence] = useState<"idle" | "rocking">("idle");
   const [bookOpen, setBookOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const [bookStep, setBookStep] = useState(0);
   const sequenceTimers = useRef<number[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLElement>(null);
@@ -367,7 +362,6 @@ export function Engage() {
       sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
       sequenceTimers.current = [];
       setBookSequence("idle");
-      setBookStep(0);
       setBookOpen(Boolean(run));
       setRevealed(Boolean(run));
     },
@@ -418,33 +412,14 @@ export function Engage() {
     };
     setBookOpen(false);
     setRevealed(false);
-    setBookStep(0);
     setBookSequence("rocking");
-    // The real governed objective run starts on the single press. The Book
-    // sequence is presentation only and never gates submission.
+    // Book scene only. The broken screenshot/open/tree substitutes are not
+    // allowed to render while the approved next scene is being corrected.
     engage.mutate();
-    later(1350, () => setBookSequence("opening"));
-    later(2250, () => {
-      setBookSequence("emerging");
-      setBookStep(1);
-    });
-    [2, 3, 4, 5, 6].forEach((step, index) => {
-      later(2650 + index * 380, () => setBookStep(step));
-    });
-    later(5000, () => {
-      setBookSequence("tree");
-      setBookStep(6);
-    });
-    // Let the fully formed Tree remain visible before revealing the answer.
-    later(6900, () => {
+    later(1350, () => {
       setBookSequence("idle");
-      setBookStep(0);
-      setBookOpen(true);
+      setBookOpen(false);
       setRevealed(true);
-      window.setTimeout(
-        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-        120,
-      );
     });
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
@@ -454,7 +429,6 @@ export function Engage() {
     <div
       className="ascension-world relative isolate mx-auto w-full max-w-none"
       data-book-sequence={bookSequence === "idle" ? undefined : bookSequence}
-      data-book-step={bookStep || undefined}
       data-book-open={bookOpen ? "true" : undefined}
       data-has-run={run && revealed ? "true" : undefined}
     >
@@ -467,15 +441,6 @@ export function Engage() {
               alt=""
               draggable={false}
             />
-            <img className="ascension-scene-open" src={OPEN_BOOK_SCENE} alt="" draggable={false} />
-            <div className="ascension-tree-emergence">
-              <img
-                className="ascension-emergence-art"
-                src={TREE_EMERGENCE_SCENE}
-                alt=""
-                draggable={false}
-              />
-            </div>
           </div>
 
           <label

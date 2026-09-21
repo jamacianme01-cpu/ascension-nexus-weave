@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { APPROVED_OPENING_SCENE } from "@/lib/ascension/approved-opening-scene";
 import {
   getObjectiveStatus,
   listMyObjectives,
@@ -23,7 +22,9 @@ import {
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
-const CLOSED_BOOK_SCENE = APPROVED_OPENING_SCENE;
+const CLOSED_BOOK_SCENE = "/approved-scene/01-closed-book.png";
+const OPEN_BOOK_SCENE = "/approved-scene/02-open-book.png";
+const TREE_EMERGENCE_SCENE = "/approved-scene/03-tree-emergence.png";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {
@@ -52,7 +53,7 @@ function download(name: string, content: string) {
 }
 
 function statusText(run: ObjectiveRun) {
-  if (run.status === "queued") return "Queued — waiting for the governed runtime to claim it.";
+  if (run.status === "queued") return "Objective received. Waiting for ASCENSION runtime.";
   if (run.status === "claimed") return "Claimed — ASCENSION has the objective.";
   if (run.status === "running")
     return "Running — ASCENSION is decomposing, simulating, governing and executing.";
@@ -134,7 +135,7 @@ function RuntimeDetails({ run }: { run: ObjectiveRun }) {
   return (
     <details className="rounded-xl border border-border/70 px-4 py-3">
       <summary className="cursor-pointer text-sm text-muted-foreground">
-        Verification details
+        Proof / verification
       </summary>
       <div className="mt-4 space-y-3 text-sm leading-relaxed">
         <p>Guardian: {run.guardian_verdict ?? "not published"}</p>
@@ -237,8 +238,6 @@ function Pathways({
     </section>
   );
 }
-
-const CANONICAL_TREE = "/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png";
 
 export function Engage() {
   const client = useQueryClient();
@@ -461,28 +460,22 @@ export function Engage() {
     >
       <section aria-label="Engage ASCENSION" className="ascension-command">
         <div className="ascension-stage">
-          <div className="ascension-book-scene" aria-hidden="true">
-            <img className="ascension-book-scene-closed" src={CLOSED_BOOK_SCENE} alt="" />
-          </div>
-          <div className="text-center">
-            <p className="label-eyebrow text-gold">THE BOOK</p>
-            <h1 className="text-etched mt-2 font-display text-2xl tracking-[0.3em] text-foreground sm:text-3xl">
-              ASCENSION
-            </h1>
-          </div>
-          <div className="ascension-opening-light" aria-hidden="true" />
-          <div className="ascension-open-book" aria-hidden="true">
-            <div className="book-page-surface book-page-surface-left" />
-            <div className="book-page-surface book-page-surface-right" />
-            <div className="book-spine-glow" />
-          </div>
-          <div className="ascension-tree-emergence" aria-hidden="true">
+          <div className="ascension-scene-hero" aria-hidden="true">
             <img
-              className="ascension-canonical-tree"
-              src={CANONICAL_TREE}
+              className="ascension-scene-closed"
+              src={CLOSED_BOOK_SCENE}
               alt=""
               draggable={false}
             />
+            <img className="ascension-scene-open" src={OPEN_BOOK_SCENE} alt="" draggable={false} />
+            <div className="ascension-tree-emergence">
+              <img
+                className="ascension-emergence-art"
+                src={TREE_EMERGENCE_SCENE}
+                alt=""
+                draggable={false}
+              />
+            </div>
           </div>
 
           <label
@@ -627,7 +620,7 @@ export function Engage() {
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="label-eyebrow text-primary">YOUR ANSWER</p>
+              <p className="label-eyebrow text-primary">ASCENSION RESPONSE</p>
               <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
             </div>
             <a
@@ -659,11 +652,12 @@ export function Engage() {
             <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-5">
               <p className="font-display text-lg text-foreground">
                 {run.status === "verified"
-                  ? "Finalizing your answer…"
-                  : "ASCENSION is working on it…"}
+                  ? "Preparing the ASCENSION response…"
+                  : "ASCENSION is processing your objective."}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                The answer will appear in this exact panel. You do not have to open another screen.
+                The response will appear here in the same flow. You do not have to open another
+                screen.
               </p>
             </div>
           )}

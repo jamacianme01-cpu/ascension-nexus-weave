@@ -1,9 +1,7 @@
-/* ASCENSION — approved opening sequence.
-   Exact approved assets only:
-   Scene 1 closed Book hero -> Scene 2 Book opens (approved open image) ->
-   Scene 3 Tree of Knowledge emerges (approved emergence image) ->
-   Scene 4 objective input + ASCENSION RESPONSE in the same flow.
-   No CSS-drawn books, no placeholder panels, no substitute imagery. */
+/* ASCENSION — Book scene lock.
+   Render the approved closed Book scene only.
+   Broken screenshot/open/tree substitutes are intentionally disabled until
+   the next approved scene is installed and verified. */
 
 body:has(.ascension-world > .ascension-command) header,
 body:has(.ascension-world > .ascension-command) footer,
@@ -77,22 +75,6 @@ body:has(.ascension-world > .ascension-command) main {
   transition: opacity .5s ease, filter .5s ease;
 }
 
-.ascension-scene-open {
-  position: absolute;
-  left: 50%;
-  top: 5%;
-  width: 60%;
-  aspect-ratio: 1043 / 710;
-  object-fit: contain;
-  object-position: center;
-  opacity: 0;
-  transform: translateX(-50%) scale(1.05);
-  transform-origin: 50% 100%;
-  filter: drop-shadow(0 0 34px rgba(64,214,247,.30)) drop-shadow(0 0 60px rgba(226,180,78,.16));
-  transition: opacity .55s ease, transform .7s cubic-bezier(.12,.76,.16,1);
-  pointer-events: none;
-}
-
 /* The Book rocks naturally before it opens — the approved artwork itself
    moves; nothing is drawn over it. */
 @keyframes approved-book-rock {
@@ -108,102 +90,7 @@ body:has(.ascension-world > .ascension-command) main {
   animation: approved-book-rock 1.35s cubic-bezier(.28,.62,.22,1) both;
 }
 
-/* Scene 2 — the closed hero hands over to the exact approved open Book. */
-.ascension-world[data-book-sequence="opening"] .ascension-scene-closed,
-.ascension-world[data-book-sequence="emerging"] .ascension-scene-closed,
-.ascension-world[data-book-sequence="tree"] .ascension-scene-closed,
-.ascension-world[data-book-open="true"] .ascension-scene-closed {
-  opacity: 0;
-}
-
-.ascension-world[data-book-sequence="opening"] .ascension-scene-open,
-.ascension-world[data-book-sequence="emerging"] .ascension-scene-open,
-.ascension-world[data-book-sequence="tree"] .ascension-scene-open,
-.ascension-world[data-book-open="true"] .ascension-scene-open {
-  opacity: 1;
-  transform: translateX(-50%) scale(1);
-}
-
-/* Scene 3 — the approved Tree of Knowledge emerges from the open Book.
-   Roots start at the open pages and the tree rises in stages. */
-.ascension-tree-emergence {
-  position: absolute;
-  left: 50%;
-  bottom: 50%;
-  width: 82%;
-  aspect-ratio: 1822 / 686;
-  pointer-events: none;
-  opacity: 0;
-  overflow: visible;
-  transform: translateX(-50%) translateY(72%) perspective(1200px) scale(.18,.05);
-  transform-origin: 50% 100%;
-  clip-path: inset(97% 0 0 0);
-  filter:
-    drop-shadow(0 0 18px rgba(55,208,240,.26))
-    drop-shadow(0 0 36px rgba(222,176,78,.12));
-  transition:
-    transform .54s cubic-bezier(.12,.80,.16,1),
-    opacity .30s ease,
-    clip-path .54s cubic-bezier(.12,.80,.16,1),
-    filter .35s ease;
-}
-
-.ascension-emergence-art {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  overflow: visible;
-  transform-origin: 50% 100%;
-}
-
-.ascension-world[data-book-sequence="emerging"][data-book-step="1"] .ascension-tree-emergence {
-  opacity: .25;
-  clip-path: inset(84% 0 0 0);
-  transform: translateX(-50%) translateY(58%) perspective(1200px) scale(.32,.17);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="2"] .ascension-tree-emergence {
-  opacity: .42;
-  clip-path: inset(68% 0 0 0);
-  transform: translateX(-50%) translateY(45%) perspective(1200px) scale(.47,.33);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="3"] .ascension-tree-emergence {
-  opacity: .58;
-  clip-path: inset(51% 0 0 0);
-  transform: translateX(-50%) translateY(32%) perspective(1200px) scale(.63,.50);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="4"] .ascension-tree-emergence {
-  opacity: .74;
-  clip-path: inset(34% 0 0 0);
-  transform: translateX(-50%) translateY(20%) perspective(1200px) scale(.77,.68);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="5"] .ascension-tree-emergence {
-  opacity: .90;
-  clip-path: inset(16% 0 0 0);
-  transform: translateX(-50%) translateY(9%) perspective(1200px) scale(.91,.86);
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="6"] .ascension-tree-emergence,
-.ascension-world[data-book-sequence="tree"] .ascension-tree-emergence,
-.ascension-world[data-book-open="true"] .ascension-tree-emergence {
-  opacity: 1;
-  clip-path: inset(0 0 0 0);
-  transform: translateX(-50%) translateY(0) perspective(1200px) scale(1);
-  filter:
-    drop-shadow(0 0 24px rgba(65,220,248,.42))
-    drop-shadow(0 0 50px rgba(227,180,78,.18));
-}
-
-@keyframes tree-breathe {
-  0%,100% { filter: brightness(1) saturate(1); transform: scale(1); }
-  50% { filter: brightness(1.09) saturate(1.12); transform: scale(1.008); }
-}
-
-.ascension-world[data-book-sequence="tree"] .ascension-emergence-art,
-.ascension-world[data-book-open="true"] .ascension-emergence-art {
-  animation: tree-breathe 3.2s ease-in-out infinite;
-}
-
-/* Scene 4 — objective input and ENGAGE below the artwork, in normal flow. */
+/* Objective input and ENGAGE below the artwork, in normal flow. */
 @keyframes controls-away {
   to { opacity: 0; visibility: hidden; }
 }
@@ -332,9 +219,6 @@ body:has(.ascension-world > .ascension-command) main {
 
 @media (prefers-reduced-motion: reduce) {
   .ascension-scene-closed,
-  .ascension-scene-open,
-  .ascension-tree-emergence,
-  .ascension-emergence-art,
   .ascension-world[data-book-sequence] .ascension-stage > label[for="objective"],
   .ascension-world[data-book-sequence] .ascension-stage textarea#objective,
   .ascension-world[data-book-sequence] .ascension-stage > div.flex {

@@ -22,7 +22,7 @@ import {
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
-const CLOSED_BOOK_SCENE = "/approved-scene/01-closed-book.png";
+const CLOSED_BOOK_SCENE = "/approved-scene/01-closed-book.jpg";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {

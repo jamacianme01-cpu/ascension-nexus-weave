@@ -108,26 +108,27 @@ body:has(.ascension-world > .ascension-command) main {
   border: 0 !important;
 }
 
-/* One real objective field, exactly covering the field painted into the artwork.
-   The nearly opaque fill prevents any second/faint field from showing through. */
+/* One real objective field, covering the field painted into the artwork
+   exactly, with a fully opaque fill so the painted field can never show
+   through. This is what removes the duplicate/faint second interface. */
 .ascension-stage textarea#objective {
   position: absolute !important;
   z-index: 40;
-  left: 50%;
-  top: 71.05%;
-  width: 51.2% !important;
-  height: 8.15% !important;
+  left: 19.9%;
+  top: 66.1%;
+  width: 60.3% !important;
+  height: 15.7% !important;
   min-height: 0 !important;
   max-height: none !important;
   margin: 0 !important;
   padding: clamp(8px, 1.25vw, 18px) clamp(12px, 1.6vw, 24px) !important;
-  transform: translateX(-50%) !important;
+  transform: none !important;
   resize: none !important;
   overflow: auto !important;
   border: 1px solid rgba(103,190,224,.42) !important;
   border-radius: clamp(10px, .9vw, 16px) !important;
   outline: 0 !important;
-  background: rgba(3,10,17,.97) !important;
+  background: rgb(4,11,18) !important;
   box-shadow:
     inset 0 0 32px rgba(0,0,0,.46),
     0 0 22px rgba(31,159,214,.10) !important;
@@ -157,16 +158,17 @@ body:has(.ascension-world > .ascension-command) main {
   display: none !important;
 }
 
-/* One live ENGAGE hit area, exactly covering the artwork button. */
+/* One live ENGAGE hit area, covering the button painted into the artwork
+   completely so only one ENGAGE control is ever visible. */
 .ascension-stage > div.flex {
   position: absolute !important;
   z-index: 41;
-  left: 50%;
-  top: 81.55%;
-  width: 26.7%;
-  height: 7.15%;
+  left: 32.4%;
+  top: 82.1%;
+  width: 35.2%;
+  height: 9.7%;
   margin: 0 !important;
-  transform: translateX(-50%) !important;
+  transform: none !important;
   display: flex !important;
   align-items: stretch !important;
   justify-content: center !important;
@@ -200,7 +202,7 @@ body:has(.ascension-world > .ascension-command) main {
   outline: 0 !important;
   background:
     radial-gradient(ellipse at 50% 45%, rgba(74,53,20,.34), transparent 56%),
-    linear-gradient(180deg, rgba(20,16,10,.99), rgba(3,6,10,.99)) !important;
+    linear-gradient(180deg, rgb(20,16,10), rgb(3,6,10)) !important;
   color: #f3d17c !important;
   font-family: Cinzel, serif !important;
   font-size: clamp(.66rem, 1vw, 1.05rem) !important;
@@ -394,14 +396,16 @@ body:has(.ascension-world > .ascension-command) main {
   opacity: 1;
 }
 
-/* Mirrored living Tree. It starts at the page seam and is revealed upward in stages. */
+/* Canonical dimensional Tree of Knowledge. It is anchored root-first at the
+   open Book seam and revealed upward in stages — it grows out of the pages,
+   never appearing as a full-size poster overlay. */
 .ascension-tree-emergence {
   position: absolute;
   z-index: 22;
   left: 50%;
-  bottom: 38.2%;
-  width: 43%;
-  height: 49%;
+  bottom: 52.5%;
+  width: 41%;
+  aspect-ratio: 1516 / 947;
   pointer-events: none;
   opacity: 0;
   overflow: visible;
@@ -418,18 +422,13 @@ body:has(.ascension-world > .ascension-command) main {
     filter .35s ease;
 }
 
-.ascension-mirrored-tree {
+.ascension-canonical-tree {
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
   overflow: visible;
   transform-origin: 50% 100%;
-}
-
-.ascension-mirrored-tree .tree-nodes,
-.ascension-mirrored-tree .tree-leaf-light {
-  opacity: .10;
-  transition: opacity .42s ease;
 }
 
 .ascension-world[data-book-sequence="emerging"][data-book-step="1"] .ascension-tree-emergence {
@@ -468,30 +467,13 @@ body:has(.ascension-world > .ascension-command) main {
     drop-shadow(0 0 50px rgba(227,180,78,.17));
 }
 
-.ascension-world[data-book-sequence="emerging"][data-book-step="4"] .tree-nodes,
-.ascension-world[data-book-sequence="emerging"][data-book-step="4"] .tree-leaf-light {
-  opacity: .34;
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="5"] .tree-nodes,
-.ascension-world[data-book-sequence="emerging"][data-book-step="5"] .tree-leaf-light {
-  opacity: .70;
-}
-.ascension-world[data-book-sequence="emerging"][data-book-step="6"] .tree-nodes,
-.ascension-world[data-book-sequence="tree"] .tree-nodes,
-.ascension-world[data-book-open="true"] .tree-nodes,
-.ascension-world[data-book-sequence="emerging"][data-book-step="6"] .tree-leaf-light,
-.ascension-world[data-book-sequence="tree"] .tree-leaf-light,
-.ascension-world[data-book-open="true"] .tree-leaf-light {
-  opacity: 1;
-}
-
 @keyframes tree-breathe {
   0%,100% { filter: brightness(1) saturate(1); transform: scale(1); }
   50% { filter: brightness(1.09) saturate(1.12); transform: scale(1.008); }
 }
 
-.ascension-world[data-book-sequence="tree"] .ascension-mirrored-tree,
-.ascension-world[data-book-open="true"] .ascension-mirrored-tree {
+.ascension-world[data-book-sequence="tree"] .ascension-canonical-tree,
+.ascension-world[data-book-open="true"] .ascension-canonical-tree {
   animation: tree-breathe 3.2s ease-in-out infinite;
 }
 
@@ -523,8 +505,7 @@ body:has(.ascension-world > .ascension-command) main {
   }
 
   .ascension-tree-emergence {
-    width: 48%;
-    height: 50%;
+    width: 46%;
   }
 }
 
@@ -533,7 +514,7 @@ body:has(.ascension-world > .ascension-command) main {
   .ascension-opening-light,
   .ascension-open-book,
   .ascension-tree-emergence,
-  .ascension-mirrored-tree,
+  .ascension-canonical-tree,
   .ascension-world[data-book-sequence] .ascension-stage textarea#objective,
   .ascension-world[data-book-sequence] .ascension-stage > div.flex {
     animation-duration: .01ms !important;

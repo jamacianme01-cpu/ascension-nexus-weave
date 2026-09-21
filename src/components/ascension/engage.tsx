@@ -54,8 +54,10 @@ function download(name: string, content: string) {
 function statusText(run: ObjectiveRun) {
   if (run.status === "queued") return "Queued — waiting for the governed runtime to claim it.";
   if (run.status === "claimed") return "Claimed — ASCENSION has the objective.";
-  if (run.status === "running") return "Running — ASCENSION is decomposing, simulating, governing and executing.";
-  if (run.status === "verified") return "Verified — the governed runtime has finished and published its result.";
+  if (run.status === "running")
+    return "Running — ASCENSION is decomposing, simulating, governing and executing.";
+  if (run.status === "verified")
+    return "Verified — the governed runtime has finished and published its result.";
   if (run.status === "rejected") return "Rejected by governance.";
   if (run.status === "failed") return "The governed run failed.";
   return run.status;
@@ -116,7 +118,9 @@ export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
         <div className="rounded-xl border border-gold/25 p-4">
           <p className="text-xs tracking-[0.14em] text-gold uppercase">What remains</p>
           <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-            {delivery.limitations.map((line, i) => <li key={i}>{line}</li>)}
+            {delivery.limitations.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
           </ul>
         </div>
       )}
@@ -129,19 +133,23 @@ function RuntimeDetails({ run }: { run: ObjectiveRun }) {
   const files = receiptFiles(run.result);
   return (
     <details className="rounded-xl border border-border/70 px-4 py-3">
-      <summary className="cursor-pointer text-sm text-muted-foreground">Verification details</summary>
+      <summary className="cursor-pointer text-sm text-muted-foreground">
+        Verification details
+      </summary>
       <div className="mt-4 space-y-3 text-sm leading-relaxed">
         <p>Guardian: {run.guardian_verdict ?? "not published"}</p>
         <p>AutoSync: {String(result["autosync_verdict"] ?? "not published")}</p>
         <p>Outcome: {run.outcome_status ?? "not published"}</p>
         {governedPersisted(run) && (
           <p className="text-gold">
-            Verified Δ · K {String(result["delta_k"] ?? "—")} · W {String(result["delta_w"] ?? "—")} · U {String(result["delta_u"] ?? "—")}
+            Verified Δ · K {String(result["delta_k"] ?? "—")} · W {String(result["delta_w"] ?? "—")}{" "}
+            · U {String(result["delta_u"] ?? "—")}
           </p>
         )}
         {files.map((file, i) => (
           <p key={i} className="break-all text-muted-foreground">
-            Artifact: {file.name}{file.bytes !== null ? ` (${file.bytes} bytes)` : ""}
+            Artifact: {file.name}
+            {file.bytes !== null ? ` (${file.bytes} bytes)` : ""}
           </p>
         ))}
       </div>
@@ -166,7 +174,10 @@ function Pathways({
   const activeId = selectedId || recommended;
 
   return (
-    <section className="space-y-4 rounded-2xl border border-primary/20 bg-void/50 p-5 sm:p-6" aria-label="Pathways">
+    <section
+      className="space-y-4 rounded-2xl border border-primary/20 bg-void/50 p-5 sm:p-6"
+      aria-label="Pathways"
+    >
       <div>
         <p className="label-eyebrow text-primary">POSSIBLE FUTURES</p>
         <h2 className="mt-2 font-display text-xl text-foreground">Choose the pathway you want</h2>
@@ -190,134 +201,44 @@ function Pathways({
                 {isRecommended ? "ASCENSION RECOMMENDED" : "ALTERNATIVE FUTURE"}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-foreground/80">
-                {strings(branch["actions"]).join(" · ") || "Pathway actions are recorded in the governed result."}
+                {strings(branch["actions"]).join(" · ") ||
+                  "Pathway actions are recorded in the governed result."}
               </p>
             </button>
           );
         })}
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => onAction("simulate")} disabled={!activeId} className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary disabled:opacity-40">SIMULATE</button>
-        <button type="button" onClick={() => onAction("refine")} disabled={!activeId} className="min-h-11 rounded-full border border-gold/30 px-5 text-sm text-gold disabled:opacity-40">REFINE</button>
-        <button type="button" onClick={() => onAction("execute")} disabled={!activeId} className="min-h-11 rounded-full border border-gold/50 bg-gold/10 px-5 text-sm text-gold disabled:opacity-40">EXECUTE</button>
+        <button
+          type="button"
+          onClick={() => onAction("simulate")}
+          disabled={!activeId}
+          className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary disabled:opacity-40"
+        >
+          SIMULATE
+        </button>
+        <button
+          type="button"
+          onClick={() => onAction("refine")}
+          disabled={!activeId}
+          className="min-h-11 rounded-full border border-gold/30 px-5 text-sm text-gold disabled:opacity-40"
+        >
+          REFINE
+        </button>
+        <button
+          type="button"
+          onClick={() => onAction("execute")}
+          disabled={!activeId}
+          className="min-h-11 rounded-full border border-gold/50 bg-gold/10 px-5 text-sm text-gold disabled:opacity-40"
+        >
+          EXECUTE
+        </button>
       </div>
     </section>
   );
 }
 
-
-function MirroredKnowledgeTree() {
-  const halfBranches = [
-    "M350 500 C314 478 284 448 252 414 C222 382 186 360 136 342 C112 333 88 318 66 296",
-    "M348 448 C309 420 282 388 259 348 C238 311 208 281 170 252 C148 235 126 213 108 188",
-    "M348 388 C319 359 299 324 287 286 C275 249 254 215 226 182 C209 162 197 139 188 114",
-    "M350 330 C329 303 320 276 320 246 C320 214 310 183 294 151 C284 132 278 111 276 90",
-    "M302 435 C264 434 229 424 195 402 C163 382 130 372 96 370",
-    "M269 349 C231 342 198 326 170 302 C145 280 119 266 88 258",
-    "M286 285 C250 276 222 259 199 236 C178 215 155 202 130 194",
-    "M319 235 C292 222 272 205 256 182 C243 164 226 151 205 142",
-    "M213 381 C183 370 158 351 137 327 C121 309 102 299 79 293",
-    "M183 282 C155 270 134 252 118 229 C106 212 91 201 72 195",
-    "M232 205 C209 193 191 177 179 157 C169 141 156 131 138 125"
-  ];
-  const halfNodes = [
-    [66,296,9],[108,188,10],[188,114,11],[276,90,9],[96,370,8],
-    [88,258,8],[130,194,8],[205,142,8],[79,293,7],[72,195,7],[138,125,7],
-    [170,252,7],[226,182,7],[294,151,7]
-  ] as const;
-
-  return (
-    <svg className="ascension-mirrored-tree" viewBox="0 0 700 650" role="presentation" aria-hidden="true">
-      <defs>
-        <linearGradient id="treeMetal" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#3b3021" />
-          <stop offset=".16" stopColor="#e0b85f" />
-          <stop offset=".34" stopColor="#8dd8e7" />
-          <stop offset=".5" stopColor="#eefcff" />
-          <stop offset=".67" stopColor="#68c8df" />
-          <stop offset=".84" stopColor="#d0a04c" />
-          <stop offset="1" stopColor="#33271a" />
-        </linearGradient>
-        <linearGradient id="treeEnergy" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" stopColor="#13bfe9" />
-          <stop offset=".52" stopColor="#a4f8ff" />
-          <stop offset="1" stopColor="#f2cd70" />
-        </linearGradient>
-        <radialGradient id="treeNode">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset=".24" stopColor="#b8fbff" />
-          <stop offset=".58" stopColor="#2bd7ef" />
-          <stop offset=".82" stopColor="#d6aa53" />
-          <stop offset="1" stopColor="#4b351a" />
-        </radialGradient>
-        <filter id="treeGlow" x="-70%" y="-70%" width="240%" height="240%">
-          <feGaussianBlur stdDeviation="5" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="treeDeepGlow" x="-70%" y="-70%" width="240%" height="240%">
-          <feGaussianBlur stdDeviation="13" />
-        </filter>
-      </defs>
-
-      <g className="tree-shadow" fill="none" stroke="#0fbfe7" strokeLinecap="round" opacity=".34" filter="url(#treeDeepGlow)">
-        <path d="M350 625 C338 548 365 484 348 419 C330 353 364 292 348 232 C335 184 350 133 350 74" strokeWidth="30" />
-        {halfBranches.map((d, i) => <path key={"sl"+i} d={d} strokeWidth={i < 4 ? 19 : 12} />)}
-        {halfBranches.map((d, i) => <path key={"sr"+i} d={d} transform="translate(700 0) scale(-1 1)" strokeWidth={i < 4 ? 19 : 12} />)}
-      </g>
-
-      <g className="tree-roots-metal" fill="none" stroke="url(#treeMetal)" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M350 614 C307 590 271 587 228 603 C185 619 139 623 84 611" strokeWidth="27" />
-        <path d="M350 614 C393 590 429 587 472 603 C515 619 561 623 616 611" strokeWidth="27" />
-        <path d="M340 586 C299 567 263 557 216 562 C176 567 141 557 109 539" strokeWidth="17" />
-        <path d="M360 586 C401 567 437 557 484 562 C524 567 559 557 591 539" strokeWidth="17" />
-        <path d="M333 553 C304 535 279 520 251 498" strokeWidth="12" />
-        <path d="M367 553 C396 535 421 520 449 498" strokeWidth="12" />
-      </g>
-
-      <g className="tree-branch-metal" fill="none" stroke="url(#treeMetal)" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M350 615 C339 548 364 485 348 420 C332 354 364 292 348 233 C337 188 351 139 350 72" strokeWidth="34" />
-        {halfBranches.map((d, i) => <path key={"ml"+i} d={d} strokeWidth={i < 4 ? 22 : 13} />)}
-        {halfBranches.map((d, i) => <path key={"mr"+i} d={d} transform="translate(700 0) scale(-1 1)" strokeWidth={i < 4 ? 22 : 13} />)}
-      </g>
-
-      <g className="tree-branch-energy" fill="none" stroke="url(#treeEnergy)" strokeLinecap="round" filter="url(#treeGlow)">
-        <path d="M350 618 C344 548 357 486 350 418 C343 350 357 294 350 231 C345 179 351 129 350 67" strokeWidth="5.5" />
-        {halfBranches.map((d, i) => <path key={"el"+i} d={d} strokeWidth={i < 4 ? 4 : 2.7} />)}
-        {halfBranches.map((d, i) => <path key={"er"+i} d={d} transform="translate(700 0) scale(-1 1)" strokeWidth={i < 4 ? 4 : 2.7} />)}
-        <path d="M350 612 C305 591 265 592 220 607 C172 623 126 625 78 613" strokeWidth="4" />
-        <path d="M350 612 C395 591 435 592 480 607 C528 623 574 625 622 613" strokeWidth="4" />
-      </g>
-
-      <g className="tree-nodes" filter="url(#treeGlow)">
-        <circle cx="350" cy="66" r="16" fill="url(#treeNode)" />
-        <circle cx="350" cy="232" r="10" fill="url(#treeNode)" />
-        <circle cx="350" cy="420" r="11" fill="url(#treeNode)" />
-        <circle cx="350" cy="548" r="10" fill="url(#treeNode)" />
-        {halfNodes.map(([cx, cy, r], i) => (
-          <g key={"nl"+i}>
-            <circle cx={cx} cy={cy} r={r+5} fill="none" stroke="#d6aa53" strokeWidth="1.4" opacity=".5" />
-            <circle cx={cx} cy={cy} r={r} fill="url(#treeNode)" />
-          </g>
-        ))}
-        {halfNodes.map(([cx, cy, r], i) => (
-          <g key={"nr"+i} transform="translate(700 0) scale(-1 1)">
-            <circle cx={cx} cy={cy} r={r+5} fill="none" stroke="#d6aa53" strokeWidth="1.4" opacity=".5" />
-            <circle cx={cx} cy={cy} r={r} fill="url(#treeNode)" />
-          </g>
-        ))}
-      </g>
-
-      <g className="tree-leaf-light" fill="#98f4ff" opacity=".62">
-        {halfNodes.slice(0, 11).map(([cx, cy], i) => (
-          <ellipse key={"ll"+i} cx={cx+13} cy={cy-9} rx="5" ry="12" transform={`rotate(-38 ${cx+13} ${cy-9})`} />
-        ))}
-        {halfNodes.slice(0, 11).map(([cx, cy], i) => (
-          <ellipse key={"lr"+i} cx={700-cx-13} cy={cy-9} rx="5" ry="12" transform={`rotate(38 ${700-cx-13} ${cy-9})`} />
-        ))}
-      </g>
-    </svg>
-  );
-}
+const CANONICAL_TREE = "/unreal-tree/ASCENSION_TreeOfKnowledge_Canonical_v1.png";
 
 export function Engage() {
   const client = useQueryClient();
@@ -328,7 +249,9 @@ export function Engage() {
   const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
   const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [bookSequence, setBookSequence] = useState<"idle" | "rocking" | "opening" | "emerging" | "tree">("idle");
+  const [bookSequence, setBookSequence] = useState<
+    "idle" | "rocking" | "opening" | "emerging" | "tree"
+  >("idle");
   const [bookOpen, setBookOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [bookStep, setBookStep] = useState(0);
@@ -347,9 +270,12 @@ export function Engage() {
     if (draft) setObjective(draft);
   }, []);
 
-  useEffect(() => () => {
-    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
-  }, []);
+  useEffect(
+    () => () => {
+      sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    },
+    [],
+  );
 
   const runQuery = useQuery({
     queryKey: ["ascension", "run", active],
@@ -410,14 +336,22 @@ export function Engage() {
       if (!data.user) {
         save(DRAFT, objective);
         window.location.href = `/auth?next=${encodeURIComponent("/")}`;
-        throw new Error("Sign in is required to send the objective to the governed runtime. Your words were kept.");
+        throw new Error(
+          "Sign in is required to send the objective to the governed runtime. Your words were kept.",
+        );
       }
       return (
         await submitObjective({
           data: {
             objective: objective.trim(),
-            evidence: evidence.split("\n").map((v) => v.trim()).filter(Boolean),
-            constraints: constraints.split("\n").map((v) => v.trim()).filter(Boolean),
+            evidence: evidence
+              .split("\n")
+              .map((v) => v.trim())
+              .filter(Boolean),
+            constraints: constraints
+              .split("\n")
+              .map((v) => v.trim())
+              .filter(Boolean),
             ...(follow
               ? {
                   parentRequestId: follow.id,
@@ -453,8 +387,6 @@ export function Engage() {
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
     },
   });
-
-
 
   let delivery: ObjectiveDelivery | null = null;
   let invalidDelivery: string | null = null;
@@ -527,132 +459,183 @@ export function Engage() {
       data-book-open={bookOpen ? "true" : undefined}
       data-has-run={run && revealed ? "true" : undefined}
     >
-
-
       <section aria-label="Engage ASCENSION" className="ascension-command">
         <div className="ascension-stage">
-        <div className="ascension-book-scene" aria-hidden="true">
-          <img className="ascension-book-scene-closed" src={CLOSED_BOOK_SCENE} alt="" />
-        </div>
-        <div className="text-center">
-          <p className="label-eyebrow text-gold">THE BOOK</p>
-          <h1 className="text-etched mt-2 font-display text-2xl tracking-[0.3em] text-foreground sm:text-3xl">ASCENSION</h1>
-        </div>
-        <div className="ascension-opening-light" aria-hidden="true" />
-        <div className="ascension-open-book" aria-hidden="true">
-          <div className="book-page-surface book-page-surface-left" />
-          <div className="book-page-surface book-page-surface-right" />
-          <div className="book-spine-glow" />
-        </div>
-        <div className="ascension-tree-emergence" aria-hidden="true">
-          <MirroredKnowledgeTree />
-        </div>
-
-        <label htmlFor="objective" className="block text-center font-display text-lg tracking-wide text-foreground/95">
-          What do you want ASCENSION to answer, solve, build, analyze, simulate, or execute?
-        </label>
-
-        {follow && (
-          <div className="rounded-xl border border-gold/25 bg-gold/5 p-3 text-sm text-gold">
-            Continuing the previous governed result · {follow.kind.toUpperCase()}
-            <button type="button" onClick={() => setFollow(null)} className="ml-3 underline">Start separately</button>
+          <div className="ascension-book-scene" aria-hidden="true">
+            <img className="ascension-book-scene-closed" src={CLOSED_BOOK_SCENE} alt="" />
           </div>
-        )}
-
-        <textarea
-          id="objective"
-          ref={inputRef}
-          value={objective}
-          placeholder="Tell ASCENSION what you want to answer, solve, build, analyze, simulate, or execute…"
-          onFocus={() => {
-            if (bookOpen && bookSequence === "idle") setBookOpen(false);
-          }}
-          onChange={(event) => setObjective(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && canEngage) startBookSequence();
-          }}
-          rows={5}
-          maxLength={4000}
-          disabled={engage.isPending}
-          className="w-full resize-y rounded-xl border border-gold/30 bg-void/70 px-5 py-4 text-base leading-relaxed focus:border-gold/60 focus:outline-none"
-        />
-
-        <details className="rounded-xl border border-border/60 px-4 py-3 text-sm text-muted-foreground">
-          <summary className="cursor-pointer">Optional: add source evidence or constraints</summary>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="block text-sm text-foreground">What evidence or source information should ASCENSION use?</span>
-              <textarea value={evidence} onChange={(e) => setEvidence(e.target.value)} rows={4} className="mt-2 w-full rounded-lg border border-border bg-void/60 p-3" />
-            </label>
-            <label className="block">
-              <span className="block text-sm text-foreground">What requirements or limits must ASCENSION preserve?</span>
-              <textarea value={constraints} onChange={(e) => setConstraints(e.target.value)} rows={4} className="mt-2 w-full rounded-lg border border-border bg-void/60 p-3" />
-            </label>
+          <div className="text-center">
+            <p className="label-eyebrow text-gold">THE BOOK</p>
+            <h1 className="text-etched mt-2 font-display text-2xl tracking-[0.3em] text-foreground sm:text-3xl">
+              ASCENSION
+            </h1>
           </div>
-        </details>
+          <div className="ascension-opening-light" aria-hidden="true" />
+          <div className="ascension-open-book" aria-hidden="true">
+            <div className="book-page-surface book-page-surface-left" />
+            <div className="book-page-surface book-page-surface-right" />
+            <div className="book-spine-glow" />
+          </div>
+          <div className="ascension-tree-emergence" aria-hidden="true">
+            <img
+              className="ascension-canonical-tree"
+              src={CANONICAL_TREE}
+              alt=""
+              draggable={false}
+            />
+          </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" onClick={() => setHistoryOpen((v) => !v)} className="min-h-11 text-sm text-muted-foreground">
-            {historyOpen ? "Close past results" : "Past results"}
-          </button>
-          <button
-            type="button"
-            disabled={!canEngage || bookSequence !== "idle"}
-            onClick={startBookSequence}
-            className="min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-[0.14em] text-gold disabled:opacity-40"
+          <label
+            htmlFor="objective"
+            className="block text-center font-display text-lg tracking-wide text-foreground/95"
           >
-            {bookSequence !== "idle" || engage.isPending ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
-          </button>
-        </div>
+            What do you want ASCENSION to answer, solve, build, analyze, simulate, or execute?
+          </label>
 
-        {historyOpen && (
-          <div className="rounded-xl border border-border p-4">
-            {history.isPending ? (
-              <p className="text-sm text-muted-foreground">Loading past results…</p>
-            ) : history.error ? (
-              <p className="text-sm text-gold">Sign in to read saved results.</p>
-            ) : history.data?.items.length ? (
-              history.data.items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setActive(item.id);
-                    setBookOpen(true);
-                    setRevealed(true);
-                    save(ACTIVE, item.id);
-                    setHistoryOpen(false);
-                    window.history.replaceState(null, "", `/?run=${encodeURIComponent(item.id)}`);
-                    window.setTimeout(() => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-                  }}
-                  className="block w-full border-b border-border/50 py-3 text-left text-sm text-foreground"
-                >
-                  {item.objective.slice(0, 180)}
-                  <span className="mt-1 block text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}</span>
-                </button>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">No saved results yet.</p>
-            )}
+          {follow && (
+            <div className="rounded-xl border border-gold/25 bg-gold/5 p-3 text-sm text-gold">
+              Continuing the previous governed result · {follow.kind.toUpperCase()}
+              <button type="button" onClick={() => setFollow(null)} className="ml-3 underline">
+                Start separately
+              </button>
+            </div>
+          )}
+
+          <textarea
+            id="objective"
+            ref={inputRef}
+            value={objective}
+            placeholder="Tell ASCENSION what you want to answer, solve, build, analyze, simulate, or execute…"
+            onFocus={() => {
+              if (bookOpen && bookSequence === "idle") setBookOpen(false);
+            }}
+            onChange={(event) => setObjective(event.target.value)}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && canEngage)
+                startBookSequence();
+            }}
+            rows={5}
+            maxLength={4000}
+            disabled={engage.isPending}
+            className="w-full resize-y rounded-xl border border-gold/30 bg-void/70 px-5 py-4 text-base leading-relaxed focus:border-gold/60 focus:outline-none"
+          />
+
+          <details className="rounded-xl border border-border/60 px-4 py-3 text-sm text-muted-foreground">
+            <summary className="cursor-pointer">
+              Optional: add source evidence or constraints
+            </summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="block text-sm text-foreground">
+                  What evidence or source information should ASCENSION use?
+                </span>
+                <textarea
+                  value={evidence}
+                  onChange={(e) => setEvidence(e.target.value)}
+                  rows={4}
+                  className="mt-2 w-full rounded-lg border border-border bg-void/60 p-3"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm text-foreground">
+                  What requirements or limits must ASCENSION preserve?
+                </span>
+                <textarea
+                  value={constraints}
+                  onChange={(e) => setConstraints(e.target.value)}
+                  rows={4}
+                  className="mt-2 w-full rounded-lg border border-border bg-void/60 p-3"
+                />
+              </label>
+            </div>
+          </details>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              className="min-h-11 text-sm text-muted-foreground"
+            >
+              {historyOpen ? "Close past results" : "Past results"}
+            </button>
+            <button
+              type="button"
+              disabled={!canEngage || bookSequence !== "idle"}
+              onClick={startBookSequence}
+              className="min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-[0.14em] text-gold disabled:opacity-40"
+            >
+              {bookSequence !== "idle" || engage.isPending
+                ? "ENGAGING ASCENSION…"
+                : "ENGAGE ASCENSION"}
+            </button>
           </div>
-        )}
 
-        {error && (
-          <p role="alert" className="rounded-xl border border-destructive/40 p-4 text-sm text-destructive">
-            {error instanceof Error ? error.message : String(error)}
-          </p>
-        )}
+          {historyOpen && (
+            <div className="rounded-xl border border-border p-4">
+              {history.isPending ? (
+                <p className="text-sm text-muted-foreground">Loading past results…</p>
+              ) : history.error ? (
+                <p className="text-sm text-gold">Sign in to read saved results.</p>
+              ) : history.data?.items.length ? (
+                history.data.items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setActive(item.id);
+                      setBookOpen(true);
+                      setRevealed(true);
+                      save(ACTIVE, item.id);
+                      setHistoryOpen(false);
+                      window.history.replaceState(null, "", `/?run=${encodeURIComponent(item.id)}`);
+                      window.setTimeout(
+                        () =>
+                          answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                        100,
+                      );
+                    }}
+                    className="block w-full border-b border-border/50 py-3 text-left text-sm text-foreground"
+                  >
+                    {item.objective.slice(0, 180)}
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {new Date(item.created_at).toLocaleString()}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No saved results yet.</p>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <p
+              role="alert"
+              className="rounded-xl border border-destructive/40 p-4 text-sm text-destructive"
+            >
+              {error instanceof Error ? error.message : String(error)}
+            </p>
+          )}
         </div>
       </section>
 
       {run && revealed && (
-        <section ref={answerRef} aria-label="Answer" className="mx-auto max-w-4xl scroll-mt-24 space-y-5 rounded-2xl border border-primary/30 bg-void/80 p-5 shadow-2xl sm:p-7">
+        <section
+          ref={answerRef}
+          aria-label="Answer"
+          className="mx-auto max-w-4xl scroll-mt-24 space-y-5 rounded-2xl border border-primary/30 bg-void/80 p-5 shadow-2xl sm:p-7"
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="label-eyebrow text-primary">YOUR ANSWER</p>
               <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
             </div>
-            <a href="/architecture" className="rounded-full border border-gold/30 px-4 py-2 text-xs text-gold">VIEW ARCHITECTURE</a>
+            <a
+              href="/architecture"
+              className="rounded-full border border-gold/30 px-4 py-2 text-xs text-gold"
+            >
+              VIEW ARCHITECTURE
+            </a>
           </div>
 
           <Progress run={run} />
@@ -663,14 +646,21 @@ export function Engage() {
             <div role="alert" className="rounded-xl border border-gold/30 p-4">
               <p className="text-foreground">ASCENSION did not produce a readable answer.</p>
               <p className="mt-2 text-sm text-muted-foreground">{deliveryError}</p>
-              <button type="button" disabled={prepare.isPending} onClick={() => prepare.mutate({ id: run.id, retry: true })} className="mt-4 min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary">
+              <button
+                type="button"
+                disabled={prepare.isPending}
+                onClick={() => prepare.mutate({ id: run.id, retry: true })}
+                className="mt-4 min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary"
+              >
                 RETRY ANSWER
               </button>
             </div>
           ) : (
             <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-5">
               <p className="font-display text-lg text-foreground">
-                {run.status === "verified" ? "Finalizing your answer…" : "ASCENSION is working on it…"}
+                {run.status === "verified"
+                  ? "Finalizing your answer…"
+                  : "ASCENSION is working on it…"}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 The answer will appear in this exact panel. You do not have to open another screen.
@@ -680,8 +670,19 @@ export function Engage() {
 
           {delivery && (
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => followUp("continue")} className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary">CONTINUE THIS RESULT</button>
-              <a href="/knowledgeverse" className="inline-flex min-h-11 items-center rounded-full border border-gold/35 px-5 text-sm text-gold">OPEN KNOWLEDGEVERSE</a>
+              <button
+                type="button"
+                onClick={() => followUp("continue")}
+                className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary"
+              >
+                CONTINUE THIS RESULT
+              </button>
+              <a
+                href="/knowledgeverse"
+                className="inline-flex min-h-11 items-center rounded-full border border-gold/35 px-5 text-sm text-gold"
+              >
+                OPEN KNOWLEDGEVERSE
+              </a>
             </div>
           )}
 
@@ -691,7 +692,12 @@ export function Engage() {
 
       {run && revealed && planning?.branches.length ? (
         <div className="mx-auto max-w-4xl">
-          <Pathways run={run} selectedId={selectedPathwayId} onSelect={setSelectedPathwayId} onAction={followUp} />
+          <Pathways
+            run={run}
+            selectedId={selectedPathwayId}
+            onSelect={setSelectedPathwayId}
+            onAction={followUp}
+          />
         </div>
       ) : null}
 
@@ -701,7 +707,11 @@ export function Engage() {
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             {[
               ["1", "TYPE", "Ask a question or state exactly what you want accomplished."],
-              ["2", "ENGAGE", "Press ENGAGE ASCENSION once. The governed runtime takes it from there."],
+              [
+                "2",
+                "ENGAGE",
+                "Press ENGAGE ASCENSION once. The governed runtime takes it from there.",
+              ],
               ["3", "ANSWER", "Your answer or created solution appears directly below the Book."],
             ].map(([n, title, copy]) => (
               <div key={n} className="rounded-xl border border-primary/15 bg-background/20 p-4">

@@ -14,7 +14,9 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 function strings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function branchTitle(branch: Record<string, unknown>): string {
@@ -24,7 +26,10 @@ function branchTitle(branch: Record<string, unknown>): string {
     minimal_seeded_construct: "Start with a small working seed",
   };
   const approach = String(branch["approach"] ?? "");
-  return names[approach] ?? String((branch["name"] ?? branch["pathway"] ?? approach) || "Selected pathway");
+  return (
+    names[approach] ??
+    String((branch["name"] ?? branch["pathway"] ?? approach) || "Selected pathway")
+  );
 }
 
 function artifactFiles(value: unknown): { name: string; content: string }[] {
@@ -81,8 +86,8 @@ function governedDelivery(
     : [];
 
   const primaryArtifact =
-    transportedFiles.find((file) => /\\.(md|txt)$/i.test(file.name)) ??
-    transportedFiles.find((file) => !/\\.json$/i.test(file.name)) ??
+    transportedFiles.find((file) => /\.(md|txt)$/i.test(file.name)) ??
+    transportedFiles.find((file) => !/\.json$/i.test(file.name)) ??
     null;
 
   const body: string[] = [];
@@ -103,8 +108,10 @@ function governedDelivery(
   const state: string[] = [];
   if (typeof result["governed_status"] === "string") state.push(result["governed_status"]);
   if (typeof result["transaction"] === "string") state.push(`transaction ${result["transaction"]}`);
-  if (typeof result["autosync_verdict"] === "string") state.push(`AutoSync ${result["autosync_verdict"]}`);
-  if (typeof result["runtime_revision"] === "number") state.push(`revision ${result["runtime_revision"]}`);
+  if (typeof result["autosync_verdict"] === "string")
+    state.push(`AutoSync ${result["autosync_verdict"]}`);
+  if (typeof result["runtime_revision"] === "number")
+    state.push(`revision ${result["runtime_revision"]}`);
   if (state.length) body.push(`Governed runtime: ${state.join(" · ")}`);
 
   const titleSource =
@@ -163,11 +170,13 @@ export async function prepareDelivery(
   };
 
   const [current, artifactStage] = await Promise.all([read(), readArtifacts()]);
-  const files = artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
+  const files =
+    artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
 
   // Once the governed projection is complete, leave it alone until artifact
   // transport arrives. This avoids rewriting the same result on every poll.
-  if (current?.status === "completed" && current.engine_label === LABEL && files.length === 0) return current;
+  if (current?.status === "completed" && current.engine_label === LABEL && files.length === 0)
+    return current;
 
   const delivery = governedDelivery(run, files);
 

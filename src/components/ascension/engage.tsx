@@ -23,6 +23,7 @@ const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
 const CLOSED_BOOK_SCENE = "/approved-scene/01-closed-book.jpg";
+const TREE_EMERGENCE_SCENE = "/approved-scene/03-tree-emergence.png";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {
@@ -246,7 +247,7 @@ export function Engage() {
   const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
   const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [bookSequence, setBookSequence] = useState<"idle" | "rocking">("idle");
+  const [bookSequence, setBookSequence] = useState<"idle" | "rocking" | "emerging" | "tree">("idle");
   const [bookOpen, setBookOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const sequenceTimers = useRef<number[]>([]);
@@ -413,12 +414,12 @@ export function Engage() {
     setBookOpen(false);
     setRevealed(false);
     setBookSequence("rocking");
-    // Book scene only. The broken screenshot/open/tree substitutes are not
-    // allowed to render while the approved next scene is being corrected.
     engage.mutate();
-    later(1350, () => {
+    later(1350, () => setBookSequence("emerging"));
+    later(4300, () => setBookSequence("tree"));
+    later(5600, () => {
       setBookSequence("idle");
-      setBookOpen(false);
+      setBookOpen(true);
       setRevealed(true);
     });
   };
@@ -438,6 +439,12 @@ export function Engage() {
             <img
               className="ascension-scene-closed"
               src={CLOSED_BOOK_SCENE}
+              alt=""
+              draggable={false}
+            />
+            <img
+              className="ascension-tree-emergence"
+              src={TREE_EMERGENCE_SCENE}
               alt=""
               draggable={false}
             />

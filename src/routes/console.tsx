@@ -38,7 +38,7 @@ export const Route = createFileRoute("/console")({
       {
         name: "description",
         content:
-          "Read-only chamber view of the ASCENSION governed core: destiny, six engines, Destiny Crystal, Tree state, emergence, DTF and Verified Δ.",
+          "Read-only chamber view of the ASCENSION governed core: destiny, engine network, Destiny Crystal, Tree state, emergence, DTF and Verified Δ.",
       },
       { property: "og:title", content: "Inspect · Chamber Console — ASCENSION" },
       {
@@ -51,7 +51,12 @@ export const Route = createFileRoute("/console")({
     ],
   }),
   ssr: false,
-  loader: ({ context }) => context.queryClient.ensureQueryData(surfaceQuery("chamber")),
+  loader: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.ensureQueryData(surfaceQuery("chamber")),
+      context.queryClient.ensureQueryData(surfaceQuery("knowledgeverse")),
+    ]);
+  },
   errorComponent: ({ error }) => <SourceFailure error={error} surface="Chamber" />,
   pendingComponent: () => <ChamberLoading surface="Chamber" />,
   notFoundComponent: () => <p className="font-mono text-sm">No chamber state published.</p>,
@@ -63,8 +68,15 @@ function ConsoleRoute() {
   return location.pathname === "/console" || location.pathname === "/console/" ? <Chamber /> : <Outlet />;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
 function Chamber() {
   const { data } = useSuspenseQuery(surfaceQuery("chamber"));
+  const { data: knowledgeData } = useSuspenseQuery(surfaceQuery("knowledgeverse"));
   const { chamber, semantic, entities, worldModel } = data;
   const t = chamber.last_transition;
   const branches = t?.branches ?? [];
@@ -79,26 +91,62 @@ function Chamber() {
   const cycles = t?.destiny_id ? operator?.destinies?.[t.destiny_id]?.cycles : undefined;
   const mes = buildMeaningElements(data);
 
-  const engines: EngineSignal[] = [
-    { name: "Analyzer", source: "no per-engine runtime field in published contracts" },
-    { name: "Akashic", source: "no per-engine runtime field in published contracts" },
-    { name: "Projector", source: "no per-engine runtime field in published contracts" },
-    {
-      name: "Outcome Predictor",
-      reading: executed?.evaluation?.outcome_predictor?.toFixed(3),
-      source: "last_transition.branches[].evaluation.outcome_predictor",
-    },
-    {
-      name: "Confidence Engine",
-      reading: executed?.confidence?.toFixed(3),
-      source: "last_transition.branches[].confidence",
-    },
-    {
-      name: "Guardian",
-      reading: executed?.evaluation?.guardian,
-      source: "last_transition.branches[].evaluation.guardian",
-    },
-  ];
+  const knowledgeSurface = asRecord(knowledgeData.live?.surfaces["knowledgeverse"]?.data);
+  const engineSurface = asRecord(knowledgeSurface?.["engines"]);
+  const allPublishedEngines = asRecord(engineSurface?.["all_engines"]);
+
+  const engines: EngineSignal[] =
+    allPublishedEngines && Object.keys(allPublishedEngines).length
+      ? Object.entries(allPublishedEngines).map(([name, raw]) => {
+          const record = asRecord(raw);
+          const output = asRecord(record?.["output"]);
+          const status = typeof record?.["status"] === "string" ? String(record["status"]) : undefined;
+          const recordCount =
+            name === "Knowledge Retrieval" && typeof output?.["record_count"] === "number"
+              ? Number(output["record_count"])
+              : undefined;
+          const reading =
+            recordCount !== undefined
+              ? `${status ?? "ACTIVE"} · ${recordCount} records`
+              : status;
+          return {
+            name,
+            reading,
+            source:
+              typeof record?.["source"] === "string"
+                ? String(record["source"])
+                : "published ASCENSION engine mesh",
+          };
+        })
+      : [
+          { name: "Knowledge Retrieval", source: "published engine mesh unavailable" },
+          { name: "Analyzer", source: "published engine mesh unavailable" },
+          { name: "Spiral", source: "published engine mesh unavailable" },
+          { name: "Projector", source: "published engine mesh unavailable" },
+          {
+            name: "Outcome Predictor",
+            reading: executed?.evaluation?.outcome_predictor?.toFixed(3),
+            source: "last_transition.branches[].evaluation.outcome_predictor",
+          },
+          {
+            name: "Confidence Engine",
+            reading: executed?.confidence?.toFixed(3),
+            source: "last_transition.branches[].confidence",
+          },
+          {
+            name: "Guardian",
+            reading: executed?.evaluation?.guardian,
+            source: "last_transition.branches[].evaluation.guardian",
+          },
+          { name: "Hypothesis Engine", source: "published engine mesh unavailable" },
+          { name: "Contradiction Engine", source: "published engine mesh unavailable" },
+          { name: "Emergence Engine", source: "published engine mesh unavailable" },
+          { name: "Identity Finder", source: "published engine mesh unavailable" },
+          { name: "Composition", source: "published engine mesh unavailable" },
+          { name: "Alchemy", source: "published engine mesh unavailable" },
+          { name: "AutoSync", source: "published engine mesh unavailable" },
+          { name: "ExecutionEngine", source: "published engine mesh unavailable" },
+        ];
 
   return (
     <>
@@ -147,7 +195,7 @@ function Chamber() {
       <FlowLegend
         steps={[
           "Destiny",
-          "Six engines",
+          "Engine network",
           "Destiny Crystal",
           "Tree / chromosome",
           "Emergence",
@@ -186,7 +234,7 @@ function Chamber() {
 
         <Stage
           index="02"
-          name="Six engine activity"
+          name="Engine network activity"
           read="Charge · amplify · process · distribute"
           glyph={
             <div className="mt-4">

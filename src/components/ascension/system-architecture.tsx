@@ -6,7 +6,7 @@ const coreEngines = [
   "Confidence Engine",
   "Guardian",
   "AutoSync",
-  "Knowledge Retrieval / Akashic",
+  "Knowledge Retrieval",
   "Hypothesis / Contradiction / Emergence",
   "Identity Finder",
   "Composition",

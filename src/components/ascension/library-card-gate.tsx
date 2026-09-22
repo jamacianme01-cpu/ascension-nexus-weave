@@ -91,15 +91,15 @@ export function LibraryCardGate() {
     let cancelled = false;
     void (async () => {
       const forceCard = new URL(window.location.href).searchParams.get("library") === "1";
-      const { data } = await supabase.auth.getUser();
-      if (cancelled) return;
-
-      if (!data.user) {
-        setMode(forceCard ? "card" : "choice");
-        return;
-      }
-
       try {
+        const { data } = await supabase.auth.getUser();
+        if (cancelled) return;
+
+        if (!data.user) {
+          setMode(forceCard ? "card" : "choice");
+          return;
+        }
+
         const result = await getMyLibraryCard();
         if (cancelled) return;
         if (result.card) {

@@ -199,9 +199,10 @@ export function SourceBadge({ className }: { className?: string | undefined }) {
   const mode = useActiveSourceMode();
   const live = mode === "live";
   const label = mode === "live" ? "live governed" : mode === "demo" ? "demo state" : "reading source";
+  const title = mode === "unknown" ? "ASCENSION source status" : source.label;
   return (
     <span
-      title={source.label}
+      title={title}
       className={cn(
         "inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 font-mono text-[0.6rem] tracking-[0.2em] uppercase",
         live ? "border-primary/50 bg-primary/10 text-primary" : "border-warn/60 bg-warn/15 text-warn",

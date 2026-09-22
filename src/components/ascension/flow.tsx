@@ -4,14 +4,14 @@ import { Pill, Unavailable } from "./chrome";
 
 /** Canonical engine names. Never renamed, never invented values. */
 export type EngineSignal = {
-  name: "Analyzer" | "Akashic" | "Projector" | "Outcome Predictor" | "Confidence Engine" | "Guardian";
+  name: string;
   /** Published reading, or undefined when the contracts do not expose runtime activity. */
   reading?: string | undefined;
   source: string;
 };
 
 /**
- * Six engines charging the Destiny Crystal. Positions are layout only; each
+ * Connected engine network feeding the Destiny Crystal. Positions are layout only; each
  * orb's reading comes from published state or is explicitly unavailable.
  */
 export function EngineRing({ engines }: { engines: EngineSignal[] }) {
@@ -19,7 +19,7 @@ export function EngineRing({ engines }: { engines: EngineSignal[] }) {
   const cy = 190;
   return (
     <div className="relative overflow-hidden rounded-lg border border-border/60 bg-void/50">
-      <svg viewBox="0 0 600 380" className="h-auto w-full" role="img" aria-label="Six engine field">
+      <svg viewBox="0 0 600 380" className="h-auto w-full" role="img" aria-label="ASCENSION engine network">
         <defs>
           <radialGradient id="crystalCore">
             <stop offset="0%" stopColor="oklch(0.98 0.05 196)" stopOpacity="0.95" />

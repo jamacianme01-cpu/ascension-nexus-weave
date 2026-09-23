@@ -22,8 +22,7 @@ import {
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
-const CLOSED_BOOK_SCENE = "/approved-scene/01-closed-book.jpg";
-const TREE_EMERGENCE_SCENE = "/approved-scene/03-tree-emergence.png";
+const BOOK_TREE_SCENE = "/approved-scene/ascension-tree-behind-book.jpg";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {
@@ -247,7 +246,7 @@ export function Engage() {
   const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
   const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [bookSequence, setBookSequence] = useState<"idle" | "rocking" | "emerging" | "tree">("idle");
+  const [bookSequence, setBookSequence] = useState<"idle" | "powering">("idle");
   const [bookOpen, setBookOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const sequenceTimers = useRef<number[]>([]);
@@ -316,6 +315,7 @@ export function Engage() {
 
   useEffect(() => {
     if (!run || !TERMINAL.has(run.status)) return;
+    setBookSequence("idle");
     setBookOpen(true);
     setRevealed(true);
     const timer = window.setTimeout(
@@ -383,21 +383,8 @@ export function Engage() {
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
 
-      sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
-      sequenceTimers.current = [];
-      const later = (delay: number, fn: () => void) => {
-        sequenceTimers.current.push(window.setTimeout(fn, delay));
-      };
-      setBookOpen(false);
+      setBookOpen(true);
       setRevealed(false);
-      setBookSequence("rocking");
-      later(1350, () => setBookSequence("emerging"));
-      later(4300, () => setBookSequence("tree"));
-      later(5600, () => {
-        setBookSequence("idle");
-        setBookOpen(true);
-        setRevealed(true);
-      });
     },
   });
 
@@ -425,6 +412,11 @@ export function Engage() {
   const canEngage = Boolean(objective.trim()) && !engage.isPending;
   const startBookSequence = () => {
     if (!canEngage || bookSequence !== "idle") return;
+    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    sequenceTimers.current = [];
+    setBookOpen(true);
+    setRevealed(false);
+    setBookSequence("powering");
     engage.mutate();
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
@@ -441,14 +433,8 @@ export function Engage() {
         <div className="ascension-stage">
           <div className="ascension-scene-hero" aria-hidden="true">
             <img
-              className="ascension-scene-closed"
-              src={CLOSED_BOOK_SCENE}
-              alt=""
-              draggable={false}
-            />
-            <img
-              className="ascension-tree-emergence"
-              src={TREE_EMERGENCE_SCENE}
+              className="ascension-tree-scene"
+              src={BOOK_TREE_SCENE}
               alt=""
               draggable={false}
             />
@@ -475,9 +461,6 @@ export function Engage() {
             ref={inputRef}
             value={objective}
             placeholder="Tell ASCENSION what you want to answer, solve, build, analyze, simulate, or execute…"
-            onFocus={() => {
-              if (bookOpen && bookSequence === "idle") setBookOpen(false);
-            }}
             onChange={(event) => setObjective(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey && canEngage) {

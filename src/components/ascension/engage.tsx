@@ -22,7 +22,7 @@ import {
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
-const BOOK_TREE_SCENE = "/approved-scene/ascension-tree-behind-book.jpg";
+const BOOK_TREE_SCENE = "/approved-scene/ascension-tree-behind-book.avif";
 type FollowUp = "continue" | "refine" | "simulate" | "execute";
 
 function save(key: string, value: string) {

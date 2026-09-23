@@ -200,9 +200,25 @@ body:has(.ascension-world > .ascension-command) main {
 
 /* Keep advanced controls and history out of the cinematic opening surface. */
 .ascension-stage > details,
-.ascension-stage > div.rounded-xl,
-.ascension-stage > p[role="alert"] {
+.ascension-stage > div.rounded-xl {
   display: none !important;
+}
+
+.ascension-stage > p[role="alert"] {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: clamp(12.3rem, 23vh, 14.8rem);
+  transform: translateX(-50%);
+  display: block !important;
+  width: min(48rem, 82vw);
+  margin: 0 !important;
+  border: 1px solid rgb(220 80 80 / 55%) !important;
+  border-radius: 1rem !important;
+  background: rgb(28 5 9 / 92%) !important;
+  padding: .8rem 1rem !important;
+  color: rgb(255 185 185) !important;
+  text-align: center;
 }
 
 /* Results and pathway surfaces are real application content and remain visible below the scene. */

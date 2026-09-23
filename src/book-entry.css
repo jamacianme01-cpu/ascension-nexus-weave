@@ -55,8 +55,7 @@ body:has(.ascension-world > .ascension-command) main {
   pointer-events: none;
 }
 
-.ascension-scene-closed,
-.ascension-tree-emergence {
+.ascension-tree-scene {
   position: absolute;
   inset: 0;
   display: block;
@@ -65,45 +64,26 @@ body:has(.ascension-world > .ascension-command) main {
   object-fit: contain;
   object-position: center;
   background: #01040a;
-}
-
-.ascension-scene-closed {
   opacity: 1;
-  transition: opacity .9s ease;
-}
-
-.ascension-tree-emergence {
-  opacity: 0;
-  clip-path: ellipse(0% 0% at 50% 54%);
-  transform: scale(.96);
-  transform-origin: 50% 54%;
-  filter: brightness(.72) saturate(.9);
-  transition:
-    clip-path 2.7s cubic-bezier(.18,.76,.16,1),
-    opacity .22s ease,
-    transform 2.7s cubic-bezier(.18,.76,.16,1),
-    filter 2.7s ease;
-}
-
-.ascension-world[data-book-sequence="emerging"] .ascension-tree-emergence {
-  opacity: 1;
-  clip-path: ellipse(78% 92% at 50% 54%);
+  filter: brightness(.82) saturate(.94);
   transform: scale(1);
-  filter: brightness(1) saturate(1);
+  transform-origin: center;
+  transition: filter .6s ease, transform .6s ease;
 }
 
-.ascension-world[data-book-sequence="tree"] .ascension-tree-emergence,
-.ascension-world[data-book-open="true"] .ascension-tree-emergence {
-  opacity: 1;
-  clip-path: ellipse(100% 100% at 50% 54%);
-  transform: scale(1);
-  filter: brightness(1) saturate(1);
+@keyframes ascension-tree-power {
+  0% {
+    filter: brightness(.88) saturate(.96) drop-shadow(0 0 .35rem rgb(64 174 255 / 16%));
+    transform: scale(1);
+  }
+  100% {
+    filter: brightness(1.08) saturate(1.08) drop-shadow(0 0 1.25rem rgb(93 196 255 / 30%));
+    transform: scale(1.008);
+  }
 }
 
-.ascension-world[data-book-sequence="emerging"] .ascension-scene-closed,
-.ascension-world[data-book-sequence="tree"] .ascension-scene-closed,
-.ascension-world[data-book-open="true"] .ascension-scene-closed {
-  opacity: 0;
+.ascension-world[data-book-sequence="powering"] .ascension-tree-scene {
+  animation: ascension-tree-power 1.15s ease-in-out infinite alternate;
 }
 
 /* The approved image already contains the question. */
@@ -228,19 +208,6 @@ body:has(.ascension-world > .ascension-command) main {
   margin-top: 2rem;
 }
 
-@keyframes approved-book-rock {
-  0% { transform: translateY(0) rotateZ(0) scale(1); }
-  20% { transform: translateY(-.35%) rotateZ(-.12deg) scale(1.004); }
-  42% { transform: translateY(.18%) rotateZ(.10deg) scale(1.002); }
-  64% { transform: translateY(-.25%) rotateZ(-.08deg) scale(1.004); }
-  82% { transform: translateY(.10%) rotateZ(.05deg) scale(1.002); }
-  100% { transform: translateY(0) rotateZ(0) scale(1); }
-}
-
-.ascension-world[data-book-sequence="rocking"] .ascension-scene-closed {
-  animation: approved-book-rock 1.35s cubic-bezier(.28,.62,.22,1) both !important;
-}
-
 @media (max-width: 820px) {
   .ascension-stage {
     min-height: 620px;
@@ -263,8 +230,7 @@ body:has(.ascension-world > .ascension-command) main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ascension-scene-closed,
-  .ascension-tree-emergence {
+  .ascension-tree-scene {
     animation: none !important;
     transition: none !important;
   }

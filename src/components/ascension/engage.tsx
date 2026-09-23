@@ -476,8 +476,10 @@ export function Engage() {
             }}
             onChange={(event) => setObjective(event.target.value)}
             onKeyDown={(event) => {
-              if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && canEngage)
+              if (event.key === "Enter" && !event.shiftKey && canEngage) {
+                event.preventDefault();
                 startBookSequence();
+              }
             }}
             rows={5}
             maxLength={4000}

@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getObjectiveStatus,
@@ -241,7 +240,6 @@ function Pathways({
 
 export function Engage() {
   const client = useQueryClient();
-  const navigate = useNavigate();
   const [objective, setObjective] = useState("");
   const [evidence, setEvidence] = useState("");
   const [constraints, setConstraints] = useState("");
@@ -329,13 +327,16 @@ export function Engage() {
 
   const engage = useMutation({
     mutationFn: async () => {
-      const { data } = await supabase.auth.getUser();
+      let { data } = await supabase.auth.getUser();
       if (!data.user) {
-        save(DRAFT, objective);
-        await navigate({ to: "/auth", search: { next: "/" } });
-        throw new Error(
-          "Sign in is required to send the objective to the governed runtime. Your words were kept.",
-        );
+        const anonymous = await supabase.auth.signInAnonymously();
+        if (anonymous.error || !anonymous.data.user) {
+          throw new Error(
+            anonymous.error?.message ??
+              "ASCENSION could not start a guest session for this objective.",
+          );
+        }
+        data = { user: anonymous.data.user };
       }
       return (
         await submitObjective({

@@ -381,6 +381,22 @@ export function Engage() {
       prepare.reset();
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
+
+      sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+      sequenceTimers.current = [];
+      const later = (delay: number, fn: () => void) => {
+        sequenceTimers.current.push(window.setTimeout(fn, delay));
+      };
+      setBookOpen(false);
+      setRevealed(false);
+      setBookSequence("rocking");
+      later(1350, () => setBookSequence("emerging"));
+      later(4300, () => setBookSequence("tree"));
+      later(5600, () => {
+        setBookSequence("idle");
+        setBookOpen(true);
+        setRevealed(true);
+      });
     },
   });
 
@@ -408,22 +424,7 @@ export function Engage() {
   const canEngage = Boolean(objective.trim()) && !engage.isPending;
   const startBookSequence = () => {
     if (!canEngage || bookSequence !== "idle") return;
-    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
-    sequenceTimers.current = [];
-    const later = (delay: number, fn: () => void) => {
-      sequenceTimers.current.push(window.setTimeout(fn, delay));
-    };
-    setBookOpen(false);
-    setRevealed(false);
-    setBookSequence("rocking");
     engage.mutate();
-    later(1350, () => setBookSequence("emerging"));
-    later(4300, () => setBookSequence("tree"));
-    later(5600, () => {
-      setBookSequence("idle");
-      setBookOpen(true);
-      setRevealed(true);
-    });
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
   const planning = useMemo(() => (run ? planningFor(run.result) : null), [run]);

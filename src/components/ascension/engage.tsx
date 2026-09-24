@@ -327,16 +327,12 @@ export function Engage() {
 
   const engage = useMutation({
     mutationFn: async () => {
-      let { data } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        const anonymous = await supabase.auth.signInAnonymously();
-        if (anonymous.error || !anonymous.data.user) {
-          throw new Error(
-            anonymous.error?.message ??
-              "ASCENSION could not start a guest session for this objective.",
-          );
-        }
-        data = { user: anonymous.data.user };
+        // Keep the typed objective, then send the visitor to sign in.
+        save(DRAFT, objective);
+        window.location.href = `/auth?next=${encodeURIComponent("/")}`;
+        throw new Error("Sign in to engage ASCENSION. Your objective has been kept.");
       }
       return (
         await submitObjective({
@@ -383,8 +379,13 @@ export function Engage() {
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
 
+      // Show YOUR ANSWER right away so QUEUED → RUNNING progress is visible.
       setBookOpen(true);
-      setRevealed(false);
+      setRevealed(true);
+      window.setTimeout(
+        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        180,
+      );
     },
   });
 

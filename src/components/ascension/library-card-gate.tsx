@@ -96,7 +96,11 @@ export function LibraryCardGate() {
         if (cancelled) return;
 
         if (!data.user) {
-          setMode(forceCard ? "card" : "choice");
+          if (forceCard) {
+            window.location.href = `/auth?next=${encodeURIComponent("/?library=1")}`;
+            return;
+          }
+          setMode("choice");
           return;
         }
 

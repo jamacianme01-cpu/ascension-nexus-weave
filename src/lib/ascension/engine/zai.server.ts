@@ -105,6 +105,8 @@ async function readStream(response: Response): Promise<string> {
 export async function callZai(input: {
   system: string;
   user: string;
+  /** Short search phrase (normally the objective). Never the full stage prompt. */
+  knowledgeQuery?: string;
   temperature?: number;
 }): Promise<ZaiCallResult> {
   const apiKey = process.env["ZAI_API_KEY"]?.trim();
@@ -116,7 +118,8 @@ export async function callZai(input: {
 
   let knowledgeText = "External knowledge retrieval unavailable for this call.";
   try {
-    const knowledge = await retrieveKnowledge(input.user, 6);
+    const query = (input.knowledgeQuery ?? input.user).replace(/\s+/g, " ").trim().slice(0, 300);
+    const knowledge = await retrieveKnowledge(query, 6);
     knowledgeText = formatKnowledgeEvidence(knowledge);
   } catch (cause) {
     knowledgeText = `External knowledge retrieval failed: ${cause instanceof Error ? cause.message : String(cause)}`;

@@ -154,7 +154,7 @@ export async function advanceRun(requestId: string): Promise<AdvanceResult> {
 
   let result;
   try {
-    result = await callZai({ system: SYSTEM, user: prompt });
+    result = await callZai({ system: SYSTEM, user: prompt, knowledgeQuery: typedRun.objective });
   } catch (cause) {
     const message =
       cause instanceof ZaiEngineError

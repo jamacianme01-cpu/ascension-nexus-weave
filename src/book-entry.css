@@ -68,22 +68,170 @@ body:has(.ascension-world > .ascension-command) main {
   filter: brightness(.82) saturate(.94);
   transform: scale(1);
   transform-origin: center;
+  z-index: 1;
   transition: filter .6s ease, transform .6s ease;
+}
+
+.ascension-scene-hero::before,
+.ascension-scene-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: 50% 50%;
+}
+
+.ascension-scene-hero::before {
+  background:
+    radial-gradient(ellipse at 50% 69%, rgb(97 206 255 / 36%) 0 4%, transparent 20%),
+    radial-gradient(ellipse at 50% 45%, rgb(76 184 255 / 26%) 0 7%, transparent 31%),
+    radial-gradient(ellipse at 50% 25%, rgb(232 196 111 / 28%) 0 9%, transparent 34%);
+  mix-blend-mode: screen;
+}
+
+.ascension-scene-hero::after {
+  z-index: 3;
+  background:
+    radial-gradient(circle at 50% 34%, rgb(255 232 174 / 72%) 0 1.4%, transparent 3.2%),
+    repeating-conic-gradient(
+      from 0deg at 50% 34%,
+      transparent 0deg 8deg,
+      rgb(111 212 255 / 42%) 9deg 10deg,
+      transparent 11deg 18deg
+    );
+  mix-blend-mode: screen;
+}
+
+@keyframes ascension-roots-charge {
+  0% {
+    filter: brightness(.82) saturate(.94);
+    transform: scale(1);
+  }
+  100% {
+    filter: brightness(.94) saturate(1.02) drop-shadow(0 1.1rem 1.5rem rgb(73 189 255 / 28%));
+    transform: scale(1.002);
+  }
+}
+
+@keyframes ascension-trunk-charge {
+  0% {
+    filter: brightness(.92) saturate(1.01) drop-shadow(0 .8rem 1rem rgb(73 189 255 / 20%));
+  }
+  100% {
+    filter: brightness(1.01) saturate(1.06) drop-shadow(0 0 1.15rem rgb(88 199 255 / 30%));
+  }
+}
+
+@keyframes ascension-node-pulse {
+  0%,
+  100% {
+    filter: brightness(1.01) saturate(1.05) drop-shadow(0 0 .8rem rgb(96 205 255 / 24%));
+    transform: scale(1.002);
+  }
+  50% {
+    filter: brightness(1.1) saturate(1.12) drop-shadow(0 0 1.45rem rgb(115 218 255 / 38%));
+    transform: scale(1.006);
+  }
+}
+
+@keyframes ascension-canopy-charge {
+  0% {
+    opacity: .18;
+    transform: scale(.92);
+  }
+  100% {
+    opacity: .72;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes ascension-knowledge-eruption {
+  0% {
+    opacity: 0;
+    transform: scale(.62) rotate(-4deg);
+    filter: blur(.2rem);
+  }
+  38% {
+    opacity: .92;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.48) rotate(5deg);
+    filter: blur(0);
+  }
 }
 
 @keyframes ascension-tree-power {
   0% {
-    filter: brightness(.88) saturate(.96) drop-shadow(0 0 .35rem rgb(64 174 255 / 16%));
+    filter: brightness(1) saturate(1.04) drop-shadow(0 0 .55rem rgb(64 174 255 / 18%));
     transform: scale(1);
   }
   100% {
-    filter: brightness(1.08) saturate(1.08) drop-shadow(0 0 1.25rem rgb(93 196 255 / 30%));
-    transform: scale(1.008);
+    filter: brightness(1.08) saturate(1.1) drop-shadow(0 0 1.25rem rgb(93 196 255 / 30%));
+    transform: scale(1.006);
   }
 }
 
-.ascension-world[data-book-sequence="powering"] .ascension-tree-scene {
+.ascension-world[data-book-sequence="roots"] .ascension-tree-scene {
+  animation: ascension-roots-charge .9s ease-out both;
+}
+
+.ascension-world[data-book-sequence="roots"] .ascension-scene-hero::before {
+  opacity: .28;
+  clip-path: inset(58% 16% 5% 16%);
+  animation: ascension-canopy-charge .9s ease-out both;
+}
+
+.ascension-world[data-book-sequence="trunk"] .ascension-tree-scene {
+  animation: ascension-trunk-charge .9s ease-out both;
+}
+
+.ascension-world[data-book-sequence="trunk"] .ascension-scene-hero::before {
+  opacity: .36;
+  clip-path: inset(26% 36% 29% 36%);
+  animation: ascension-canopy-charge .9s ease-out both;
+}
+
+.ascension-world[data-book-sequence="nodes"] .ascension-tree-scene {
+  animation: ascension-node-pulse .65s ease-in-out 2;
+}
+
+.ascension-world[data-book-sequence="nodes"] .ascension-scene-hero::before {
+  opacity: .5;
+  animation: ascension-node-pulse .65s ease-in-out 2;
+}
+
+.ascension-world[data-book-sequence="canopy"] .ascension-tree-scene {
+  filter: brightness(1.08) saturate(1.1) drop-shadow(0 0 1.2rem rgb(100 207 255 / 34%));
+}
+
+.ascension-world[data-book-sequence="canopy"] .ascension-scene-hero::before {
+  clip-path: inset(4% 15% 42% 15%);
+  animation: ascension-canopy-charge 1.1s ease-out both;
+}
+
+.ascension-world[data-book-sequence="eruption"] .ascension-tree-scene {
+  filter: brightness(1.15) saturate(1.14) drop-shadow(0 0 1.8rem rgb(117 218 255 / 42%));
+  transform: scale(1.01);
+}
+
+.ascension-world[data-book-sequence="eruption"] .ascension-scene-hero::before {
+  opacity: .72;
+  animation: ascension-canopy-charge .8s ease-out both;
+}
+
+.ascension-world[data-book-sequence="eruption"] .ascension-scene-hero::after {
+  animation: ascension-knowledge-eruption 1.35s cubic-bezier(.15,.7,.2,1) both;
+}
+
+.ascension-world[data-book-sequence="processing"] .ascension-tree-scene {
   animation: ascension-tree-power 1.15s ease-in-out infinite alternate;
+}
+
+.ascension-world[data-book-sequence="processing"] .ascension-scene-hero::before {
+  opacity: .24;
 }
 
 /* The approved image already contains the question. */
@@ -230,7 +378,9 @@ body:has(.ascension-world > .ascension-command) main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ascension-tree-scene {
+  .ascension-tree-scene,
+  .ascension-scene-hero::before,
+  .ascension-scene-hero::after {
     animation: none !important;
     transition: none !important;
   }

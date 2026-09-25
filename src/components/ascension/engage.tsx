@@ -153,7 +153,7 @@ export function Engage() {
   const [active, setActive] = useState<string | null>(null);
   const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [bookSequence, setBookSequence] = useState<"idle" | "powering">("idle");
+  const [bookSequence, setBookSequence] = useState<"idle" | "roots" | "trunk" | "nodes" | "canopy" | "eruption" | "processing">("idle");
   const [bookOpen, setBookOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const sequenceTimers = useRef<number[]>([]);
@@ -222,6 +222,8 @@ export function Engage() {
 
   useEffect(() => {
     if (!run || !TERMINAL.has(run.status)) return;
+    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    sequenceTimers.current = [];
     setBookSequence("idle");
     setBookOpen(true);
     setRevealed(true);
@@ -284,13 +286,9 @@ export function Engage() {
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
 
-      // Show YOUR ANSWER right away so QUEUED → RUNNING progress is visible.
+      // Keep the cinematic power-up on screen first. The queued/running panel
+      // is revealed after the knowledge eruption, unless the run finishes sooner.
       setBookOpen(true);
-      setRevealed(true);
-      window.setTimeout(
-        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-        180,
-      );
     },
   });
 
@@ -334,7 +332,34 @@ export function Engage() {
     sequenceTimers.current = [];
     setBookOpen(true);
     setRevealed(false);
-    setBookSequence("powering");
+    setBookSequence("roots");
+
+    const phase = (
+      delay: number,
+      next: "trunk" | "nodes" | "canopy" | "eruption" | "processing",
+      reveal = false,
+    ) => {
+      const timer = window.setTimeout(() => {
+        setBookSequence(next);
+        if (reveal) {
+          setRevealed(true);
+          window.setTimeout(
+            () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+            180,
+          );
+        }
+      }, delay);
+      sequenceTimers.current.push(timer);
+    };
+
+    // The Tree is already present. ENGAGE powers it from foundations upward,
+    // then releases the accumulated knowledge before normal processing continues.
+    phase(900, "trunk");
+    phase(1800, "nodes");
+    phase(2800, "canopy");
+    phase(3900, "eruption");
+    phase(5300, "processing", true);
+
     engage.mutate();
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;

@@ -112,16 +112,21 @@ function governedDelivery(
     return basename && basename !== "governed_objective.json" && !transportedNames.has(basename);
   });
 
+  const answerLimitations = requestedOutput["truth_status"] === "UNVERIFIED_MODEL_DRAFT"
+    ? ["A local model drafted this answer. Its factual claims have not been independently checked."]
+    : [];
+
   return parseDelivery({
-    kind: assessment.files.length ? "artifact" : "answer",
+    kind: assessment.kind === "answer" ? "answer" : "artifact",
     title: titleSource.slice(0, 200) || "ASCENSION result",
     body: body.slice(0, 40000),
-    files: assessment.files,
-    limitations: missingReceipts.length
-      ? [
-          `${missingReceipts.length} recorded file${missingReceipts.length === 1 ? " has" : "s have"} a receipt but ${missingReceipts.length === 1 ? "its" : "their"} contents have not reached the website yet.`,
-        ]
-      : [],
+    files: assessment.kind === "answer" ? [] : assessment.files,
+    limitations: [
+      ...answerLimitations,
+      ...(missingReceipts.length
+        ? [`${missingReceipts.length} recorded file${missingReceipts.length === 1 ? " has" : "s have"} a receipt but ${missingReceipts.length === 1 ? "its" : "their"} contents have not reached the website yet.`]
+        : []),
+    ],
   });
 }
 

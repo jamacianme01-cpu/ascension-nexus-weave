@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getObjectiveStatus,
@@ -9,10 +9,10 @@ import {
 } from "@/lib/ascension/objectives.functions";
 import { getObjectiveDelivery, prepareObjectiveDelivery } from "@/lib/ascension/delivery.functions";
 import {
-  branchTitle,
+  assessResult,
   governedPersisted,
+  notProducedMessage,
   parseDelivery,
-  planningFor,
   receiptFiles,
   record,
   strings,
@@ -23,7 +23,7 @@ const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
 const BOOK_TREE_SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
-type FollowUp = "continue" | "refine" | "simulate" | "execute";
+type FollowUp = "continue" | "refine";
 
 function save(key: string, value: string) {
   try {
@@ -50,40 +50,18 @@ function download(name: string, content: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function statusText(run: ObjectiveRun) {
-  if (run.status === "queued") return "Objective received. Waiting for ASCENSION runtime.";
-  if (run.status === "claimed") return "Claimed — ASCENSION has the objective.";
-  if (run.status === "running")
-    return "Running — ASCENSION is decomposing, simulating, governing and executing.";
+function statusText(run: ObjectiveRun, produced: boolean | null) {
+  if (run.status === "queued") return "Waiting for your ASCENSION runtime to pick this up.";
+  if (run.status === "claimed" || run.status === "running") return "Your ASCENSION runtime is working on this.";
+  if (run.status === "rejected") return "Governance rejected this objective.";
+  if (run.status === "failed") return "The run failed.";
   if (run.status === "verified")
-    return "Verified — the governed runtime has finished and published its result.";
-  if (run.status === "rejected") return "Rejected by governance.";
-  if (run.status === "failed") return "The governed run failed.";
+    return produced
+      ? "Finished. The result is below."
+      : produced === false
+        ? "The run finished, but the requested result has not been produced."
+        : "The run finished. Checking what it returned…";
   return run.status;
-}
-
-function Progress({ run }: { run: ObjectiveRun }) {
-  const order = ["QUEUED", "CLAIMED", "RUNNING", "VERIFIED"];
-  const current = Math.max(0, order.indexOf(run.status.toUpperCase()));
-  return (
-    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-      <div className="flex flex-wrap gap-2">
-        {order.map((stage, index) => (
-          <span
-            key={stage}
-            className={`rounded-full border px-3 py-1 text-[0.68rem] tracking-[0.14em] ${
-              index <= current
-                ? "border-primary/50 bg-primary/10 text-primary"
-                : "border-border text-muted-foreground"
-            }`}
-          >
-            {stage}
-          </span>
-        ))}
-      </div>
-      <p className="mt-3 text-sm text-muted-foreground">{statusText(run)}</p>
-    </div>
-  );
 }
 
 export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
@@ -101,7 +79,9 @@ export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
           className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4"
         >
           <div>
-            <p className="text-xs tracking-[0.14em] text-gold uppercase">Created artifact</p>
+            <p className="text-xs tracking-[0.14em] text-gold uppercase">
+              File · not independently verified
+            </p>
             <p className="mt-1 break-all text-sm text-foreground">{file.name}</p>
           </div>
           <button
@@ -127,13 +107,13 @@ export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
   );
 }
 
-function RuntimeDetails({ run }: { run: ObjectiveRun }) {
+function InspectDetails({ run }: { run: ObjectiveRun }) {
   const result = record(run.result);
   const files = receiptFiles(run.result);
   return (
     <details className="rounded-xl border border-border/70 px-4 py-3">
       <summary className="cursor-pointer text-sm text-muted-foreground">
-        Proof / verification
+        Inspect
       </summary>
       <div className="mt-4 space-y-3 text-sm leading-relaxed">
         <p>Guardian: {run.guardian_verdict ?? "not published"}</p>
@@ -147,93 +127,12 @@ function RuntimeDetails({ run }: { run: ObjectiveRun }) {
         )}
         {files.map((file, i) => (
           <p key={i} className="break-all text-muted-foreground">
-            Artifact: {file.name}
+            File receipt (stored bytes only): {file.name}
             {file.bytes !== null ? ` (${file.bytes} bytes)` : ""}
           </p>
         ))}
       </div>
     </details>
-  );
-}
-
-function Pathways({
-  run,
-  selectedId,
-  onSelect,
-  onAction,
-}: {
-  run: ObjectiveRun;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onAction: (kind: FollowUp) => void;
-}) {
-  const planning = planningFor(run.result);
-  if (!planning.branches.length) return null;
-  const recommended = String(planning.selected["branch_id"] ?? "");
-  const activeId = selectedId || recommended;
-
-  return (
-    <section
-      className="space-y-4 rounded-2xl border border-primary/20 bg-void/50 p-5 sm:p-6"
-      aria-label="Pathways"
-    >
-      <div>
-        <p className="label-eyebrow text-primary">POSSIBLE FUTURES</p>
-        <h2 className="mt-2 font-display text-xl text-foreground">Choose the pathway you want</h2>
-      </div>
-      <div className="grid gap-3 lg:grid-cols-3">
-        {planning.branches.map((branch, index) => {
-          const id = String(branch["branch_id"] ?? index);
-          const active = id === activeId;
-          const isRecommended = id === recommended;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onSelect(id)}
-              className={`rounded-xl border p-4 text-left ${
-                active ? "border-gold/55 bg-gold/10" : "border-primary/20 bg-primary/5"
-              }`}
-            >
-              <p className={active ? "text-gold" : "text-primary"}>{branchTitle(branch)}</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {isRecommended ? "ASCENSION RECOMMENDED" : "ALTERNATIVE FUTURE"}
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-foreground/80">
-                {strings(branch["actions"]).join(" · ") ||
-                  "Pathway actions are recorded in the governed result."}
-              </p>
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onAction("simulate")}
-          disabled={!activeId}
-          className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary disabled:opacity-40"
-        >
-          SIMULATE
-        </button>
-        <button
-          type="button"
-          onClick={() => onAction("refine")}
-          disabled={!activeId}
-          className="min-h-11 rounded-full border border-gold/30 px-5 text-sm text-gold disabled:opacity-40"
-        >
-          REFINE
-        </button>
-        <button
-          type="button"
-          onClick={() => onAction("execute")}
-          disabled={!activeId}
-          className="min-h-11 rounded-full border border-gold/50 bg-gold/10 px-5 text-sm text-gold disabled:opacity-40"
-        >
-          EXECUTE
-        </button>
-      </div>
-    </section>
   );
 }
 
@@ -244,7 +143,6 @@ export function Engage() {
   const [constraints, setConstraints] = useState("");
   const [active, setActive] = useState<string | null>(null);
   const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
-  const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [bookSequence, setBookSequence] = useState<"idle" | "powering">("idle");
   const [bookOpen, setBookOpen] = useState(false);
@@ -350,7 +248,6 @@ export function Engage() {
               ? {
                   parentRequestId: follow.id,
                   followUp: follow.kind,
-                  ...(selectedPathwayId ? { selectedPathwayId } : {}),
                 }
               : {}),
           },
@@ -374,7 +271,6 @@ export function Engage() {
       setEvidence("");
       setConstraints("");
       setFollow(null);
-      setSelectedPathwayId(null);
       prepare.reset();
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
@@ -391,13 +287,25 @@ export function Engage() {
 
   let delivery: ObjectiveDelivery | null = null;
   let invalidDelivery: string | null = null;
-  if (deliveryQuery.data?.status === "completed") {
+  let notProduced: string | null = null;
+  if (deliveryQuery.data?.status === "completed" && run) {
     try {
-      delivery = parseDelivery(deliveryQuery.data.response_payload);
+      const parsed = parseDelivery(deliveryQuery.data.response_payload);
+      // Re-check on screen too: a stale projection must never pass as a result.
+      const check = assessResult(run.objective, parsed.body, parsed.files);
+      if (parsed.kind === "not_produced" || !check.produced) {
+        notProduced =
+          parsed.kind === "not_produced"
+            ? parsed.body
+            : `${notProducedMessage(check.kind)} What came back${check.reason ? ` — ${check.reason}` : ""} — is not the result you asked for.`;
+      } else {
+        delivery = { ...parsed, files: check.files };
+      }
     } catch (cause) {
       invalidDelivery = cause instanceof Error ? cause.message : String(cause);
     }
   }
+  const produced = delivery ? true : notProduced ? false : null;
 
   const followUp = (kind: FollowUp) => {
     if (!run) return;
@@ -421,7 +329,6 @@ export function Engage() {
     engage.mutate();
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
-  const planning = useMemo(() => (run ? planningFor(run.result) : null), [run]);
 
   return (
     <div
@@ -445,12 +352,12 @@ export function Engage() {
             htmlFor="objective"
             className="block text-center font-display text-lg tracking-wide text-foreground/95"
           >
-            What do you want ASCENSION to answer, solve, build, analyze, simulate, or execute?
+            What do you want to accomplish?
           </label>
 
           {follow && (
             <div className="rounded-xl border border-gold/25 bg-gold/5 p-3 text-sm text-gold">
-              Continuing the previous governed result · {follow.kind.toUpperCase()}
+              {follow.kind === "refine" ? "Refining" : "Continuing"} the previous result
               <button type="button" onClick={() => setFollow(null)} className="ml-3 underline">
                 Start separately
               </button>
@@ -461,7 +368,7 @@ export function Engage() {
             id="objective"
             ref={inputRef}
             value={objective}
-            placeholder="Tell ASCENSION what you want to answer, solve, build, analyze, simulate, or execute…"
+            placeholder="Tell ASCENSION what you want to accomplish…"
             onChange={(event) => setObjective(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey && canEngage) {
@@ -577,29 +484,30 @@ export function Engage() {
       {run && revealed && (
         <section
           ref={answerRef}
-          aria-label="Answer"
+          aria-label="Your answer"
           className="mx-auto max-w-4xl scroll-mt-24 space-y-5 rounded-2xl border border-primary/30 bg-void/80 p-5 shadow-2xl sm:p-7"
         >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="label-eyebrow text-primary">ASCENSION RESPONSE</p>
-              <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
-            </div>
-            <a
-              href="/architecture"
-              className="rounded-full border border-gold/30 px-4 py-2 text-xs text-gold"
-            >
-              VIEW ARCHITECTURE
-            </a>
+          <div>
+            <p className="label-eyebrow text-primary">YOUR ANSWER</p>
+            <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
+            <p role="status" className="mt-3 text-sm text-foreground/90">
+              {statusText(run, produced)}
+            </p>
           </div>
-
-          <Progress run={run} />
 
           {delivery ? (
             <ResultContent delivery={delivery} />
+          ) : notProduced ? (
+            <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">
+              <p className="whitespace-pre-wrap text-foreground">{notProduced}</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                A finished or verified run is not the same as your result. Nothing here is
+                offered for download.
+              </p>
+            </div>
           ) : deliveryError ? (
             <div role="alert" className="rounded-xl border border-gold/30 p-4">
-              <p className="text-foreground">ASCENSION did not produce a readable answer.</p>
+              <p className="text-foreground">No readable result could be shown.</p>
               <p className="mt-2 text-sm text-muted-foreground">{deliveryError}</p>
               <button
                 type="button"
@@ -607,76 +515,31 @@ export function Engage() {
                 onClick={() => prepare.mutate({ id: run.id, retry: true })}
                 className="mt-4 min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary"
               >
-                RETRY ANSWER
+                TRY AGAIN
               </button>
             </div>
-          ) : (
-            <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-5">
-              <p className="font-display text-lg text-foreground">
-                {run.status === "verified"
-                  ? "Preparing the ASCENSION response…"
-                  : "ASCENSION is processing your objective."}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                The response will appear here in the same flow. You do not have to open another
-                screen.
-              </p>
-            </div>
-          )}
+          ) : null}
 
-          {delivery && (
+          {TERMINAL.has(run.status) && (
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => followUp("continue")}
                 className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary"
               >
-                CONTINUE THIS RESULT
+                CONTINUE
               </button>
-              <a
-                href="/knowledgeverse"
-                className="inline-flex min-h-11 items-center rounded-full border border-gold/35 px-5 text-sm text-gold"
+              <button
+                type="button"
+                onClick={() => followUp("refine")}
+                className="min-h-11 rounded-full border border-gold/40 px-5 text-sm text-gold"
               >
-                OPEN KNOWLEDGEVERSE
-              </a>
+                REFINE
+              </button>
             </div>
           )}
 
-          <RuntimeDetails run={run} />
-        </section>
-      )}
-
-      {run && revealed && planning?.branches.length ? (
-        <div className="mx-auto max-w-4xl">
-          <Pathways
-            run={run}
-            selectedId={selectedPathwayId}
-            onSelect={setSelectedPathwayId}
-            onAction={followUp}
-          />
-        </div>
-      ) : null}
-
-      {run && revealed && (
-        <section className="mx-auto max-w-4xl rounded-2xl border border-primary/20 bg-void/65 p-4 sm:p-5">
-          <p className="label-eyebrow text-primary">HOW TO USE ASCENSION</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            {[
-              ["1", "TYPE", "Ask a question or state exactly what you want accomplished."],
-              [
-                "2",
-                "ENGAGE",
-                "Press ENGAGE ASCENSION once. The governed runtime takes it from there.",
-              ],
-              ["3", "ANSWER", "Your answer or created solution appears directly below the Book."],
-            ].map(([n, title, copy]) => (
-              <div key={n} className="rounded-xl border border-primary/15 bg-background/20 p-4">
-                <p className="text-xs text-gold">STEP {n}</p>
-                <p className="mt-1 font-display text-sm tracking-wide text-foreground">{title}</p>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{copy}</p>
-              </div>
-            ))}
-          </div>
+          <InspectDetails run={run} />
         </section>
       )}
     </div>

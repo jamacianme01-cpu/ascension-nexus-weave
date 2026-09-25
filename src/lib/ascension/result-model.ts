@@ -79,7 +79,7 @@ export function receiptFiles(
 }
 
 export interface ObjectiveDelivery {
-  kind: "answer" | "recommendation" | "artifact";
+  kind: "answer" | "recommendation" | "artifact" | "not_produced";
   title: string;
   body: string;
   files: { name: string; content: string }[];
@@ -90,7 +90,7 @@ export interface ObjectiveDelivery {
 export function parseDelivery(value: unknown): ObjectiveDelivery {
   const v = record(value);
   if (
-    !["answer", "recommendation", "artifact"].includes(String(v["kind"])) ||
+    !["answer", "recommendation", "artifact", "not_produced"].includes(String(v["kind"])) ||
     typeof v["title"] !== "string" ||
     !v["title"].trim() ||
     v["title"].length > 200 ||
@@ -138,6 +138,8 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     names.add(f["name"].toLowerCase());
     return { name: f["name"], content: f["content"] };
   });
+  if (v["kind"] === "not_produced" && files.length)
+    throw new Error("An unproduced result cannot carry downloadable files.");
   if (v["kind"] === "artifact" && !files.length)
     throw new Error("The created result did not include a file.");
   return {

@@ -42,7 +42,11 @@ export const getObjectiveDelivery = createServerFn({ method: "GET" })
       .eq("ordinal", DELIVERY_ORDINAL)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (row?.status === "completed" && hasDownloadableFiles(row.response_payload)) {
+    if (
+      row?.status === "completed" &&
+      row.engine_label === "GOVERNED_RUNTIME_RESULT_V2" &&
+      hasDownloadableFiles(row.response_payload)
+    ) {
       return row as unknown as DeliveryState;
     }
 

@@ -1,10 +1,11 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
-import { parseDelivery } from "../result-model";
+import { assessResult, notProducedMessage, parseDelivery } from "../result-model";
 
 const ORDINAL = 100;
 const ARTIFACT_ORDINAL = 101;
-const LABEL = "GOVERNED_RUNTIME_RESULT";
+// V2: projections are assessed so plans/Knowledge Forms/receipts are never a user result.
+const LABEL = "GOVERNED_RUNTIME_RESULT_V2";
 const MODEL = "governed-runtime";
 
 function record(value: unknown): Record<string, unknown> {
@@ -85,54 +86,55 @@ function governedDelivery(
       })
     : [];
 
-  const primaryArtifact =
-    transportedFiles.find((file) => /\.(md|txt)$/i.test(file.name)) ??
-    transportedFiles.find((file) => !/\.json$/i.test(file.name)) ??
-    null;
-
-  const body: string[] = [];
-  if (primaryArtifact?.content.trim()) {
-    body.push(primaryArtifact.content.trim());
-  } else {
-    body.push(run.objective);
-    if (Object.keys(selected).length) body.push(`Selected future: ${branchTitle(selected)}`);
-    if (actions.length) body.push(`Actions:\n${actions.map((action) => `- ${action}`).join("\n")}`);
-  }
-
-  if (receipts.length) {
-    body.push(
-      `Verification receipts: ${receipts.length} artifact${receipts.length === 1 ? "" : "s"} persisted and read back by the governed runtime.`,
-    );
-  }
-
-  const state: string[] = [];
-  if (typeof result["governed_status"] === "string") state.push(result["governed_status"]);
-  if (typeof result["transaction"] === "string") state.push(`transaction ${result["transaction"]}`);
-  if (typeof result["autosync_verdict"] === "string")
-    state.push(`AutoSync ${result["autosync_verdict"]}`);
-  if (typeof result["runtime_revision"] === "number")
-    state.push(`revision ${result["runtime_revision"]}`);
-  if (state.length) body.push(`Governed runtime: ${state.join(" · ")}`);
-
   const titleSource =
     typeof result["objective_text"] === "string" && result["objective_text"].trim()
       ? result["objective_text"].trim()
       : run.objective.trim();
 
-  const transportedNames = new Set(transportedFiles.map((file) => file.name.toLowerCase()));
+  const primary =
+    transportedFiles.find((file) => /\.(md|txt)$/i.test(file.name)) ??
+    transportedFiles.find((file) => !/\.json$/i.test(file.name)) ??
+    null;
+  const assessment = assessResult(run.objective, primary?.content ?? "", transportedFiles);
+
+  if (!assessment.produced) {
+    const lines = [
+      notProducedMessage(assessment.kind),
+      `The ASCENSION runtime finished this run, but what it returned is not the result you asked for${assessment.reason ? ` (${assessment.reason})` : ""}.`,
+    ];
+    return parseDelivery({
+      kind: "not_produced",
+      title: titleSource.slice(0, 200) || "ASCENSION result",
+      body: lines.join("\n\n"),
+      files: [],
+      limitations: receipts.length
+        ? [
+            `The runtime's file receipt${receipts.length === 1 ? "" : "s"} confirm${receipts.length === 1 ? "s" : ""} stored bytes only. ${receipts.length === 1 ? "It does" : "They do"} not show the objective was accomplished.`,
+          ]
+        : [],
+    });
+  }
+
+  const primaryOk = primary && assessment.files.some((f) => f.name === primary.name);
+  const body =
+    primaryOk && !/\.svg$/i.test(primary.name)
+      ? primary.content.trim()
+      : `The requested ${assessment.kind === "drawing" ? "drawing" : assessment.kind === "app" ? "app files" : "result"} ${assessment.files.length === 1 ? "is" : "are"} ready to download below.`;
+
+  const transportedNames = new Set(assessment.files.map((file) => file.name.toLowerCase()));
   const missingReceipts = receipts.filter((receipt) => {
     const basename = receipt.path.split(/[\\/]/).at(-1)?.toLowerCase() ?? "";
     return basename && !transportedNames.has(basename);
   });
 
   return parseDelivery({
-    kind: transportedFiles.length ? "artifact" : "recommendation",
+    kind: assessment.files.length ? "artifact" : "answer",
     title: titleSource.slice(0, 200) || "ASCENSION result",
-    body: body.join("\n\n").slice(0, 40000),
-    files: transportedFiles,
+    body: body.slice(0, 40000),
+    files: assessment.files,
     limitations: missingReceipts.length
       ? [
-          `${missingReceipts.length} recorded artifact${missingReceipts.length === 1 ? " has" : "s have"} a verified receipt but its file body has not been transported to the website yet.`,
+          `${missingReceipts.length} recorded file${missingReceipts.length === 1 ? " has" : "s have"} a receipt but ${missingReceipts.length === 1 ? "its" : "their"} contents have not reached the website yet.`,
         ]
       : [],
   });

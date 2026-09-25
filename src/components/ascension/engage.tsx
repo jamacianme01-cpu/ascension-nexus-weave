@@ -42,7 +42,8 @@ function read(key: string) {
 }
 
 function download(name: string, content: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
+  const mime = /\.svg$/i.test(name) ? "image/svg+xml" : /\.html?$/i.test(name) ? "text/html" : "text/plain";
+  const url = URL.createObjectURL(new Blob([content], { type: `${mime};charset=utf-8` }));
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
@@ -65,6 +66,7 @@ function statusText(run: ObjectiveRun, produced: boolean | null) {
 }
 
 export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
+  const drawing = delivery.files.find((file) => /\.svg$/i.test(file.name));
   return (
     <div className="space-y-5">
       <h2 className="font-display text-2xl tracking-wide text-foreground">{delivery.title}</h2>
@@ -73,6 +75,13 @@ export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
           {delivery.body}
         </p>
       </div>
+      {drawing && (
+        <img
+          src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(drawing.content)}`}
+          alt={`Drawing for ${delivery.title}`}
+          className="w-full rounded-xl border border-primary/25 bg-background/40"
+        />
+      )}
       {delivery.files.map((file) => (
         <div
           key={file.name}
@@ -80,7 +89,7 @@ export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
         >
           <div>
             <p className="text-xs tracking-[0.14em] text-gold uppercase">
-              File · not independently verified
+              File · delivered by runtime
             </p>
             <p className="mt-1 break-all text-sm text-foreground">{file.name}</p>
           </div>

@@ -199,7 +199,8 @@ export interface ResultAssessment {
   files: { name: string; content: string }[];
 }
 
-const CODE_FILE = /\.(html?|js|jsx|ts|tsx|py|css|json|java|kt|swift|go|rs|rb|php|c|cpp|cs|sh|vue|svelte)$/i;
+const CODE_FILE = /\.(html?|js|jsx|ts|tsx|py|java|kt|swift|go|rs|rb|php|c|cpp|cs|sh|vue|svelte)$/i;
+const INTERNAL_FILE = /^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|knowledgeform_.*\.md)$/i;
 
 /**
  * Decide whether delivered text/files are the thing the user asked for.
@@ -212,6 +213,7 @@ export function assessResult(
 ): ResultAssessment {
   const kind = requestedKind(objective);
   const realFiles = files.filter((f) => {
+    if (INTERNAL_FILE.test(f.name)) return false;
     if (/\.svg$/i.test(f.name)) return /<svg[\s>]/i.test(f.content) && /<(path|line|rect|circle|polyline|polygon|ellipse|g)\b/i.test(f.content);
     return scaffoldReason(f.content, objective) === null;
   });

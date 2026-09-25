@@ -93,6 +93,25 @@ try {
     const a = model.assessResult("make a quick money making app", "", [{ name: "index.html", content: html }]);
     assert.equal(a.produced, true); assert.equal(a.files[0].name, "index.html");
   });
+  check("old Knowledge Form and governed metadata do not count as an app", () => {
+    const metadata = JSON.stringify({ objective: "make a quick money making app", receipts: ["persisted", "read back"], meaning_elements: ["make", "quick", "money", "app"], runtime_revision: 44, details: "No usable source was created by this run." });
+    const a = model.assessResult("make a quick money making app", kf, [
+      { name: "knowledgeform_make-a-quick-money-making-app.md", content: kf },
+      { name: "governed_objective.json", content: metadata },
+      { name: "README.md", content: "Recorded the governed runtime transaction and read back the stored file bytes." },
+    ]);
+    assert.equal(a.produced, false);
+    assert.deepEqual(a.files, []);
+  });
+  check("README plus actual app returns only the app download", () => {
+    const html = "<!doctype html><html><body><h1>Service Revenue</h1><form id='lead-form'></form><script>document.querySelector('form').onsubmit = e => e.preventDefault()</script></body></html>";
+    const a = model.assessResult("make a quick money making app", "", [
+      { name: "README.md", content: "Open the service revenue app in your browser." },
+      { name: "service-revenue-app.html", content: html },
+    ]);
+    assert.equal(a.produced, true);
+    assert.deepEqual(a.files.map(f => f.name), ["service-revenue-app.html"]);
+  });
   check("a real written answer is displayed", () => {
     assert.equal(model.assessResult("what is the capital of France", "The capital of France is Paris. It has been the seat of government for most of the country's history and sits on the Seine.", []).produced, true);
   });

@@ -148,3 +148,96 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     limitations: v["limitations"] as string[],
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Result honesty: what counts as an actual user result.               */
+/* ------------------------------------------------------------------ */
+
+export type RequestedKind = "drawing" | "app" | "answer";
+
+export function requestedKind(objective: string): RequestedKind {
+  const o = objective.toLowerCase();
+  if (/\b(draw|drawing|sketch|diagram|illustrat\w*|render|picture|image|blueprint|schematic)\b/.test(o))
+    return "drawing";
+  if (/\b(app|application|website|web ?site|program|script|code|software|game|tool|bot)\b/.test(o))
+    return "app";
+  return "answer";
+}
+
+const SCAFFOLD_LINE =
+  /^(#+\s*)?(knowledge form|selected future|actions?:|verification receipts?|governed runtime|recorded artifact|transaction|autosync|revision|meaning elements?|tokens?|chromosome|genesis|lineage|phenotype|sid|id|branch|approach|pathway)\b/i;
+const APPROACH_TOKEN = /\b(single_?pass_?construct|staged_?construct|minimal_?seeded_?construct|singlepassconstruct|stagedconstruct|minimalseededconstruct)\b/i;
+
+function normalize(text: string) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Why a piece of text is not a real result, or null when it is substantive. */
+export function scaffoldReason(text: string, objective: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return "it is empty";
+  if (/^\s*#*\s*knowledge form\b/im.test(trimmed)) return "it is a Knowledge Form, not the requested result";
+  const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const content = lines.filter(
+    (l) => !SCAFFOLD_LINE.test(l.replace(/^[-*•]\s*/, "")) && !APPROACH_TOKEN.test(l) && !/^[a-f0-9]{16,}$/i.test(l),
+  );
+  const shortLines = content.filter((l) => l.replace(/^[-*•\d.)\s]+/, "").split(/\s+/).length <= 3);
+  if (content.length && shortLines.length / content.length >= 0.6 && !/```|<svg|<html|function |=>|def |class /i.test(trimmed))
+    return "it is a token list, not the requested result";
+  const obj = normalize(objective);
+  const rest = normalize(content.join(" ")).replace(obj, " ").replace(/\s+/g, " ").trim();
+  if (rest.length < 60) return "it only repeats the request or lists a plan, path label or receipt";
+  return null;
+}
+
+export interface ResultAssessment {
+  produced: boolean;
+  kind: RequestedKind;
+  reason: string | null;
+  files: { name: string; content: string }[];
+}
+
+const CODE_FILE = /\.(html?|js|jsx|ts|tsx|py|css|json|java|kt|swift|go|rs|rb|php|c|cpp|cs|sh|vue|svelte)$/i;
+
+/**
+ * Decide whether delivered text/files are the thing the user asked for.
+ * A verified run status or a byte receipt never makes this true by itself.
+ */
+export function assessResult(
+  objective: string,
+  body: string,
+  files: { name: string; content: string }[],
+): ResultAssessment {
+  const kind = requestedKind(objective);
+  const realFiles = files.filter((f) => {
+    if (/\.svg$/i.test(f.name)) return /<svg[\s>]/i.test(f.content) && /<(path|line|rect|circle|polyline|polygon|ellipse|g)\b/i.test(f.content);
+    return scaffoldReason(f.content, objective) === null;
+  });
+  const bodyOk = scaffoldReason(body, objective) === null;
+  if (kind === "drawing") {
+    const drawings = realFiles.filter((f) => /\.svg$/i.test(f.name));
+    if (drawings.length) return { produced: true, kind, reason: null, files: realFiles };
+    return { produced: false, kind, reason: "no drawing file was returned", files: [] };
+  }
+  if (kind === "app") {
+    const code = realFiles.filter((f) => CODE_FILE.test(f.name));
+    if (code.length || (bodyOk && /```[\s\S]+```/.test(body)))
+      return { produced: true, kind, reason: null, files: realFiles };
+    return {
+      produced: false,
+      kind,
+      reason: realFiles.length || bodyOk ? "no app code was returned" : scaffoldReason(files[0]?.content ?? body, objective),
+      files: [],
+    };
+  }
+  if (bodyOk || realFiles.length) return { produced: true, kind, reason: null, files: realFiles };
+  return { produced: false, kind, reason: scaffoldReason(body, objective), files: [] };
+}
+
+export function notProducedMessage(kind: RequestedKind) {
+  return kind === "drawing"
+    ? "The requested drawing has not been produced."
+    : kind === "app"
+      ? "The requested app has not been produced."
+      : "The requested answer has not been produced.";
+}

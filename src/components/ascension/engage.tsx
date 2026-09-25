@@ -195,10 +195,19 @@ export function Engage() {
       const payload = q.state.data?.response_payload;
       if (q.state.data?.status !== "completed") return 3000;
       if (payload?.files?.length) return false;
-      // The governed run is finished and its readable answer is projected.
-      // Keep one slower poll only while artifact transport could still arrive.
+      if (payload?.kind === "answer" || payload?.kind === "recommendation") return false;
+
+      // A terminal queue update can become visible a moment before the
+      // separately stored artifact transport. Keep checking briefly so a real
+      // runtime file replaces an early "not produced" projection automatically.
       const status = runQuery.data?.status ?? "";
-      return TERMINAL.has(status) ? false : 4000;
+      if (!TERMINAL.has(status)) return 3000;
+      const completedAt = runQuery.data?.completed_at
+        ? Date.parse(runQuery.data.completed_at)
+        : Number.NaN;
+      return Number.isFinite(completedAt) && Date.now() - completedAt < 15000
+        ? 2000
+        : false;
     },
     retry: false,
   });
@@ -538,6 +547,14 @@ export function Engage() {
                 A finished or verified run is not the same as your result. Nothing here is
                 offered for download.
               </p>
+              <button
+                type="button"
+                disabled={prepare.isPending}
+                onClick={() => prepare.mutate({ id: run.id, retry: true })}
+                className="mt-4 min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary"
+              >
+                CHECK FOR RESULT
+              </button>
             </div>
           ) : deliveryError ? (
             <div role="alert" className="rounded-xl border border-gold/30 p-4">

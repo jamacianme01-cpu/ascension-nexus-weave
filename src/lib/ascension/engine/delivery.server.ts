@@ -14,25 +14,6 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function strings(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
-}
-
-function branchTitle(branch: Record<string, unknown>): string {
-  const names: Record<string, string> = {
-    single_pass_construct: "Create in one pass",
-    staged_construct: "Build and check in stages",
-    minimal_seeded_construct: "Start with a small working seed",
-  };
-  const approach = String(branch["approach"] ?? "");
-  return (
-    names[approach] ??
-    String((branch["name"] ?? branch["pathway"] ?? approach) || "Selected pathway")
-  );
-}
-
 function artifactFiles(value: unknown): { name: string; content: string }[] {
   const payload = record(value);
   if (!Array.isArray(payload["files"])) return [];
@@ -68,9 +49,6 @@ function governedDelivery(
   const result = record(run.result);
   if (!Object.keys(result).length) return null;
 
-  const planning = record(result["objective_planning"]);
-  const selected = record(planning["selected_branch"]);
-  const actions = strings(selected["actions"]);
   const receipts = Array.isArray(result["execution_receipts"])
     ? result["execution_receipts"].flatMap((rawReceipt) => {
         const receipt = record(rawReceipt);

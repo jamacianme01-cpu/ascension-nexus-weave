@@ -115,6 +115,13 @@ try {
   check("a real written answer is displayed", () => {
     assert.equal(model.assessResult("what is the capital of France", "The capital of France is Paris. It has been the seat of government for most of the country's history and sits on the Seine.", []).produced, true);
   });
+  check("a checked multiplication explanation counts as an answer", () => {
+    const answer = "To multiply, find the total in equal groups. For example, 4 × 3 means four groups of three: 3 + 3 + 3 + 3 = 12, so 4 × 3 = 12. For larger numbers, split a factor into tens and ones and add the partial products.";
+    const a = model.assessResult("how do you mutiply", answer, [{ name: "answer.txt", content: answer }]);
+    assert.equal(a.kind, "answer");
+    assert.equal(a.produced, true);
+    assert.deepEqual(a.files.map(file => file.name), ["answer.txt"]);
+  });
   const original = globalThis.fetch;
   const priorKey = process.env.ZAI_API_KEY;
   process.env.ZAI_API_KEY = "test-only";

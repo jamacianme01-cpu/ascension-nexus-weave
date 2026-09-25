@@ -64,6 +64,38 @@ try {
   check("path traversal and duplicate file names are refused", () => { assert.throws(() => model.parseDelivery({ ...valid, files: [{ name: "../secret", content: "x" }] })); assert.throws(() => model.parseDelivery({ ...valid, files: [...valid.files, ...valid.files] })); });
   check("empty or partial generated output is refused", () => { assert.throws(() => model.parseDelivery({ ...valid, body: "" })); assert.throws(() => model.parseDelivery({ ...valid, files: [] })); });
   check("canned Knowledgeverse template is refused", () => { assert.throws(() => model.parseDelivery({ kind: "answer", title: "Solution", body: "The Knowledgeverse has mapped 6 relevant entities. **Identity Phase:** Establish your objective\'s unique chromosome. **Development Phase:** Cultivate relationships. **Emergence Phase:** Allow verified deltas to guide natural evolution.", files: [], limitations: [] }), /generic architecture template/); });
+  const kf = "# Knowledge Form: stagedconstruct\n\n- draw\n- linear\n- propulsion\n- engine\n- staged_construct\n- tokens: draw, linear, propulsion";
+  const moneyKf = "# Knowledge Form: stagedconstruct\n- make\n- quick\n- money\n- making\n- app";
+  check("drawing objective: tokenized Knowledge Form is not a result", () => {
+    const a = model.assessResult("draw a linear prpopulsion engine", kf, [{ name: "knowledge_form.md", content: kf }]);
+    assert.equal(a.produced, false); assert.equal(a.kind, "drawing"); assert.equal(a.files.length, 0);
+  });
+  check("app objective: tokenized Knowledge Form is not a result", () => {
+    const a = model.assessResult("make a quick money making app", moneyKf, [{ name: "form.md", content: moneyKf }]);
+    assert.equal(a.produced, false); assert.equal(a.kind, "app"); assert.equal(a.files.length, 0);
+  });
+  check("plan, receipt and request echo are not results", () => {
+    const echo = "make a quick money making app\n\nSelected future: Build and check in stages\n\nActions:\n- construct\n- verify\n\nVerification receipts: 1 artifact persisted";
+    assert.equal(model.assessResult("make a quick money making app", echo, []).produced, false);
+    assert.equal(model.assessResult("what is the capital of France", "what is the capital of France", []).produced, false);
+  });
+  check("verified status with only receipts stays not produced", () => {
+    assert.throws(() => model.parseDelivery({ kind: "not_produced", title: "x", body: "not produced", files: [{ name: "a.md", content: "x" }], limitations: [] }));
+    assert.equal(model.parseDelivery({ kind: "not_produced", title: "x", body: "The requested drawing has not been produced.", files: [], limitations: [] }).kind, "not_produced");
+  });
+  check("valid transported SVG drawing is displayed", () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60"><rect x="10" y="20" width="180" height="20"/><line x1="0" y1="30" x2="200" y2="30"/></svg>';
+    const a = model.assessResult("draw a linear propulsion engine", "", [{ name: "engine.svg", content: svg }, { name: "form.md", content: kf }]);
+    assert.equal(a.produced, true); assert.deepEqual(a.files.map(f => f.name), ["engine.svg"]);
+  });
+  check("valid transported app code is displayed", () => {
+    const html = "<!doctype html><html><body><h1>Tip Jar</h1><button id=b>Tip $1</button><script>let t=0;document.getElementById('b').onclick=()=>{t++;document.title='Tips: '+t};</script></body></html>";
+    const a = model.assessResult("make a quick money making app", "", [{ name: "index.html", content: html }]);
+    assert.equal(a.produced, true); assert.equal(a.files[0].name, "index.html");
+  });
+  check("a real written answer is displayed", () => {
+    assert.equal(model.assessResult("what is the capital of France", "The capital of France is Paris. It has been the seat of government for most of the country's history and sits on the Seine.", []).produced, true);
+  });
   const original = globalThis.fetch;
   const priorKey = process.env.ZAI_API_KEY;
   process.env.ZAI_API_KEY = "test-only";

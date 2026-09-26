@@ -37,7 +37,7 @@ interface GuestBundle {
   delivery_stage: {
     created_at: string;
     status: string;
-    response_payload: ObjectiveDelivery | null;
+    response_payload: Json | null;
     error: string | null;
     engine_model: string | null;
     engine_label: string;
@@ -51,7 +51,7 @@ interface GuestBundle {
 export interface GuestDeliveryState {
   created_at: string;
   status: string;
-  response_payload: ObjectiveDelivery | null;
+  response_payload: Json | null;
   error: string | null;
   engine_model: string | null;
   engine_label: string;
@@ -159,7 +159,7 @@ async function projectGuestDelivery(
   return {
     created_at: stored?.created_at ?? bundle.run.completed_at ?? bundle.run.updated_at,
     status: delivery ? "completed" : "running",
-    response_payload: delivery,
+    response_payload: delivery as unknown as Json,
     error: null,
     engine_model: "governed-runtime",
     engine_label: "GUEST_RUNTIME_RESULT_V2",

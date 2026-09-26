@@ -154,7 +154,7 @@ async function projectGuestDelivery(
   }
 
   const { projectRuntimeDelivery } = await import("./engine/delivery.server");
-  const delivery = projectRuntimeDelivery(
+  const delivery = await projectRuntimeDelivery(
     { objective: bundle.run.objective, result: bundle.run.result },
     bundle.artifact_stage?.status === "completed"
       ? bundle.artifact_stage.response_payload

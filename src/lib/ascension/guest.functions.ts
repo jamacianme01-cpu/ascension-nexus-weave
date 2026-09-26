@@ -3,7 +3,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import type { ObjectiveRun } from "./objectives.functions";
-import type { ObjectiveDelivery } from "./result-model";
 
 type RpcResult<T> = { data: T | null; error: { message: string } | null };
 

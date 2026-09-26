@@ -28,6 +28,7 @@ export type Database = {
           error: string | null
           evidence: Json | null
           guardian_verdict: string | null
+          guest_key_hash: string | null
           id: string
           objective: string
           outcome_status: string | null
@@ -35,7 +36,7 @@ export type Database = {
           runtime_revision: number | null
           stage: string | null
           status: string
-          submitted_by: string
+          submitted_by: string | null
           submitted_via: string
           transition_id: string | null
           updated_at: string
@@ -53,6 +54,7 @@ export type Database = {
           error?: string | null
           evidence?: Json | null
           guardian_verdict?: string | null
+          guest_key_hash?: string | null
           id?: string
           objective: string
           outcome_status?: string | null
@@ -60,7 +62,7 @@ export type Database = {
           runtime_revision?: number | null
           stage?: string | null
           status?: string
-          submitted_by?: string
+          submitted_by?: string | null
           submitted_via?: string
           transition_id?: string | null
           updated_at?: string
@@ -78,6 +80,7 @@ export type Database = {
           error?: string | null
           evidence?: Json | null
           guardian_verdict?: string | null
+          guest_key_hash?: string | null
           id?: string
           objective?: string
           outcome_status?: string | null
@@ -85,7 +88,7 @@ export type Database = {
           runtime_revision?: number | null
           stage?: string | null
           status?: string
-          submitted_by?: string
+          submitted_by?: string | null
           submitted_via?: string
           transition_id?: string | null
           updated_at?: string
@@ -255,7 +258,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ascension_guest_hash: { Args: { p_guest_key: string }; Returns: string }
+      get_guest_delivery_stages: {
+        Args: { p_guest_key: string; p_request_id: string }
+        Returns: Json
+      }
+      get_guest_objective: {
+        Args: { p_guest_key: string; p_request_id: string }
+        Returns: Json
+      }
+      submit_guest_objective: {
+        Args: {
+          p_constraints: Json
+          p_evidence: Json
+          p_guest_key: string
+          p_objective: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

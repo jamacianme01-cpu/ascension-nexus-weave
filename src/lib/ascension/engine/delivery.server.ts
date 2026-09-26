@@ -1,4 +1,3 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { assessResult, notProducedMessage, parseDelivery } from "../result-model";
 
@@ -141,6 +140,7 @@ export async function prepareDelivery(
   retry: boolean,
 ) {
   void retry;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const table = () => supabaseAdmin.from("ascension_run_stages");
   const read = async () => {
     const { data, error } = await table()
@@ -237,4 +237,48 @@ export async function prepareDelivery(
   });
   if (error?.code !== "23505" && error) throw new Error(error.message);
   return read();
+}
+
+/**
+ * Read-only projection used by the guest path: computes the same delivery the
+ * authenticated path persists, but never writes. No service-role access.
+ */
+export function projectDelivery(
+  run: { objective: string; result: Json | null },
+  current: StageRow | null,
+  artifactStage: { status: string; response_payload: Json | null } | null,
+): StageRow {
+  const files =
+    artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
+  if (current?.status === "completed" && current.engine_label === LABEL && files.length === 0)
+    return current;
+  const delivery = governedDelivery(run, files);
+  if (delivery) {
+    return {
+      status: "completed",
+      response_payload: delivery as unknown as Json,
+      error: null,
+      engine_model: MODEL,
+      engine_label: LABEL,
+      created_at: current?.created_at ?? new Date().toISOString(),
+    };
+  }
+  if (current?.status === "completed") return current;
+  return {
+    status: "running",
+    response_payload: null,
+    error: null,
+    engine_model: MODEL,
+    engine_label: LABEL,
+    created_at: current?.created_at ?? new Date().toISOString(),
+  };
+}
+
+export interface StageRow {
+  status: string;
+  response_payload: Json | null;
+  error: string | null;
+  engine_model: string | null;
+  engine_label: string;
+  created_at: string;
 }

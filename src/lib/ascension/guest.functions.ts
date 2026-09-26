@@ -1,49 +1,51 @@
 import { createServerFn } from "@tanstack/react-start";
 
+import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import type { ObjectiveRun } from "./objectives.functions";
 import type { ObjectiveDelivery } from "./result-model";
 
-const GUEST_EMAIL = "ascension-book-guest@users.invalid";
-const DELIVERY_ORDINAL = 100;
+type RpcResult<T> = { data: T | null; error: { message: string } | null };
 
-async function guestOwnerId(): Promise<string> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-  const findGuest = async () => {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    if (error) throw new Error(error.message);
-    return data.users.find((user) => user.email?.toLowerCase() === GUEST_EMAIL);
-  };
-
-  const existing = await findGuest();
-  if (existing) return existing.id;
-
-  const password = `Ascension-${crypto.randomUUID()}-aA1!`;
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email: GUEST_EMAIL,
-    password,
-    email_confirm: true,
-    user_metadata: { ascension_book_guest: true },
-  });
-
-  if (!error && data.user) return data.user.id;
-
-  // A simultaneous first guest request may have created the shared guest user.
-  const raced = await findGuest();
-  if (raced) return raced.id;
-  throw new Error(error?.message ?? "ASCENSION guest access could not be established.");
+async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T | null> {
+  const call = supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<RpcResult<T>>;
+  const { data, error } = await call(name, args);
+  if (error) throw new Error(error.message);
+  return data;
 }
 
-function validateRequestId(input: { requestId: string; retry?: boolean }) {
+function validateRequest(input: { requestId: string; guestToken: string; retry?: boolean }) {
   if (!/^[a-f0-9-]{36}$/i.test(input.requestId)) throw new Error("A valid request id is required.");
-  return { requestId: input.requestId, retry: input.retry === true };
+  if (!/^[a-f0-9-]{36}$/i.test(input.guestToken)) throw new Error("A valid guest token is required.");
+  return {
+    requestId: input.requestId,
+    guestToken: input.guestToken,
+    retry: input.retry === true,
+  };
 }
 
-function hasDownloadableFiles(value: unknown): boolean {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const files = (value as Record<string, unknown>)["files"];
-  return Array.isArray(files) && files.length > 0;
+export interface GuestSubmission {
+  request: ObjectiveRun;
+  guestToken: string;
+}
+
+interface GuestBundle {
+  run: ObjectiveRun;
+  delivery_stage: {
+    created_at: string;
+    status: string;
+    response_payload: ObjectiveDelivery | null;
+    error: string | null;
+    engine_model: string | null;
+    engine_label: string;
+  } | null;
+  artifact_stage: {
+    response_payload: Json | null;
+    status: string;
+  } | null;
 }
 
 export interface GuestDeliveryState {
@@ -62,6 +64,7 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
       evidence?: string[];
       constraints?: string[];
       parentRequestId?: string;
+      parentGuestToken?: string;
       followUp?: "continue" | "refine";
     }) => {
       const objective = input.objective?.trim();
@@ -78,138 +81,95 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
         evidence: clean(input.evidence, 2000),
         constraints: clean(input.constraints, 500),
         parentRequestId: input.parentRequestId ?? null,
+        parentGuestToken: input.parentGuestToken ?? null,
         followUp: input.followUp ?? null,
       };
     },
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const ownerId = await guestOwnerId();
-    let evidence = data.evidence;
+    const payload = await rpc<{
+      request: ObjectiveRun;
+      guest_token: string;
+    }>("ascension_guest_submit", {
+      p_objective: data.objective,
+      p_evidence: data.evidence,
+      p_constraints: data.constraints,
+      p_parent_request_id: data.parentRequestId,
+      p_parent_guest_token: data.parentGuestToken,
+      p_follow_up: data.followUp,
+    });
 
-    if (data.parentRequestId) {
-      if (
-        !/^[a-f0-9-]{36}$/i.test(data.parentRequestId) ||
-        !["continue", "refine"].includes(data.followUp ?? "")
-      ) {
-        throw new Error("Invalid follow-up reference.");
-      }
+    if (!payload?.request || !payload.guest_token)
+      throw new Error("ASCENSION could not accept this objective.");
 
-      const { data: parent, error: parentError } = await supabaseAdmin
-        .from("ascension_execution_requests")
-        .select("id, objective, result")
-        .eq("id", data.parentRequestId)
-        .eq("submitted_by", ownerId)
-        .maybeSingle();
-      if (parentError) throw new Error(parentError.message);
-      if (!parent) throw new Error("The earlier objective is unavailable.");
-
-      const { data: delivery, error: deliveryError } = await supabaseAdmin
-        .from("ascension_run_stages")
-        .select("response_payload")
-        .eq("request_id", parent.id)
-        .eq("ordinal", DELIVERY_ORDINAL)
-        .eq("status", "completed")
-        .maybeSingle();
-      if (deliveryError) throw new Error(deliveryError.message);
-
-      const contextText = JSON.stringify({
-        parent_request_id: parent.id,
-        requested_action: data.followUp,
-        prior_objective: parent.objective,
-        prior_result: delivery?.response_payload ?? null,
-        verification: "Prior result supplied as continuation context.",
-      });
-      evidence = [...(evidence ?? []), contextText];
-    }
-
-    const { data: row, error } = await supabaseAdmin
-      .from("ascension_execution_requests")
-      .insert({
-        engine: "governed_runtime",
-        submitted_by: ownerId,
-        submitted_via: "web_guest",
-        objective: data.objective,
-        evidence: evidence as Json | null,
-        constraints: data.constraints as Json | null,
-      })
-      .select(
-        "engine, id, objective, evidence, constraints, status, stage, claimed_at, claimed_by, completed_at, runtime_revision, transition_id, guardian_verdict, outcome_status, accepted_delta, result, error, created_at, updated_at",
-      )
-      .single();
-
-    if (error) throw new Error(error.message);
-    return { accepted: true, executed_here: false, request: row as ObjectiveRun };
+    return {
+      request: payload.request,
+      guestToken: payload.guest_token,
+    } satisfies GuestSubmission;
   });
 
 export const getGuestObjectiveStatus = createServerFn({ method: "GET" })
-  .inputValidator(validateRequestId)
+  .inputValidator(validateRequest)
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const ownerId = await guestOwnerId();
-    const { data: row, error } = await supabaseAdmin
-      .from("ascension_execution_requests")
-      .select(
-        "engine, id, objective, evidence, constraints, status, stage, claimed_at, claimed_by, completed_at, runtime_revision, transition_id, guardian_verdict, outcome_status, accepted_delta, result, error, created_at, updated_at",
-      )
-      .eq("id", data.requestId)
-      .eq("submitted_by", ownerId)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    return { request: (row as ObjectiveRun | null) ?? null };
+    const row = await rpc<ObjectiveRun>("ascension_guest_status", {
+      p_request_id: data.requestId,
+      p_guest_token: data.guestToken,
+    });
+    return { request: row ?? null };
   });
+
+async function projectGuestDelivery(
+  requestId: string,
+  guestToken: string,
+): Promise<GuestDeliveryState | null> {
+  const bundle = await rpc<GuestBundle>("ascension_guest_bundle", {
+    p_request_id: requestId,
+    p_guest_token: guestToken,
+  });
+  if (!bundle?.run) return null;
+
+  const stored = bundle.delivery_stage;
+  if (
+    stored?.status === "completed" &&
+    stored.engine_label === "GOVERNED_RUNTIME_RESULT_V2" &&
+    stored.response_payload
+  ) {
+    return stored;
+  }
+
+  if (bundle.run.result === null) {
+    return {
+      created_at: stored?.created_at ?? bundle.run.created_at,
+      status: "running",
+      response_payload: null,
+      error: null,
+      engine_model: "governed-runtime",
+      engine_label: "GUEST_RUNTIME_RESULT_V2",
+    };
+  }
+
+  const { projectRuntimeDelivery } = await import("./engine/delivery.server");
+  const delivery = projectRuntimeDelivery(
+    { objective: bundle.run.objective, result: bundle.run.result },
+    bundle.artifact_stage?.status === "completed"
+      ? bundle.artifact_stage.response_payload
+      : null,
+  );
+
+  return {
+    created_at: stored?.created_at ?? bundle.run.completed_at ?? bundle.run.updated_at,
+    status: delivery ? "completed" : "running",
+    response_payload: delivery,
+    error: null,
+    engine_model: "governed-runtime",
+    engine_label: "GUEST_RUNTIME_RESULT_V2",
+  };
+}
 
 export const getGuestObjectiveDelivery = createServerFn({ method: "GET" })
-  .inputValidator(validateRequestId)
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const ownerId = await guestOwnerId();
-
-    const { data: run, error: runError } = await supabaseAdmin
-      .from("ascension_execution_requests")
-      .select("id, objective, evidence, constraints, result, submitted_by")
-      .eq("id", data.requestId)
-      .eq("submitted_by", ownerId)
-      .maybeSingle();
-    if (runError) throw new Error(runError.message);
-    if (!run) return null;
-
-    const { data: row, error } = await supabaseAdmin
-      .from("ascension_run_stages")
-      .select("status, response_payload, error, engine_model, engine_label, created_at")
-      .eq("request_id", data.requestId)
-      .eq("ordinal", DELIVERY_ORDINAL)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-
-    if (
-      row?.status === "completed" &&
-      row.engine_label === "GOVERNED_RUNTIME_RESULT_V2" &&
-      hasDownloadableFiles(row.response_payload)
-    ) {
-      return row as unknown as GuestDeliveryState;
-    }
-
-    const { prepareDelivery } = await import("./engine/delivery.server");
-    return (await prepareDelivery(run, false)) as unknown as GuestDeliveryState | null;
-  });
+  .inputValidator(validateRequest)
+  .handler(async ({ data }) => projectGuestDelivery(data.requestId, data.guestToken));
 
 export const prepareGuestObjectiveDelivery = createServerFn({ method: "POST" })
-  .inputValidator(validateRequestId)
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const ownerId = await guestOwnerId();
-
-    const { data: run, error } = await supabaseAdmin
-      .from("ascension_execution_requests")
-      .select("id, objective, evidence, constraints, result, engine, status, submitted_by")
-      .eq("id", data.requestId)
-      .eq("submitted_by", ownerId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!run) throw new Error("This objective is unavailable.");
-
-    const { prepareDelivery } = await import("./engine/delivery.server");
-    return prepareDelivery(run, data.retry);
-  });
+  .inputValidator(validateRequest)
+  .handler(async ({ data }) => projectGuestDelivery(data.requestId, data.guestToken));

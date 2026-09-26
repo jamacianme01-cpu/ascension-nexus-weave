@@ -23,11 +23,12 @@ CREATE OR REPLACE FUNCTION public.ascension_guest_submit(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
-AS $$
+SET search_path = public, extensions
+AS $
 DECLARE
   v_objective text := btrim(coalesce(p_objective, ''));
   v_token uuid := gen_random_uuid();
+  v_hash text := encode(digest(v_token::text, 'sha256'), 'hex');
   v_evidence jsonb := p_evidence;
   v_parent public.ascension_execution_requests%rowtype;
   v_parent_delivery jsonb;
@@ -48,7 +49,7 @@ BEGIN
     SELECT * INTO v_parent
     FROM public.ascension_execution_requests
     WHERE id = p_parent_request_id
-      AND guest_token = p_parent_guest_token
+      AND guest_key_hash = encode(digest(p_parent_guest_token::text, 'sha256'), 'hex')
       AND submitted_by IS NULL;
 
     IF NOT FOUND THEN
@@ -76,6 +77,7 @@ BEGIN
     engine,
     submitted_by,
     submitted_via,
+    guest_key_hash,
     guest_token,
     objective,
     evidence,
@@ -84,6 +86,7 @@ BEGIN
     'governed_runtime',
     NULL,
     'web_guest',
+    v_hash,
     v_token,
     v_objective,
     v_evidence,
@@ -92,7 +95,7 @@ BEGIN
   RETURNING * INTO v_row;
 
   RETURN jsonb_build_object(
-    'request', to_jsonb(v_row) - 'guest_token',
+    'request', (to_jsonb(v_row) - 'guest_token') - 'guest_key_hash',
     'guest_token', v_token
   );
 END;
@@ -106,12 +109,12 @@ RETURNS jsonb
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT to_jsonb(r) - 'guest_token'
+SET search_path = public, extensions
+AS $
+  SELECT (to_jsonb(r) - 'guest_token') - 'guest_key_hash'
   FROM public.ascension_execution_requests r
   WHERE r.id = p_request_id
-    AND r.guest_token = p_guest_token
+    AND r.guest_key_hash = encode(digest(p_guest_token::text, 'sha256'), 'hex')
     AND r.submitted_by IS NULL
   LIMIT 1;
 $$;
@@ -124,10 +127,10 @@ RETURNS jsonb
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
-AS $$
+SET search_path = public, extensions
+AS $
   SELECT jsonb_build_object(
-    'run', to_jsonb(r) - 'guest_token',
+    'run', (to_jsonb(r) - 'guest_token') - 'guest_key_hash',
     'delivery_stage', (
       SELECT to_jsonb(s)
       FROM public.ascension_run_stages s
@@ -143,7 +146,7 @@ AS $$
   )
   FROM public.ascension_execution_requests r
   WHERE r.id = p_request_id
-    AND r.guest_token = p_guest_token
+    AND r.guest_key_hash = encode(digest(p_guest_token::text, 'sha256'), 'hex')
     AND r.submitted_by IS NULL
   LIMIT 1;
 $$;

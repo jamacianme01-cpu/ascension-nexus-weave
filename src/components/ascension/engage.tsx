@@ -229,20 +229,6 @@ export function Engage() {
 
   const run = runQuery.data;
 
-  useEffect(() => {
-    if (!run || !TERMINAL.has(run.status)) return;
-    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
-    sequenceTimers.current = [];
-    setBookSequence("idle");
-    setBookOpen(true);
-    setRevealed(true);
-    const timer = window.setTimeout(
-      () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      180,
-    );
-    return () => window.clearTimeout(timer);
-  }, [run?.id, run?.status]);
-
   const engage = useMutation({
     mutationFn: async () => {
       const { data } = await supabase.auth.getUser();
@@ -295,9 +281,9 @@ export function Engage() {
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
 
-      // Keep the cinematic power-up on screen first. The queued/running panel
-      // is revealed after the knowledge eruption, unless the run finishes sooner.
+      // Show the queued result area as soon as the request is accepted.
       setBookOpen(true);
+      setRevealed(true);
     },
   });
 
@@ -322,6 +308,33 @@ export function Engage() {
     }
   }
   const produced = delivery ? true : notProduced ? false : null;
+
+  useEffect(() => {
+    if (!run || !TERMINAL.has(run.status)) return;
+    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    sequenceTimers.current = [];
+    setBookOpen(true);
+    setRevealed(true);
+
+    // Only a delivered result releases the tree's knowledge burst.
+    if (run.status === "verified" && produced === null) {
+      setBookSequence("processing");
+      return;
+    }
+    const hasResult = run.status === "verified" && produced === true;
+    setBookSequence(hasResult ? "eruption" : "idle");
+    const scrollTimer = window.setTimeout(
+      () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      180,
+    );
+    const settleTimer = hasResult
+      ? window.setTimeout(() => setBookSequence("idle"), 1800)
+      : undefined;
+    return () => {
+      window.clearTimeout(scrollTimer);
+      if (settleTimer !== undefined) window.clearTimeout(settleTimer);
+    };
+  }, [run?.id, run?.status, produced]);
 
   const followUp = (kind: FollowUp) => {
     if (!run) return;
@@ -361,14 +374,12 @@ export function Engage() {
       sequenceTimers.current.push(timer);
     };
 
-    // The Tree is already present. ENGAGE powers it from foundations upward,
-    // then releases the accumulated knowledge before normal processing continues.
+    // The Tree is present from the start. It charges as the request moves
+    // through the queue; the knowledge eruption waits for a delivered result.
     phase(900, "trunk");
     phase(1800, "nodes");
     phase(2800, "canopy");
-    phase(3900, "eruption");
-    phase(5300, "processing", true);
-
+    phase(3900, "processing");
     engage.mutate();
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;

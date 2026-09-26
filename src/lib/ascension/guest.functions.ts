@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { Json } from "@/integrations/supabase/types";
 import type { ObjectiveRun } from "./objectives.functions";
 import type { ObjectiveDelivery } from "./result-model";
+import type { StageRow } from "./engine/delivery.server";
 
 /**
  * Anonymous Book path. No sign-in and no service-role key: every call uses the
@@ -193,5 +194,5 @@ export const prepareGuestObjectiveDelivery = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const delivery = await guestDelivery(data.requestId);
     if (!delivery) throw new Error("This objective is unavailable.");
-    return delivery;
+    return delivery as unknown as StageRow;
   });

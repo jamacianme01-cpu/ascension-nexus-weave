@@ -14,7 +14,7 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function artifactFiles(value: unknown): { name: string; content: string }[] {
+export function artifactFiles(value: unknown): { name: string; content: string }[] {
   const payload = record(value);
   if (!Array.isArray(payload["files"])) return [];
   const names = new Set<string>();
@@ -37,7 +37,7 @@ function artifactFiles(value: unknown): { name: string; content: string }[] {
   });
 }
 
-function governedDelivery(
+export function governedDelivery(
   run: {
     objective: string;
     result: Json | null;
@@ -128,6 +128,16 @@ function governedDelivery(
         : []),
     ],
   });
+}
+
+export function projectRuntimeDelivery(
+  run: {
+    objective: string;
+    result: Json | null;
+  },
+  artifactPayload: unknown,
+) {
+  return governedDelivery(run, artifactFiles(artifactPayload));
 }
 
 export async function prepareDelivery(

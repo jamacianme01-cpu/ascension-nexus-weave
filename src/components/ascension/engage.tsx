@@ -9,6 +9,12 @@ import {
 } from "@/lib/ascension/objectives.functions";
 import { getObjectiveDelivery, prepareObjectiveDelivery } from "@/lib/ascension/delivery.functions";
 import {
+  getGuestObjectiveDelivery,
+  getGuestObjectiveStatus,
+  prepareGuestObjectiveDelivery,
+  submitGuestObjective,
+} from "@/lib/ascension/guest.functions";
+import {
   assessResult,
   governedPersisted,
   notProducedMessage,
@@ -22,6 +28,7 @@ import {
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
+const ACCESS = "ascension.active-access";
 const BOOK_TREE_SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 type FollowUp = "continue" | "refine";
 
@@ -151,6 +158,7 @@ export function Engage() {
   const [evidence, setEvidence] = useState("");
   const [constraints, setConstraints] = useState("");
   const [active, setActive] = useState<string | null>(null);
+  const [access, setAccess] = useState<"guest" | "auth">("guest");
   const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [bookSequence, setBookSequence] = useState<"idle" | "roots" | "trunk" | "nodes" | "canopy" | "eruption" | "processing">("idle");
@@ -164,6 +172,7 @@ export function Engage() {
     const id = new URL(window.location.href).searchParams.get("run") ?? read(ACTIVE);
     if (id && /^[a-f0-9-]{36}$/i.test(id)) {
       setActive(id);
+      setAccess(read(ACCESS) === "auth" ? "auth" : "guest");
       setBookOpen(true);
       setRevealed(true);
     }
@@ -179,17 +188,23 @@ export function Engage() {
   );
 
   const runQuery = useQuery({
-    queryKey: ["ascension", "run", active],
+    queryKey: ["ascension", "run", active, access],
     enabled: Boolean(active),
-    queryFn: async () => (await getObjectiveStatus({ data: { requestId: active! } })).request,
+    queryFn: async () =>
+      access === "guest"
+        ? (await getGuestObjectiveStatus({ data: { requestId: active! } })).request
+        : (await getObjectiveStatus({ data: { requestId: active! } })).request,
     refetchInterval: (q) => (q.state.data && TERMINAL.has(q.state.data.status) ? false : 2500),
     retry: false,
   });
 
   const deliveryQuery = useQuery({
-    queryKey: ["ascension", "delivery", active],
+    queryKey: ["ascension", "delivery", active, access],
     enabled: Boolean(active),
-    queryFn: () => getObjectiveDelivery({ data: { requestId: active! } }),
+    queryFn: () =>
+      access === "guest"
+        ? getGuestObjectiveDelivery({ data: { requestId: active! } })
+        : getObjectiveDelivery({ data: { requestId: active! } }),
     refetchInterval: (q) => {
       if (!active) return false;
       const payload = q.state.data?.response_payload;
@@ -221,7 +236,9 @@ export function Engage() {
 
   const prepare = useMutation({
     mutationFn: ({ id, retry = false }: { id: string; retry?: boolean }) =>
-      prepareObjectiveDelivery({ data: { requestId: id, retry } }),
+      access === "guest"
+        ? prepareGuestObjectiveDelivery({ data: { requestId: id, retry } })
+        : prepareObjectiveDelivery({ data: { requestId: id, retry } }),
     onSuccess: (_data, vars) => {
       void client.invalidateQueries({ queryKey: ["ascension", "delivery", vars.id] });
     },
@@ -231,34 +248,34 @@ export function Engage() {
 
   const engage = useMutation({
     mutationFn: async () => {
+      const payload = {
+        objective: objective.trim(),
+        evidence: evidence
+          .split("\n")
+          .map((v) => v.trim())
+          .filter(Boolean),
+        constraints: constraints
+          .split("\n")
+          .map((v) => v.trim())
+          .filter(Boolean),
+        ...(follow
+          ? {
+              parentRequestId: follow.id,
+              followUp: follow.kind,
+            }
+          : {}),
+      };
+
       const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        // Keep the typed objective, then send the visitor to sign in.
-        save(DRAFT, objective);
-        window.location.href = `/auth?next=${encodeURIComponent("/")}`;
-        throw new Error("Sign in to engage ASCENSION. Your objective has been kept.");
+      if (data.user) {
+        setAccess("auth");
+        save(ACCESS, "auth");
+        return (await submitObjective({ data: payload })).request;
       }
-      return (
-        await submitObjective({
-          data: {
-            objective: objective.trim(),
-            evidence: evidence
-              .split("\n")
-              .map((v) => v.trim())
-              .filter(Boolean),
-            constraints: constraints
-              .split("\n")
-              .map((v) => v.trim())
-              .filter(Boolean),
-            ...(follow
-              ? {
-                  parentRequestId: follow.id,
-                  followUp: follow.kind,
-                }
-              : {}),
-          },
-        })
-      ).request;
+
+      setAccess("guest");
+      save(ACCESS, "guest");
+      return (await submitGuestObjective({ data: payload })).request;
     },
     onError: () => {
       // Return the Book to a usable state so the objective can be sent again.
@@ -269,7 +286,7 @@ export function Engage() {
       setRevealed(Boolean(run));
     },
     onSuccess: (request) => {
-      client.setQueryData(["ascension", "run", request.id], request);
+      client.setQueryData(["ascension", "run", request.id, access], request);
       setActive(request.id);
       save(ACTIVE, request.id);
       save(DRAFT, "");
@@ -498,6 +515,8 @@ export function Engage() {
                     key={item.id}
                     type="button"
                     onClick={() => {
+                      setAccess("auth");
+                      save(ACCESS, "auth");
                       setActive(item.id);
                       setBookOpen(true);
                       setRevealed(true);

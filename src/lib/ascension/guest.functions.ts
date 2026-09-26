@@ -7,11 +7,13 @@ import type { ObjectiveRun } from "./objectives.functions";
 type RpcResult<T> = { data: T | null; error: { message: string } | null };
 
 async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T | null> {
-  const call = supabase.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<RpcResult<T>>;
-  const { data, error } = await call(name, args);
+  // Keep rpc bound to the Supabase client. Detaching supabase.rpc loses its
+  // internal client context and causes "Cannot read properties of undefined
+  // (reading 'rest')" at runtime.
+  const { data, error } = (await supabase.rpc(
+    name as never,
+    args as never,
+  )) as unknown as RpcResult<T>;
   if (error) throw new Error(error.message);
   return data;
 }

@@ -138,7 +138,11 @@ async function projectGuestDelivery(
     return stored;
   }
 
-  if (bundle.run.result === null) {
+  if (
+    bundle.run.result === null ||
+    bundle.artifact_stage?.status !== "completed" ||
+    !bundle.artifact_stage.response_payload
+  ) {
     return {
       created_at: stored?.created_at ?? bundle.run.created_at,
       status: "running",

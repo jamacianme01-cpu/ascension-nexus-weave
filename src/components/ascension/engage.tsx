@@ -7,7 +7,11 @@ import {
   submitObjective,
   type ObjectiveRun,
 } from "@/lib/ascension/objectives.functions";
-import { getObjectiveDelivery, prepareObjectiveDelivery } from "@/lib/ascension/delivery.functions";
+import {
+  getObjectiveDelivery,
+  prepareObjectiveDelivery,
+  type DeliveryState,
+} from "@/lib/ascension/delivery.functions";
 import {
   getGuestObjectiveDelivery,
   getGuestObjectiveStatus,
@@ -209,7 +213,7 @@ export function Engage() {
     retry: false,
   });
 
-  const deliveryQuery = useQuery({
+  const deliveryQuery = useQuery<DeliveryState | null>({
     queryKey: ["ascension", "delivery", active, access],
     enabled: Boolean(active) && (access === "auth" || Boolean(guestToken)),
     queryFn: () =>

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
-import { assessResult, notProducedMessage, parseDelivery } from "../result-model";
+import { assessResult, notProducedMessage, parseDelivery, type ObjectiveDelivery } from "../result-model";
 
 const ORDINAL = 100;
 const ARTIFACT_ORDINAL = 101;
@@ -135,14 +135,97 @@ export function governedDelivery(
   });
 }
 
-export function projectRuntimeDelivery(
+async function externalProductDraft(
+  run: {
+    objective: string;
+    result: Json | null;
+  },
+  transportedFiles: { name: string; content: string }[],
+): Promise<ObjectiveDelivery | null> {
+  const { callZai } = await import("./zai.server");
+
+  const artifactContext = transportedFiles
+    .filter((file) => !/^knowledgeform_/i.test(file.name))
+    .slice(0, 6)
+    .map((file) => `FILE: ${file.name}\n${file.content.slice(0, 12000)}`)
+    .join("\n\n");
+
+  const system = [
+    "You are the external product-result generator for the ASCENSION interface.",
+    "ASCENSION governed execution has already run. Your job is to return the actual user-facing result when the governed artifacts are only receipts, plans, Knowledge Forms, or scaffolds.",
+    "Do not claim you physically built, tested, verified, persisted, or governed anything.",
+    "Return exactly one JSON object with keys: kind, title, body, files, limitations.",
+    'kind must be "answer" or "artifact".',
+    "For ordinary questions or product/invention requests, give a substantive direct result in body.",
+    "For app/code requests, include complete runnable source files.",
+    "For drawing/image/diagram requests, include an SVG file when the request can be satisfied as vector art.",
+    "For product/invention creation requests, create a substantive design/specification rather than a receipt, token list, or plan to make one.",
+    "files must be an array of objects with name and content. Use [] when no download is needed.",
+    "limitations must truthfully state what remains unverified or conceptual.",
+    "Never return a Knowledge Form, execution receipt, generic ASCENSION architecture explanation, or placeholder.",
+  ].join(" ");
+
+  const user = [
+    `OBJECTIVE:\n${run.objective}`,
+    artifactContext
+      ? `\nGOVERNED RUNTIME ARTIFACTS / CONTEXT:\n${artifactContext}`
+      : "\nNo usable runtime artifact content was transported.",
+    "\nProduce the requested user-facing result now.",
+  ].join("\n");
+
+  const generated = await callZai({
+    system,
+    user,
+    knowledgeQuery: run.objective,
+    temperature: 0.25,
+  });
+
+  const candidate =
+    generated.json ??
+    ({
+      kind: "answer",
+      title: run.objective.slice(0, 200) || "ASCENSION result",
+      body: generated.text.trim(),
+      files: [],
+      limitations: [],
+    } as Record<string, unknown>);
+
+  const parsed = parseDelivery(candidate);
+  const check = assessResult(run.objective, parsed.body, parsed.files);
+  if (!check.produced) return null;
+
+  return {
+    ...parsed,
+    files: check.kind === "answer" ? [] : check.files,
+    limitations: [
+      ...parsed.limitations,
+      "External model draft. ASCENSION governed execution, verification, and persistence remain separate.",
+    ],
+  };
+}
+
+export async function projectRuntimeDelivery(
   run: {
     objective: string;
     result: Json | null;
   },
   artifactPayload: unknown,
 ) {
-  return governedDelivery(run, artifactFiles(artifactPayload));
+  const files = artifactFiles(artifactPayload);
+  const projected = governedDelivery(run, files);
+  if (!projected || projected.kind !== "not_produced") return projected;
+
+  try {
+    return (await externalProductDraft(run, files)) ?? projected;
+  } catch (cause) {
+    return parseDelivery({
+      ...projected,
+      limitations: [
+        ...projected.limitations,
+        `The external product-result generator is unavailable: ${cause instanceof Error ? cause.message : String(cause)}`,
+      ],
+    });
+  }
 }
 
 export async function prepareDelivery(
@@ -185,7 +268,7 @@ export async function prepareDelivery(
   if (current?.status === "completed" && current.engine_label === LABEL && files.length === 0)
     return current;
 
-  const delivery = governedDelivery(run, files);
+  const delivery = await projectRuntimeDelivery(run, { files });
 
   if (delivery) {
     const completedAt = new Date().toISOString();

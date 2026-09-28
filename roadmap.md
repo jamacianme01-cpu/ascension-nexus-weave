@@ -1,7 +1,6 @@
 # ASCENSION web layer — roadmap
 
 ## Open
-- [ ] Replace the expired/invalid Z.AI credential (`ZAI_API_KEY`) through the secure secret form, then re-run request `27199e50-9b13-488d-b140-22554a12cc72` to prove the `user_result` stage completes. Blocked on the owner entering a valid key.
 - [ ] Report production deployment status for `b9ca9651-c0e1-454c-9b90-6cec818ac92f` (no deployment-status tool available to this session).
 - [ ] One governed run could not be driven to `verified` from this machine: Supabase requires email confirmation for new accounts (no inbox access here). Owner should run one objective from a signed-in account to confirm the answer panel end to end.
 
@@ -16,4 +15,5 @@
 - [x] Restricted `ascension_relay_documents` so no browser client can read it directly; public replay stays served by the app's server route.
 
 ## Done (answer path)
-- [x] ENGAGE now returns real text with no Z.AI credential: when `ZAI_API_KEY` is absent, the engine falls back to the local OpenAI-compatible answer engine (Ollama at `localhost:11434`, model `qwen3-ascension` — a qwen3:4b variant with a 16k context so reasoning does not consume the answer). No credential is sent or stored; reasoning deltas and inline `<think>` are stripped; `limitations` strings are normalized at the external-draft boundary. Verified with a live guest ENGAGE ("Why is the sky blue?") that returned a substantive Rayleigh-scattering answer labelled EXTERNAL DRAFT · UNVERIFIED, plus a new interface contract check (36 total).
+- [x] ENGAGE no longer depends on the Windows worker for its immediate user-facing result. The deployed app prefers Lovable's built-in hosted AI gateway through its managed `LOVABLE_API_KEY`; a verified ASCENSION runtime result can still supersede that unverified draft later. Z.AI is opt-in only, and local Ollama is now an explicit local-development fallback only when `LOCAL_LLM_BASE_URL` is set. Provider-routing contract coverage includes the Lovable hosted endpoint and verifies that production routing does not fall back to localhost.
+- [ ] Exercise the newly deployed hosted path end-to-end with the three acceptance objectives ("how do you multiply", "make a gel support shoe", "make a quick money making app") and record the returned outputs. Code and deployment are in place; this item stays open until the live server path is actually exercised.

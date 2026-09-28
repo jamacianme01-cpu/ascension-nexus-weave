@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import type { ObjectiveRun } from "./objectives.functions";
+import type { ObjectiveDelivery } from "./result-model";
 
 type RpcResult<T> = { data: T | null; error: { message: string } | null };
 
@@ -53,7 +54,7 @@ interface GuestBundle {
 export interface GuestDeliveryState {
   created_at: string;
   status: string;
-  response_payload: Json | null;
+  response_payload: ObjectiveDelivery | null;
   error: string | null;
   engine_model: string | null;
   engine_label: string;

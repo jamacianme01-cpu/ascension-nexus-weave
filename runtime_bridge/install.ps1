@@ -8,11 +8,18 @@ if ([string]::IsNullOrWhiteSpace($token)) { $token = [Environment]::GetEnvironme
 if ([string]::IsNullOrWhiteSpace($token)) { throw 'ASCENSION_PUBLISH_TOKEN must be saved in the User or Machine environment so the worker can restart after sign-in.' }
 
 $ollama = Get-Command 'ollama' -ErrorAction SilentlyContinue
+if (!$ollama) {
+    $ollama = @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'),
+        (Join-Path $env:ProgramFiles 'Ollama\ollama.exe')
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
 if (!$ollama) { throw 'Ollama is not installed or is not on PATH. The local answer model must be installed to answer without API charges.' }
+$ollamaPath = if ($ollama -is [string]) { $ollama } else { $ollama.Source }
 try {
     $response = Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 8
 } catch {
-    Start-Process -FilePath $ollama.Source -ArgumentList 'serve' -WindowStyle Hidden
+    Start-Process -FilePath $ollamaPath -ArgumentList 'serve' -WindowStyle Hidden
     $response = $null
     for ($i = 0; $i -lt 12 -and !$response; $i++) {
         Start-Sleep -Seconds 2
@@ -44,15 +51,15 @@ if ([string]::IsNullOrWhiteSpace($token)) { throw 'ASCENSION_PUBLISH_TOKEN is mi
 $env:ASCENSION_PUBLISH_TOKEN = $token
 $env:LOCAL_LLM_BASE_URL = 'http://127.0.0.1:11434/v1'
 $env:LOCAL_LLM_MODEL = '__MODEL__'
+$ollamaPath = '__OLLAMA__'
 Set-Location $runtimeRepo
 $logDir = Join-Path $runtimeRepo 'ASCENSION_CORE\state\live\logs'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $tries = 0
 while ($true) {
     try { Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 4 | Out-Null; break } catch {
-        $ollama = Get-Command 'ollama' -ErrorAction SilentlyContinue
-        if ($ollama -and $tries % 6 -eq 0) {
-            Start-Process -FilePath $ollama.Source -ArgumentList 'serve' -WindowStyle Hidden
+        if ($tries % 6 -eq 0) {
+            Start-Process -FilePath $ollamaPath -ArgumentList 'serve' -WindowStyle Hidden
         }
         $tries++
         Start-Sleep -Seconds 5
@@ -68,6 +75,7 @@ while ($true) {
 }
 '@
 $runnerText = $runnerText.Replace('__MODEL__', $model)
+$runnerText = $runnerText.Replace('__OLLAMA__', $ollamaPath)
 Set-Content -Path $runner -Value $runnerText -Encoding UTF8
 
 # The worker starts for this Windows account at sign-in and stays running.

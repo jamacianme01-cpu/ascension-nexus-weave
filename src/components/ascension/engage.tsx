@@ -214,7 +214,8 @@ export function Engage() {
   });
 
   const deliveryQuery = useQuery<DeliveryState | null>({
-    queryKey: ["ascension", "delivery", active, access],
+    queryKey: ["ascension", "delivery", active, access, runQuery.data?.status ?? null],
+    placeholderData: (prev) => prev,
     enabled: Boolean(active) && (access === "auth" || Boolean(guestToken)),
     queryFn: () =>
       access === "guest"
@@ -222,25 +223,9 @@ export function Engage() {
             data: { requestId: active!, guestToken: guestToken! },
           })
         : getObjectiveDelivery({ data: { requestId: active! } }),
-    refetchInterval: (q) => {
-      if (!active) return false;
-      const payload = q.state.data?.response_payload;
-      if (q.state.data?.status !== "completed") return 3000;
-      if (payload?.files?.length) return false;
-      if (payload?.kind === "answer" || payload?.kind === "recommendation") return false;
-
-      // A terminal queue update can become visible a moment before the
-      // separately stored artifact transport. Keep checking briefly so a real
-      // runtime file replaces an early "not produced" projection automatically.
-      const status = runQuery.data?.status ?? "";
-      if (!TERMINAL.has(status)) return 3000;
-      const completedAt = runQuery.data?.completed_at
-        ? Date.parse(runQuery.data.completed_at)
-        : Number.NaN;
-      return Number.isFinite(completedAt) && Date.now() - completedAt < 15000
-        ? 2000
-        : false;
-    },
+    // Poll until the server says the final delivery has been assessed. The
+    // server never reports "completed" while the governed run is still going.
+    refetchInterval: (q) => (active && q.state.data?.status !== "completed" ? 2500 : false),
     retry: false,
   });
 
@@ -345,7 +330,7 @@ export function Engage() {
   let delivery: ObjectiveDelivery | null = null;
   let invalidDelivery: string | null = null;
   let notProduced: string | null = null;
-  if (deliveryQuery.data?.status === "completed" && run) {
+  if (deliveryQuery.data?.status === "completed" && run && TERMINAL.has(run.status)) {
     try {
       const parsed = parseDelivery(deliveryQuery.data.response_payload);
       // Re-check on screen too: a stale projection must never pass as a result.
@@ -604,8 +589,15 @@ export function Engage() {
             <p className="label-eyebrow text-primary">YOUR ANSWER</p>
             <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
             <p role="status" className="mt-3 text-sm text-foreground/90">
-              {statusText(run, produced)}
+              {run.status === "verified" && produced === null && deliveryQuery.data?.note
+                ? deliveryQuery.data.note
+                : statusText(run, produced)}
             </p>
+            {delivery && deliveryQuery.data?.source === "external_draft" && (
+              <p className="mt-2 inline-block rounded-full border border-gold/40 px-3 py-1 text-xs tracking-wide text-gold">
+                EXTERNAL DRAFT · UNVERIFIED — not ASCENSION verified
+              </p>
+            )}
           </div>
 
           {delivery ? (
@@ -613,6 +605,9 @@ export function Engage() {
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">
               <p className="whitespace-pre-wrap text-foreground">{notProduced}</p>
+              {deliveryQuery.data?.error && (
+                <p className="mt-3 text-sm text-foreground/85">{deliveryQuery.data.error}</p>
+              )}
               <p className="mt-3 text-sm text-muted-foreground">
                 A finished or verified run is not the same as your result. Nothing here is
                 offered for download.
@@ -623,7 +618,7 @@ export function Engage() {
                 onClick={() => prepare.mutate({ id: run.id, retry: true })}
                 className="mt-4 min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary"
               >
-                CHECK FOR RESULT
+                {deliveryQuery.data?.error ? "RETRY DRAFT" : "CHECK FOR RESULT"}
               </button>
             </div>
           ) : deliveryError ? (

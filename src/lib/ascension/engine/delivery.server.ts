@@ -121,10 +121,10 @@ export function governedDelivery(
     : [];
 
   return parseDelivery({
-    kind: assessment.kind === "answer" ? "answer" : "artifact",
+    kind: assessment.kind === "answer" || assessment.kind === "design" ? "answer" : "artifact",
     title: titleSource.slice(0, 200) || "ASCENSION result",
     body: body.slice(0, 40000),
-    files: assessment.kind === "answer" ? [] : assessment.files,
+    files: assessment.kind === "answer" || assessment.kind === "design" ? [] : assessment.files,
     limitations: [
       ...answerLimitations,
       ...(missingReceipts.length
@@ -198,7 +198,7 @@ export async function externalProductDraft(
 
   return {
     ...parsed,
-    files: check.kind === "answer" ? [] : check.files,
+    files: check.kind === "answer" || check.kind === "design" ? [] : check.files,
     limitations: [
       ...parsed.limitations,
       "External model draft. ASCENSION governed execution, verification, and persistence remain separate.",

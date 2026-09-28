@@ -20,28 +20,22 @@ from .local_answer import generate_local_draft
 class LocalAnswerWorker(CloudQueueWorker):
     def process_pending(self, pending):
         cloud_id = pending["cloud_request_id"]
-        local_id = pending["local_request_id"]
-        previous = self.store.load(local_id)
-        if not previous or previous.get("status") not in {
-            "PERSISTED", "REJECTED", "FAILED", "VERIFIED_UNPUBLISHED",
-            "BLOCKED_TRANSACTION_RECOVERY",
-        }:
-            try:
-                draft = generate_local_draft(
-                    pending["objective"], pending["evidence"], pending["constraints"]
-                )
-                self.client.report(
-                    cloud_id,
-                    "running",
-                    stage="local_answer_delivered",
-                    draft=draft,
-                    draft_model=os.getenv("LOCAL_LLM_MODEL", "qwen3-ascension"),
-                )
-            except Exception as exc:
-                # A failed draft does not become governed success. The core can
-                # still execute; the website shows a missing result honestly.
-                print(json.dumps({"local_draft": "failed", "request_id": cloud_id,
-                                  "error": str(exc)[:500]}), flush=True)
+        try:
+            draft = generate_local_draft(
+                pending["objective"], pending["evidence"], pending["constraints"]
+            )
+            self.client.report(
+                cloud_id,
+                "running",
+                stage="local_answer_delivered",
+                draft=draft,
+                draft_model=os.getenv("LOCAL_LLM_MODEL", "qwen3-ascension"),
+            )
+        except Exception as exc:
+            # A failed draft does not become governed success. The core can
+            # still execute; the website shows a missing result honestly.
+            print(json.dumps({"local_draft": "failed", "request_id": cloud_id,
+                              "error": str(exc)[:500]}), flush=True)
         return super().process_pending(pending)
 
 

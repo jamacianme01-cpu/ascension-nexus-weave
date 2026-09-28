@@ -64,8 +64,8 @@ function download(name: string, content: string) {
 }
 
 function statusText(run: ObjectiveRun, produced: boolean | null) {
-  if (run.status === "queued") return "Waiting for your ASCENSION runtime to pick this up.";
-  if (run.status === "claimed" || run.status === "running") return "Your ASCENSION runtime is working on this.";
+  if (run.status === "queued") return "Objective received. Waiting for ASCENSION runtime.";
+  if (run.status === "claimed" || run.status === "running") return "ASCENSION is processing your objective.";
   if (run.status === "rejected") return "Governance rejected this objective.";
   if (run.status === "failed") return "The run failed.";
   if (run.status === "verified")
@@ -134,7 +134,7 @@ function InspectDetails({ run }: { run: ObjectiveRun }) {
   return (
     <details className="rounded-xl border border-border/70 px-4 py-3">
       <summary className="cursor-pointer text-sm text-muted-foreground">
-        Inspect
+        Proof / verification
       </summary>
       <div className="mt-4 space-y-3 text-sm leading-relaxed">
         <p>Guardian: {run.guardian_verdict ?? "not published"}</p>
@@ -596,7 +596,7 @@ export function Engage() {
           className="mx-auto max-w-4xl scroll-mt-24 space-y-5 rounded-2xl border border-primary/30 bg-void/80 p-5 shadow-2xl sm:p-7"
         >
           <div>
-            <p className="label-eyebrow text-primary">YOUR ANSWER</p>
+            <p className="label-eyebrow text-primary">ASCENSION RESPONSE</p>
             <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
             <p role="status" className="mt-3 text-sm text-foreground/90">
               {delivery && deliveryQuery.data?.source === "external_draft"

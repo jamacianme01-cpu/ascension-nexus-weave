@@ -28,6 +28,12 @@ if (!$model) { throw ('A local answer model is needed. Installed models: ' + ($n
 Copy-Item (Join-Path $PSScriptRoot 'local_answer.py') (Join-Path $core 'local_answer.py') -Force
 Copy-Item (Join-Path $PSScriptRoot 'local_queue_worker.py') (Join-Path $core 'local_queue_worker.py') -Force
 
+Set-Location $runtimeRepo
+$env:LOCAL_LLM_BASE_URL = 'http://127.0.0.1:11434/v1'
+$env:LOCAL_LLM_MODEL = $model
+& python -B -c "from ASCENSION_CORE.local_answer import generate_local_draft; d = generate_local_draft('Why do leaves change color in autumn?'); assert d['kind'] == 'answer' and len(d['body']) >= 80; print('Local answer check passed: ' + d['body'][:180])"
+if ($LASTEXITCODE -ne 0) { throw 'The installed local model did not produce an answer. The worker was not started.' }
+
 $runner = Join-Path $runtimeRepo 'run_ascension_answer_worker.ps1'
 $runnerText = @'
 $ErrorActionPreference = 'Stop'

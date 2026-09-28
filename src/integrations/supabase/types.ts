@@ -265,6 +265,18 @@ export type Database = {
         Args: { p_guest_token: string; p_request_id: string }
         Returns: Json
       }
+      ascension_guest_draft: {
+        Args: {
+          p_action: string
+          p_error: string
+          p_expected_created_at: string
+          p_guest_token: string
+          p_payload: Json
+          p_request_id: string
+          p_source_key: string
+        }
+        Returns: boolean
+      }
       ascension_guest_hash: { Args: { p_guest_key: string }; Returns: string }
       ascension_guest_status: {
         Args: { p_guest_token: string; p_request_id: string }

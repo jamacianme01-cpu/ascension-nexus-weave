@@ -10,26 +10,21 @@ import { formatKnowledgeEvidence, retrieveKnowledge } from "./knowledge.server";
 
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_MODEL = "glm-4.6";
-// Local answer engine (OpenAI-compatible, e.g. Ollama at localhost:11434).
-// Used only when no hosted ZAI_API_KEY is configured, so ENGAGE can still
-// return real text without any credential leaving the machine.
-const DEFAULT_LOCAL_BASE_URL = "http://localhost:11434/v1";
+const LOVABLE_BASE_URL = "https://ai.gateway.lovable.dev/v1";
+const LOVABLE_MODEL = "google/gemini-3.1-flash-lite";
+// Local answer engine remains available for local development only when an
+// explicit LOCAL_LLM_BASE_URL is configured. Production ENGAGE uses Lovable AI.
 const DEFAULT_LOCAL_MODEL = "qwen3:4b";
 const LOCAL_MAX_TOKENS = 4096;
 
 function localLlmConfig() {
-  return {
-    baseUrl: (process.env["LOCAL_LLM_BASE_URL"]?.trim() || DEFAULT_LOCAL_BASE_URL).replace(
-      /\/+$/,
-      "",
-    ),
-    model: process.env["LOCAL_LLM_MODEL"]?.trim() || DEFAULT_LOCAL_MODEL,
-  };
-}
-
-/** True when no hosted key exists and the local engine is not explicitly disabled. */
-function usingLocalEngine(): boolean {
-  return !process.env["ZAI_API_KEY"]?.trim() && process.env["LOCAL_LLM_BASE_URL"]?.trim() !== "";
+  const baseUrl = process.env["LOCAL_LLM_BASE_URL"]?.trim();
+  return baseUrl
+    ? {
+        baseUrl: baseUrl.replace(/\/+$/, ""),
+        model: process.env["LOCAL_LLM_MODEL"]?.trim() || DEFAULT_LOCAL_MODEL,
+      }
+    : null;
 }
 
 /** Strip a local model's inline reasoning block if it leaks into content. */
@@ -54,10 +49,13 @@ export class ZaiEngineError extends Error {
 }
 
 export function zaiModel(): string {
+  if (process.env["LOVABLE_API_KEY"]?.trim()) {
+    return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
+  }
   const hosted = process.env["ZAI_MODEL"]?.trim();
-  if (hosted) return hosted;
+  if (hosted && process.env["ZAI_API_KEY"]?.trim()) return hosted;
   if (process.env["ZAI_API_KEY"]?.trim()) return DEFAULT_MODEL;
-  return localLlmConfig().model;
+  return localLlmConfig()?.model || LOVABLE_MODEL;
 }
 
 function zaiBaseUrl(): string {
@@ -130,8 +128,9 @@ async function readStream(response: Response): Promise<string> {
   return text;
 }
 
-/** One streamed engine call — hosted Z.AI when a key exists, otherwise the
- *  local OpenAI-compatible engine — with live external knowledge as evidence. */
+/** One streamed engine call. Production prefers Lovable's built-in AI gateway;
+ *  Z.AI is used only when explicitly configured, and a local OpenAI-compatible
+ *  engine is used only when LOCAL_LLM_BASE_URL is explicitly set. */
 export async function callZai(input: {
   system: string;
   user: string;
@@ -139,11 +138,13 @@ export async function callZai(input: {
   knowledgeQuery?: string;
   temperature?: number;
 }): Promise<ZaiCallResult> {
-  const apiKey = process.env["ZAI_API_KEY"]?.trim();
-  const local = !apiKey ? localLlmConfig() : null;
-  if (!apiKey && !local) {
+  const lovableKey = process.env["LOVABLE_API_KEY"]?.trim();
+  const zaiKey = process.env["ZAI_API_KEY"]?.trim();
+  const local = !lovableKey && !zaiKey ? localLlmConfig() : null;
+  const provider = lovableKey ? "lovable" : zaiKey ? "zai" : local ? "local" : null;
+  if (!provider) {
     throw new ZaiEngineError(
-      "ZAI_API_KEY is not configured; the hosted Z.AI engine is unavailable.",
+      "No answer engine is configured. Lovable AI should provide LOVABLE_API_KEY in deployed projects.",
     );
   }
 
@@ -162,33 +163,38 @@ export async function callZai(input: {
     "Do not claim retrieved information is ASCENSION VERIFIED or PERSISTED. Preserve source URLs when relying on it.",
   ].join(" ");
   // Local engines run smaller context windows; keep retrieved evidence compact.
-  const knowledgeForPrompt = local ? knowledgeText.slice(0, 2400) : knowledgeText;
+  const knowledgeForPrompt = provider === "local" ? knowledgeText.slice(0, 2400) : knowledgeText;
   const user = `${input.user}\n\nEXTERNAL KNOWLEDGE (retrieved evidence; not governed state):\n${knowledgeForPrompt}`;
 
   const model = zaiModel();
   const started = Date.now();
+  const baseUrl =
+    provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai" ? zaiBaseUrl() : local!.baseUrl;
+  const apiKey = provider === "lovable" ? lovableKey : provider === "zai" ? zaiKey : null;
   let response: Response;
   try {
-    response = await fetch(`${local ? local.baseUrl : zaiBaseUrl()}/chat/completions`, {
+    response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      signal: AbortSignal.timeout(local ? 180000 : 90000),
-      headers: local
-        ? {
-            "Content-Type": "application/json",
-            Accept: "text/event-stream",
-          }
-        : {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-            Accept: "text/event-stream",
-          },
+      signal: AbortSignal.timeout(provider === "local" ? 180000 : 90000),
+      headers:
+        provider === "local"
+          ? {
+              "Content-Type": "application/json",
+              Accept: "text/event-stream",
+            }
+          : {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+              ...(provider === "lovable" ? { "Lovable-API-Key": apiKey! } : {}),
+              Accept: "text/event-stream",
+            },
       body: JSON.stringify({
         model,
         stream: true,
         temperature: input.temperature ?? 0.2,
         // Local reasoning models budget their thinking inside max_tokens;
         // without headroom the visible answer can come back empty.
-        ...(local ? { max_tokens: LOCAL_MAX_TOKENS } : {}),
+        ...(provider === "local" ? { max_tokens: LOCAL_MAX_TOKENS } : {}),
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -197,18 +203,20 @@ export async function callZai(input: {
     });
   } catch (cause) {
     const detail = cause instanceof Error ? cause.message : String(cause);
-    if (local) {
+    if (provider === "local") {
       throw new ZaiEngineError(
-        `The local answer engine at ${local.baseUrl} is unreachable (${detail}). Set ZAI_API_KEY to use the hosted Z.AI engine, or start the local engine.`,
+        `The local answer engine at ${local!.baseUrl} is unreachable (${detail}).`,
       );
     }
-    throw new ZaiEngineError(`Z.AI request failed: ${detail}`);
+    throw new ZaiEngineError(
+      `${provider === "lovable" ? "Lovable AI" : "Z.AI"} request failed: ${detail}`,
+    );
   }
 
   if (!response.ok) {
     const detail = (await response.text().catch(() => "")).slice(0, 2000);
     throw new ZaiEngineError(
-      `${local ? `The local answer engine (${local.baseUrl})` : "Z.AI"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
+      `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : provider === "lovable" ? "Lovable AI" : "Z.AI"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
       response.status,
     );
   }
@@ -216,7 +224,7 @@ export async function callZai(input: {
   const text = stripInlineReasoning(await readStream(response));
   if (!text.trim()) {
     throw new ZaiEngineError(
-      `${local ? "The local answer engine" : "Z.AI"} returned an empty response`,
+      `${provider === "local" ? "The local answer engine" : provider === "lovable" ? "Lovable AI" : "Z.AI"} returned an empty response`,
       response.status,
     );
   }

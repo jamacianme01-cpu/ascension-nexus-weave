@@ -47,6 +47,7 @@ interface GuestBundle {
     response_payload: Json | null;
     status: string;
   } | null;
+  draft_stage?: unknown;
 }
 
 export interface GuestDeliveryState {
@@ -56,6 +57,8 @@ export interface GuestDeliveryState {
   error: string | null;
   engine_model: string | null;
   engine_label: string;
+  note?: string | null;
+  source?: "governed" | "external_draft" | null;
 }
 
 export const submitGuestObjective = createServerFn({ method: "POST" })
@@ -122,6 +125,7 @@ export const getGuestObjectiveStatus = createServerFn({ method: "GET" })
 async function projectGuestDelivery(
   requestId: string,
   guestToken: string,
+  retry: boolean,
 ): Promise<GuestDeliveryState | null> {
   const bundle = await rpc<GuestBundle>("ascension_guest_bundle", {
     p_request_id: requestId,
@@ -129,52 +133,41 @@ async function projectGuestDelivery(
   });
   if (!bundle?.run) return null;
 
-  const stored = bundle.delivery_stage;
-  if (
-    stored?.status === "completed" &&
-    stored.engine_label === "GOVERNED_RUNTIME_RESULT_V2" &&
-    stored.response_payload
-  ) {
-    return stored;
-  }
-
-  if (
-    bundle.run.result === null ||
-    bundle.artifact_stage?.status !== "completed" ||
-    !bundle.artifact_stage.response_payload
-  ) {
-    return {
-      created_at: stored?.created_at ?? bundle.run.created_at,
-      status: "running",
-      response_payload: null,
-      error: null,
-      engine_model: "governed-runtime",
-      engine_label: "GUEST_RUNTIME_RESULT_V2",
-    };
-  }
-
-  const { projectRuntimeDelivery } = await import("./engine/delivery.server");
-  const delivery = await projectRuntimeDelivery(
-    { objective: bundle.run.objective, result: bundle.run.result },
-    bundle.artifact_stage?.status === "completed"
-      ? bundle.artifact_stage.response_payload
-      : null,
-  );
-
-  return {
-    created_at: stored?.created_at ?? bundle.run.completed_at ?? bundle.run.updated_at,
-    status: delivery ? "completed" : "running",
-    response_payload: delivery as unknown as Json,
-    error: null,
-    engine_model: "governed-runtime",
-    engine_label: "GUEST_RUNTIME_RESULT_V2",
-  };
+  const engine = await import("./engine/delivery.server");
+  const draftRpc = (action: string, sourceKey: string, extra: Record<string, unknown> = {}) =>
+    rpc<boolean>("ascension_guest_draft", {
+      p_request_id: requestId,
+      p_guest_token: guestToken,
+      p_action: action,
+      p_source_key: sourceKey,
+      p_expected_created_at: null,
+      p_payload: null,
+      p_error: null,
+      ...extra,
+    });
+  const state = await engine.resolveDelivery({
+    run: bundle.run,
+    artifactStage: bundle.artifact_stage,
+    draft: engine.draftFromStage(bundle.draft_stage),
+    retry,
+    store: {
+      claim: async (key, expected) =>
+        (await draftRpc("claim", key, { p_expected_created_at: expected })) === true,
+      complete: async (key, payload) => {
+        await draftRpc("complete", key, { p_payload: payload });
+      },
+      fail: async (key, message) => {
+        await draftRpc("fail", key, { p_error: message });
+      },
+    },
+  });
+  return state as unknown as GuestDeliveryState;
 }
 
 export const getGuestObjectiveDelivery = createServerFn({ method: "GET" })
   .inputValidator(validateRequest)
-  .handler(async ({ data }) => projectGuestDelivery(data.requestId, data.guestToken));
+  .handler(async ({ data }) => projectGuestDelivery(data.requestId, data.guestToken, false));
 
 export const prepareGuestObjectiveDelivery = createServerFn({ method: "POST" })
   .inputValidator(validateRequest)
-  .handler(async ({ data }) => projectGuestDelivery(data.requestId, data.guestToken));
+  .handler(async ({ data }) => projectGuestDelivery(data.requestId, data.guestToken, data.retry));

@@ -10,6 +10,8 @@ export interface DeliveryState {
   error: string | null;
   engine_model: string | null;
   engine_label: string;
+  note?: string | null;
+  source?: "governed" | "external_draft" | null;
 }
 
 function validate(input: { requestId: string; retry?: boolean }) {
@@ -17,65 +19,53 @@ function validate(input: { requestId: string; retry?: boolean }) {
   return { requestId: input.requestId, retry: input.retry === true };
 }
 
-function hasDownloadableFiles(value: unknown): boolean {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const files = (value as Record<string, unknown>)["files"];
-  return Array.isArray(files) && files.length > 0;
+async function resolveForOwner(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  userId: string,
+  requestId: string,
+  retry: boolean,
+): Promise<DeliveryState | null> {
+  const { data: run, error } = await supabase
+    .from("ascension_execution_requests")
+    .select("id, objective, status, result, completed_at, updated_at, created_at")
+    .eq("id", requestId)
+    .eq("submitted_by", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!run) return null;
+  const { data: stages, error: stageError } = await supabase
+    .from("ascension_run_stages")
+    .select("ordinal, status, response_payload, error, engine_model, created_at, request_payload")
+    .eq("request_id", requestId)
+    .in("ordinal", [101, 102]);
+  if (stageError) throw new Error(stageError.message);
+  const byOrdinal = (n: number) =>
+    (stages as { ordinal: number }[] | null)?.find((s) => s.ordinal === n) ?? null;
+  const engine = await import("./engine/delivery.server");
+  return engine.resolveDelivery({
+    run,
+    artifactStage: byOrdinal(101) as { status: string; response_payload: unknown } | null,
+    draft: engine.draftFromStage(byOrdinal(102)),
+    store: await engine.adminDraftStore(requestId),
+    retry,
+  });
 }
 
-/**
- * Read the user-facing projection of the governed runtime result.
- *
- * While the runtime is still working, the delivery remains running and this
- * endpoint is polled. Once the runtime publishes its result, that recorded
- * result becomes the delivery. If artifact transport arrives after the result,
- * a later read re-projects the same governed result with downloadable files.
- */
+/** Read what the answer panel should show for this run (never terminal mid-run). */
 export const getObjectiveDelivery = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
-  .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
-      .from("ascension_run_stages")
-      .select("status, response_payload, error, engine_model, engine_label, created_at")
-      .eq("request_id", data.requestId)
-      .eq("ordinal", DELIVERY_ORDINAL)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (
-      row?.status === "completed" &&
-      row.engine_label === "GOVERNED_RUNTIME_RESULT_V2" &&
-      hasDownloadableFiles(row.response_payload)
-    ) {
-      return row as unknown as DeliveryState;
-    }
+  .handler(async ({ data, context }) =>
+    resolveForOwner(context.supabase, context.userId, data.requestId, false),
+  );
 
-    const { data: run, error: runError } = await context.supabase
-      .from("ascension_execution_requests")
-      .select("id, objective, evidence, constraints, result, submitted_by")
-      .eq("id", data.requestId)
-      .eq("submitted_by", context.userId)
-      .maybeSingle();
-    if (runError) throw new Error(runError.message);
-    if (!run) return row as unknown as DeliveryState | null;
-
-    const { prepareDelivery } = await import("./engine/delivery.server");
-    return (await prepareDelivery(run, row?.status === "failed")) as unknown as DeliveryState | null;
-  });
-
-/** Re-project the latest governed runtime result for this objective. */
+/** Same as above, but a retry re-runs a failed external draft. */
 export const prepareObjectiveDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
-    const { data: run, error } = await context.supabase
-      .from("ascension_execution_requests")
-      .select("id, objective, evidence, constraints, result, engine, status, submitted_by")
-      .eq("id", data.requestId)
-      .eq("submitted_by", context.userId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!run) throw new Error("This objective is unavailable to your account.");
-    const { prepareDelivery } = await import("./engine/delivery.server");
-    return prepareDelivery(run, data.retry);
+    const state = await resolveForOwner(context.supabase, context.userId, data.requestId, data.retry);
+    if (!state) throw new Error("This objective is unavailable to your account.");
+    return state;
   });

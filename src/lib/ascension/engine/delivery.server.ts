@@ -1,4 +1,3 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { assessResult, notProducedMessage, parseDelivery, type ObjectiveDelivery } from "../result-model";
 
@@ -122,10 +121,10 @@ export function governedDelivery(
     : [];
 
   return parseDelivery({
-    kind: assessment.kind === "answer" ? "answer" : "artifact",
+    kind: assessment.kind === "answer" || assessment.kind === "design" ? "answer" : "artifact",
     title: titleSource.slice(0, 200) || "ASCENSION result",
     body: body.slice(0, 40000),
-    files: assessment.kind === "answer" ? [] : assessment.files,
+    files: assessment.kind === "answer" || assessment.kind === "design" ? [] : assessment.files,
     limitations: [
       ...answerLimitations,
       ...(missingReceipts.length
@@ -135,13 +134,13 @@ export function governedDelivery(
   });
 }
 
-async function externalProductDraft(
+export async function externalProductDraft(
   run: {
     objective: string;
     result: Json | null;
   },
   transportedFiles: { name: string; content: string }[],
-): Promise<ObjectiveDelivery | null> {
+): Promise<ObjectiveDelivery> {
   const { callZai } = await import("./zai.server");
 
   const artifactContext = transportedFiles
@@ -192,11 +191,14 @@ async function externalProductDraft(
 
   const parsed = parseDelivery(candidate);
   const check = assessResult(run.objective, parsed.body, parsed.files);
-  if (!check.produced) return null;
+  if (!check.produced || parsed.kind === "not_produced")
+    throw new Error(
+      `the external engine did not return a substantive result${check.reason ? ` (${check.reason})` : ""}`,
+    );
 
   return {
     ...parsed,
-    files: check.kind === "answer" ? [] : check.files,
+    files: check.kind === "answer" || check.kind === "design" ? [] : check.files,
     limitations: [
       ...parsed.limitations,
       "External model draft. ASCENSION governed execution, verification, and persistence remain separate.",
@@ -204,135 +206,269 @@ async function externalProductDraft(
   };
 }
 
-export async function projectRuntimeDelivery(
-  run: {
-    objective: string;
-    result: Json | null;
-  },
-  artifactPayload: unknown,
-) {
-  const files = artifactFiles(artifactPayload);
-  const projected = governedDelivery(run, files);
-  if (!projected || projected.kind !== "not_produced") return projected;
 
-  try {
-    return (await externalProductDraft(run, files)) ?? projected;
-  } catch (cause) {
-    return parseDelivery({
-      ...projected,
-      limitations: [
-        ...projected.limitations,
-        `The external product-result generator is unavailable: ${cause instanceof Error ? cause.message : String(cause)}`,
-      ],
+/* ------------------------------------------------------------------ */
+/* Delivery resolution shared by the signed-in and guest paths.        */
+/* ------------------------------------------------------------------ */
+
+export const TERMINAL_STATUSES = new Set(["verified", "rejected", "failed"]);
+export const DRAFT_ORDINAL = 102;
+export const DRAFT_LABEL = "ZAI_EXTERNAL_RESULT";
+/** How long a verified run waits for its separately transported files. */
+export const ARTIFACT_GRACE_MS = 90_000;
+/** A draft left "running" longer than this is considered abandoned. */
+export const DRAFT_STALE_MS = 180_000;
+
+export interface ResolvedDelivery {
+  created_at: string;
+  status: "running" | "completed";
+  response_payload: ObjectiveDelivery | null;
+  error: string | null;
+  engine_model: string | null;
+  engine_label: string;
+  /** Plain-language description of what is still pending. */
+  note: string | null;
+  /** "governed" projection of the runtime result, or the external unverified draft. */
+  source: "governed" | "external_draft" | null;
+}
+
+export interface DraftRow {
+  status: string;
+  created_at: string;
+  response_payload: unknown;
+  error: string | null;
+  engine_model: string | null;
+  source_key: string | null;
+}
+
+export interface DraftStore {
+  claim(sourceKey: string, expectedCreatedAt: string | null): Promise<boolean>;
+  complete(sourceKey: string, payload: ObjectiveDelivery): Promise<void>;
+  fail(sourceKey: string, message: string): Promise<void>;
+}
+
+export interface DeliveryRun {
+  id: string;
+  objective: string;
+  status: string;
+  result: Json | null;
+  completed_at: string | null;
+  updated_at?: string | null;
+  created_at: string;
+}
+
+/** Stable identity of the transported artifacts a projection was made from. */
+export function artifactSourceKey(runId: string, files: { name: string; content: string }[]) {
+  let h = 2166136261;
+  const text = files.map((f) => `${f.name}:${f.content.length}:${f.content}`).join("\u0000");
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
+  return `${runId}:${files.length}:${h.toString(16)}`;
+}
+
+export function draftFromStage(stage: unknown): DraftRow | null {
+  const s = record(stage);
+  if (!Object.keys(s).length) return null;
+  return {
+    status: String(s["status"] ?? ""),
+    created_at: String(s["created_at"] ?? ""),
+    response_payload: s["response_payload"] ?? null,
+    error: typeof s["error"] === "string" ? s["error"] : null,
+    engine_model: typeof s["engine_model"] === "string" ? s["engine_model"] : null,
+    source_key:
+      typeof record(s["request_payload"])["source_key"] === "string"
+        ? (record(s["request_payload"])["source_key"] as string)
+        : null,
+  };
+}
+
+type DraftGenerator = typeof externalProductDraft;
+
+/**
+ * Decide what the answer panel shows. Never terminal while the governed run is
+ * still running; never sticky when later artifacts arrive (the projection is
+ * recomputed from the current artifacts every read, which is cheap and makes
+ * no model call); the external draft is generated at most once per artifact
+ * set because a stage row must be claimed first.
+ */
+export async function resolveDelivery(args: {
+  run: DeliveryRun;
+  artifactStage: { status: string; response_payload: unknown } | null;
+  draft: DraftRow | null;
+  store: DraftStore;
+  retry: boolean;
+  now?: number;
+  generate?: DraftGenerator;
+}): Promise<ResolvedDelivery> {
+  const { run, artifactStage, draft, store, retry } = args;
+  const now = args.now ?? Date.now();
+  const generate = args.generate ?? externalProductDraft;
+  const base = {
+    created_at: run.completed_at ?? run.updated_at ?? run.created_at,
+    error: null,
+    engine_model: "governed-runtime",
+    engine_label: LABEL,
+    source: null,
+  } as const;
+  const pending = (note: string, extra: Partial<ResolvedDelivery> = {}): ResolvedDelivery => ({
+    ...base,
+    status: "running",
+    response_payload: null,
+    note,
+    ...extra,
+  });
+
+  if (!TERMINAL_STATUSES.has(run.status)) {
+    return pending(
+      run.status === "queued"
+        ? "Waiting for your ASCENSION runtime to pick this up."
+        : "Your ASCENSION runtime is working on this.",
+    );
+  }
+  if (run.status !== "verified") {
+    return { ...base, status: "completed", response_payload: null, note: null };
+  }
+
+  const files =
+    artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
+  const finishedAt = Date.parse(run.completed_at ?? run.updated_at ?? "");
+  if (!files.length && Number.isFinite(finishedAt) && now - finishedAt < ARTIFACT_GRACE_MS) {
+    return pending("The run finished. Waiting for its files to arrive.");
+  }
+
+  const governed = governedDelivery(run, files);
+  if (!governed) {
+    return {
+      ...base,
+      status: "completed",
+      response_payload: null,
+      error: "The runtime marked this run verified but returned no result record.",
+      note: null,
+    };
+  }
+  if (governed.kind !== "not_produced") {
+    return { ...base, status: "completed", response_payload: governed, note: null, source: "governed" };
+  }
+
+  // The governed result is not the thing that was asked for. Ask the external
+  // engine for a clearly unverified draft — once per artifact set.
+  const sourceKey = artifactSourceKey(run.id, files);
+  const draftBase = { ...base, engine_label: DRAFT_LABEL, engine_model: draft?.engine_model ?? null };
+  const sameSource = draft?.source_key === sourceKey;
+
+  if (draft?.status === "completed" && sameSource) {
+    try {
+      return {
+        ...draftBase,
+        created_at: draft.created_at,
+        status: "completed",
+        response_payload: parseDelivery(draft.response_payload),
+        note: null,
+        source: "external_draft",
+      };
+    } catch {
+      // A stored draft that no longer validates is regenerated below.
+    }
+  }
+  const running = draft?.status === "running";
+  const fresh = running && now - Date.parse(draft!.created_at) < DRAFT_STALE_MS;
+  if (running && fresh) {
+    return pending("Your governed result is not the requested output. Writing an unverified draft…", {
+      engine_label: DRAFT_LABEL,
     });
+  }
+  const failed = (message: string): ResolvedDelivery => ({
+    ...draftBase,
+    status: "completed",
+    response_payload: governed,
+    error: `The external result engine failed: ${message}`,
+    note: null,
+    source: "governed",
+  });
+  if (draft?.status === "failed" && sameSource && !retry) return failed(draft.error ?? "unknown error");
+
+  const claimed = await store.claim(sourceKey, draft ? draft.created_at : null);
+  if (!claimed) {
+    return pending("An unverified draft is being prepared…", { engine_label: DRAFT_LABEL });
+  }
+  try {
+    const produced = await generate(run, files);
+    await store.complete(sourceKey, produced);
+    return {
+      ...draftBase,
+      created_at: new Date(now).toISOString(),
+      status: "completed",
+      response_payload: produced,
+      note: null,
+      source: "external_draft",
+    };
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    await store.fail(sourceKey, message).catch(() => undefined);
+    return failed(message);
   }
 }
 
-export async function prepareDelivery(
-  run: {
-    id: string;
-    objective: string;
-    evidence: Json | null;
-    constraints: Json | null;
-    result: Json | null;
-  },
-  retry: boolean,
-) {
-  void retry;
+/** Signed-in path: stage writes go through the server-only admin client. */
+export async function adminDraftStore(runId: string): Promise<DraftStore> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const table = () => supabaseAdmin.from("ascension_run_stages");
-  const read = async () => {
-    const { data, error } = await table()
-      .select("status, response_payload, error, engine_model, engine_label, created_at")
-      .eq("request_id", run.id)
-      .eq("ordinal", ORDINAL)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    return data;
-  };
-  const readArtifacts = async () => {
-    const { data, error } = await table()
-      .select("status, response_payload")
-      .eq("request_id", run.id)
-      .eq("ordinal", ARTIFACT_ORDINAL)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
-  const [current, artifactStage] = await Promise.all([read(), readArtifacts()]);
-  const files =
-    artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
-
-  // Once the governed projection is complete, leave it alone until artifact
-  // transport arrives. This avoids rewriting the same result on every poll.
-  if (current?.status === "completed" && current.engine_label === LABEL && files.length === 0)
-    return current;
-
-  const delivery = await projectRuntimeDelivery(run, { files });
-
-  if (delivery) {
-    const completedAt = new Date().toISOString();
-    if (current) {
-      const { error } = await table()
-        .update({
-          status: "completed",
-          response_payload: delivery as unknown as Json,
-          response_text: delivery.body,
-          error: null,
-          engine_label: LABEL,
-          engine_model: MODEL,
-          duration_ms: 0,
-          completed_at: completedAt,
-        })
-        .eq("request_id", run.id)
-        .eq("ordinal", ORDINAL);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await table().insert({
-        request_id: run.id,
-        ordinal: ORDINAL,
-        stage: "user_result",
-        status: "completed",
-        response_payload: delivery as unknown as Json,
-        response_text: delivery.body,
-        engine_label: LABEL,
-        engine_model: MODEL,
-        duration_ms: 0,
-        completed_at: completedAt,
-      });
-      if (error?.code !== "23505" && error) throw new Error(error.message);
-    }
-    return read();
-  }
-
-  if (current?.status === "completed") return current;
-
-  if (current) {
-    if (current.status !== "running" || current.error || current.engine_label !== LABEL) {
-      const { error } = await table()
+  return {
+    async claim(sourceKey, expectedCreatedAt) {
+      if (expectedCreatedAt === null) {
+        const { error } = await table().insert({
+          request_id: runId,
+          ordinal: DRAFT_ORDINAL,
+          stage: "external_result",
+          engine_label: DRAFT_LABEL,
+          status: "running",
+          request_payload: { source_key: sourceKey, attempts: 1 },
+        });
+        if (error?.code === "23505") return false;
+        if (error) throw new Error(error.message);
+        return true;
+      }
+      const stale = new Date(Date.now() - DRAFT_STALE_MS).toISOString();
+      const { data, error } = await table()
         .update({
           status: "running",
           error: null,
+          response_payload: null,
+          response_text: null,
           completed_at: null,
-          engine_label: LABEL,
-          engine_model: MODEL,
           created_at: new Date().toISOString(),
+          request_payload: { source_key: sourceKey },
         })
-        .eq("request_id", run.id)
-        .eq("ordinal", ORDINAL);
+        .eq("request_id", runId)
+        .eq("ordinal", DRAFT_ORDINAL)
+        .eq("created_at", expectedCreatedAt)
+        .or(`status.neq.running,created_at.lt.${stale}`)
+        .select("id");
       if (error) throw new Error(error.message);
-    }
-    return read();
-  }
-
-  const { error } = await table().insert({
-    request_id: run.id,
-    ordinal: ORDINAL,
-    stage: "user_result",
-    status: "running",
-    engine_label: LABEL,
-    engine_model: MODEL,
-  });
-  if (error?.code !== "23505" && error) throw new Error(error.message);
-  return read();
+      return (data?.length ?? 0) === 1;
+    },
+    async complete(sourceKey, payload) {
+      const { error } = await table()
+        .update({
+          status: "completed",
+          response_payload: payload as unknown as Json,
+          response_text: payload.body,
+          engine_model: "external",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("request_id", runId)
+        .eq("ordinal", DRAFT_ORDINAL)
+        .eq("status", "running")
+        .eq("request_payload->>source_key", sourceKey);
+      if (error) throw new Error(error.message);
+    },
+    async fail(sourceKey, message) {
+      const { error } = await table()
+        .update({ status: "failed", error: message.slice(0, 2000), completed_at: new Date().toISOString() })
+        .eq("request_id", runId)
+        .eq("ordinal", DRAFT_ORDINAL)
+        .eq("status", "running")
+        .eq("request_payload->>source_key", sourceKey);
+      if (error) throw new Error(error.message);
+    },
+  };
 }

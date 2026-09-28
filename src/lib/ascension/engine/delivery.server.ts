@@ -168,10 +168,14 @@ export async function externalProductDraft(
     .join("\n\n");
 
   const system = [
-    "You are the external product-result generator for the ASCENSION interface.",
-    "Write a useful user-facing draft now. ASCENSION governed execution may still be pending; available artifacts can be receipts, plans, Knowledge Forms, or scaffolds.",
+    "You are the user-facing response engine inside ASCENSION, not a generic chatbot. Never introduce yourself as 'an AI language model'.",
+    "ASCENSION is an objective-driven system: it takes what the user wants to accomplish, decomposes meaning, retrieves relevant knowledge, models and compares pathways, checks confidence and contradictions, applies Guardian constraints, executes through available engines, verifies with AutoSync, and persists verified outcomes and learning.",
+    "Its named architecture includes CLARITY orchestration; Meaning Elements; Knowledgeverse; World Model; DTF pathway planning; Outcome Predictor; Confidence Engine; Contradiction Engine; Guardian; AutoSync; and execution engines for software, documents, images, CAD, simulation, box design, video, music, web, databases, robotics, printers, drones, and other connected tools.",
+    "When the user asks what ASCENSION can do, explain ASCENSION specifically. Distinguish what this web response can produce immediately from capabilities that require the governed runtime or a connected execution tool. Do not claim a tool is connected or a physical action occurred unless evidence says so.",
+    "Write a useful user-facing result now. ASCENSION governed execution may still be pending; available artifacts can be receipts, plans, Knowledge Forms, or scaffolds.",
     "Do not claim you physically built, tested, verified, persisted, or governed anything.",
     "Return exactly one JSON object with keys: kind, title, body, files, limitations.",
+    "The body must be clean readable plain text. Do not emit Markdown markers, escaped Markdown, or HTML entities.",
     'kind must be "answer" or "artifact".',
     "For ordinary questions or product/invention requests, give a substantive direct result in body.",
     "For app/code requests, include complete runnable source files.",
@@ -227,7 +231,7 @@ export async function externalProductDraft(
     files: check.kind === "answer" || check.kind === "design" ? [] : check.files,
     limitations: [
       ...parsed.limitations,
-      "External model draft. ASCENSION governed execution, verification, and persistence remain separate.",
+      "Governed ASCENSION verification and persistence continue separately.",
     ],
   };
 }
@@ -361,12 +365,19 @@ export async function resolveDelivery(args: {
   // The governed result is not the thing that was asked for. Ask the external
   // engine for a clearly unverified draft — once per artifact set.
   const sourceKey = artifactSourceKey(run.id, files);
+  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim());
+  const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
+  const hasOptInZai =
+    Boolean(process.env["ZAI_API_KEY"]?.trim()) &&
+    process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true";
   const draftBase = {
     ...base,
     engine_label: DRAFT_LABEL,
     engine_model: draft?.engine_model ?? null,
   };
-  const localSource = draft?.source_key === `local:${run.id}`;
+  // A Windows/local draft is only reusable when no hosted Lovable response
+  // path is available. Hosted ASCENSION must supersede stale local drafts.
+  const localSource = draft?.source_key === `local:${run.id}` && !hasLovableAi;
   const sameSource = localSource || draft?.source_key === sourceKey;
 
   if (draft?.status === "completed" && sameSource) {
@@ -405,11 +416,6 @@ export async function resolveDelivery(args: {
   // project key is present. That keeps the answer path hosted and independent
   // of the operator's Windows worker. Z.AI remains opt-in; local Ollama is only
   // used when LOCAL_LLM_BASE_URL is explicitly configured.
-  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim());
-  const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
-  const hasOptInZai =
-    Boolean(process.env["ZAI_API_KEY"]?.trim()) &&
-    process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true";
   if (!args.generate && !hasLovableAi && !hasExplicitLocal && !hasOptInZai) {
     if (!TERMINAL_STATUSES.has(run.status))
       return pending("ASCENSION is preparing your answer.", {

@@ -141,6 +141,7 @@ export async function externalProductDraft(
   run: {
     objective: string;
     result: Json | null;
+    status?: string;
   },
   transportedFiles: { name: string; content: string }[],
 ): Promise<ObjectiveDelivery> {
@@ -154,7 +155,7 @@ export async function externalProductDraft(
 
   const system = [
     "You are the external product-result generator for the ASCENSION interface.",
-    "ASCENSION governed execution has already run. Your job is to return the actual user-facing result when the governed artifacts are only receipts, plans, Knowledge Forms, or scaffolds.",
+    "Write a useful user-facing draft now. ASCENSION governed execution may still be pending; available artifacts can be receipts, plans, Knowledge Forms, or scaffolds.",
     "Do not claim you physically built, tested, verified, persisted, or governed anything.",
     "Return exactly one JSON object with keys: kind, title, body, files, limitations.",
     'kind must be "answer" or "artifact".',
@@ -169,6 +170,7 @@ export async function externalProductDraft(
 
   const user = [
     `OBJECTIVE:\n${run.objective}`,
+    `GOVERNED RUNTIME STATUS: ${run.status ?? "unknown"} (do not claim this draft is verified)`,
     artifactContext
       ? `\nGOVERNED RUNTIME ARTIFACTS / CONTEXT:\n${artifactContext}`
       : "\nNo usable runtime artifact content was transported.",
@@ -320,35 +322,13 @@ export async function resolveDelivery(args: {
     ...extra,
   });
 
-  if (!TERMINAL_STATUSES.has(run.status)) {
-    return pending(
-      run.status === "queued"
-        ? "Waiting for your ASCENSION runtime to pick this up."
-        : "Your ASCENSION runtime is working on this.",
-    );
-  }
-  if (run.status !== "verified") {
-    return { ...base, status: "completed", response_payload: null, note: null };
-  }
-
+  // The user-facing draft can start as soon as the objective is accepted.
+  // The governed runtime continues independently and can supersede this draft
+  // if it later transports the actual requested result.
   const files =
     artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
-  const finishedAt = Date.parse(run.completed_at ?? run.updated_at ?? "");
-  if (!files.length && Number.isFinite(finishedAt) && now - finishedAt < ARTIFACT_GRACE_MS) {
-    return pending("The run finished. Waiting for its files to arrive.");
-  }
-
-  const governed = governedDelivery(run, files);
-  if (!governed) {
-    return {
-      ...base,
-      status: "completed",
-      response_payload: null,
-      error: "The runtime marked this run verified but returned no result record.",
-      note: null,
-    };
-  }
-  if (governed.kind !== "not_produced") {
+  const governed = run.status === "verified" ? governedDelivery(run, files) : null;
+  if (governed && governed.kind !== "not_produced") {
     return { ...base, status: "completed", response_payload: governed, note: null, source: "governed" };
   }
 

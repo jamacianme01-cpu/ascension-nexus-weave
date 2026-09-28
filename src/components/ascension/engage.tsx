@@ -53,6 +53,18 @@ function read(key: string) {
   }
 }
 
+function cleanDisplayText(value: string) {
+  return value
+    .replace(/&#x20;|&nbsp;/gi, " ")
+    .replace(/\\([.*_#>-])/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/(^|\n)\*([^*\n]+)\*/g, "$1$2")
+    .replace(/\\\./g, ".")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
 function download(name: string, content: string) {
   const mime = /\.svg$/i.test(name) ? "image/svg+xml" : /\.html?$/i.test(name) ? "text/html" : "text/plain";
   const url = URL.createObjectURL(new Blob([content], { type: `${mime};charset=utf-8` }));
@@ -84,7 +96,7 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
       <h2 className="font-display text-2xl tracking-wide text-foreground">{delivery.title}</h2>
       <div className="rounded-xl border border-primary/20 bg-background/20 p-5 sm:p-6">
         <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground/95">
-          {delivery.body}
+          {cleanDisplayText(delivery.body)}
         </p>
       </div>
       {drawing && (
@@ -101,7 +113,7 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
         >
           <div>
             <p className="text-xs tracking-[0.14em] text-gold uppercase">
-              {source === "external_draft" ? "File · unverified draft" : "File · delivered by runtime"}
+              {source === "external_draft" ? "File · generated result" : "File · delivered by runtime"}
             </p>
             <p className="mt-1 break-all text-sm text-foreground">{file.name}</p>
           </div>
@@ -600,16 +612,11 @@ export function Engage() {
             <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
             <p role="status" className="mt-3 text-sm text-foreground/90">
               {delivery && deliveryQuery.data?.source === "external_draft"
-                ? "Your answer draft is below."
+                ? "Your result is below."
                 : deliveryQuery.data?.note && produced === null
                   ? deliveryQuery.data.note
                   : statusText(run, produced)}
             </p>
-            {delivery && deliveryQuery.data?.source === "external_draft" && (
-              <p className="mt-2 inline-block rounded-full border border-gold/40 px-3 py-1 text-xs tracking-wide text-gold">
-                ANSWER DRAFT · UNVERIFIED
-              </p>
-            )}
           </div>
 
           {delivery ? (

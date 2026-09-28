@@ -16,7 +16,11 @@ DEFAULT_MODEL = "qwen3-ascension"
 
 
 def _kind(objective: str) -> str:
-    text = objective.lower()
+    text = objective.lower().strip()
+    if re.match(r"^(how|why|what|when|where|who|which|does|do|is|are|explain|tell me|describe)\b", text):
+        return "answer"
+    if re.match(r"^can (you|we)\b", text) and not re.search(r"\b(draw|sketch|build|make|create|design|write|generate)\b", text):
+        return "answer"
     if re.search(r"\b(draw|drawing|sketch|illustrat\w*|picture|image|diagram|blueprint)\b", text):
         return "drawing"
     if re.search(r"\b(app|application|website|web ?site|program|software|game|tool|bot)\b", text):

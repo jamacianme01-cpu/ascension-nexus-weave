@@ -223,9 +223,19 @@ export function Engage() {
             data: { requestId: active!, guestToken: guestToken! },
           })
         : getObjectiveDelivery({ data: { requestId: active! } }),
-    // Poll until the server says the final delivery has been assessed. The
-    // server never reports "completed" while the governed run is still going.
-    refetchInterval: (q) => (active && q.state.data?.status !== "completed" ? 2500 : false),
+    // Keep checking briefly after verification: artifact transport can arrive
+    // after the run status, and a substantive governed result supersedes a draft.
+    refetchInterval: (q) => {
+      if (!active) return false;
+      if (q.state.data?.status !== "completed") return 2500;
+      if (q.state.data?.source !== "external_draft") return false;
+      const finishedAt = Date.parse(runQuery.data?.completed_at ?? "");
+      return runQuery.data?.status === "verified" &&
+        Number.isFinite(finishedAt) &&
+        Date.now() - finishedAt < 90_000
+        ? 2500
+        : false;
+    },
     retry: false,
   });
 
@@ -589,9 +599,11 @@ export function Engage() {
             <p className="label-eyebrow text-primary">YOUR ANSWER</p>
             <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
             <p role="status" className="mt-3 text-sm text-foreground/90">
-              {run.status === "verified" && produced === null && deliveryQuery.data?.note
-                ? deliveryQuery.data.note
-                : statusText(run, produced)}
+              {delivery && deliveryQuery.data?.source === "external_draft"
+                ? "Your answer draft is below."
+                : deliveryQuery.data?.note && produced === null
+                  ? deliveryQuery.data.note
+                  : statusText(run, produced)}
             </p>
             {delivery && deliveryQuery.data?.source === "external_draft" && (
               <p className="mt-2 inline-block rounded-full border border-gold/40 px-3 py-1 text-xs tracking-wide text-gold">

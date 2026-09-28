@@ -7,10 +7,18 @@ $token = [Environment]::GetEnvironmentVariable('ASCENSION_PUBLISH_TOKEN','User')
 if ([string]::IsNullOrWhiteSpace($token)) { $token = [Environment]::GetEnvironmentVariable('ASCENSION_PUBLISH_TOKEN','Machine') }
 if ([string]::IsNullOrWhiteSpace($token)) { throw 'ASCENSION_PUBLISH_TOKEN must be saved in the User or Machine environment so the worker can restart after sign-in.' }
 
+$ollama = Get-Command 'ollama' -ErrorAction SilentlyContinue
+if (!$ollama) { throw 'Ollama is not installed or is not on PATH. The local answer model must be installed to answer without API charges.' }
 try {
     $response = Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 8
 } catch {
-    throw 'The local answer model is not running at 127.0.0.1:11434. ASCENSION cannot answer without a local model or paid API.'
+    Start-Process -FilePath $ollama.Source -ArgumentList 'serve' -WindowStyle Hidden
+    $response = $null
+    for ($i = 0; $i -lt 12 -and !$response; $i++) {
+        Start-Sleep -Seconds 2
+        try { $response = Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 4 } catch { }
+    }
+    if (!$response) { throw 'Ollama did not start. The answer worker needs a running local model.' }
 }
 $names = @($response.models | ForEach-Object { $_.name })
 $model = @('qwen3:4b','qwen3-ascension','qwen3-ascension:latest') | Where-Object { $names -contains $_ } | Select-Object -First 1
@@ -33,8 +41,23 @@ $env:LOCAL_LLM_MODEL = '__MODEL__'
 Set-Location $runtimeRepo
 $logDir = Join-Path $runtimeRepo 'ASCENSION_CORE\state\live\logs'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+$tries = 0
 while ($true) {
-    & python -B -u -m ASCENSION_CORE.local_queue_worker --root (Join-Path $runtimeRepo 'ASCENSION_CORE\state\live') --queue-url 'https://ascensionweave.app/api/public/ascension/execution-queue' 2>&1 | Out-File -FilePath (Join-Path $logDir 'local_answer_worker.log') -Append
+    try { Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 4 | Out-Null; break } catch {
+        $ollama = Get-Command 'ollama' -ErrorAction SilentlyContinue
+        if ($ollama -and $tries % 6 -eq 0) {
+            Start-Process -FilePath $ollama.Source -ArgumentList 'serve' -WindowStyle Hidden
+        }
+        $tries++
+        Start-Sleep -Seconds 5
+    }
+}
+while ($true) {
+    try {
+        & python -B -u -m ASCENSION_CORE.local_queue_worker --root (Join-Path $runtimeRepo 'ASCENSION_CORE\state\live') --queue-url 'https://ascensionweave.app/api/public/ascension/execution-queue' 2>&1 | Out-File -FilePath (Join-Path $logDir 'local_answer_worker.log') -Append
+    } catch {
+        $_ | Out-File -FilePath (Join-Path $logDir 'local_answer_worker.log') -Append
+    }
     Start-Sleep -Seconds 5
 }
 '@

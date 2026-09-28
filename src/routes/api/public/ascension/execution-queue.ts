@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createHash, timingSafeEqual } from "crypto";
 
 import type { Database, Json } from "@/integrations/supabase/types";
+import { assessResult, parseDelivery, type ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type QueuePatch = Database["public"]["Tables"]["ascension_execution_requests"]["Update"];
 
@@ -167,6 +168,16 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         const normalizedArtifacts = has("artifacts") ? normalizeArtifacts(body["artifacts"]) : null;
         if (normalizedArtifacts && "error" in normalizedArtifacts) return json({ error: normalizedArtifacts.error }, 400);
 
+        let localDraft: ObjectiveDelivery | null = null;
+        if (has("draft")) {
+          try {
+            localDraft = parseDelivery(body["draft"]);
+            if (localDraft.kind === "not_produced") return json({ error: "draft_not_produced" }, 422);
+          } catch {
+            return json({ error: "invalid_local_draft" }, 400);
+          }
+        }
+
         const revision = body["runtime_revision"];
         const terminal = status === "verified" || status === "rejected" || status === "failed";
 
@@ -192,6 +203,26 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         if (terminal) patch["completed_at"] = new Date().toISOString();
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        if (localDraft) {
+          const { data: target, error: targetError } = await supabaseAdmin
+            .from("ascension_execution_requests")
+            .select("objective")
+            .eq("id", id)
+            .eq("engine", "governed_runtime")
+            .maybeSingle();
+          if (targetError) return json({ error: "draft_target_read_failed" }, 500);
+          if (!target) return json({ error: "unknown_request_id" }, 404);
+          if (!assessResult(target.objective, localDraft.body, localDraft.files).produced)
+            return json({ error: "local_draft_did_not_produce_requested_result" }, 422);
+          localDraft = {
+            ...localDraft,
+            limitations: [
+              ...localDraft.limitations.slice(0, 8),
+              "Local model draft. ASCENSION governed verification and persistence are separate.",
+            ],
+          };
+        }
+
         const { data, error } = await supabaseAdmin
           .from("ascension_execution_requests")
           .update(patch)
@@ -201,6 +232,28 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
           .maybeSingle();
         if (error) return json({ error: "update_failed" }, 500);
         if (!data) return json({ error: "unknown_request_id" }, 404);
+
+        if (localDraft) {
+          const now = new Date().toISOString();
+          const { error: draftError } = await supabaseAdmin.from("ascension_run_stages").upsert(
+            {
+              request_id: id,
+              ordinal: 102,
+              stage: "external_result",
+              engine_label: "LOCAL_MODEL_DRAFT",
+              engine_model: optionalString(body["draft_model"], 120) ?? "local-model",
+              status: "completed",
+              request_payload: { source_key: `local:${id}` } as Json,
+              response_payload: localDraft as unknown as Json,
+              response_text: localDraft.body,
+              duration_ms: 0,
+              error: null,
+              completed_at: now,
+            },
+            { onConflict: "request_id,ordinal" },
+          );
+          if (draftError) return json({ error: "local_draft_transport_failed" }, 500);
+        }
 
         if (normalizedArtifacts && "files" in normalizedArtifacts) {
           const now = new Date().toISOString();

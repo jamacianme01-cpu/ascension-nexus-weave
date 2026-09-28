@@ -124,8 +124,8 @@ try {
   });
   const deliveryEngine = await server.ssrLoadModule("/src/lib/ascension/engine/delivery.server.ts");
   const shoeObjective = "make a gel support shoe";
-  const receipt = "# ASCENSION Result\\nCreated create/document artifact.\\nWorkspace: Public Workspace\\nCapability: create\\nOutput: document\\nFolder: C:\\\\Users\\\\Gordo\\\\Projects\\\\clarity\\\\generated_artifacts\\\\workbench\\nFiles:\\n- document.md\\nValidation: passed";
-  const placeholder = "# Document\\n\\n## Request\\nmake a gel support shoe\\n\\n## Subject\\ngel support shoe\\n\\nThis document turns the command into a clear reviewable artifact with context, structure, and next action.";
+  const receipt = "# ASCENSION Result\nCreated create/document artifact.\nWorkspace: Public Workspace\nCapability: create\nOutput: document\nFolder: C:\\\\Users\\\\Gordo\\\\Projects\\\\clarity\\\\generated_artifacts\\\\workbench\nFiles:\n- document.md\nValidation: passed";
+  const placeholder = "# Document\n\n## Request\nmake a gel support shoe\n\n## Subject\ngel support shoe\n\nThis document turns the command into a clear reviewable artifact with context, structure, and next action.";
   check("shoe runtime receipts and placeholder do not count as a design", () => {
     const a = model.assessResult(shoeObjective, receipt, [
       { name: "ascension_result.md", content: receipt },
@@ -165,7 +165,7 @@ try {
     assert.equal(waitingFiles.status, "running");
     assert.equal(waitingFiles.response_payload, null);
   });
-  const design = "# Gel Support Shoe\\nA walking shoe with a dual-density TPU gel heel pod and a broad midfoot support plate. The heel pod is removable through a sealed outsole hatch; the toe box uses breathable mesh. A prototype needs fit testing, compression-cycle testing, and slip-resistance validation before use.";
+  const design = "# Gel Support Shoe\nA walking shoe with a dual-density TPU gel heel pod and a broad midfoot support plate. The heel pod is removable through a sealed outsole hatch; the toe box uses breathable mesh. A prototype needs fit testing, compression-cycle testing, and slip-resistance validation before use.";
   const lateResult = await deliveryEngine.resolveDelivery({
     run: verifiedShoe,
     artifactStage: { status: "completed", response_payload: { files: [

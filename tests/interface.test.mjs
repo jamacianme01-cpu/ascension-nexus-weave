@@ -233,6 +233,25 @@ try {
     assert.equal(a.produced, true);
     assert.equal(a.files[0].name, "index.html");
   });
+  check("a question about an app gets an answer, not a code requirement", () => {
+    const question = "What does a booking app do?";
+    const answer = "A booking app collects a customer's chosen service and time, checks availability, saves the appointment, and sends a confirmation. A barber might offer hourly slots, prevent duplicate reservations, and let customers cancel.";
+    const a = model.assessResult(question, answer, []);
+    assert.equal(a.kind, "answer");
+    assert.equal(a.produced, true);
+  });
+  check("the AutoSync status stub cannot pass as an app", () => {
+    const fakeApp = [
+      '"""Small working application generated through the ASCENSION AutoSync bridge."""',
+      "def run(request):",
+      "    return f'AutoSync Built Application\\nRequest: {request}\\nStatus: running'",
+    ].join("\\n");
+    const a = model.assessResult("make a quick money making app", "", [
+      { name: "app.py", content: fakeApp },
+    ]);
+    assert.equal(a.produced, false);
+    assert.deepEqual(a.files, []);
+  });
   check("old Knowledge Form and governed metadata do not count as an app", () => {
     const metadata = JSON.stringify({
       objective: "make a quick money making app",
@@ -388,6 +407,43 @@ try {
   check("polling reuses the draft without another model call", () => {
     assert.equal(repeat.source, "external_draft");
     assert.equal(repeat.response_payload.body, draftAnswer.body);
+  });
+  const priorPaidDrafts = process.env.ASCENSION_ALLOW_PAID_DRAFTS;
+  delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
+  try {
+    const waitingLocal = await deliveryEngine.resolveDelivery({
+      run: runShoe,
+      artifactStage: null,
+      draft: null,
+      store: noStore,
+      retry: false,
+    });
+    check("without the local worker, queued work does not call a paid API", () => {
+      assert.equal(waitingLocal.status, "running");
+      assert.equal(waitingLocal.source, null);
+    });
+  } finally {
+    if (priorPaidDrafts === undefined) delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
+    else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorPaidDrafts;
+  }
+  const localDraft = await deliveryEngine.resolveDelivery({
+    run: runShoe,
+    artifactStage: null,
+    draft: {
+      status: "completed",
+      source_key: `local:${runShoe.id}`,
+      created_at: "2026-09-28T13:06:08Z",
+      response_payload: draftAnswer,
+      error: null,
+      engine_model: "qwen3-ascension",
+    },
+    store: noStore,
+    retry: false,
+  });
+  check("a local model draft appears while the governed run is still running", () => {
+    assert.equal(localDraft.status, "completed");
+    assert.equal(localDraft.source, "external_draft");
+    assert.match(localDraft.response_payload.body, /heel pod/);
   });
   const verifiedShoe = { ...runShoe, status: "verified", completed_at: "2026-09-28T13:06:48Z" };
   const noFilesYet = await deliveryEngine.resolveDelivery({

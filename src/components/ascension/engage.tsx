@@ -613,7 +613,7 @@ export function Engage() {
           </div>
 
           {delivery ? (
-            <ResultContent delivery={delivery} source={deliveryQuery.data?.source} />
+            <ResultContent delivery={delivery} source={deliveryQuery.data?.source ?? null} />
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">
               <p className="whitespace-pre-wrap text-foreground">{notProduced}</p>

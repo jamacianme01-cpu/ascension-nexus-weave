@@ -77,7 +77,7 @@ function statusText(run: ObjectiveRun, produced: boolean | null) {
   return run.status;
 }
 
-export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
+export function ResultContent({ delivery, source }: { delivery: ObjectiveDelivery; source?: "governed" | "external_draft" | null }) {
   const drawing = delivery.files.find((file) => /\.svg$/i.test(file.name));
   return (
     <div className="space-y-5">
@@ -101,7 +101,7 @@ export function ResultContent({ delivery }: { delivery: ObjectiveDelivery }) {
         >
           <div>
             <p className="text-xs tracking-[0.14em] text-gold uppercase">
-              File · delivered by runtime
+              {source === "external_draft" ? "File · unverified local draft" : "File · delivered by runtime"}
             </p>
             <p className="mt-1 break-all text-sm text-foreground">{file.name}</p>
           </div>
@@ -340,7 +340,7 @@ export function Engage() {
   let delivery: ObjectiveDelivery | null = null;
   let invalidDelivery: string | null = null;
   let notProduced: string | null = null;
-  if (deliveryQuery.data?.status === "completed" && run && TERMINAL.has(run.status)) {
+  if (deliveryQuery.data?.status === "completed" && run) {
     try {
       const parsed = parseDelivery(deliveryQuery.data.response_payload);
       // Re-check on screen too: a stale projection must never pass as a result.
@@ -371,7 +371,7 @@ export function Engage() {
       setBookSequence("processing");
       return;
     }
-    const hasResult = run.status === "verified" && produced === true;
+    const hasResult = produced === true;
     setBookSequence(hasResult ? "eruption" : "idle");
     const scrollTimer = window.setTimeout(
       () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -613,7 +613,7 @@ export function Engage() {
           </div>
 
           {delivery ? (
-            <ResultContent delivery={delivery} />
+            <ResultContent delivery={delivery} source={deliveryQuery.data?.source} />
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">
               <p className="whitespace-pre-wrap text-foreground">{notProduced}</p>

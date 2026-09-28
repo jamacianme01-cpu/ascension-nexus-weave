@@ -122,6 +122,63 @@ try {
     assert.equal(a.produced, true);
     assert.deepEqual(a.files.map(file => file.name), ["answer.txt"]);
   });
+  const deliveryEngine = await server.ssrLoadModule("/src/lib/ascension/engine/delivery.server.ts");
+  const shoeObjective = "make a gel support shoe";
+  const receipt = "# ASCENSION Result\\nCreated create/document artifact.\\nWorkspace: Public Workspace\\nCapability: create\\nOutput: document\\nFolder: C:\\\\Users\\\\Gordo\\\\Projects\\\\clarity\\\\generated_artifacts\\\\workbench\\nFiles:\\n- document.md\\nValidation: passed";
+  const placeholder = "# Document\\n\\n## Request\\nmake a gel support shoe\\n\\n## Subject\\ngel support shoe\\n\\nThis document turns the command into a clear reviewable artifact with context, structure, and next action.";
+  check("shoe runtime receipts and placeholder do not count as a design", () => {
+    const a = model.assessResult(shoeObjective, receipt, [
+      { name: "ascension_result.md", content: receipt },
+      { name: "document.md", content: placeholder },
+      { name: "metadata.json", content: JSON.stringify({ validation: "passed", objective: shoeObjective, path: "workbench" }) },
+    ]);
+    assert.equal(a.kind, "design");
+    assert.equal(a.produced, false);
+  });
+  const runShoe = {
+    id: "752d0bcc-3420-417c-abfa-4c02b6901a79",
+    objective: shoeObjective,
+    status: "running",
+    result: { objective_text: shoeObjective },
+    completed_at: null,
+    created_at: "2026-09-28T13:06:02Z",
+  };
+  const noStore = {
+    claim: async () => { throw new Error("draft cannot start mid-run"); },
+    complete: async () => { throw new Error("draft cannot complete mid-run"); },
+    fail: async () => { throw new Error("draft cannot fail mid-run"); },
+  };
+  const midRun = await deliveryEngine.resolveDelivery({
+    run: runShoe, artifactStage: { status: "completed", response_payload: { files: [{ name: "document.md", content: placeholder }] } },
+    draft: null, store: noStore, retry: false, now: Date.parse("2026-09-28T13:06:07Z"),
+  });
+  check("mid-run result stays pending despite an early artifact", () => {
+    assert.equal(midRun.status, "running");
+    assert.equal(midRun.response_payload, null);
+  });
+  const verifiedShoe = { ...runShoe, status: "verified", completed_at: "2026-09-28T13:06:48Z" };
+  const waitingFiles = await deliveryEngine.resolveDelivery({
+    run: verifiedShoe, artifactStage: null, draft: null, store: noStore, retry: false,
+    now: Date.parse("2026-09-28T13:07:20Z"),
+  });
+  check("verified run waits for late transported artifacts", () => {
+    assert.equal(waitingFiles.status, "running");
+    assert.equal(waitingFiles.response_payload, null);
+  });
+  const design = "# Gel Support Shoe\\nA walking shoe with a dual-density TPU gel heel pod and a broad midfoot support plate. The heel pod is removable through a sealed outsole hatch; the toe box uses breathable mesh. A prototype needs fit testing, compression-cycle testing, and slip-resistance validation before use.";
+  const lateResult = await deliveryEngine.resolveDelivery({
+    run: verifiedShoe,
+    artifactStage: { status: "completed", response_payload: { files: [
+      { name: "ascension_result.md", content: receipt },
+      { name: "shoe-design.md", content: design },
+    ] } },
+    draft: null, store: noStore, retry: false, now: Date.parse("2026-09-28T13:07:21Z"),
+  });
+  check("late substantive design replaces the early missing result", () => {
+    assert.equal(lateResult.status, "completed");
+    assert.equal(lateResult.source, "governed");
+    assert.match(lateResult.response_payload.body, /dual-density TPU gel heel pod/);
+  });
   const original = globalThis.fetch;
   const priorKey = process.env.ZAI_API_KEY;
   process.env.ZAI_API_KEY = "test-only";

@@ -401,13 +401,19 @@ export async function resolveDelivery(args: {
     note: null,
     source: "governed",
   });
-  // The local runtime must deliver a draft before the site claims success.
-  // Paid hosted calls require explicit opt-in; a configured ZAI_API_KEY alone
-  // must never charge the owner when visitors press ENGAGE.
-  if (!args.generate && process.env["ASCENSION_ALLOW_PAID_DRAFTS"] !== "true") {
+  // Production ENGAGE uses Lovable's built-in AI gateway when its managed
+  // project key is present. That keeps the answer path hosted and independent
+  // of the operator's Windows worker. Z.AI remains opt-in; local Ollama is only
+  // used when LOCAL_LLM_BASE_URL is explicitly configured.
+  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim());
+  const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
+  const hasOptInZai =
+    Boolean(process.env["ZAI_API_KEY"]?.trim()) &&
+    process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true";
+  if (!args.generate && !hasLovableAi && !hasExplicitLocal && !hasOptInZai) {
     if (!TERMINAL_STATUSES.has(run.status))
-      return pending("ASCENSION is preparing your answer on the local runtime.", {
-        engine_label: "LOCAL_MODEL_DRAFT",
+      return pending("ASCENSION is preparing your answer.", {
+        engine_label: DRAFT_LABEL,
       });
     return {
       ...base,
@@ -419,7 +425,9 @@ export async function resolveDelivery(args: {
         files: [],
         limitations: [],
       }),
-      error: draft?.error ?? "The local runtime did not deliver the requested answer.",
+      error:
+        draft?.error ??
+        "No hosted answer engine is available. Enable Lovable AI for this project.",
       note: null,
       source: "governed",
     };

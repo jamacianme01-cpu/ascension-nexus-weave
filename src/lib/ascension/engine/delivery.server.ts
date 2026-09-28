@@ -366,7 +366,8 @@ export async function resolveDelivery(args: {
     engine_label: DRAFT_LABEL,
     engine_model: draft?.engine_model ?? null,
   };
-  const sameSource = draft?.source_key === sourceKey;
+  const localSource = draft?.source_key === `local:${run.id}`;
+  const sameSource = localSource || draft?.source_key === sourceKey;
 
   if (draft?.status === "completed" && sameSource) {
     try {
@@ -400,6 +401,30 @@ export async function resolveDelivery(args: {
     note: null,
     source: "governed",
   });
+  // The local runtime must deliver a draft before the site claims success.
+  // Paid hosted calls require explicit opt-in; a configured ZAI_API_KEY alone
+  // must never charge the owner when visitors press ENGAGE.
+  if (!args.generate && process.env["ASCENSION_ALLOW_PAID_DRAFTS"] !== "true") {
+    if (!TERMINAL_STATUSES.has(run.status))
+      return pending("ASCENSION is preparing your answer on the local runtime.", {
+        engine_label: "LOCAL_MODEL_DRAFT",
+      });
+    return {
+      ...base,
+      status: "completed",
+      response_payload: governed ?? parseDelivery({
+        kind: "not_produced",
+        title: run.objective.slice(0, 200) || "ASCENSION result",
+        body: notProducedMessage(assessResult(run.objective, "", []).kind),
+        files: [],
+        limitations: [],
+      }),
+      error: draft?.error ?? "The local runtime did not deliver the requested answer.",
+      note: null,
+      source: "governed",
+    };
+  }
+
   if (draft?.status === "failed" && sameSource && !retry)
     return failed(draft.error ?? "unknown error");
 

@@ -180,6 +180,10 @@ export function scaffoldReason(text: string, objective: string): string | null {
   const trimmed = text.trim();
   if (!trimmed) return "it is empty";
   if (/^\s*#*\s*knowledge form\b/im.test(trimmed)) return "it is a Knowledge Form, not the requested result";
+  if (/^#\s*ASCENSION Result\b/im.test(trimmed) && /\b(?:Workspace|Capability|Output|Folder|Files|Validation):/i.test(trimmed))
+    return "it is a runtime file receipt, not the requested result";
+  if (/this document turns the command into a clear reviewable artifact with context, structure, and next action/i.test(trimmed))
+    return "it is a placeholder document, not the requested result";
   const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const content = lines.filter(
     (l) => !SCAFFOLD_LINE.test(l.replace(/^[-*•]\s*/, "")) && !APPROACH_TOKEN.test(l) && !/^[a-f0-9]{16,}$/i.test(l),
@@ -201,7 +205,7 @@ export interface ResultAssessment {
 }
 
 const CODE_FILE = /\.(html?|js|jsx|ts|tsx|py|java|kt|swift|go|rs|rb|php|c|cpp|cs|sh|vue|svelte)$/i;
-const INTERNAL_FILE = /^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|knowledgeform_.*\.md)$/i;
+const INTERNAL_FILE = /^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|acceptance_result\.json|metadata\.json|lineage\.json|knowledgeform_.*\.md)$/i;
 
 /**
  * Decide whether delivered text/files are the thing the user asked for.

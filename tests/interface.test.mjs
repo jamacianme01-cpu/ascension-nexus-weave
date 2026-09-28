@@ -143,27 +143,61 @@ try {
     completed_at: null,
     created_at: "2026-09-28T13:06:02Z",
   };
-  const noStore = {
-    claim: async () => { throw new Error("draft cannot start mid-run"); },
-    complete: async () => { throw new Error("draft cannot complete mid-run"); },
-    fail: async () => { throw new Error("draft cannot fail mid-run"); },
+  const draftAnswer = {
+    kind: "answer", title: "Gel support shoe", body: "A conceptual shoe design uses a removable dual-density TPU gel heel pod, a broad midfoot support plate, and a breathable toe box. Fit, fatigue, and slip-resistance testing are still required.",
+    files: [], limitations: ["Concept only; not physically tested."],
   };
+  let claims = 0;
+  const draftStore = {
+    claim: async () => { claims++; return true; },
+    complete: async () => {},
+    fail: async () => {},
+  };
+  const noStore = {
+    claim: async () => { throw new Error("draft must not regenerate"); },
+    complete: async () => { throw new Error("draft must not complete again"); },
+    fail: async () => { throw new Error("draft must not fail again"); },
+  };
+  const earlyArtifact = { status: "completed", response_payload: { files: [{ name: "document.md", content: placeholder }] } };
   const midRun = await deliveryEngine.resolveDelivery({
-    run: runShoe, artifactStage: { status: "completed", response_payload: { files: [{ name: "document.md", content: placeholder }] } },
-    draft: null, store: noStore, retry: false, now: Date.parse("2026-09-28T13:06:07Z"),
+    run: runShoe, artifactStage: earlyArtifact, draft: null, store: draftStore, retry: false,
+    now: Date.parse("2026-09-28T13:06:07Z"),
+    generate: async () => draftAnswer,
   });
-  check("mid-run result stays pending despite an early artifact", () => {
-    assert.equal(midRun.status, "running");
-    assert.equal(midRun.response_payload, null);
+  check("ENGAGE returns an explicitly unverified design draft before runtime completion", () => {
+    assert.equal(midRun.status, "completed");
+    assert.equal(midRun.source, "external_draft");
+    assert.match(midRun.response_payload.body, /dual-density TPU gel heel pod/);
+    assert.equal(claims, 1);
+  });
+  const draftKey = deliveryEngine.artifactSourceKey(runShoe.id, [{ name: "document.md", content: placeholder }]);
+  const repeat = await deliveryEngine.resolveDelivery({
+    run: runShoe, artifactStage: earlyArtifact,
+    draft: { status: "completed", source_key: draftKey, created_at: "2026-09-28T13:06:07Z", response_payload: draftAnswer, error: null, engine_model: "zai" },
+    store: noStore, retry: false, now: Date.parse("2026-09-28T13:06:12Z"),
+    generate: async () => { throw new Error("duplicate model call"); },
+  });
+  check("polling reuses the draft without another model call", () => {
+    assert.equal(repeat.source, "external_draft");
+    assert.equal(repeat.response_payload.body, draftAnswer.body);
   });
   const verifiedShoe = { ...runShoe, status: "verified", completed_at: "2026-09-28T13:06:48Z" };
-  const waitingFiles = await deliveryEngine.resolveDelivery({
-    run: verifiedShoe, artifactStage: null, draft: null, store: noStore, retry: false,
-    now: Date.parse("2026-09-28T13:07:20Z"),
+  const noFilesYet = await deliveryEngine.resolveDelivery({
+    run: verifiedShoe, artifactStage: null, draft: null, store: draftStore, retry: false,
+    now: Date.parse("2026-09-28T13:07:20Z"), generate: async () => draftAnswer,
   });
-  check("verified run waits for late transported artifacts", () => {
-    assert.equal(waitingFiles.status, "running");
-    assert.equal(waitingFiles.response_payload, null);
+  check("verified status does not withhold the answer while artifact transport is late", () => {
+    assert.equal(noFilesYet.source, "external_draft");
+    assert.equal(noFilesYet.status, "completed");
+  });
+  const question = await deliveryEngine.resolveDelivery({
+    run: { ...runShoe, id: "00000000-0000-0000-0000-000000000001", objective: "how do you multiply", status: "queued", result: null },
+    artifactStage: null, draft: null, store: draftStore, retry: false,
+    generate: async () => ({ kind: "answer", title: "Multiplication", body: "Multiplication combines equal groups: three groups of four means 4 + 4 + 4 = 12, so 3 × 4 = 12. For larger numbers, split a factor into parts and add the products.", files: [], limitations: [] }),
+  });
+  check("ordinary question gets a direct draft answer even while queued", () => {
+    assert.equal(question.source, "external_draft");
+    assert.match(question.response_payload.body, /3 × 4 = 12/);
   });
   const design = "# Gel Support Shoe\nA walking shoe with a dual-density TPU gel heel pod and a broad midfoot support plate. The heel pod is removable through a sealed outsole hatch; the toe box uses breathable mesh. A prototype needs fit testing, compression-cycle testing, and slip-resistance validation before use.";
   const lateResult = await deliveryEngine.resolveDelivery({

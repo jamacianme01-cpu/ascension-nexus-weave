@@ -101,7 +101,7 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
         >
           <div>
             <p className="text-xs tracking-[0.14em] text-gold uppercase">
-              {source === "external_draft" ? "File · unverified local draft" : "File · delivered by runtime"}
+              {source === "external_draft" ? "File · unverified draft" : "File · delivered by runtime"}
             </p>
             <p className="mt-1 break-all text-sm text-foreground">{file.name}</p>
           </div>
@@ -171,6 +171,7 @@ export function Engage() {
   const [bookOpen, setBookOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const sequenceTimers = useRef<number[]>([]);
+  const burstRun = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLElement>(null);
 
@@ -360,30 +361,29 @@ export function Engage() {
   const produced = delivery ? true : notProduced ? false : null;
 
   useEffect(() => {
-    if (!run || !TERMINAL.has(run.status)) return;
+    if (!run) return;
+    if (produced === true) {
+      if (burstRun.current === run.id) return;
+      burstRun.current = run.id;
+      sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+      sequenceTimers.current = [];
+      setBookOpen(true);
+      setRevealed(true);
+      setBookSequence("eruption");
+      const scrollTimer = window.setTimeout(
+        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        180,
+      );
+      const settleTimer = window.setTimeout(() => setBookSequence("idle"), 1800);
+      sequenceTimers.current.push(scrollTimer, settleTimer);
+      return;
+    }
+    if (!TERMINAL.has(run.status)) return;
     sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
     sequenceTimers.current = [];
     setBookOpen(true);
     setRevealed(true);
-
-    // Only a delivered result releases the tree's knowledge burst.
-    if (run.status === "verified" && produced === null) {
-      setBookSequence("processing");
-      return;
-    }
-    const hasResult = produced === true;
-    setBookSequence(hasResult ? "eruption" : "idle");
-    const scrollTimer = window.setTimeout(
-      () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      180,
-    );
-    const settleTimer = hasResult
-      ? window.setTimeout(() => setBookSequence("idle"), 1800)
-      : undefined;
-    return () => {
-      window.clearTimeout(scrollTimer);
-      if (settleTimer !== undefined) window.clearTimeout(settleTimer);
-    };
+    setBookSequence(run.status === "verified" && produced === null ? "processing" : "idle");
   }, [run?.id, run?.status, produced]);
 
   const followUp = (kind: FollowUp) => {
@@ -607,7 +607,7 @@ export function Engage() {
             </p>
             {delivery && deliveryQuery.data?.source === "external_draft" && (
               <p className="mt-2 inline-block rounded-full border border-gold/40 px-3 py-1 text-xs tracking-wide text-gold">
-                EXTERNAL DRAFT · UNVERIFIED — not ASCENSION verified
+                ANSWER DRAFT · UNVERIFIED
               </p>
             )}
           </div>

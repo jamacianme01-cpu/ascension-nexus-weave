@@ -159,6 +159,35 @@ export async function externalProductDraft(
   },
   transportedFiles: { name: string; content: string }[],
 ): Promise<ObjectiveDelivery> {
+  const normalizedObjective = run.objective.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const asksCapabilities =
+    /^(what|wat) (can|do) (u|you) do$/.test(normalizedObjective) ||
+    /^(what|wat) can ascension do$/.test(normalizedObjective) ||
+    /^(what|wat) does ascension do$/.test(normalizedObjective) ||
+    /^(explain|describe) ascension$/.test(normalizedObjective);
+
+  if (asksCapabilities) {
+    return parseDelivery({
+      kind: "answer",
+      title: "What ASCENSION can do",
+      body: [
+        "ASCENSION is built to take an objective from idea to a verified result.",
+        "",
+        "You tell ASCENSION what you want to accomplish. CLARITY orchestrates the objective, breaks its meaning into Meaning Elements, retrieves relevant knowledge, builds multiple pathways through the World Model and DTF, compares outcomes, confidence and contradictions, applies Guardian constraints, then sends the selected pathway to the proper execution engine.",
+        "",
+        "ASCENSION can work across software, documents, images, CAD, simulation, web apps, databases, box design, video, music, robotics, printers, drones and other connected execution tools. It is designed to return the thing requested — not just a plan or a Knowledge Form.",
+        "",
+        "AutoSync checks outputs against the objective and evidence. Verified results can be persisted into the Knowledgeverse with lineage and Delta learning so later objectives can build from what was actually learned.",
+        "",
+        "In this web app, I can immediately answer questions, generate specifications, write code and create supported digital artifacts. When a connected governed execution engine is required, ASCENSION sends the objective through that runtime and reports the verified result when it comes back.",
+        "",
+        "The operating loop is: Objective -> Meaning -> Knowledge -> Pathways -> Evaluation -> Guardian -> Execution -> AutoSync verification -> Persisted result -> Delta learning."
+      ].join("\n"),
+      files: [],
+      limitations: [],
+    });
+  }
+
   const { callZai } = await import("./zai.server");
 
   const artifactContext = transportedFiles

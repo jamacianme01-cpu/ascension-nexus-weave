@@ -155,7 +155,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
 /* Result honesty: what counts as an actual user result.               */
 /* ------------------------------------------------------------------ */
 
-export type RequestedKind = "drawing" | "app" | "answer";
+export type RequestedKind = "drawing" | "app" | "design" | "answer";
 
 export function requestedKind(objective: string): RequestedKind {
   const o = objective.toLowerCase();
@@ -163,6 +163,7 @@ export function requestedKind(objective: string): RequestedKind {
     return "drawing";
   if (/\b(app|application|website|web ?site|program|script|code|software|game|tool|bot)\b/.test(o))
     return "app";
+  if (/\b(make|design|invent|build|create|prototype|engineer|develop)\b/.test(o)) return "design";
   return "answer";
 }
 
@@ -243,5 +244,7 @@ export function notProducedMessage(kind: RequestedKind) {
     ? "The requested drawing has not been produced."
     : kind === "app"
       ? "The requested app has not been produced."
-      : "The requested answer has not been produced.";
+      : kind === "design"
+        ? "The requested design has not been produced."
+        : "The requested answer has not been produced.";
 }

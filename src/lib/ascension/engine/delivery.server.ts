@@ -1,5 +1,10 @@
 import type { Json } from "@/integrations/supabase/types";
-import { assessResult, notProducedMessage, parseDelivery, type ObjectiveDelivery } from "../result-model";
+import {
+  assessResult,
+  notProducedMessage,
+  parseDelivery,
+  type ObjectiveDelivery,
+} from "../result-model";
 
 const ORDINAL = 100;
 const ARTIFACT_ORDINAL = 101;
@@ -69,15 +74,19 @@ export function governedDelivery(
       : run.objective.trim();
 
   const requestedOutput = record(result["requested_output"]);
-  const primaryName = typeof requestedOutput["primary_artifact"] === "string"
-    ? requestedOutput["primary_artifact"] : "";
+  const primaryName =
+    typeof requestedOutput["primary_artifact"] === "string"
+      ? requestedOutput["primary_artifact"]
+      : "";
   const primary =
     transportedFiles.find((file) => file.name === primaryName) ??
     transportedFiles.find((file) => /^ascension_result\.md$/i.test(file.name)) ??
     transportedFiles.find((file) => /^document\.md$/i.test(file.name)) ??
     transportedFiles.find(
       (file) =>
-        !/^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|acceptance_result\.json|metadata\.json|lineage\.json|knowledgeform_.*\.md)$/i.test(file.name),
+        !/^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|acceptance_result\.json|metadata\.json|lineage\.json|knowledgeform_.*\.md)$/i.test(
+          file.name,
+        ),
     ) ??
     null;
   const assessment = assessResult(run.objective, primary?.content ?? "", transportedFiles);
@@ -119,9 +128,12 @@ export function governedDelivery(
     return basename && basename !== "governed_objective.json" && !transportedNames.has(basename);
   });
 
-  const answerLimitations = requestedOutput["truth_status"] === "UNVERIFIED_MODEL_DRAFT"
-    ? ["A local model drafted this answer. Its factual claims have not been independently checked."]
-    : [];
+  const answerLimitations =
+    requestedOutput["truth_status"] === "UNVERIFIED_MODEL_DRAFT"
+      ? [
+          "A local model drafted this answer. Its factual claims have not been independently checked.",
+        ]
+      : [];
 
   return parseDelivery({
     kind: assessment.kind === "answer" || assessment.kind === "design" ? "answer" : "artifact",
@@ -131,7 +143,9 @@ export function governedDelivery(
     limitations: [
       ...answerLimitations,
       ...(missingReceipts.length
-        ? [`${missingReceipts.length} recorded file${missingReceipts.length === 1 ? " has" : "s have"} a receipt but ${missingReceipts.length === 1 ? "its" : "their"} contents have not reached the website yet.`]
+        ? [
+            `${missingReceipts.length} recorded file${missingReceipts.length === 1 ? " has" : "s have"} a receipt but ${missingReceipts.length === 1 ? "its" : "their"} contents have not reached the website yet.`,
+          ]
         : []),
     ],
   });
@@ -193,6 +207,13 @@ export async function externalProductDraft(
       files: [],
       limitations: [],
     } as Record<string, unknown>);
+  // Local engines sometimes return limitations as a plain string. Normalize
+  // at this external boundary — the delivery contract itself stays strict.
+  if (typeof candidate["limitations"] === "string" && candidate["limitations"].trim()) {
+    candidate["limitations"] = [candidate["limitations"].trim()];
+  } else if (!Array.isArray(candidate["limitations"])) {
+    candidate["limitations"] = [];
+  }
 
   const parsed = parseDelivery(candidate);
   const check = assessResult(run.objective, parsed.body, parsed.files);
@@ -210,7 +231,6 @@ export async function externalProductDraft(
     ],
   };
 }
-
 
 /* ------------------------------------------------------------------ */
 /* Delivery resolution shared by the signed-in and guest paths.        */
@@ -329,13 +349,23 @@ export async function resolveDelivery(args: {
     artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
   const governed = run.status === "verified" ? governedDelivery(run, files) : null;
   if (governed && governed.kind !== "not_produced") {
-    return { ...base, status: "completed", response_payload: governed, note: null, source: "governed" };
+    return {
+      ...base,
+      status: "completed",
+      response_payload: governed,
+      note: null,
+      source: "governed",
+    };
   }
 
   // The governed result is not the thing that was asked for. Ask the external
   // engine for a clearly unverified draft — once per artifact set.
   const sourceKey = artifactSourceKey(run.id, files);
-  const draftBase = { ...base, engine_label: DRAFT_LABEL, engine_model: draft?.engine_model ?? null };
+  const draftBase = {
+    ...base,
+    engine_label: DRAFT_LABEL,
+    engine_model: draft?.engine_model ?? null,
+  };
   const sameSource = draft?.source_key === sourceKey;
 
   if (draft?.status === "completed" && sameSource) {
@@ -355,9 +385,12 @@ export async function resolveDelivery(args: {
   const running = draft?.status === "running";
   const fresh = running && now - Date.parse(draft!.created_at) < DRAFT_STALE_MS;
   if (running && fresh) {
-    return pending("Your governed result is not the requested output. Writing an unverified draft…", {
-      engine_label: DRAFT_LABEL,
-    });
+    return pending(
+      "Your governed result is not the requested output. Writing an unverified draft…",
+      {
+        engine_label: DRAFT_LABEL,
+      },
+    );
   }
   const failed = (message: string): ResolvedDelivery => ({
     ...draftBase,
@@ -367,7 +400,8 @@ export async function resolveDelivery(args: {
     note: null,
     source: "governed",
   });
-  if (draft?.status === "failed" && sameSource && !retry) return failed(draft.error ?? "unknown error");
+  if (draft?.status === "failed" && sameSource && !retry)
+    return failed(draft.error ?? "unknown error");
 
   const claimed = await store.claim(sourceKey, draft ? draft.created_at : null);
   if (!claimed) {
@@ -446,7 +480,11 @@ export async function adminDraftStore(runId: string): Promise<DraftStore> {
     },
     async fail(sourceKey, message) {
       const { error } = await table()
-        .update({ status: "failed", error: message.slice(0, 2000), completed_at: new Date().toISOString() })
+        .update({
+          status: "failed",
+          error: message.slice(0, 2000),
+          completed_at: new Date().toISOString(),
+        })
         .eq("request_id", runId)
         .eq("ordinal", DRAFT_ORDINAL)
         .eq("status", "running")

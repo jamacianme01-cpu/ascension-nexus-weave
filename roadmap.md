@@ -14,3 +14,6 @@
 - [x] Fixed the artifact selection regexes in the governed delivery projection (`\\.` never matched real filenames, so `.md` artifacts could lose priority to `.json` files in the answer body).
 - [x] Diagnosed Z.AI HTTP 401: endpoint `https://api.z.ai/api/paas/v4` and model `glm-4.6` are correct and reachable; the stored credential is rejected (`token expired or incorrect`) and is only 11 characters long, i.e. truncated or a placeholder.
 - [x] Restricted `ascension_relay_documents` so no browser client can read it directly; public replay stays served by the app's server route.
+
+## Done (answer path)
+- [x] ENGAGE now returns real text with no Z.AI credential: when `ZAI_API_KEY` is absent, the engine falls back to the local OpenAI-compatible answer engine (Ollama at `localhost:11434`, model `qwen3-ascension` — a qwen3:4b variant with a 16k context so reasoning does not consume the answer). No credential is sent or stored; reasoning deltas and inline `<think>` are stripped; `limitations` strings are normalized at the external-draft boundary. Verified with a live guest ENGAGE ("Why is the sky blue?") that returned a substantive Rayleigh-scattering answer labelled EXTERNAL DRAFT · UNVERIFIED, plus a new interface contract check (36 total).

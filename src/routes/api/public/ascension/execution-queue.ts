@@ -203,6 +203,13 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         if (terminal) patch["completed_at"] = new Date().toISOString();
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        if (localDraft && process.env["LOVABLE_API_KEY"]?.trim()) {
+          // The deployed web app has a hosted answer path. Keep accepting the
+          // runtime's status/artifacts, but never let its local language model
+          // overwrite the hosted ASCENSION response in ordinal 102.
+          localDraft = null;
+        }
+
         if (localDraft) {
           const { data: target, error: targetError } = await supabaseAdmin
             .from("ascension_execution_requests")

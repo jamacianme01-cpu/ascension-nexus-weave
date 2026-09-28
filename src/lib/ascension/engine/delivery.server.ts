@@ -101,6 +101,7 @@ export function governedDelivery(
   }
 
   const primaryOk = primary && assessment.files.some((f) => f.name === primary.name);
+  const answerFile = assessment.files.find((file) => /\.(md|txt)$/i.test(file.name));
   const body =
     assessment.kind === "app"
       ? "Your runnable app is ready below. Download the HTML file and open it in your browser."
@@ -108,7 +109,9 @@ export function governedDelivery(
         ? "Your drawing is shown below. Download the SVG to keep or edit it."
         : primaryOk && /\.(md|txt)$/i.test(primary.name)
           ? primary.content.trim()
-          : "Your result is ready to download below.";
+          : answerFile
+            ? answerFile.content.trim()
+            : "Your result is ready to download below.";
 
   const transportedNames = new Set(assessment.files.map((file) => file.name.toLowerCase()));
   const missingReceipts = receipts.filter((receipt) => {

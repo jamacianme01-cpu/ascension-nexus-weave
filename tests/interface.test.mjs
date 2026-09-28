@@ -508,6 +508,8 @@ try {
   });
   const original = globalThis.fetch;
   const priorKey = process.env.ZAI_API_KEY;
+  const priorLovableKey = process.env.LOVABLE_API_KEY;
+  delete process.env.LOVABLE_API_KEY;
   process.env.ZAI_API_KEY = "test-only";
   try {
     const payload = JSON.stringify(valid);
@@ -538,12 +540,58 @@ try {
     globalThis.fetch = original;
     if (priorKey === undefined) delete process.env.ZAI_API_KEY;
     else process.env.ZAI_API_KEY = priorKey;
+    if (priorLovableKey === undefined) delete process.env.LOVABLE_API_KEY;
+    else process.env.LOVABLE_API_KEY = priorLovableKey;
   }
-  // Local engine fallback: no ZAI_API_KEY → local OpenAI-compatible provider,
+
+  // Production hosted path: Lovable AI is preferred even when a stale Z.AI
+  // credential exists, and it never calls localhost.
+  const priorLovableModel = process.env.LOVABLE_AI_MODEL;
+  process.env.LOVABLE_API_KEY = "lovable-test-only";
+  process.env.ZAI_API_KEY = "stale-zai-key";
+  delete process.env.LOCAL_LLM_BASE_URL;
+  try {
+    let sentUrl = "";
+    let sentAuth = null;
+    let sentLovableKey = null;
+    let sentBody = null;
+    globalThis.fetch = async (url, init) => {
+      sentUrl = String(url);
+      sentAuth = init.headers["Authorization"] ?? null;
+      sentLovableKey = init.headers["Lovable-API-Key"] ?? null;
+      sentBody = JSON.parse(String(init.body));
+      return new Response(
+        'data: ' +
+          JSON.stringify({ choices: [{ delta: { content: "Hosted answer." } }] }) +
+          '\n' +
+          'data: [DONE]\n',
+      );
+    };
+    const hosted = await callZai({ system: "test", user: "test" });
+    check("Lovable AI is the hosted ENGAGE path and does not use localhost", () => {
+      assert.equal(sentUrl, "https://ai.gateway.lovable.dev/v1/chat/completions");
+      assert.equal(sentAuth, "Bearer lovable-test-only");
+      assert.equal(sentLovableKey, "lovable-test-only");
+      assert.equal(sentBody.model, "google/gemini-3.1-flash-lite");
+      assert.ok(!sentUrl.includes("localhost"));
+      assert.equal(hosted.text, "Hosted answer.");
+    });
+  } finally {
+    globalThis.fetch = original;
+    if (priorLovableKey === undefined) delete process.env.LOVABLE_API_KEY;
+    else process.env.LOVABLE_API_KEY = priorLovableKey;
+    if (priorLovableModel === undefined) delete process.env.LOVABLE_AI_MODEL;
+    else process.env.LOVABLE_AI_MODEL = priorLovableModel;
+    if (priorKey === undefined) delete process.env.ZAI_API_KEY;
+    else process.env.ZAI_API_KEY = priorKey;
+  }
+
+  // Local engine fallback: no hosted key → explicit local OpenAI-compatible provider,
   // reasoning deltas ignored, inline <think> stripped, no credentials sent.
   const priorLocalBase = process.env.LOCAL_LLM_BASE_URL;
   const priorLocalModel = process.env.LOCAL_LLM_MODEL;
   delete process.env.ZAI_API_KEY;
+  delete process.env.LOVABLE_API_KEY;
   process.env.LOCAL_LLM_BASE_URL = "http://localhost:11444/v1";
   process.env.LOCAL_LLM_MODEL = "test-local-model";
   try {
@@ -576,6 +624,10 @@ try {
     else process.env.LOCAL_LLM_BASE_URL = priorLocalBase;
     if (priorLocalModel === undefined) delete process.env.LOCAL_LLM_MODEL;
     else process.env.LOCAL_LLM_MODEL = priorLocalModel;
+    if (priorLovableKey === undefined) delete process.env.LOVABLE_API_KEY;
+    else process.env.LOVABLE_API_KEY = priorLovableKey;
+    if (priorKey === undefined) delete process.env.ZAI_API_KEY;
+    else process.env.ZAI_API_KEY = priorKey;
   }
   process.stdout.write(`${passed} interface contract checks passed\n`);
 } finally {

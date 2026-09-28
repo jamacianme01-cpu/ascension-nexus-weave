@@ -183,7 +183,7 @@ export async function externalProductDraft(
     "For product/invention creation requests, create a substantive design/specification rather than a receipt, token list, or plan to make one.",
     "files must be an array of objects with name and content. Use [] when no download is needed.",
     "limitations must truthfully state what remains unverified or conceptual.",
-    "Never return a Knowledge Form, execution receipt, generic ASCENSION architecture explanation, or placeholder.",
+    "Never return a Knowledge Form, execution receipt, or placeholder. Only explain ASCENSION architecture when the user is actually asking about ASCENSION's capabilities or how it works.",
   ].join(" ");
 
   const user = [
@@ -242,7 +242,7 @@ export async function externalProductDraft(
 
 export const TERMINAL_STATUSES = new Set(["verified", "rejected", "failed"]);
 export const DRAFT_ORDINAL = 102;
-export const DRAFT_LABEL = "ZAI_EXTERNAL_RESULT";
+export const DRAFT_LABEL = "ASCENSION_GENERATED_RESULT";
 /** How long a verified run waits for its separately transported files. */
 export const ARTIFACT_GRACE_MS = 90_000;
 /** A draft left "running" longer than this is considered abandoned. */

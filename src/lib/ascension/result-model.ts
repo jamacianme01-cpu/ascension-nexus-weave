@@ -158,7 +158,13 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
 export type RequestedKind = "drawing" | "app" | "design" | "answer";
 
 export function requestedKind(objective: string): RequestedKind {
-  const o = objective.toLowerCase();
+  const o = objective.toLowerCase().trim();
+  // A question about an app or drawing asks for an explanation unless it
+  // explicitly commands creation. The noun alone is not an output format.
+  if (/^(?:how|why|what|when|where|who|which|does|do|is|are|explain|tell me|describe)\b/.test(o))
+    return "answer";
+  if (/^can (?:you|we)\b/.test(o) && !/\b(draw|sketch|build|make|create|design|write|generate)\b/.test(o))
+    return "answer";
   if (/\b(draw|drawing|sketch|diagram|illustrat\w*|render|picture|image|blueprint|schematic)\b/.test(o))
     return "drawing";
   if (/\b(app|application|website|web ?site|program|script|code|software|game|tool|bot)\b/.test(o))
@@ -184,6 +190,8 @@ export function scaffoldReason(text: string, objective: string): string | null {
     return "it is a runtime file receipt, not the requested result";
   if (/this document turns the command into a clear reviewable artifact with context, structure, and next action/i.test(trimmed))
     return "it is a placeholder document, not the requested result";
+  if (/Small working application generated through the ASCENSION AutoSync bridge|Verified runnable app artifact\.|AutoSync Built Application[\s\S]*Status: running/i.test(trimmed))
+    return "it is the AutoSync status stub, not an app that performs the requested task";
   const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const content = lines.filter(
     (l) => !SCAFFOLD_LINE.test(l.replace(/^[-*•]\s*/, "")) && !APPROACH_TOKEN.test(l) && !/^[a-f0-9]{16,}$/i.test(l),

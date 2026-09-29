@@ -78,7 +78,7 @@ function labelToken(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function SpiralPathways({ run }: { run: ObjectiveRun }) {
+function SpiralPathways({ run, delivery }: { run: ObjectiveRun; delivery: ObjectiveDelivery }) {
   const planning = planningFor(run.result);
   const planningRecord = record(record(run.result)["objective_planning"]);
   const mesh = record(planningRecord["engine_mesh"]);
@@ -93,7 +93,7 @@ function SpiralPathways({ run }: { run: ObjectiveRun }) {
   const selectedId =
     typeof planning.selected["branch_id"] === "string" ? planning.selected["branch_id"] : null;
 
-  if (!planning.branches.length && !expandedForms.length) return null;
+  if (!planning.branches.length && !expandedForms.length && !delivery.pathways.length) return null;
 
   return (
     <section
@@ -103,10 +103,63 @@ function SpiralPathways({ run }: { run: ObjectiveRun }) {
       <div>
         <p className="label-eyebrow text-primary">SPIRAL · MULTIPLE PATHWAYS</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          ASCENSION generated and evaluated multiple governed possibilities before CLARITY selected
-          the execution path shown below.
+          Spiral expands the objective into multiple ways forward. Solution pathways below are
+          Spiral-guided user-facing syntheses; governed DTF execution branches are shown separately.
         </p>
       </div>
+
+      {delivery.pathways.length > 0 && (
+        <div className="grid gap-3">
+          {delivery.pathways.map((pathway, index) => (
+            <article
+              key={pathway.id}
+              className="rounded-xl border border-primary/35 bg-background/20 p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Solution Pathway {index + 1} · {cleanDisplayText(pathway.label)}
+                  </p>
+                  {pathway.spiral_form && (
+                    <p className="mt-1 text-xs text-primary">
+                      Spiral form · {labelToken(pathway.spiral_form)}
+                    </p>
+                  )}
+                </div>
+                <span className="rounded-full border border-primary/30 px-2.5 py-1 text-[0.65rem] tracking-[0.12em] text-primary uppercase">
+                  SPIRAL GUIDED
+                </span>
+              </div>
+
+              <p className="mt-3 text-sm leading-6 text-foreground/90">
+                {cleanDisplayText(pathway.summary)}
+              </p>
+
+              {pathway.steps.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-foreground/80">Steps</p>
+                  <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-foreground/90">
+                    {pathway.steps.map((step, stepIndex) => (
+                      <li key={stepIndex}>{cleanDisplayText(step)}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {pathway.tradeoffs.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-foreground/80">Tradeoffs</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                    {pathway.tradeoffs.map((tradeoff, tradeoffIndex) => (
+                      <li key={tradeoffIndex}>{cleanDisplayText(tradeoff)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
 
       {expandedForms.length > 0 && (
         <div>
@@ -127,7 +180,11 @@ function SpiralPathways({ run }: { run: ObjectiveRun }) {
       )}
 
       {planning.branches.length > 0 && (
-        <div className="grid gap-3">
+        <div>
+          <p className="mb-2 text-xs font-medium tracking-[0.12em] text-foreground/80 uppercase">
+            Governed DTF execution branches
+          </p>
+          <div className="grid gap-3">
           {planning.branches.map((branch, index) => {
             const branchId =
               typeof branch["branch_id"] === "string"
@@ -211,6 +268,7 @@ function SpiralPathways({ run }: { run: ObjectiveRun }) {
               </article>
             );
           })}
+          </div>
         </div>
       )}
     </section>
@@ -774,7 +832,7 @@ export function Engage() {
           {delivery ? (
             <>
               <ResultContent delivery={delivery} source={deliveryQuery.data?.source ?? null} />
-              <SpiralPathways run={run} />
+              <SpiralPathways run={run} delivery={delivery} />
             </>
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">

@@ -10,6 +10,15 @@ export interface KnowledgeEvidence {
   source_path: string;
   snippet: string;
   source: "ascension";
+  record_kind:
+    | "meaning_element"
+    | "evidence_record"
+    | "delta_record"
+    | "transition_record"
+    | "pathway_record"
+    | "governance_record"
+    | "knowledge_record";
+  provenance_status: "recorded" | "verified_runtime_record";
 }
 
 export interface KnowledgeRetrievalResult {
@@ -77,6 +86,29 @@ function score(queryTokens: string[], item: { path: string; text: string }) {
     value += 1;
   }
   return value;
+}
+
+function classifyRecord(sourcePath: string, path: string) {
+  const key = `${sourcePath} ${path}`.toLowerCase();
+  const record_kind: KnowledgeEvidence["record_kind"] =
+    /meaning|me_refs|active_me|canonical_concept/.test(key)
+      ? "meaning_element"
+      : /evidence|observation/.test(key)
+        ? "evidence_record"
+        : /verified_delta|delta/.test(key)
+          ? "delta_record"
+          : /transition/.test(key)
+            ? "transition_record"
+            : /pathway|dtf|branch/.test(key)
+              ? "pathway_record"
+              : /guardian|constraint|confidence|governance/.test(key)
+                ? "governance_record"
+                : "knowledge_record";
+  const provenance_status: KnowledgeEvidence["provenance_status"] =
+    /verified_delta|ledger|evidence|transition/.test(key)
+      ? "verified_runtime_record"
+      : "recorded";
+  return { record_kind, provenance_status };
 }
 
 function compactFallback(doc: Record<string, unknown>, sourcePath: string) {
@@ -156,11 +188,13 @@ export async function retrieveKnowledge(
     const key = `${item.sourcePath}|${item.path}|${item.text}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    const classification = classifyRecord(item.sourcePath, item.path);
     evidence.push({
       title: item.path,
       source_path: item.sourcePath,
       snippet: item.text.slice(0, 1800),
       source: "ascension",
+      ...classification,
     });
     if (evidence.length >= Math.max(1, Math.min(limit, 24))) break;
   }
@@ -182,7 +216,13 @@ export function formatKnowledgeEvidence(result: KnowledgeRetrievalResult): strin
     header,
     ...result.evidence.map(
       (item, index) =>
-        `[A${index + 1}] ${item.source_path} · ${item.title}\nKnowledge: ${item.snippet}`,
+        [
+          `[A${index + 1}] ${item.source_path} · ${item.title}`,
+          `Record type: ${item.record_kind}`,
+          `Provenance status: ${item.provenance_status}`,
+          "Support scope: this marker supports only the exact stored record below; runtime verification of a record is not proof of a broader scientific claim.",
+          `Knowledge: ${item.snippet}`,
+        ].join("\n"),
     ),
   ].join("\n\n");
 }

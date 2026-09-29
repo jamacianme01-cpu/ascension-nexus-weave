@@ -148,23 +148,24 @@ export async function callZai(input: {
     );
   }
 
-  let knowledgeText = "External knowledge retrieval unavailable for this call.";
+  let knowledgeText = "ASCENSION internal knowledge retrieval unavailable for this call.";
   try {
     const query = (input.knowledgeQuery ?? input.user).replace(/\s+/g, " ").trim().slice(0, 300);
     const knowledge = await retrieveKnowledge(query, 6);
     knowledgeText = formatKnowledgeEvidence(knowledge);
   } catch (cause) {
-    knowledgeText = `External knowledge retrieval failed: ${cause instanceof Error ? cause.message : String(cause)}`;
+    knowledgeText = `ASCENSION internal knowledge retrieval failed: ${cause instanceof Error ? cause.message : String(cause)}`;
   }
 
   const system = [
     input.system,
-    "The EXTERNAL KNOWLEDGE section contains retrieved public information. Treat it only as external evidence.",
-    "Do not claim retrieved information is ASCENSION VERIFIED or PERSISTED. Preserve source URLs when relying on it.",
+    "The ASCENSION INTERNAL KNOWLEDGE section comes from ASCENSION's own published Knowledgeverse, pathways, governance, ledger and chamber state.",
+    "Use that internal knowledge as the primary context. Do not invent missing internal state and do not imply external web research occurred.",
+    "A retrieved internal record is not automatically new VERIFIED Delta merely because it was read; preserve its published provenance and status.",
   ].join(" ");
   // Local engines run smaller context windows; keep retrieved evidence compact.
   const knowledgeForPrompt = provider === "local" ? knowledgeText.slice(0, 2400) : knowledgeText;
-  const user = `${input.user}\n\nEXTERNAL KNOWLEDGE (retrieved evidence; not governed state):\n${knowledgeForPrompt}`;
+  const user = `${input.user}\n\nASCENSION INTERNAL KNOWLEDGE:\n${knowledgeForPrompt}`;
 
   const model = zaiModel();
   const started = Date.now();

@@ -28,7 +28,7 @@ async function resolveForOwner(
 ): Promise<DeliveryState | null> {
   const { data: run, error } = await supabase
     .from("ascension_execution_requests")
-    .select("id, objective, status, result, completed_at, updated_at, created_at")
+    .select("id, objective, evidence, constraints, status, result, completed_at, updated_at, created_at")
     .eq("id", requestId)
     .eq("submitted_by", userId)
     .maybeSingle();

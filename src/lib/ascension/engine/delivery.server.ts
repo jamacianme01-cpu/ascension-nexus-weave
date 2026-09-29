@@ -154,6 +154,8 @@ export function governedDelivery(
 export async function externalProductDraft(
   run: {
     objective: string;
+    evidence?: Json | null;
+    constraints?: Json | null;
     result: Json | null;
     status?: string;
   },
@@ -215,8 +217,17 @@ export async function externalProductDraft(
     "Never return a Knowledge Form, execution receipt, or placeholder. Only explain ASCENSION architecture when the user is actually asking about ASCENSION's capabilities or how it works.",
   ].join(" ");
 
+  const evidenceContext = Array.isArray(run.evidence)
+    ? run.evidence.map((item) => String(item)).filter(Boolean).slice(0, 32).join("\n")
+    : "";
+  const constraintContext = Array.isArray(run.constraints)
+    ? run.constraints.map((item) => String(item)).filter(Boolean).slice(0, 32).join("\n")
+    : "";
+
   const user = [
     `OBJECTIVE:\n${run.objective}`,
+    evidenceContext ? `USER / OBJECTIVE EVIDENCE:\n${evidenceContext}` : "",
+    constraintContext ? `OBJECTIVE CONSTRAINTS:\n${constraintContext}` : "",
     `GOVERNED RUNTIME STATUS: ${run.status ?? "unknown"} (do not claim this draft is verified)`,
     artifactContext
       ? `\nGOVERNED RUNTIME ARTIFACTS / CONTEXT:\n${artifactContext}`
@@ -308,6 +319,8 @@ export interface DraftStore {
 export interface DeliveryRun {
   id: string;
   objective: string;
+  evidence?: Json | null;
+  constraints?: Json | null;
   status: string;
   result: Json | null;
   completed_at: string | null;

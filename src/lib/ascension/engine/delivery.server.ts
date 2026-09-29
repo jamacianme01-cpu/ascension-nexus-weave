@@ -216,6 +216,7 @@ export async function externalProductDraft(
         "",
         "The operating loop is: Objective -> Meaning -> Knowledge -> Pathways -> Evaluation -> Guardian -> Execution -> AutoSync verification -> Persisted result -> Delta learning."
       ].join("\n"),
+      pathways: [],
       files: [],
       limitations: [],
     });
@@ -229,6 +230,26 @@ export async function externalProductDraft(
     .map((file) => `FILE: ${file.name}\n${file.content.slice(0, 12000)}`)
     .join("\n\n");
 
+  const planning = record(record(run.result)["objective_planning"]);
+  const mesh = record(planning["engine_mesh"]);
+  const engines = record(mesh["engines"]);
+  const spiral = record(engines["Spiral"]);
+  const spiralOutput = Array.isArray(spiral["output"]) ? spiral["output"].map(record) : [];
+  const spiralForms = [
+    ...new Set(
+      spiralOutput.flatMap((item) =>
+        Array.isArray(item["expanded_forms"])
+          ? item["expanded_forms"].filter((value): value is string => typeof value === "string")
+          : [],
+      ),
+    ),
+  ].slice(0, 5);
+  const spiralContext = spiralForms.length
+    ? `SPIRAL EXPANSION FOR THIS OBJECTIVE:\n${spiralForms
+        .map((form, index) => `${index + 1}. ${form}`)
+        .join("\n")}`
+    : "";
+
   const system = [
     "You are the user-facing response engine inside ASCENSION, not a generic chatbot. Never introduce yourself as 'an AI language model'.",
     "ASCENSION is an objective-driven system: it takes what the user wants to accomplish, decomposes meaning, retrieves relevant knowledge, models and compares pathways, checks confidence and contradictions, applies Guardian constraints, executes through available engines, verifies with AutoSync, and persists verified outcomes and learning.",
@@ -236,8 +257,12 @@ export async function externalProductDraft(
     "When the user asks what ASCENSION can do, explain ASCENSION specifically. Distinguish what this web response can produce immediately from capabilities that require the governed runtime or a connected execution tool. Do not claim a tool is connected or a physical action occurred unless evidence says so.",
     "Write a useful user-facing result now. ASCENSION governed execution may still be pending; available artifacts can be receipts, plans, Knowledge Forms, or scaffolds.",
     "Do not claim you physically built, tested, verified, persisted, or governed anything.",
-    "Return exactly one JSON object with keys: kind, title, body, files, limitations.",
+    "Return exactly one JSON object with keys: kind, title, body, pathways, files, limitations.",
     "The body must be clean readable plain text. Do not emit Markdown markers, escaped Markdown, or HTML entities.",
+    "pathways must be an array. When a SPIRAL EXPANSION is supplied, create one substantive user-facing solution pathway for each Spiral form instead of collapsing them into one answer.",
+    "Each pathway object must contain id, label, summary, steps, tradeoffs, spiral_form. steps and tradeoffs are string arrays.",
+    "The pathway content is a Spiral-guided user-facing synthesis, not a claim that the governed runtime physically executed or verified that solution.",
+    "Make the pathways materially different approaches to accomplishing the objective. Do not merely rename the same answer.",
     'kind must be "answer" or "artifact".',
     "For ordinary questions or product/invention requests, give a substantive direct result in body.",
     "For app/code requests, include complete runnable source files.",
@@ -260,9 +285,13 @@ export async function externalProductDraft(
     evidenceContext ? `USER / OBJECTIVE EVIDENCE:\n${evidenceContext}` : "",
     constraintContext ? `OBJECTIVE CONSTRAINTS:\n${constraintContext}` : "",
     `GOVERNED RUNTIME STATUS: ${run.status ?? "unknown"} (do not claim this draft is verified)`,
+    spiralContext,
     artifactContext
       ? `\nGOVERNED RUNTIME ARTIFACTS / CONTEXT:\n${artifactContext}`
       : "\nNo usable runtime artifact content was transported.",
+    spiralForms.length
+      ? "\nUse the Spiral expansion to produce multiple distinct solution pathways. Do not collapse them into a single recommendation."
+      : "",
     "\nProduce the requested user-facing result now.",
   ].join("\n");
 
@@ -283,6 +312,7 @@ export async function externalProductDraft(
       kind: "answer",
       title: run.objective.slice(0, 200) || "ASCENSION result",
       body: generated.text.trim(),
+      pathways: [],
       files: [],
       limitations: [],
     } as Record<string, unknown>);

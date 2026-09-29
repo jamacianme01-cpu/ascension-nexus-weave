@@ -78,10 +78,20 @@ export function receiptFiles(
   });
 }
 
+export interface ObjectivePathway {
+  id: string;
+  label: string;
+  summary: string;
+  steps: string[];
+  tradeoffs: string[];
+  spiral_form: string | null;
+}
+
 export interface ObjectiveDelivery {
   kind: "answer" | "recommendation" | "artifact" | "not_produced";
   title: string;
   body: string;
+  pathways: ObjectivePathway[];
   files: { name: string; content: string }[];
   limitations: string[];
 }
@@ -97,6 +107,8 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     typeof v["body"] !== "string" ||
     !v["body"].trim() ||
     v["body"].length > 40000 ||
+    (v["pathways"] !== undefined && !Array.isArray(v["pathways"])) ||
+    (Array.isArray(v["pathways"]) && v["pathways"].length > 8) ||
     !Array.isArray(v["files"]) ||
     v["files"].length > 8 ||
     !Array.isArray(v["limitations"]) ||
@@ -121,6 +133,23 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       "The answer engine returned a generic architecture template instead of answering the objective. Retry this result.",
     );
   }
+  const pathways = (Array.isArray(v["pathways"]) ? v["pathways"] : []).map((raw, index) => {
+    const p = record(raw);
+    const id = typeof p["id"] === "string" && p["id"].trim() ? p["id"].trim() : `path-${index + 1}`;
+    const label = typeof p["label"] === "string" ? p["label"].trim() : "";
+    const summary = typeof p["summary"] === "string" ? p["summary"].trim() : "";
+    const steps = strings(p["steps"]).slice(0, 12);
+    const tradeoffs = strings(p["tradeoffs"]).slice(0, 12);
+    const spiralForm =
+      typeof p["spiral_form"] === "string" && p["spiral_form"].trim()
+        ? p["spiral_form"].trim()
+        : null;
+    if (!label || !summary || label.length > 160 || summary.length > 5000) {
+      throw new Error("The answer engine returned an invalid pathway.");
+    }
+    return { id, label, summary, steps, tradeoffs, spiral_form: spiralForm };
+  });
+
   const names = new Set<string>();
   const files = v["files"].map((raw) => {
     const f = record(raw);
@@ -146,6 +175,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     kind: v["kind"] as ObjectiveDelivery["kind"],
     title: v["title"],
     body: v["body"],
+    pathways,
     files,
     limitations: v["limitations"] as string[],
   };

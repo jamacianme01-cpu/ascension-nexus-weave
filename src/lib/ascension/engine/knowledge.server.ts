@@ -20,6 +20,7 @@ export interface KnowledgeRetrievalResult {
 }
 
 const INTERNAL_PATHS = [
+  "/snapshot",
   "/knowledgeverse",
   "/pathways",
   "/governance",
@@ -60,7 +61,7 @@ function flattenStrings(value: unknown, path = "$", out: { path: string; text: s
   if (value && typeof value === "object") {
     for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
       flattenStrings(item, `${path}.${key}`, out);
-      if (out.length >= 3000) break;
+      if (out.length >= 20000) break;
     }
   }
   return out;
@@ -133,7 +134,10 @@ export async function retrieveKnowledge(
     }
 
     // Always retain a compact Knowledgeverse baseline so ASCENSION never
-    // answers from a model with zero internal context.
+    // answers from a model with zero internal context. The full /snapshot
+    // above carries historical Meaning Elements, state transitions, evidence,
+    // World Model state and verified Delta that may not be repeated by the
+    // smaller surface endpoints.
     if (row.path === "/knowledgeverse") {
       const baseline = compactFallback(doc, row.path);
       if (baseline) candidates.push({

@@ -1,95 +1,184 @@
 /**
- * Server-only external knowledge retrieval for ASCENSION objectives.
+ * Server-only ASCENSION internal knowledge retrieval.
  *
- * Retrieved material is EXTERNAL EVIDENCE. It is never VERIFIED, accepted Δ,
- * or PERSISTED merely because retrieval succeeded. The governed runtime remains
- * authoritative for those transitions.
+ * Knowledge comes from ASCENSION's own published governed state first:
+ * Knowledgeverse, pathways, governance, ledger, chamber and Library Cards.
+ * Nothing here performs an external web search.
  */
-
 export interface KnowledgeEvidence {
   title: string;
-  url: string;
+  source_path: string;
   snippet: string;
-  source: "web";
+  source: "ascension";
 }
 
 export interface KnowledgeRetrievalResult {
   query: string;
   evidence: KnowledgeEvidence[];
   retrieved_at: string;
+  source_revision: number | null;
 }
 
-function stripHtml(value: string): string {
-  return value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;|&#39;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
-    .trim();
+const INTERNAL_PATHS = [
+  "/knowledgeverse",
+  "/pathways",
+  "/governance",
+  "/ledger",
+  "/chamber",
+] as const;
+
+function record(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
-function decodeDuckRedirect(value: string): string {
-  try {
-    const parsed = new URL(value, "https://html.duckduckgo.com");
-    const target = parsed.searchParams.get("uddg");
-    return target ? decodeURIComponent(target) : parsed.href;
-  } catch {
-    return value;
+function tokens(value: string): string[] {
+  return [...new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(" ")
+      .filter((part) => part.length >= 3),
+  )].slice(0, 32);
+}
+
+function flattenStrings(value: unknown, path = "$", out: { path: string; text: string }[] = []) {
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (text) out.push({ path, text });
+    return out;
   }
+  if (typeof value === "number" || typeof value === "boolean") {
+    out.push({ path, text: String(value) });
+    return out;
+  }
+  if (Array.isArray(value)) {
+    value.slice(0, 300).forEach((item, i) => flattenStrings(item, `${path}[${i}]`, out));
+    return out;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      flattenStrings(item, `${path}.${key}`, out);
+      if (out.length >= 3000) break;
+    }
+  }
+  return out;
+}
+
+function score(queryTokens: string[], item: { path: string; text: string }) {
+  const hay = `${item.path} ${item.text}`.toLowerCase();
+  let value = 0;
+  for (const token of queryTokens) {
+    if (hay.includes(token)) value += item.path.toLowerCase().includes(token) ? 4 : 2;
+  }
+  if (/verified|knowledge|meaning|relationship|lineage|delta|pathway|guardian|confidence|world|destiny/i.test(item.path)) {
+    value += 1;
+  }
+  return value;
+}
+
+function compactFallback(doc: Record<string, unknown>, sourcePath: string) {
+  const data = record(doc["data"]);
+  if (sourcePath === "/knowledgeverse") {
+    const forms = Array.isArray(data["knowledge_forms"]) ? data["knowledge_forms"] : [];
+    const summaries = forms.slice(0, 8).map((raw) => {
+      const form = record(raw);
+      const phenotype = record(form["phenotype"]);
+      const delta = record(record(form["verified_delta"])["summary"]);
+      return [
+        String(form["entity_id"] ?? "form"),
+        `SID=${String(form["sid"] ?? "unknown")}`,
+        `state=${String(form["developmental_state"] ?? "unknown")}`,
+        `capabilities=${Array.isArray(phenotype["active_capabilities"]) ? phenotype["active_capabilities"].join(",") : ""}`,
+        `verified_delta=K:${String(delta["K"] ?? 0)},W:${String(delta["W"] ?? 0)},U:${String(delta["U"] ?? 0)}`,
+      ].join(" | ");
+    });
+    return summaries.join("\n");
+  }
+  return JSON.stringify(data).slice(0, 3500);
 }
 
 export async function retrieveKnowledge(
   query: string,
-  limit = 6,
+  limit = 12,
 ): Promise<KnowledgeRetrievalResult> {
   const cleanQuery = query.trim();
-  if (!cleanQuery) {
-    return { query: cleanQuery, evidence: [], retrieved_at: new Date().toISOString() };
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("ascension_relay_documents")
+    .select("path, body, http_status")
+    .in("path", [...INTERNAL_PATHS])
+    .eq("http_status", 200);
+  if (error) throw new Error(`ASCENSION internal knowledge retrieval failed: ${error.message}`);
+
+  const queryTokens = tokens(cleanQuery);
+  const candidates: { sourcePath: string; path: string; text: string; score: number }[] = [];
+  let sourceRevision: number | null = null;
+
+  for (const row of data ?? []) {
+    let doc: Record<string, unknown>;
+    try {
+      doc = record(JSON.parse(row.body));
+    } catch {
+      continue;
+    }
+    const revision = doc["snapshot_revision"];
+    if (typeof revision === "number") sourceRevision = Math.max(sourceRevision ?? 0, revision);
+    const root = doc["data"] ?? doc;
+    const flattened = flattenStrings(root);
+    for (const item of flattened) {
+      const s = score(queryTokens, item);
+      if (s > 0) candidates.push({ sourcePath: row.path, ...item, score: s });
+    }
+
+    // Always retain a compact Knowledgeverse baseline so ASCENSION never
+    // answers from a model with zero internal context.
+    if (row.path === "/knowledgeverse") {
+      const baseline = compactFallback(doc, row.path);
+      if (baseline) candidates.push({
+        sourcePath: row.path,
+        path: "$.knowledgeverse.baseline",
+        text: baseline,
+        score: 1,
+      });
+    }
   }
 
-  const endpoint = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(cleanQuery)}`;
-  const response = await fetch(endpoint, {
-    signal: AbortSignal.timeout(12000),
-    headers: {
-      Accept: "text/html",
-      "User-Agent": "ASCENSION-Knowledge-Retrieval/1.0",
-    },
-  });
-
-  if (!response.ok) throw new Error(`Knowledge retrieval returned HTTP ${response.status}`);
-
-  const html = await response.text();
-  const blocks = html.split(/class=["']result(?:\s|__)/i).slice(1);
+  candidates.sort((a, b) => b.score - a.score);
+  const seen = new Set<string>();
   const evidence: KnowledgeEvidence[] = [];
-
-  for (const block of blocks) {
-    if (evidence.length >= Math.max(1, Math.min(limit, 10))) break;
-    const link = block.match(/class=["'][^"']*result__a[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
-    const href = link?.[1];
-    const titleHtml = link?.[2];
-    if (!href || !titleHtml) continue;
-    const snippet = block.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/(?:a|div)/i);
-    const url = decodeDuckRedirect(href);
-    if (!/^https?:\/\//i.test(url)) continue;
+  for (const item of candidates) {
+    const key = `${item.sourcePath}|${item.path}|${item.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     evidence.push({
-      title: stripHtml(titleHtml),
-      url,
-      snippet: stripHtml(snippet?.[1] ?? ""),
-      source: "web",
+      title: item.path,
+      source_path: item.sourcePath,
+      snippet: item.text.slice(0, 1800),
+      source: "ascension",
     });
+    if (evidence.length >= Math.max(1, Math.min(limit, 24))) break;
   }
 
-  return { query: cleanQuery, evidence, retrieved_at: new Date().toISOString() };
+  return {
+    query: cleanQuery,
+    evidence,
+    retrieved_at: new Date().toISOString(),
+    source_revision: sourceRevision,
+  };
 }
 
 export function formatKnowledgeEvidence(result: KnowledgeRetrievalResult): string {
-  if (result.evidence.length === 0) return "No external knowledge results were retrieved.";
-  return result.evidence
-    .map((item, index) =>
-      `[K${index + 1}] ${item.title}\nURL: ${item.url}\nEvidence: ${item.snippet || "No snippet supplied by source."}`,
-    )
-    .join("\n\n");
+  if (result.evidence.length === 0) {
+    return "No matching internal ASCENSION knowledge was found in the current governed publication.";
+  }
+  const header = `ASCENSION INTERNAL KNOWLEDGE · snapshot revision ${result.source_revision ?? "unknown"}`;
+  return [
+    header,
+    ...result.evidence.map(
+      (item, index) =>
+        `[A${index + 1}] ${item.source_path} · ${item.title}\nKnowledge: ${item.snippet}`,
+    ),
+  ].join("\n\n");
 }

@@ -33,6 +33,22 @@ function cleanGeneratedText(value: string): string {
     .trim();
 }
 
+function stripModelProvenanceClaims(value: string): string {
+  return value
+    .replace(
+      /\bAccording to ASCENSION(?:'s)? internal (?:knowledge|records)(?:\s*\[[^\]]+\])?,?\s*/gi,
+      "From general knowledge, ",
+    )
+    .replace(
+      /\bASCENSION(?:'s)? internal (?:knowledge|records)(?:\s*\[[^\]]+\])?\s+(?:confirms|notes|shows|indicates|states|establishes|demonstrates|supports|suggests)\s+(?:that\s+)?/gi,
+      "From general knowledge, ",
+    )
+    .replace(/\s*\[A\d+(?:\s*,\s*A?\d+)*\]/gi, "")
+    .replace(/\bASCENSION(?:'s)? internal (?:knowledge|records)\b/gi, "general knowledge")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function artifactFiles(value: unknown): { name: string; content: string }[] {
   const payload = record(value);
   if (!Array.isArray(payload["files"])) return [];
@@ -256,6 +272,10 @@ export async function externalProductDraft(
     knowledgeQuery: run.objective,
     temperature: 0.25,
   });
+  const { formatInternalConnection } = await import("./knowledge.server");
+  const internalConnection = generated.knowledge
+    ? formatInternalConnection(generated.knowledge, 3)
+    : "";
 
   const candidate =
     generated.json ??
@@ -278,7 +298,12 @@ export async function externalProductDraft(
     candidate["title"] = cleanGeneratedText(candidate["title"]);
   }
   if (typeof candidate["body"] === "string") {
-    candidate["body"] = cleanGeneratedText(candidate["body"]);
+    const modelBody = stripModelProvenanceClaims(cleanGeneratedText(candidate["body"]));
+    candidate["body"] = cleanGeneratedText(
+      internalConnection
+        ? `${internalConnection}\n\nGeneral-knowledge explanation:\n${modelBody}`
+        : modelBody,
+    );
   }
   if (Array.isArray(candidate["limitations"])) {
     candidate["limitations"] = candidate["limitations"].map((item) =>

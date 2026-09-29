@@ -18,6 +18,21 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function cleanGeneratedText(value: string): string {
+  return value
+    .replace(/&#x20;|&nbsp;/gi, " ")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x27;|&#39;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\\([\\`*_[\]{}()#+\-.!>])/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
 export function artifactFiles(value: unknown): { name: string; content: string }[] {
   const payload = record(value);
   if (!Array.isArray(payload["files"])) return [];
@@ -257,6 +272,18 @@ export async function externalProductDraft(
     candidate["limitations"] = [candidate["limitations"].trim()];
   } else if (!Array.isArray(candidate["limitations"])) {
     candidate["limitations"] = [];
+  }
+
+  if (typeof candidate["title"] === "string") {
+    candidate["title"] = cleanGeneratedText(candidate["title"]);
+  }
+  if (typeof candidate["body"] === "string") {
+    candidate["body"] = cleanGeneratedText(candidate["body"]);
+  }
+  if (Array.isArray(candidate["limitations"])) {
+    candidate["limitations"] = candidate["limitations"].map((item) =>
+      typeof item === "string" ? cleanGeneratedText(item) : item,
+    );
   }
 
   const parsed = parseDelivery(candidate);

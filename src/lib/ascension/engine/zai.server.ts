@@ -162,7 +162,11 @@ export async function callZai(input: {
     "The ASCENSION INTERNAL KNOWLEDGE section comes from ASCENSION's own published Knowledgeverse, pathways, governance, ledger and chamber state.",
     "Use that internal knowledge as the primary context. Do not invent missing internal state and do not imply external web research occurred.",
     "When directly relevant prior ASCENSION knowledge is present, explicitly connect the current objective to that prior knowledge and cite its [A#] marker in the response. Distinguish stored Meaning Elements, prior transitions/evidence, and verified Delta from general model knowledge.",
-    "If the internal records do not contain enough information to answer completely, say what came from ASCENSION and what is general model knowledge instead of blending them together.",
+    "CITATION RULE: an [A#] marker supports only the exact stored record printed under that marker. Do not say ASCENSION internal knowledge confirms, proves, verifies, establishes, demonstrates, or supports a scientific or technical claim unless the exact stored Knowledge text states that claim.",
+    "A prior Meaning Element such as 'magnets and coils' supports only the statement that ASCENSION has prior internal history involving magnets and coils. It does not by itself verify Faraday's law, relative motion, voltage, copper-wire behavior, efficiency, or any other physics claim.",
+    "Runtime provenance such as a verified transition, evidence record, or verified Delta means ASCENSION verified that runtime record/transition. It does not automatically make every scientific proposition associated with the objective externally verified.",
+    "For information supplied by the model's general training knowledge rather than the internal records, explicitly introduce it as general knowledge (for example: 'From general physics knowledge...'). Never blend it into an ASCENSION-internal citation.",
+    "If the internal records do not contain enough information to answer completely, state the internal connection first, then clearly separate the general-knowledge explanation.",
     "A retrieved internal record is not automatically new VERIFIED Delta merely because it was read; preserve its published provenance and status.",
   ].join(" ");
   // Local engines run smaller context windows; keep retrieved evidence compact.

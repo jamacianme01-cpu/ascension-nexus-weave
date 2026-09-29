@@ -20,9 +20,11 @@ import {
 } from "@/lib/ascension/guest.functions";
 import {
   assessResult,
+  branchTitle,
   governedPersisted,
   notProducedMessage,
   parseDelivery,
+  planningFor,
   receiptFiles,
   record,
   strings,
@@ -67,6 +69,152 @@ function cleanDisplayText(value: string) {
     .replace(/(^|\n)\*([^*\n]+)\*/g, "$1$2")
     .replace(/[ \t]+\n/g, "\n")
     .trim();
+}
+
+
+function labelToken(value: string) {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function SpiralPathways({ run }: { run: ObjectiveRun }) {
+  const planning = planningFor(run.result);
+  const planningRecord = record(record(run.result)["objective_planning"]);
+  const mesh = record(planningRecord["engine_mesh"]);
+  const engines = record(mesh["engines"]);
+  const spiral = record(engines["Spiral"]);
+  const spiralOutput = Array.isArray(spiral["output"]) ? spiral["output"].map(record) : [];
+  const expandedForms = spiralOutput.flatMap((item) =>
+    Array.isArray(item["expanded_forms"])
+      ? item["expanded_forms"].filter((value): value is string => typeof value === "string")
+      : [],
+  );
+  const selectedId =
+    typeof planning.selected["branch_id"] === "string" ? planning.selected["branch_id"] : null;
+
+  if (!planning.branches.length && !expandedForms.length) return null;
+
+  return (
+    <section
+      aria-label="Spiral and DTF pathways"
+      className="space-y-4 rounded-xl border border-primary/25 bg-primary/[0.03] p-4 sm:p-5"
+    >
+      <div>
+        <p className="label-eyebrow text-primary">SPIRAL · MULTIPLE PATHWAYS</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          ASCENSION generated and evaluated multiple governed possibilities before CLARITY selected
+          the execution path shown below.
+        </p>
+      </div>
+
+      {expandedForms.length > 0 && (
+        <div>
+          <p className="text-xs font-medium tracking-[0.12em] text-foreground/80 uppercase">
+            Spiral expansion
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[...new Set(expandedForms)].map((form) => (
+              <span
+                key={form}
+                className="rounded-full border border-primary/30 px-3 py-1 text-xs text-primary"
+              >
+                {labelToken(form)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {planning.branches.length > 0 && (
+        <div className="grid gap-3">
+          {planning.branches.map((branch, index) => {
+            const branchId =
+              typeof branch["branch_id"] === "string"
+                ? branch["branch_id"]
+                : typeof branch["id"] === "string"
+                  ? branch["id"]
+                  : `path-${index + 1}`;
+            const selected = selectedId === branchId;
+            const evaluation = record(branch["evaluation"]);
+            const confidence =
+              typeof branch["confidence"] === "number"
+                ? branch["confidence"]
+                : typeof evaluation["confidence"] === "number"
+                  ? evaluation["confidence"]
+                  : null;
+            const outcome =
+              typeof evaluation["outcome_predictor"] === "number"
+                ? evaluation["outcome_predictor"]
+                : null;
+            const actions = strings(branch["actions"]);
+            const risks = strings(branch["risks"]);
+
+            return (
+              <article
+                key={branchId}
+                className={
+                  selected
+                    ? "rounded-xl border border-gold/60 bg-gold/5 p-4"
+                    : "rounded-xl border border-border/70 bg-void/40 p-4"
+                }
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Pathway {index + 1} · {branchTitle(branch)}
+                    </p>
+                    <p className="mt-1 break-all font-mono text-[0.68rem] text-muted-foreground">
+                      {branchId}
+                    </p>
+                  </div>
+                  <span
+                    className={
+                      selected
+                        ? "rounded-full border border-gold/50 px-2.5 py-1 text-[0.65rem] tracking-[0.12em] text-gold uppercase"
+                        : "rounded-full border border-border px-2.5 py-1 text-[0.65rem] tracking-[0.12em] text-muted-foreground uppercase"
+                    }
+                  >
+                    {selected ? "CLARITY SELECTED" : String(branch["status"] ?? "SIMULATED")}
+                  </span>
+                </div>
+
+                {(confidence !== null || outcome !== null) && (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {confidence !== null ? `Confidence ${Math.round(confidence * 100)}%` : ""}
+                    {confidence !== null && outcome !== null ? " · " : ""}
+                    {outcome !== null ? `Outcome ${Math.round(outcome * 100)}%` : ""}
+                  </p>
+                )}
+
+                {actions.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-foreground/80">Actions</p>
+                    <ul className="mt-1 space-y-1 text-sm text-foreground/90">
+                      {actions.map((action, actionIndex) => (
+                        <li key={actionIndex}>• {cleanDisplayText(action)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {risks.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-foreground/80">Risks</p>
+                    <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+                      {risks.map((risk, riskIndex) => (
+                        <li key={riskIndex}>• {cleanDisplayText(risk)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function download(name: string, content: string) {
@@ -624,7 +772,10 @@ export function Engage() {
           </div>
 
           {delivery ? (
-            <ResultContent delivery={delivery} source={deliveryQuery.data?.source ?? null} />
+            <>
+              <ResultContent delivery={delivery} source={deliveryQuery.data?.source ?? null} />
+              <SpiralPathways run={run} />
+            </>
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">
               <p className="whitespace-pre-wrap text-foreground">{notProduced}</p>

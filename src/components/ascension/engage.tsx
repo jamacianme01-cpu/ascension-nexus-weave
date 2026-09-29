@@ -56,11 +56,15 @@ function read(key: string) {
 function cleanDisplayText(value: string) {
   return value
     .replace(/&#x20;|&nbsp;/gi, " ")
-    .replace(/\\([.*_#>-])/g, "$1")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x27;|&#39;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\\([\\`*_[\]{}()#+\-.!>])/g, "$1")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/\*\*/g, "")
     .replace(/(^|\n)\*([^*\n]+)\*/g, "$1$2")
-    .replace(/\\\./g, ".")
     .replace(/[ \t]+\n/g, "\n")
     .trim();
 }
@@ -93,7 +97,7 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
   const drawing = delivery.files.find((file) => /\.svg$/i.test(file.name));
   return (
     <div className="space-y-5">
-      <h2 className="font-display text-2xl tracking-wide text-foreground">{delivery.title}</h2>
+      <h2 className="font-display text-2xl tracking-wide text-foreground">{cleanDisplayText(delivery.title)}</h2>
       <div className="rounded-xl border border-primary/20 bg-background/20 p-5 sm:p-6">
         <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground/95">
           {cleanDisplayText(delivery.body)}
@@ -131,7 +135,7 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
           <p className="text-xs tracking-[0.14em] text-gold uppercase">What remains</p>
           <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
             {delivery.limitations.map((line, i) => (
-              <li key={i}>{line}</li>
+              <li key={i}>{cleanDisplayText(line)}</li>
             ))}
           </ul>
         </div>

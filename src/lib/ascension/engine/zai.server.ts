@@ -6,7 +6,11 @@
  * be labelled as such by the caller. This module never writes governed state,
  * never invents a value and never rewrites an engine error.
  */
-import { formatKnowledgeEvidence, retrieveKnowledge } from "./knowledge.server";
+import {
+  formatKnowledgeEvidence,
+  retrieveKnowledge,
+  type KnowledgeRetrievalResult,
+} from "./knowledge.server";
 
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_MODEL = "glm-4.6";
@@ -37,6 +41,7 @@ export interface ZaiCallResult {
   text: string;
   json: Record<string, unknown> | null;
   duration_ms: number;
+  knowledge: KnowledgeRetrievalResult | null;
 }
 
 export class ZaiEngineError extends Error {
@@ -149,10 +154,11 @@ export async function callZai(input: {
   }
 
   let knowledgeText = "ASCENSION internal knowledge retrieval unavailable for this call.";
+  let knowledgeResult: KnowledgeRetrievalResult | null = null;
   try {
     const query = (input.knowledgeQuery ?? input.user).replace(/\s+/g, " ").trim().slice(0, 300);
-    const knowledge = await retrieveKnowledge(query, 6);
-    knowledgeText = formatKnowledgeEvidence(knowledge);
+    knowledgeResult = await retrieveKnowledge(query, 6);
+    knowledgeText = formatKnowledgeEvidence(knowledgeResult);
   } catch (cause) {
     knowledgeText = `ASCENSION internal knowledge retrieval failed: ${cause instanceof Error ? cause.message : String(cause)}`;
   }
@@ -161,12 +167,10 @@ export async function callZai(input: {
     input.system,
     "The ASCENSION INTERNAL KNOWLEDGE section comes from ASCENSION's own published Knowledgeverse, pathways, governance, ledger and chamber state.",
     "Use that internal knowledge as the primary context. Do not invent missing internal state and do not imply external web research occurred.",
-    "When directly relevant prior ASCENSION knowledge is present, explicitly connect the current objective to that prior knowledge and cite its [A#] marker in the response. Distinguish stored Meaning Elements, prior transitions/evidence, and verified Delta from general model knowledge.",
-    "CITATION RULE: an [A#] marker supports only the exact stored record printed under that marker. Do not say ASCENSION internal knowledge confirms, proves, verifies, establishes, demonstrates, or supports a scientific or technical claim unless the exact stored Knowledge text states that claim.",
-    "A prior Meaning Element such as 'magnets and coils' supports only the statement that ASCENSION has prior internal history involving magnets and coils. It does not by itself verify Faraday's law, relative motion, voltage, copper-wire behavior, efficiency, or any other physics claim.",
-    "Runtime provenance such as a verified transition, evidence record, or verified Delta means ASCENSION verified that runtime record/transition. It does not automatically make every scientific proposition associated with the objective externally verified.",
-    "For information supplied by the model's general training knowledge rather than the internal records, explicitly introduce it as general knowledge (for example: 'From general physics knowledge...'). Never blend it into an ASCENSION-internal citation.",
-    "If the internal records do not contain enough information to answer completely, state the internal connection first, then clearly separate the general-knowledge explanation.",
+    "The application renders ASCENSION provenance separately. Do NOT emit [A#] markers, source-path citations, or phrases such as 'according to ASCENSION internal knowledge', 'ASCENSION internal knowledge confirms', or equivalent provenance claims in your response.",
+    "Use relevant internal records only as background context. Do not turn a stored Meaning Element, prior transition, evidence record, or verified Delta into proof of a broader scientific or technical proposition.",
+    "Runtime verification means ASCENSION verified that runtime record or transition. It does not automatically verify every scientific proposition associated with the objective.",
+    "When you supply scientific, technical, historical, or other factual material that is not explicitly stated in the internal records, introduce it as general knowledge where useful and do not attribute it to ASCENSION's stored records.",
     "A retrieved internal record is not automatically new VERIFIED Delta merely because it was read; preserve its published provenance and status.",
   ].join(" ");
   // Local engines run smaller context windows; keep retrieved evidence compact.
@@ -236,5 +240,11 @@ export async function callZai(input: {
     );
   }
 
-  return { model, text, json: extractJson(text), duration_ms: Date.now() - started };
+  return {
+    model,
+    text,
+    json: extractJson(text),
+    duration_ms: Date.now() - started,
+    knowledge: knowledgeResult,
+  };
 }

@@ -19,6 +19,7 @@ export interface KnowledgeEvidence {
     | "governance_record"
     | "knowledge_record";
   provenance_status: "recorded" | "verified_runtime_record";
+  relevance_score: number;
 }
 
 export interface KnowledgeRetrievalResult {
@@ -195,6 +196,7 @@ export async function retrieveKnowledge(
       snippet: item.text.slice(0, 1800),
       source: "ascension",
       ...classification,
+      relevance_score: item.score,
     });
     if (evidence.length >= Math.max(1, Math.min(limit, 24))) break;
   }
@@ -225,4 +227,31 @@ export function formatKnowledgeEvidence(result: KnowledgeRetrievalResult): strin
         ].join("\n"),
     ),
   ].join("\n\n");
+}
+
+
+export function formatInternalConnection(
+  result: KnowledgeRetrievalResult,
+  maxItems = 3,
+): string {
+  const relevant = result.evidence
+    .filter((item) => item.relevance_score >= 2 && item.title !== "$.knowledgeverse.baseline")
+    .slice(0, Math.max(1, Math.min(maxItems, 5)));
+  if (!relevant.length) return "";
+
+  const lines = [
+    "ASCENSION internal connection:",
+    "These are prior ASCENSION records related to the objective. They are shown exactly as stored and do not, by themselves, verify broader scientific claims.",
+  ];
+  relevant.forEach((item, index) => {
+    const status =
+      item.provenance_status === "verified_runtime_record"
+        ? "verified runtime record"
+        : "recorded internal knowledge";
+    lines.push(
+      `[A${index + 1}] ${item.record_kind} · ${status} · ${item.source_path}`,
+      `Stored record: ${item.snippet.slice(0, 900)}`,
+    );
+  });
+  return lines.join("\n");
 }

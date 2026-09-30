@@ -78,6 +78,61 @@ function labelToken(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+
+function splitResultBody(value: string) {
+  const cleaned = cleanDisplayText(value);
+  const marker = "General-knowledge explanation:";
+  const markerIndex = cleaned.indexOf(marker);
+  const internal =
+    markerIndex >= 0 ? cleaned.slice(0, markerIndex).trim() : "";
+  const main =
+    markerIndex >= 0 ? cleaned.slice(markerIndex + marker.length).trim() : cleaned;
+
+  const firstBreak = main.search(/\n\s*\n/);
+  let summary = firstBreak > 0 ? main.slice(0, firstBreak).trim() : main;
+  let detail = firstBreak > 0 ? main.slice(firstBreak).trim() : "";
+
+  if (summary.length > 680) {
+    const sentenceCut = summary.slice(0, 680).lastIndexOf(". ");
+    const cut = sentenceCut > 320 ? sentenceCut + 1 : 680;
+    detail = [summary.slice(cut).trim(), detail].filter(Boolean).join("\n\n");
+    summary = summary.slice(0, cut).trim();
+  }
+
+  return { summary, detail, internal };
+}
+
+function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: ObjectiveDelivery }) {
+  const planning = planningFor(run.result);
+  const result = record(run.result);
+  const pathCount = delivery.pathways.length || planning.branches.length;
+  const guardian = run.guardian_verdict ?? "—";
+  const autosync = String(result["autosync_verdict"] ?? "—");
+  const delta =
+    governedPersisted(run)
+      ? `K+${String(result["delta_k"] ?? 0)} · W+${String(result["delta_w"] ?? 0)} · U+${String(result["delta_u"] ?? 0)}`
+      : "PENDING";
+
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {[
+        ["SPIRAL", pathCount ? `${pathCount} PATHS` : "ACTIVE"],
+        ["GUARDIAN", guardian],
+        ["AUTOSYNC", autosync],
+        ["VERIFIED Δ", delta],
+      ].map(([label, value]) => (
+        <div
+          key={label}
+          className="rounded-xl border border-primary/20 bg-primary/[0.04] px-3 py-3 text-center"
+        >
+          <p className="text-[0.58rem] tracking-[0.2em] text-muted-foreground uppercase">{label}</p>
+          <p className="mt-1 text-xs font-medium tracking-wide text-primary">{value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SpiralPathways({ run, delivery }: { run: ObjectiveRun; delivery: ObjectiveDelivery }) {
   const planning = planningFor(run.result);
   const planningRecord = record(record(run.result)["objective_planning"]);
@@ -85,191 +140,141 @@ function SpiralPathways({ run, delivery }: { run: ObjectiveRun; delivery: Object
   const engines = record(mesh["engines"]);
   const spiral = record(engines["Spiral"]);
   const spiralOutput = Array.isArray(spiral["output"]) ? spiral["output"].map(record) : [];
-  const expandedForms = spiralOutput.flatMap((item) =>
-    Array.isArray(item["expanded_forms"])
-      ? item["expanded_forms"].filter((value): value is string => typeof value === "string")
-      : [],
-  );
+  const expandedForms = [
+    ...new Set(
+      spiralOutput.flatMap((item) =>
+        Array.isArray(item["expanded_forms"])
+          ? item["expanded_forms"].filter((value): value is string => typeof value === "string")
+          : [],
+      ),
+    ),
+  ];
   const selectedId =
     typeof planning.selected["branch_id"] === "string" ? planning.selected["branch_id"] : null;
 
   if (!planning.branches.length && !expandedForms.length && !delivery.pathways.length) return null;
 
   return (
-    <section
-      aria-label="Spiral and DTF pathways"
-      className="space-y-4 rounded-xl border border-primary/25 bg-primary/[0.03] p-4 sm:p-5"
-    >
-      <div>
-        <p className="label-eyebrow text-primary">SPIRAL · MULTIPLE PATHWAYS</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Spiral expands the objective into multiple ways forward. Solution pathways below are
-          Spiral-guided user-facing syntheses; governed DTF execution branches are shown separately.
-        </p>
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="label-eyebrow text-primary">SPIRAL</p>
+          <h3 className="mt-1 font-display text-xl text-foreground">Ways forward</h3>
+        </div>
+        {expandedForms.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {expandedForms.map((form) => (
+              <span
+                key={form}
+                className="rounded-full border border-primary/25 bg-primary/[0.04] px-2.5 py-1 text-[0.65rem] text-primary"
+              >
+                {labelToken(form)}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {delivery.pathways.length > 0 && (
-        <div className="grid gap-3">
+        <div className="ascension-pathway-strip flex snap-x gap-3 overflow-x-auto pb-2">
           {delivery.pathways.map((pathway, index) => (
             <article
               key={pathway.id}
-              className="rounded-xl border border-primary/35 bg-background/20 p-4"
+              className="min-w-[82%] snap-start rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.08] to-background/20 p-4 sm:min-w-[360px] sm:max-w-[420px]"
             >
-              <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Solution Pathway {index + 1} · {cleanDisplayText(pathway.label)}
+                  <p className="text-[0.62rem] tracking-[0.18em] text-primary uppercase">
+                    PATH {String(index + 1).padStart(2, "0")}
                   </p>
-                  {pathway.spiral_form && (
-                    <p className="mt-1 text-xs text-primary">
-                      Spiral form · {labelToken(pathway.spiral_form)}
-                    </p>
-                  )}
+                  <h4 className="mt-1 text-base font-medium text-foreground">
+                    {cleanDisplayText(pathway.label)}
+                  </h4>
                 </div>
-                <span className="rounded-full border border-primary/30 px-2.5 py-1 text-[0.65rem] tracking-[0.12em] text-primary uppercase">
-                  SPIRAL GUIDED
-                </span>
+                {pathway.spiral_form && (
+                  <span className="rounded-full border border-primary/25 px-2 py-1 text-[0.58rem] text-primary">
+                    {labelToken(pathway.spiral_form)}
+                  </span>
+                )}
               </div>
 
               <p className="mt-3 text-sm leading-6 text-foreground/90">
                 {cleanDisplayText(pathway.summary)}
               </p>
 
-              {pathway.steps.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs font-medium text-foreground/80">Steps</p>
-                  <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-foreground/90">
+              <details className="mt-4 border-t border-primary/15 pt-3">
+                <summary className="cursor-pointer text-xs font-medium tracking-wide text-primary">
+                  OPEN PATHWAY
+                </summary>
+                {pathway.steps.length > 0 && (
+                  <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-foreground/90">
                     {pathway.steps.map((step, stepIndex) => (
                       <li key={stepIndex}>{cleanDisplayText(step)}</li>
                     ))}
                   </ol>
-                </div>
-              )}
-
-              {pathway.tradeoffs.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs font-medium text-foreground/80">Tradeoffs</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                    {pathway.tradeoffs.map((tradeoff, tradeoffIndex) => (
-                      <li key={tradeoffIndex}>{cleanDisplayText(tradeoff)}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                )}
+                {pathway.tradeoffs.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-muted-foreground">Tradeoffs</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                      {pathway.tradeoffs.map((tradeoff, tradeoffIndex) => (
+                        <li key={tradeoffIndex}>{cleanDisplayText(tradeoff)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </details>
             </article>
           ))}
         </div>
       )}
 
-      {expandedForms.length > 0 && (
-        <div>
-          <p className="text-xs font-medium tracking-[0.12em] text-foreground/80 uppercase">
-            Spiral expansion
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {[...new Set(expandedForms)].map((form) => (
-              <span
-                key={form}
-                className="rounded-full border border-primary/30 px-3 py-1 text-xs text-primary"
-              >
-                {labelToken(form)}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {planning.branches.length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-medium tracking-[0.12em] text-foreground/80 uppercase">
-            Governed DTF execution branches
-          </p>
-          <div className="grid gap-3">
-          {planning.branches.map((branch, index) => {
-            const branchId =
-              typeof branch["branch_id"] === "string"
-                ? branch["branch_id"]
-                : typeof branch["id"] === "string"
-                  ? branch["id"]
-                  : `path-${index + 1}`;
-            const selected = selectedId === branchId;
-            const evaluation = record(branch["evaluation"]);
-            const confidence =
-              typeof branch["confidence"] === "number"
-                ? branch["confidence"]
-                : typeof evaluation["confidence"] === "number"
-                  ? evaluation["confidence"]
-                  : null;
-            const outcome =
-              typeof evaluation["outcome_predictor"] === "number"
-                ? evaluation["outcome_predictor"]
-                : null;
-            const actions = strings(branch["actions"]);
-            const risks = strings(branch["risks"]);
-
-            return (
-              <article
-                key={branchId}
-                className={
-                  selected
-                    ? "rounded-xl border border-gold/60 bg-gold/5 p-4"
-                    : "rounded-xl border border-border/70 bg-void/40 p-4"
-                }
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Pathway {index + 1} · {branchTitle(branch)}
-                    </p>
-                    <p className="mt-1 break-all font-mono text-[0.68rem] text-muted-foreground">
-                      {branchId}
-                    </p>
-                  </div>
-                  <span
-                    className={
-                      selected
-                        ? "rounded-full border border-gold/50 px-2.5 py-1 text-[0.65rem] tracking-[0.12em] text-gold uppercase"
-                        : "rounded-full border border-border px-2.5 py-1 text-[0.65rem] tracking-[0.12em] text-muted-foreground uppercase"
-                    }
-                  >
+        <details className="rounded-xl border border-border/70 bg-void/30 px-4 py-3">
+          <summary className="cursor-pointer text-sm text-muted-foreground">
+            Governed DTF execution branches · {planning.branches.length}
+          </summary>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {planning.branches.map((branch, index) => {
+              const branchId =
+                typeof branch["branch_id"] === "string"
+                  ? branch["branch_id"]
+                  : typeof branch["id"] === "string"
+                    ? branch["id"]
+                    : `path-${index + 1}`;
+              const selected = selectedId === branchId;
+              const evaluation = record(branch["evaluation"]);
+              const confidence =
+                typeof branch["confidence"] === "number"
+                  ? branch["confidence"]
+                  : typeof evaluation["confidence"] === "number"
+                    ? evaluation["confidence"]
+                    : null;
+              const risks = strings(branch["risks"]);
+              return (
+                <div
+                  key={branchId}
+                  className={
+                    selected
+                      ? "rounded-lg border border-gold/45 bg-gold/5 p-3"
+                      : "rounded-lg border border-border/60 p-3"
+                  }
+                >
+                  <p className="text-xs font-medium text-foreground">{branchTitle(branch)}</p>
+                  <p className="mt-1 text-[0.65rem] text-muted-foreground">
                     {selected ? "CLARITY SELECTED" : String(branch["status"] ?? "SIMULATED")}
-                  </span>
-                </div>
-
-                {(confidence !== null || outcome !== null) && (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    {confidence !== null ? `Confidence ${Math.round(confidence * 100)}%` : ""}
-                    {confidence !== null && outcome !== null ? " · " : ""}
-                    {outcome !== null ? `Outcome ${Math.round(outcome * 100)}%` : ""}
+                    {confidence !== null ? ` · ${Math.round(confidence * 100)}%` : ""}
                   </p>
-                )}
-
-                {actions.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium text-foreground/80">Actions</p>
-                    <ul className="mt-1 space-y-1 text-sm text-foreground/90">
-                      {actions.map((action, actionIndex) => (
-                        <li key={actionIndex}>• {cleanDisplayText(action)}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {risks.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium text-foreground/80">Risks</p>
-                    <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
-                      {risks.map((risk, riskIndex) => (
-                        <li key={riskIndex}>• {cleanDisplayText(risk)}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </article>
-            );
-          })}
+                  {risks[0] && (
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      Risk: {cleanDisplayText(risks[0])}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </details>
       )}
     </section>
   );
@@ -301,29 +306,93 @@ function statusText(run: ObjectiveRun, produced: boolean | null) {
 
 export function ResultContent({ delivery, source }: { delivery: ObjectiveDelivery; source?: "governed" | "external_draft" | null }) {
   const drawing = delivery.files.find((file) => /\.svg$/i.test(file.name));
+  const body = splitResultBody(delivery.body);
+  const otherFiles = delivery.files.filter((file) => file !== drawing);
+
   return (
-    <div className="space-y-5">
-      <h2 className="font-display text-2xl tracking-wide text-foreground">{cleanDisplayText(delivery.title)}</h2>
-      <div className="rounded-xl border border-primary/20 bg-background/20 p-5 sm:p-6">
-        <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground/95">
-          {cleanDisplayText(delivery.body)}
-        </p>
-      </div>
+    <div className="space-y-4">
       {drawing && (
-        <img
-          src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(drawing.content)}`}
-          alt={`Drawing for ${delivery.title}`}
-          className="w-full rounded-xl border border-primary/25 bg-background/40"
-        />
+        <section className="ascension-artifact-hero overflow-hidden rounded-2xl border border-primary/40 bg-background/30 shadow-2xl">
+          <div className="flex items-center justify-between gap-3 border-b border-primary/20 px-4 py-3 sm:px-5">
+            <div>
+              <p className="label-eyebrow text-primary">VISUAL OUTPUT · CREATED NOW</p>
+              <p className="mt-1 text-sm text-foreground/85">{cleanDisplayText(drawing.name)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => download(drawing.name, drawing.content)}
+              className="min-h-10 rounded-full border border-gold/50 bg-gold/10 px-4 text-xs tracking-wide text-gold"
+            >
+              KEEP SVG
+            </button>
+          </div>
+          <div className="ascension-artifact-canvas relative flex min-h-[360px] items-center justify-center overflow-hidden p-4 sm:min-h-[520px] sm:p-8">
+            <img
+              src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(drawing.content)}`}
+              alt={`Drawing for ${delivery.title}`}
+              className="max-h-[70vh] w-full object-contain"
+            />
+          </div>
+        </section>
       )}
-      {delivery.files.map((file) => (
+
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="label-eyebrow text-primary">{drawing ? "DESIGN READOUT" : "ASCENSION RESULT"}</p>
+            <h2 className="mt-1 font-display text-2xl tracking-wide text-foreground sm:text-3xl">
+              {cleanDisplayText(delivery.title)}
+            </h2>
+          </div>
+          {source === "governed" && (
+            <span className="rounded-full border border-gold/40 px-3 py-1 text-[0.65rem] tracking-[0.14em] text-gold uppercase">
+              GOVERNED RESULT
+            </span>
+          )}
+        </div>
+
+        {body.summary && (
+          <div className="rounded-xl border border-primary/20 bg-background/20 p-4 sm:p-5">
+            <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground/95">
+              {body.summary}
+            </p>
+          </div>
+        )}
+
+        {(body.detail || body.internal) && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {body.detail && (
+              <details className="rounded-xl border border-border/70 bg-void/35 px-4 py-3">
+                <summary className="cursor-pointer text-sm font-medium text-foreground/85">
+                  Full explanation
+                </summary>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                  {body.detail}
+                </p>
+              </details>
+            )}
+            {body.internal && (
+              <details className="rounded-xl border border-border/70 bg-void/35 px-4 py-3">
+                <summary className="cursor-pointer text-sm font-medium text-foreground/85">
+                  Knowledge used
+                </summary>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                  {body.internal}
+                </p>
+              </details>
+            )}
+          </div>
+        )}
+      </div>
+
+      {otherFiles.map((file) => (
         <div
           key={file.name}
           className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4"
         >
           <div>
             <p className="text-xs tracking-[0.14em] text-gold uppercase">
-              {source === "external_draft" ? "File · generated result" : "File · delivered by runtime"}
+              {source === "external_draft" ? "CREATED FILE" : "RUNTIME FILE"}
             </p>
             <p className="mt-1 break-all text-sm text-foreground">{file.name}</p>
           </div>
@@ -336,15 +405,16 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
           </button>
         </div>
       ))}
+
       {delivery.limitations.length > 0 && (
-        <div className="rounded-xl border border-gold/25 p-4">
-          <p className="text-xs tracking-[0.14em] text-gold uppercase">What remains</p>
-          <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+        <details className="rounded-xl border border-gold/20 bg-gold/[0.03] px-4 py-3">
+          <summary className="cursor-pointer text-sm text-gold">Limits / what remains</summary>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
             {delivery.limitations.map((line, i) => (
               <li key={i}>{cleanDisplayText(line)}</li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
     </div>
   );
@@ -815,7 +885,7 @@ export function Engage() {
         <section
           ref={answerRef}
           aria-label="Your answer"
-          className="mx-auto max-w-4xl scroll-mt-24 space-y-5 rounded-2xl border border-primary/30 bg-void/80 p-5 shadow-2xl sm:p-7"
+          className="ascension-result-reveal mx-auto max-w-6xl scroll-mt-20 space-y-4 rounded-2xl border border-primary/30 bg-void/85 p-4 shadow-2xl sm:p-6"
         >
           <div>
             <p className="label-eyebrow text-primary">ASCENSION RESPONSE</p>
@@ -831,6 +901,7 @@ export function Engage() {
 
           {delivery ? (
             <>
+              <AscensionSignal run={run} delivery={delivery} />
               <ResultContent delivery={delivery} source={deliveryQuery.data?.source ?? null} />
               <SpiralPathways run={run} delivery={delivery} />
             </>

@@ -85,6 +85,14 @@ export interface ObjectivePathway {
   steps: string[];
   tradeoffs: string[];
   spiral_form: string | null;
+  visual_svg: string | null;
+  outcome_score: number | null;
+  outcome_reason: string | null;
+}
+
+export interface ObjectiveBlend extends ObjectivePathway {
+  blend_from: string[];
+  blend_reason: string;
 }
 
 export interface ObjectiveDelivery {
@@ -92,6 +100,7 @@ export interface ObjectiveDelivery {
   title: string;
   body: string;
   pathways: ObjectivePathway[];
+  blend: ObjectiveBlend | null;
   files: { name: string; content: string }[];
   limitations: string[];
 }
@@ -109,6 +118,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     v["body"].length > 40000 ||
     (v["pathways"] !== undefined && !Array.isArray(v["pathways"])) ||
     (Array.isArray(v["pathways"]) && v["pathways"].length > 8) ||
+    (v["blend"] !== undefined && v["blend"] !== null && typeof v["blend"] !== "object") ||
     !Array.isArray(v["files"]) ||
     v["files"].length > 8 ||
     !Array.isArray(v["limitations"]) ||
@@ -133,7 +143,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       "The answer engine returned a generic architecture template instead of answering the objective. Retry this result.",
     );
   }
-  const pathways = (Array.isArray(v["pathways"]) ? v["pathways"] : []).map((raw, index) => {
+  const parsePathway = (raw: unknown, index: number): ObjectivePathway => {
     const p = record(raw);
     const id = typeof p["id"] === "string" && p["id"].trim() ? p["id"].trim() : `path-${index + 1}`;
     const label = typeof p["label"] === "string" ? p["label"].trim() : "";
@@ -144,11 +154,51 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       typeof p["spiral_form"] === "string" && p["spiral_form"].trim()
         ? p["spiral_form"].trim()
         : null;
+    const visualSvg =
+      typeof p["visual_svg"] === "string" && /<svg[\s>]/i.test(p["visual_svg"])
+        ? p["visual_svg"].slice(0, 100000)
+        : null;
+    const outcomeScore =
+      typeof p["outcome_score"] === "number" &&
+      Number.isFinite(p["outcome_score"]) &&
+      p["outcome_score"] >= 0 &&
+      p["outcome_score"] <= 1
+        ? p["outcome_score"]
+        : null;
+    const outcomeReason =
+      typeof p["outcome_reason"] === "string" && p["outcome_reason"].trim()
+        ? p["outcome_reason"].trim().slice(0, 2000)
+        : null;
     if (!label || !summary || label.length > 160 || summary.length > 5000) {
       throw new Error("The answer engine returned an invalid pathway.");
     }
-    return { id, label, summary, steps, tradeoffs, spiral_form: spiralForm };
-  });
+    return {
+      id,
+      label,
+      summary,
+      steps,
+      tradeoffs,
+      spiral_form: spiralForm,
+      visual_svg: visualSvg,
+      outcome_score: outcomeScore,
+      outcome_reason: outcomeReason,
+    };
+  };
+
+  const pathways = (Array.isArray(v["pathways"]) ? v["pathways"] : []).map(parsePathway);
+  const blendRaw = v["blend"] && typeof v["blend"] === "object" ? v["blend"] : null;
+  let blend: ObjectiveBlend | null = null;
+  if (blendRaw) {
+    const base = parsePathway(blendRaw, pathways.length);
+    const b = record(blendRaw);
+    const blendFrom = strings(b["blend_from"]).slice(0, 8);
+    const blendReason =
+      typeof b["blend_reason"] === "string" && b["blend_reason"].trim()
+        ? b["blend_reason"].trim().slice(0, 3000)
+        : "";
+    if (!blendReason) throw new Error("The answer engine returned an incomplete blend pathway.");
+    blend = { ...base, blend_from: blendFrom, blend_reason: blendReason };
+  }
 
   const names = new Set<string>();
   const files = v["files"].map((raw) => {
@@ -176,6 +226,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     title: v["title"],
     body: v["body"],
     pathways,
+    blend,
     files,
     limitations: v["limitations"] as string[],
   };

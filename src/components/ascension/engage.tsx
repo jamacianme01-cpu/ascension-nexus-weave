@@ -106,7 +106,8 @@ function splitResultBody(value: string) {
 function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: ObjectiveDelivery }) {
   const planning = planningFor(run.result);
   const result = record(run.result);
-  const pathCount = delivery.pathways.length || planning.branches.length;
+  const pathCount =
+    delivery.pathways.length + (delivery.blend ? 1 : 0) || planning.branches.length;
   const guardian = run.guardian_verdict ?? "—";
   const autosync = String(result["autosync_verdict"] ?? "—");
   const delta =
@@ -160,15 +161,25 @@ function SpiralPathways({
   ];
   const selectedId =
     typeof planning.selected["branch_id"] === "string" ? planning.selected["branch_id"] : null;
+  const choices = delivery.blend
+    ? [...delivery.pathways, delivery.blend]
+    : delivery.pathways;
+  const [activeChoiceId, setActiveChoiceId] = useState<string | null>(null);
+  const activeChoice = choices.find((choice) => choice.id === activeChoiceId) ?? null;
+  const activeIsBlend = Boolean(activeChoice && delivery.blend?.id === activeChoice.id);
 
-  if (!planning.branches.length && !expandedForms.length && !delivery.pathways.length) return null;
+  if (!planning.branches.length && !expandedForms.length && !choices.length) return null;
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="label-eyebrow text-primary">SPIRAL</p>
-          <h3 className="mt-1 font-display text-xl text-foreground">Ways forward</h3>
+          <p className="label-eyebrow text-primary">SPIRAL · OUTCOME PREDICTOR</p>
+          <h3 className="mt-1 font-display text-xl text-foreground">Choose a reality</h3>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Read the possibilities visually first. Choose one to reveal its reasoning, steps and
+            tradeoffs.
+          </p>
         </div>
         {expandedForms.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -184,66 +195,168 @@ function SpiralPathways({
         )}
       </div>
 
-      {delivery.pathways.length > 0 && (
+      {choices.length > 0 && (
         <div className="ascension-pathway-strip flex snap-x gap-3 overflow-x-auto pb-2">
-          {delivery.pathways.map((pathway, index) => (
-            <article
-              key={pathway.id}
-              className="min-w-[82%] snap-start rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.08] to-background/20 p-4 sm:min-w-[360px] sm:max-w-[420px]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[0.62rem] tracking-[0.18em] text-primary uppercase">
-                    PATH {String(index + 1).padStart(2, "0")}
-                  </p>
-                  <h4 className="mt-1 text-base font-medium text-foreground">
-                    {cleanDisplayText(pathway.label)}
-                  </h4>
-                </div>
-                {pathway.spiral_form && (
-                  <span className="rounded-full border border-primary/25 px-2 py-1 text-[0.58rem] text-primary">
-                    {labelToken(pathway.spiral_form)}
-                  </span>
-                )}
-              </div>
-
-              <p className="mt-3 text-sm leading-6 text-foreground/90">
-                {cleanDisplayText(pathway.summary)}
-              </p>
-
-              <div className="mt-4 flex items-center justify-between gap-2 border-t border-primary/15 pt-3">
-                <details className="min-w-0 flex-1">
-                  <summary className="cursor-pointer text-xs font-medium tracking-wide text-primary">
-                    OPEN PATHWAY
-                  </summary>
-                {pathway.steps.length > 0 && (
-                  <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-foreground/90">
-                    {pathway.steps.map((step, stepIndex) => (
-                      <li key={stepIndex}>{cleanDisplayText(step)}</li>
-                    ))}
-                  </ol>
-                )}
-                {pathway.tradeoffs.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium text-muted-foreground">Tradeoffs</p>
-                    <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                      {pathway.tradeoffs.map((tradeoff, tradeoffIndex) => (
-                        <li key={tradeoffIndex}>{cleanDisplayText(tradeoff)}</li>
-                      ))}
-                    </ul>
+          {choices.map((pathway, index) => {
+            const isBlend = delivery.blend?.id === pathway.id;
+            const isActive = activeChoiceId === pathway.id;
+            return (
+              <button
+                key={pathway.id}
+                type="button"
+                onClick={() => setActiveChoiceId(pathway.id)}
+                aria-pressed={isActive}
+                className={
+                  isBlend
+                    ? "group min-w-[84%] snap-start overflow-hidden rounded-2xl border border-gold/55 bg-gradient-to-br from-gold/[0.12] to-background/20 text-left shadow-xl transition sm:min-w-[380px] sm:max-w-[440px]"
+                    : isActive
+                      ? "group min-w-[84%] snap-start overflow-hidden rounded-2xl border border-primary/65 bg-primary/[0.08] text-left shadow-xl transition sm:min-w-[380px] sm:max-w-[440px]"
+                      : "group min-w-[84%] snap-start overflow-hidden rounded-2xl border border-primary/25 bg-background/20 text-left transition hover:border-primary/45 sm:min-w-[380px] sm:max-w-[440px]"
+                }
+              >
+                <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#f4f7f9]">
+                  {pathway.visual_svg ? (
+                    <img
+                      src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(pathway.visual_svg)}`}
+                      alt={`Visual pathway: ${pathway.label}`}
+                      className="h-full w-full object-contain p-2"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_center,rgba(54,205,228,.18),transparent_60%)]">
+                      <span className="font-display text-4xl text-primary/70">
+                        {isBlend ? "BLEND" : String(index + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-4 pb-3 pt-10">
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p
+                          className={
+                            isBlend
+                              ? "text-[0.62rem] tracking-[0.18em] text-gold uppercase"
+                              : "text-[0.62rem] tracking-[0.18em] text-primary uppercase"
+                          }
+                        >
+                          {isBlend ? "BLEND · SPIRAL + OUTCOME" : `PATH ${String(index + 1).padStart(2, "0")}`}
+                        </p>
+                        <h4 className="mt-1 text-base font-medium text-white">
+                          {cleanDisplayText(pathway.label)}
+                        </h4>
+                      </div>
+                      {pathway.outcome_score !== null && (
+                        <span className="rounded-full border border-white/30 bg-black/35 px-2.5 py-1 text-[0.65rem] text-white">
+                          {Math.round(pathway.outcome_score * 100)}%
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
-                </details>
-                <button
-                  type="button"
-                  onClick={() => onChoosePathway(pathway)}
-                  className="shrink-0 rounded-full border border-gold/45 bg-gold/10 px-3 py-2 text-[0.65rem] font-medium tracking-[0.08em] text-gold"
-                >
-                  USE THIS PATH
-                </button>
-              </div>
-            </article>
-          ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {activeChoice && (
+        <div
+          className={
+            activeIsBlend
+              ? "rounded-2xl border border-gold/45 bg-gold/[0.05] p-4 sm:p-5"
+              : "rounded-2xl border border-primary/35 bg-primary/[0.04] p-4 sm:p-5"
+          }
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className={activeIsBlend ? "label-eyebrow text-gold" : "label-eyebrow text-primary"}>
+                {activeIsBlend ? "BLEND SELECTED" : "PATH SELECTED"}
+              </p>
+              <h4 className="mt-1 font-display text-xl text-foreground">
+                {cleanDisplayText(activeChoice.label)}
+              </h4>
+            </div>
+            {activeChoice.spiral_form && (
+              <span
+                className={
+                  activeIsBlend
+                    ? "rounded-full border border-gold/35 px-2.5 py-1 text-xs text-gold"
+                    : "rounded-full border border-primary/30 px-2.5 py-1 text-xs text-primary"
+                }
+              >
+                {labelToken(activeChoice.spiral_form)}
+              </span>
+            )}
+          </div>
+
+          <p className="mt-3 text-sm leading-6 text-foreground/90">
+            {cleanDisplayText(activeChoice.summary)}
+          </p>
+
+          {activeIsBlend && delivery.blend && (
+            <div className="mt-3 rounded-xl border border-gold/20 bg-background/20 p-3">
+              <p className="text-xs font-medium tracking-wide text-gold">WHY THIS BLEND</p>
+              <p className="mt-2 text-sm leading-6 text-foreground/85">
+                {cleanDisplayText(delivery.blend.blend_reason)}
+              </p>
+              {delivery.blend.blend_from.length > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Combines: {delivery.blend.blend_from.map(cleanDisplayText).join(" · ")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeChoice.outcome_reason && (
+            <div className="mt-3">
+              <p className="text-xs font-medium text-foreground/75">Outcome Predictor</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {cleanDisplayText(activeChoice.outcome_reason)}
+              </p>
+            </div>
+          )}
+
+          {activeChoice.steps.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-medium text-foreground/80">Steps</p>
+              <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-foreground/90">
+                {activeChoice.steps.map((step, stepIndex) => (
+                  <li key={stepIndex}>{cleanDisplayText(step)}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {activeChoice.tradeoffs.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-medium text-foreground/80">Tradeoffs</p>
+              <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+                {activeChoice.tradeoffs.map((tradeoff, tradeoffIndex) => (
+                  <li key={tradeoffIndex}>{cleanDisplayText(tradeoff)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onChoosePathway(activeChoice)}
+              className={
+                activeIsBlend
+                  ? "rounded-full border border-gold/55 bg-gold/12 px-5 py-3 text-xs font-medium tracking-[0.1em] text-gold"
+                  : "rounded-full border border-primary/50 bg-primary/10 px-5 py-3 text-xs font-medium tracking-[0.1em] text-primary"
+              }
+            >
+              USE THIS PATH
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveChoiceId(null)}
+              className="rounded-full border border-border px-4 py-3 text-xs text-muted-foreground"
+            >
+              BACK TO VISUALS
+            </button>
+          </div>
         </div>
       )}
 
@@ -326,6 +439,7 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
   const drawing = delivery.files.find((file) => /\.svg$/i.test(file.name));
   const body = splitResultBody(delivery.body);
   const otherFiles = delivery.files.filter((file) => file !== drawing);
+  const hasVisualChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
 
   return (
     <div className="space-y-4">
@@ -369,12 +483,21 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
           )}
         </div>
 
-        {body.summary && (
+        {body.summary && !hasVisualChoices && (
           <div className="rounded-xl border border-primary/20 bg-background/20 p-4 sm:p-5">
             <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground/95">
               {body.summary}
             </p>
           </div>
+        )}
+
+        {body.summary && hasVisualChoices && (
+          <details className="rounded-xl border border-border/60 bg-void/25 px-4 py-3">
+            <summary className="cursor-pointer text-sm text-muted-foreground">Overview</summary>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground/85">
+              {body.summary}
+            </p>
+          </details>
         )}
 
         {(body.detail || body.internal) && (

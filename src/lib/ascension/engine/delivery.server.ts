@@ -217,6 +217,7 @@ export async function externalProductDraft(
         "The operating loop is: Objective -> Meaning -> Knowledge -> Pathways -> Evaluation -> Guardian -> Execution -> AutoSync verification -> Persisted result -> Delta learning."
       ].join("\n"),
       pathways: [],
+      blend: null,
       files: [],
       limitations: [],
     });
@@ -250,6 +251,14 @@ export async function externalProductDraft(
         .join("\n")}`
     : "";
 
+  const outcomePredictor = record(engines["Outcome Predictor"]);
+  const outcomeOutput = Array.isArray(outcomePredictor["output"])
+    ? outcomePredictor["output"].map(record)
+    : [];
+  const outcomeContext = outcomeOutput.length
+    ? `OUTCOME PREDICTOR CONTEXT:\n${JSON.stringify(outcomeOutput).slice(0, 8000)}`
+    : "";
+
   const system = [
     "You are the user-facing response engine inside ASCENSION, not a generic chatbot. Never introduce yourself as 'an AI language model'.",
     "ASCENSION is an objective-driven system: it takes what the user wants to accomplish, decomposes meaning, retrieves relevant knowledge, models and compares pathways, checks confidence and contradictions, applies Guardian constraints, executes through available engines, verifies with AutoSync, and persists verified outcomes and learning.",
@@ -257,13 +266,19 @@ export async function externalProductDraft(
     "When the user asks what ASCENSION can do, explain ASCENSION specifically. Distinguish what this web response can produce immediately from capabilities that require the governed runtime or a connected execution tool. Do not claim a tool is connected or a physical action occurred unless evidence says so.",
     "Write a useful user-facing result now. ASCENSION governed execution may still be pending; available artifacts can be receipts, plans, Knowledge Forms, or scaffolds.",
     "Do not claim you physically built, tested, verified, persisted, or governed anything.",
-    "Return exactly one JSON object with keys: kind, title, body, pathways, files, limitations.",
+    "Return exactly one JSON object with keys: kind, title, body, pathways, blend, files, limitations.",
     "The body must be clean readable plain text. Do not emit Markdown markers, escaped Markdown, or HTML entities.",
     "pathways must be an array. When a SPIRAL EXPANSION is supplied, create one substantive user-facing solution pathway for each Spiral form instead of collapsing them into one answer.",
-    "Each pathway object must contain id, label, summary, steps, tradeoffs, spiral_form. steps and tradeoffs are string arrays.",
+    "Each pathway object must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, outcome_score, outcome_reason. steps and tradeoffs are string arrays.",
+    "visual_svg must be a compact self-contained SVG that visually communicates that pathway. Use a landscape viewBox, strong contrast, meaningful geometry and very little text. The visual should make the pathways distinguishable at a glance.",
+    "outcome_score is 0..1 when a grounded relative assessment can be made from the supplied context; otherwise use null. outcome_reason must briefly explain the basis without pretending the score is physically verified.",
     "The pathway content is a Spiral-guided user-facing synthesis, not a claim that the governed runtime physically executed or verified that solution.",
     "Make the pathways materially different approaches to accomplishing the objective. Do not merely rename the same answer.",
     "When Spiral supplies three forms, return three pathways unless one form genuinely cannot produce a distinct useful route; do not silently collapse them.",
+    "blend must be an object when two or more useful pathways exist. It must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, outcome_score, outcome_reason, blend_from, blend_reason.",
+    "The BLEND pathway is where Spiral and Outcome Predictor work together: combine complementary strengths from the distinct pathways, explicitly account for their tradeoffs and the supplied Outcome Predictor context, and explain the blend in blend_reason. Do not simply concatenate every pathway.",
+    "blend_from is an array of the pathway ids or labels whose strongest elements were combined. Use spiral_form 'spiral_outcome_blend'.",
+    "If fewer than two useful pathways exist, return blend as null.",
     'kind must be "answer" or "artifact".',
     "For ordinary questions or product/invention requests, give a substantive direct result in body.",
     "For app/code requests, include complete runnable source files.",
@@ -289,6 +304,7 @@ export async function externalProductDraft(
     constraintContext ? `OBJECTIVE CONSTRAINTS:\n${constraintContext}` : "",
     `GOVERNED RUNTIME STATUS: ${run.status ?? "unknown"} (do not claim this draft is verified)`,
     spiralContext,
+    outcomeContext,
     artifactContext
       ? `\nGOVERNED RUNTIME ARTIFACTS / CONTEXT:\n${artifactContext}`
       : "\nNo usable runtime artifact content was transported.",
@@ -316,6 +332,7 @@ export async function externalProductDraft(
       title: run.objective.slice(0, 200) || "ASCENSION result",
       body: generated.text.trim(),
       pathways: [],
+      blend: null,
       files: [],
       limitations: [],
     } as Record<string, unknown>);

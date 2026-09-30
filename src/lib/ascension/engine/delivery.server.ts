@@ -434,12 +434,14 @@ export interface DeliveryRun {
   created_at: string;
 }
 
-/** Stable identity of the transported artifacts a projection was made from. */
+const DRAFT_SCHEMA_VERSION = "visual-pathways-v2";
+
+/** Stable identity of the transported artifacts and delivery contract a projection was made from. */
 export function artifactSourceKey(runId: string, files: { name: string; content: string }[]) {
   let h = 2166136261;
   const text = files.map((f) => `${f.name}:${f.content.length}:${f.content}`).join("\u0000");
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
-  return `${runId}:${files.length}:${h.toString(16)}`;
+  return `${DRAFT_SCHEMA_VERSION}:${runId}:${files.length}:${h.toString(16)}`;
 }
 
 export function draftFromStage(stage: unknown): DraftRow | null {

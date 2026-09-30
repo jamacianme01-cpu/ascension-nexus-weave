@@ -235,7 +235,14 @@ export function formatInternalConnection(
   maxItems = 3,
 ): string {
   const relevant = result.evidence
-    .filter((item) => item.relevance_score >= 2 && item.title !== "$.knowledgeverse.baseline")
+    .filter((item) => {
+      if (item.relevance_score < 2 || item.title === "$.knowledgeverse.baseline") return false;
+      const text = item.snippet.trim();
+      // Opaque package/hash handles are provenance plumbing, not useful user knowledge.
+      if (/^(?:PKG|EV|DELTA|SEL|TR|EXEC|AUTH|REQ|PUB):[A-Za-z0-9:_-]+$/.test(text)) return false;
+      if (/^(?:sha256:)?[a-f0-9]{16,}$/i.test(text)) return false;
+      return text.length >= 24;
+    })
     .slice(0, Math.max(1, Math.min(maxItems, 5)));
   if (!relevant.length) return "";
 

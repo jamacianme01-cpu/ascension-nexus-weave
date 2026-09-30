@@ -778,7 +778,13 @@ export function Engage() {
     try {
       const parsed = parseDelivery(deliveryQuery.data.response_payload);
       // Re-check on screen too: a stale projection must never pass as a result.
-      const check = assessResult(run.objective, parsed.body, parsed.files);
+      const visualSvgs = [
+        ...parsed.pathways
+          .map((pathway) => pathway.visual_svg)
+          .filter((value): value is string => Boolean(value)),
+        ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
+      ];
+      const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
       if (parsed.kind === "not_produced" || !check.produced) {
         notProduced =
           parsed.kind === "not_produced"

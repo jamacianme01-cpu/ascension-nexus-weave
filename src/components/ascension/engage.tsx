@@ -38,6 +38,7 @@ const ACCESS = "ascension.active-access";
 const GUEST_TOKEN = "ascension.active-guest-token";
 const BOOK_TREE_SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 type FollowUp = "continue" | "refine";
+type FollowState = { id: string; kind: FollowUp; pathwayLabel?: string };
 
 function save(key: string, value: string) {
   try {
@@ -133,7 +134,15 @@ function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: Objec
   );
 }
 
-function SpiralPathways({ run, delivery }: { run: ObjectiveRun; delivery: ObjectiveDelivery }) {
+function SpiralPathways({
+  run,
+  delivery,
+  onChoosePathway,
+}: {
+  run: ObjectiveRun;
+  delivery: ObjectiveDelivery;
+  onChoosePathway: (pathway: ObjectiveDelivery["pathways"][number]) => void;
+}) {
   const planning = planningFor(run.result);
   const planningRecord = record(record(run.result)["objective_planning"]);
   const mesh = record(planningRecord["engine_mesh"]);
@@ -202,10 +211,11 @@ function SpiralPathways({ run, delivery }: { run: ObjectiveRun; delivery: Object
                 {cleanDisplayText(pathway.summary)}
               </p>
 
-              <details className="mt-4 border-t border-primary/15 pt-3">
-                <summary className="cursor-pointer text-xs font-medium tracking-wide text-primary">
-                  OPEN PATHWAY
-                </summary>
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-primary/15 pt-3">
+                <details className="min-w-0 flex-1">
+                  <summary className="cursor-pointer text-xs font-medium tracking-wide text-primary">
+                    OPEN PATHWAY
+                  </summary>
                 {pathway.steps.length > 0 && (
                   <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-foreground/90">
                     {pathway.steps.map((step, stepIndex) => (
@@ -223,7 +233,15 @@ function SpiralPathways({ run, delivery }: { run: ObjectiveRun; delivery: Object
                     </ul>
                   </div>
                 )}
-              </details>
+                </details>
+                <button
+                  type="button"
+                  onClick={() => onChoosePathway(pathway)}
+                  className="shrink-0 rounded-full border border-gold/45 bg-gold/10 px-3 py-2 text-[0.65rem] font-medium tracking-[0.08em] text-gold"
+                >
+                  USE THIS PATH
+                </button>
+              </div>
             </article>
           ))}
         </div>
@@ -457,7 +475,7 @@ export function Engage() {
   const [active, setActive] = useState<string | null>(null);
   const [access, setAccess] = useState<"guest" | "auth">("guest");
   const [guestToken, setGuestToken] = useState<string | null>(null);
-  const [follow, setFollow] = useState<{ id: string; kind: FollowUp } | null>(null);
+  const [follow, setFollow] = useState<FollowState | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [bookSequence, setBookSequence] = useState<"idle" | "roots" | "trunk" | "nodes" | "canopy" | "eruption" | "processing">("idle");
   const [bookOpen, setBookOpen] = useState(false);
@@ -688,6 +706,29 @@ export function Engage() {
     window.setTimeout(() => inputRef.current?.focus(), 250);
   };
 
+  const choosePathway = (pathway: ObjectiveDelivery["pathways"][number]) => {
+    if (!run) return;
+    const selection = JSON.stringify({
+      source: "USER_SPIRAL_SELECTION",
+      selection_authority: "USER_SELECTED",
+      pathway: {
+        id: pathway.id,
+        label: pathway.label,
+        spiral_form: pathway.spiral_form,
+        summary: pathway.summary,
+        steps: pathway.steps,
+        tradeoffs: pathway.tradeoffs,
+      },
+      instruction: "Use this selected Spiral pathway as the direction for the next governed objective.",
+    });
+    setFollow({ id: run.id, kind: "refine", pathwayLabel: pathway.label });
+    setObjective(run.objective);
+    setEvidence([...strings(run.evidence), selection].join("\n"));
+    setConstraints(strings(run.constraints).join("\n"));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => inputRef.current?.focus(), 250);
+  };
+
   const error = engage.error ?? runQuery.error ?? deliveryQuery.error ?? prepare.error;
   const canEngage = Boolean(objective.trim()) && !engage.isPending;
   const startBookSequence = () => {
@@ -753,7 +794,11 @@ export function Engage() {
 
           {follow && (
             <div className="rounded-xl border border-gold/25 bg-gold/5 p-3 text-sm text-gold">
-              {follow.kind === "refine" ? "Refining" : "Continuing"} the previous result
+              {follow.pathwayLabel
+                ? `Pursuing pathway: ${follow.pathwayLabel}`
+                : follow.kind === "refine"
+                  ? "Refining the previous result"
+                  : "Continuing the previous result"}
               <button type="button" onClick={() => setFollow(null)} className="ml-3 underline">
                 Start separately
               </button>
@@ -903,7 +948,7 @@ export function Engage() {
             <>
               <AscensionSignal run={run} delivery={delivery} />
               <ResultContent delivery={delivery} source={deliveryQuery.data?.source ?? null} />
-              <SpiralPathways run={run} delivery={delivery} />
+              <SpiralPathways run={run} delivery={delivery} onChoosePathway={choosePathway} />
             </>
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">

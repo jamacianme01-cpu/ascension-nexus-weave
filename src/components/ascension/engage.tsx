@@ -223,6 +223,125 @@ function TreeKnowledgeEruption({
   );
 }
 
+function SelectedRealityDetails({
+  delivery,
+  selectedId,
+  onUse,
+}: {
+  delivery: ObjectiveDelivery;
+  selectedId: string;
+  onUse: (pathway: ObjectiveDelivery["pathways"][number]) => void;
+}) {
+  const choices = delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways;
+  const selected = choices.find((choice) => choice.id === selectedId) ?? null;
+  if (!selected) return null;
+  const isBlend = delivery.blend?.id === selected.id;
+
+  return (
+    <section
+      className={
+        isBlend
+          ? "overflow-hidden rounded-2xl border border-gold/45 bg-gold/[0.04]"
+          : "overflow-hidden rounded-2xl border border-primary/35 bg-primary/[0.03]"
+      }
+    >
+      {selected.visual_svg && (
+        <div className="ascension-artifact-canvas relative flex min-h-[360px] items-center justify-center p-4 sm:min-h-[520px] sm:p-8">
+          <img
+            src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(selected.visual_svg)}`}
+            alt={`Selected reality: ${selected.label}`}
+            className="max-h-[68vh] w-full object-contain"
+          />
+        </div>
+      )}
+
+      <div className="space-y-4 p-4 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className={isBlend ? "label-eyebrow text-gold" : "label-eyebrow text-primary"}>
+              {isBlend ? "BLEND REALITY" : "SELECTED REALITY"}
+            </p>
+            <h2 className="mt-1 font-display text-2xl text-foreground sm:text-3xl">
+              {cleanDisplayText(selected.label)}
+            </h2>
+          </div>
+          {selected.outcome_score !== null && (
+            <div className="rounded-full border border-primary/25 px-3 py-1 text-sm text-primary">
+              Outcome {Math.round(selected.outcome_score * 100)}%
+            </div>
+          )}
+        </div>
+
+        <p className="text-base leading-7 text-foreground/92">
+          {cleanDisplayText(selected.summary)}
+        </p>
+
+        {isBlend && delivery.blend?.blend_reason && (
+          <div className="rounded-xl border border-gold/25 bg-gold/[0.04] p-4">
+            <p className="text-xs font-medium tracking-[0.14em] text-gold uppercase">
+              Why ASCENSION blended it
+            </p>
+            <p className="mt-2 text-sm leading-6 text-foreground/88">
+              {cleanDisplayText(delivery.blend.blend_reason)}
+            </p>
+          </div>
+        )}
+
+        {selected.outcome_reason && (
+          <div className="rounded-xl border border-primary/20 p-4">
+            <p className="text-xs font-medium tracking-[0.14em] text-primary uppercase">
+              Outcome Predictor
+            </p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {cleanDisplayText(selected.outcome_reason)}
+            </p>
+          </div>
+        )}
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          {selected.steps.length > 0 && (
+            <div>
+              <p className="text-xs font-medium tracking-[0.12em] text-foreground/75 uppercase">
+                Path steps
+              </p>
+              <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6 text-foreground/90">
+                {selected.steps.map((step, index) => (
+                  <li key={index}>{cleanDisplayText(step)}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {selected.tradeoffs.length > 0 && (
+            <div>
+              <p className="text-xs font-medium tracking-[0.12em] text-foreground/75 uppercase">
+                Tradeoffs
+              </p>
+              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                {selected.tradeoffs.map((tradeoff, index) => (
+                  <li key={index}>{cleanDisplayText(tradeoff)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onUse(selected)}
+          className={
+            isBlend
+              ? "min-h-12 rounded-full border border-gold/55 bg-gold/10 px-6 text-sm font-medium tracking-[0.1em] text-gold"
+              : "min-h-12 rounded-full border border-primary/50 bg-primary/10 px-6 text-sm font-medium tracking-[0.1em] text-primary"
+          }
+        >
+          USE THIS PATH
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function SpiralPathways({
   run,
   delivery,
@@ -1184,8 +1303,14 @@ export function Engage() {
           {delivery ? (
             <>
               <AscensionSignal run={run} delivery={delivery} />
+              {treeChoiceId && (
+                <SelectedRealityDetails
+                  delivery={delivery}
+                  selectedId={treeChoiceId}
+                  onUse={choosePathway}
+                />
+              )}
               <ResultContent delivery={delivery} source={deliveryQuery.data?.source ?? null} />
-              <SpiralPathways run={run} delivery={delivery} onChoosePathway={choosePathway} />
             </>
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">

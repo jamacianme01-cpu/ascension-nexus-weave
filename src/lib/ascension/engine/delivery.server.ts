@@ -362,7 +362,11 @@ export async function externalProductDraft(
   }
 
   const parsed = parseDelivery(candidate);
-  const check = assessResult(run.objective, parsed.body, parsed.files);
+  const visualSvgs = [
+    ...parsed.pathways.map((pathway) => pathway.visual_svg).filter((value): value is string => Boolean(value)),
+    ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
+  ];
+  const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
   if (!check.produced || parsed.kind === "not_produced")
     throw new Error(
       `the external engine did not return a substantive result${check.reason ? ` (${check.reason})` : ""}`,

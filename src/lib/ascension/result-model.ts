@@ -217,10 +217,12 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     names.add(f["name"].toLowerCase());
     return { name: f["name"], content: f["content"] };
   });
-  if (v["kind"] === "not_produced" && files.length)
-    throw new Error("An unproduced result cannot carry downloadable files.");
-  if (v["kind"] === "artifact" && !files.length)
-    throw new Error("The created result did not include a file.");
+  const hasVisualPathway =
+    pathways.some((pathway) => Boolean(pathway.visual_svg)) || Boolean(blend?.visual_svg);
+  if (v["kind"] === "not_produced" && (files.length || hasVisualPathway))
+    throw new Error("An unproduced result cannot carry created artifacts.");
+  if (v["kind"] === "artifact" && !files.length && !hasVisualPathway)
+    throw new Error("The created result did not include a visual or downloadable artifact.");
   return {
     kind: v["kind"] as ObjectiveDelivery["kind"],
     title: v["title"],
@@ -304,6 +306,7 @@ export function assessResult(
   objective: string,
   body: string,
   files: { name: string; content: string }[],
+  visualSvgs: string[] = [],
 ): ResultAssessment {
   const kind = requestedKind(objective);
   const realFiles = files.filter((f) => {
@@ -314,8 +317,19 @@ export function assessResult(
   const bodyOk = scaffoldReason(body, objective) === null;
   if (kind === "drawing") {
     const drawings = realFiles.filter((f) => /\.svg$/i.test(f.name));
-    if (drawings.length) return { produced: true, kind, reason: null, files: realFiles };
-    return { produced: false, kind, reason: "no drawing file was returned", files: [] };
+    const pathwayDrawings = visualSvgs.filter(
+      (svg) =>
+        /<svg[\s>]/i.test(svg) &&
+        /<(path|line|rect|circle|polyline|polygon|ellipse|g)\b/i.test(svg),
+    );
+    if (drawings.length || pathwayDrawings.length)
+      return { produced: true, kind, reason: null, files: realFiles };
+    return {
+      produced: false,
+      kind,
+      reason: "no visual drawing was returned in either the main artifact or the Spiral pathways",
+      files: [],
+    };
   }
   if (kind === "app") {
     const code = realFiles.filter((f) => CODE_FILE.test(f.name));

@@ -135,6 +135,94 @@ function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: Objec
   );
 }
 
+
+function TreeKnowledgeEruption({
+  delivery,
+  selectedId,
+  onSelect,
+  onUse,
+}: {
+  delivery: ObjectiveDelivery;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onUse: (pathway: ObjectiveDelivery["pathways"][number]) => void;
+}) {
+  const choices = delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways;
+  const selected = choices.find((choice) => choice.id === selectedId) ?? null;
+  const selectedIsBlend = Boolean(selected && delivery.blend?.id === selected.id);
+
+  if (!choices.length) return null;
+
+  return (
+    <div className="ascension-tree-knowledge" aria-label="Knowledge eruption pathways">
+      <div className="ascension-knowledge-core" aria-hidden="true">
+        <span>KNOWLEDGE</span>
+      </div>
+
+      <div className="ascension-knowledge-shards">
+        {choices.slice(0, 4).map((pathway, index) => {
+          const isBlend = delivery.blend?.id === pathway.id;
+          const active = pathway.id === selectedId;
+          return (
+            <button
+              key={pathway.id}
+              type="button"
+              data-shard={index + 1}
+              data-blend={isBlend ? "true" : undefined}
+              data-active={active ? "true" : undefined}
+              className="ascension-knowledge-shard"
+              onClick={() => onSelect(active ? null : pathway.id)}
+            >
+              <div className="ascension-shard-visual">
+                {pathway.visual_svg ? (
+                  <img
+                    src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(pathway.visual_svg)}`}
+                    alt=""
+                  />
+                ) : (
+                  <span>{isBlend ? "BLEND" : String(index + 1).padStart(2, "0")}</span>
+                )}
+              </div>
+              <div className="ascension-shard-caption">
+                <span>{isBlend ? "BLEND" : `PATH ${String(index + 1).padStart(2, "0")}`}</span>
+                <strong>{cleanDisplayText(pathway.label)}</strong>
+                {pathway.outcome_score !== null && (
+                  <em>{Math.round(pathway.outcome_score * 100)}%</em>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <div className="ascension-tree-choice-panel">
+          <div>
+            <p className={selectedIsBlend ? "text-gold" : "text-primary"}>
+              {selectedIsBlend ? "SPIRAL + OUTCOME BLEND" : "SELECTED REALITY"}
+            </p>
+            <h3>{cleanDisplayText(selected.label)}</h3>
+            <p>{cleanDisplayText(selected.summary)}</p>
+            {selectedIsBlend && delivery.blend?.blend_reason && (
+              <p className="ascension-tree-blend-reason">
+                {cleanDisplayText(delivery.blend.blend_reason)}
+              </p>
+            )}
+          </div>
+          <div className="ascension-tree-choice-actions">
+            <button type="button" onClick={() => onSelect(null)}>
+              BACK
+            </button>
+            <button type="button" onClick={() => onUse(selected)}>
+              OPEN THIS REALITY
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SpiralPathways({
   run,
   delivery,
@@ -603,6 +691,8 @@ export function Engage() {
   const [bookSequence, setBookSequence] = useState<"idle" | "roots" | "trunk" | "nodes" | "canopy" | "eruption" | "processing">("idle");
   const [bookOpen, setBookOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [treeChoiceId, setTreeChoiceId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const sequenceTimers = useRef<number[]>([]);
   const burstRun = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -761,6 +851,8 @@ export function Engage() {
       setEvidence("");
       setConstraints("");
       setFollow(null);
+      setTreeChoiceId(null);
+      setDetailsOpen(false);
       prepare.reset();
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
@@ -808,13 +900,10 @@ export function Engage() {
       sequenceTimers.current = [];
       setBookOpen(true);
       setRevealed(true);
+      setDetailsOpen(false);
+      // The tree is the result event. Hold the eruption state instead of
+      // treating it as a short transition into a separate scrolling page.
       setBookSequence("eruption");
-      const scrollTimer = window.setTimeout(
-        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-        180,
-      );
-      const settleTimer = window.setTimeout(() => setBookSequence("idle"), 1800);
-      sequenceTimers.current.push(scrollTimer, settleTimer);
       return;
     }
     if (!TERMINAL.has(run.status)) return;
@@ -856,6 +945,16 @@ export function Engage() {
     setConstraints(strings(run.constraints).join("\n"));
     window.scrollTo({ top: 0, behavior: "smooth" });
     window.setTimeout(() => inputRef.current?.focus(), 250);
+  };
+
+  const openTreeReality = (pathway: ObjectiveDelivery["pathways"][number]) => {
+    setTreeChoiceId(pathway.id);
+    setDetailsOpen(true);
+    setBookSequence("eruption");
+    window.setTimeout(
+      () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      120,
+    );
   };
 
   const error = engage.error ?? runQuery.error ?? deliveryQuery.error ?? prepare.error;
@@ -913,6 +1012,15 @@ export function Engage() {
               draggable={false}
             />
           </div>
+
+          {delivery && bookSequence === "eruption" && (
+            <TreeKnowledgeEruption
+              delivery={delivery}
+              selectedId={treeChoiceId}
+              onSelect={setTreeChoiceId}
+              onUse={openTreeReality}
+            />
+          )}
 
           <label
             htmlFor="objective"
@@ -1055,7 +1163,7 @@ export function Engage() {
         </div>
       </section>
 
-      {run && revealed && (
+      {run && revealed && detailsOpen && (
         <section
           ref={answerRef}
           aria-label="Your answer"

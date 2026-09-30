@@ -825,3 +825,50 @@ body:has(.ascension-world > .ascension-command) main {
     padding: .75rem;
   }
 }
+
+
+.ascension-sound-toggle {
+  position: absolute;
+  z-index: 24;
+  top: clamp(.75rem, 2.2vh, 1.35rem);
+  right: clamp(.75rem, 2vw, 1.6rem);
+  min-height: 2.35rem;
+  border: 1px solid rgb(111 214 255 / 34%);
+  border-radius: 999px;
+  background: rgb(2 9 17 / 70%);
+  box-shadow:
+    inset 0 0 16px rgb(83 194 235 / 8%),
+    0 8px 24px rgb(0 0 0 / 28%);
+  padding: 0 .85rem;
+  color: rgb(154 224 247);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .58rem;
+  letter-spacing: .14em;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.ascension-sound-toggle[aria-pressed="false"] {
+  border-color: rgb(255 255 255 / 16%);
+  color: rgb(153 164 171);
+}
+
+.ascension-sound-toggle:hover {
+  border-color: rgb(135 225 255 / 66%);
+  color: rgb(210 243 255);
+}
+
+.ascension-sound-toggle:focus-visible {
+  outline: 2px solid rgb(232 198 126 / 82%);
+  outline-offset: 3px;
+}
+
+@media (max-width: 620px) {
+  .ascension-sound-toggle {
+    top: .55rem;
+    right: .55rem;
+    min-height: 2rem;
+    padding: 0 .65rem;
+    font-size: .5rem;
+  }
+}

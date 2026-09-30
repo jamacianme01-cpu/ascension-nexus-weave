@@ -299,28 +299,32 @@ function TreeKnowledgeEruption({
   onSelect: (id: string | null) => void;
   onUse: (pathway: ObjectiveDelivery["pathways"][number]) => void;
 }) {
-  const choices = delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways;
+  const paths = delivery.pathways;
+  const choices = delivery.blend ? [...paths, delivery.blend] : paths;
   const selected = choices.find((choice) => choice.id === selectedId) ?? null;
   const selectedIsBlend = Boolean(selected && delivery.blend?.id === selected.id);
 
   if (!choices.length) return null;
 
   return (
-    <div className="ascension-tree-knowledge" aria-label="Knowledge eruption pathways">
+    <div className="ascension-tree-knowledge" aria-label="ENVISION MODE">
+      <div className="ascension-envision-mode-banner">
+        <span>ENVISION MODE</span>
+        <strong>See the possible realities before you choose one.</strong>
+      </div>
+
       <div className="ascension-knowledge-core" aria-hidden="true">
         <span>KNOWLEDGE</span>
       </div>
 
       <div className="ascension-knowledge-shards">
-        {choices.slice(0, 4).map((pathway, index) => {
-          const isBlend = delivery.blend?.id === pathway.id;
+        {paths.slice(0, 4).map((pathway, index) => {
           const active = pathway.id === selectedId;
           return (
             <button
               key={pathway.id}
               type="button"
               data-shard={index + 1}
-              data-blend={isBlend ? "true" : undefined}
               data-active={active ? "true" : undefined}
               className="ascension-knowledge-shard"
               onClick={() => onSelect(active ? null : pathway.id)}
@@ -332,11 +336,11 @@ function TreeKnowledgeEruption({
                     alt=""
                   />
                 ) : (
-                  <span>{isBlend ? "BLEND" : String(index + 1).padStart(2, "0")}</span>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
                 )}
               </div>
               <div className="ascension-shard-caption">
-                <span>{isBlend ? "BLEND" : `PATH ${String(index + 1).padStart(2, "0")}`}</span>
+                <span>{`PATH ${String(index + 1).padStart(2, "0")}`}</span>
                 <strong>{cleanDisplayText(pathway.label)}</strong>
                 {pathway.outcome_score !== null && (
                   <em>{Math.round(pathway.outcome_score * 100)}%</em>
@@ -347,11 +351,36 @@ function TreeKnowledgeEruption({
         })}
       </div>
 
+      {delivery.blend && (
+        <button
+          type="button"
+          className="ascension-blend-gate"
+          data-active={delivery.blend.id === selectedId ? "true" : undefined}
+          onClick={() =>
+            onSelect(delivery.blend!.id === selectedId ? null : delivery.blend!.id)
+          }
+        >
+          <span>BLEND REALITIES</span>
+          <strong>SPIRAL + OUTCOME PREDICTOR</strong>
+          <em>
+            {delivery.blend.outcome_score !== null
+              ? `${Math.round(delivery.blend.outcome_score * 100)}% projected`
+              : "combined reality"}
+          </em>
+        </button>
+      )}
+
       {selected && (
-        <div className="ascension-tree-choice-panel">
+        <div
+          className={
+            selectedIsBlend
+              ? "ascension-tree-choice-panel ascension-tree-choice-panel--blend"
+              : "ascension-tree-choice-panel"
+          }
+        >
           <div>
             <p className={selectedIsBlend ? "text-gold" : "text-primary"}>
-              {selectedIsBlend ? "SPIRAL + OUTCOME BLEND" : "SELECTED REALITY"}
+              {selectedIsBlend ? "BLEND REALITY · SPIRAL + OUTCOME" : "ENVISIONED REALITY"}
             </p>
             <h3>{cleanDisplayText(selected.label)}</h3>
             <p>{cleanDisplayText(selected.summary)}</p>
@@ -366,7 +395,7 @@ function TreeKnowledgeEruption({
               BACK
             </button>
             <button type="button" onClick={() => onUse(selected)}>
-              OPEN THIS REALITY
+              {selectedIsBlend ? "ENVISION BLEND" : "OPEN THIS REALITY"}
             </button>
           </div>
         </div>

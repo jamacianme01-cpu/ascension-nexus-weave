@@ -872,3 +872,133 @@ body:has(.ascension-world > .ascension-command) main {
     font-size: .5rem;
   }
 }
+
+
+/* ENVISION MODE + dedicated BLEND gate */
+.ascension-envision-mode-banner {
+  position: absolute;
+  z-index: 18;
+  left: 50%;
+  top: clamp(.7rem, 2vh, 1.2rem);
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: .2rem;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 72%);
+}
+
+.ascension-envision-mode-banner > span {
+  color: rgb(230 199 130);
+  font-family: "Cinzel", serif;
+  font-size: clamp(.75rem, 1.15vw, 1rem);
+  letter-spacing: .28em;
+}
+
+.ascension-envision-mode-banner > strong {
+  color: rgb(173 214 231);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: clamp(.48rem, .68vw, .62rem);
+  font-weight: 500;
+  letter-spacing: .06em;
+}
+
+.ascension-blend-gate {
+  position: absolute;
+  z-index: 14;
+  left: 50%;
+  top: 44.5%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  min-width: clamp(11rem, 16vw, 15rem);
+  gap: .18rem;
+  border: 1px solid rgb(241 202 119 / 72%);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(244 204 120 / 20%), transparent 58%),
+    linear-gradient(180deg, rgb(18 13 8 / 92%), rgb(4 7 12 / 96%));
+  box-shadow:
+    0 0 0 1px rgb(255 220 148 / 8%),
+    0 0 34px rgb(237 192 100 / 24%),
+    inset 0 0 18px rgb(237 192 100 / 10%);
+  padding: .72rem 1.05rem .7rem;
+  color: rgb(242 207 136);
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: center;
+  backdrop-filter: blur(12px);
+  transition:
+    transform .22s ease,
+    box-shadow .22s ease,
+    border-color .22s ease;
+}
+
+.ascension-blend-gate:hover,
+.ascension-blend-gate[data-active="true"] {
+  transform: translate(-50%, -50%) scale(1.045);
+  border-color: rgb(255 223 158 / 96%);
+  box-shadow:
+    0 0 0 1px rgb(255 226 166 / 15%),
+    0 0 52px rgb(242 199 109 / 42%),
+    inset 0 0 25px rgb(242 199 109 / 16%);
+}
+
+.ascension-blend-gate > span {
+  font-family: "Cinzel", serif;
+  font-size: .76rem;
+  letter-spacing: .13em;
+}
+
+.ascension-blend-gate > strong {
+  color: rgb(167 224 244);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .5rem;
+  font-weight: 500;
+  letter-spacing: .1em;
+}
+
+.ascension-blend-gate > em {
+  color: rgb(230 211 171);
+  font-size: .56rem;
+  font-style: normal;
+}
+
+.ascension-tree-choice-panel--blend {
+  border-color: rgb(240 199 111 / 62%);
+  box-shadow:
+    0 25px 65px rgb(0 0 0 / 70%),
+    0 0 46px rgb(239 196 106 / 26%);
+}
+
+@media (max-width: 900px) {
+  .ascension-blend-gate {
+    top: 42%;
+    min-width: 10.5rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .ascension-envision-mode-banner {
+    top: .45rem;
+    width: 72vw;
+  }
+
+  .ascension-envision-mode-banner > span {
+    font-size: .62rem;
+  }
+
+  .ascension-envision-mode-banner > strong {
+    font-size: .42rem;
+  }
+
+  .ascension-blend-gate {
+    top: 33%;
+    min-width: 9rem;
+    padding: .55rem .72rem;
+  }
+
+  .ascension-blend-gate > span {
+    font-size: .62rem;
+  }
+}

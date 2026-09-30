@@ -36,6 +36,7 @@ const ACTIVE = "ascension.active-objective";
 const DRAFT = "ascension.objective.draft";
 const ACCESS = "ascension.active-access";
 const GUEST_TOKEN = "ascension.active-guest-token";
+const SOUND_PREF = "ascension.sound.enabled";
 const BOOK_TREE_SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 type FollowUp = "continue" | "refine";
 type FollowState = { id: string; kind: FollowUp; pathwayLabel?: string };
@@ -54,6 +55,157 @@ function read(key: string) {
   } catch {
     return null;
   }
+}
+
+
+type AscensionSoundCue =
+  | "engage"
+  | "roots"
+  | "trunk"
+  | "nodes"
+  | "canopy"
+  | "processing"
+  | "eruption"
+  | "select"
+  | "blend"
+  | "open";
+
+function audioContextFor(ref: { current: AudioContext | null }) {
+  if (typeof window === "undefined") return null;
+  if (ref.current) return ref.current;
+  const AudioContextCtor =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) return null;
+  ref.current = new AudioContextCtor();
+  return ref.current;
+}
+
+function scheduleTone(
+  ctx: AudioContext,
+  destination: AudioNode,
+  frequency: number,
+  start: number,
+  duration: number,
+  volume: number,
+  endFrequency?: number,
+  type: OscillatorType = "sine",
+) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, start);
+  if (endFrequency && endFrequency > 0) {
+    osc.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
+  }
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(Math.max(volume, 0.0002), start + Math.min(.045, duration / 4));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  osc.connect(gain);
+  gain.connect(destination);
+  osc.start(start);
+  osc.stop(start + duration + .02);
+}
+
+function scheduleNoise(
+  ctx: AudioContext,
+  destination: AudioNode,
+  start: number,
+  duration: number,
+  volume: number,
+) {
+  const frameCount = Math.max(1, Math.floor(ctx.sampleRate * duration));
+  const buffer = ctx.createBuffer(1, frameCount, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < frameCount; i++) data[i] = Math.random() * 2 - 1;
+  const source = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(1400, start);
+  filter.frequency.exponentialRampToValueAtTime(5200, start + duration);
+  filter.Q.value = .7;
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + .03);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(destination);
+  source.start(start);
+  source.stop(start + duration + .02);
+}
+
+function playAscensionSound(ref: { current: AudioContext | null }, cue: AscensionSoundCue) {
+  const ctx = audioContextFor(ref);
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume();
+
+  const master = ctx.createGain();
+  const compressor = ctx.createDynamicsCompressor();
+  master.gain.value = .72;
+  master.connect(compressor);
+  compressor.connect(ctx.destination);
+  const now = ctx.currentTime + .015;
+
+  switch (cue) {
+    case "engage":
+      scheduleTone(ctx, master, 58, now, .7, .055, 86, "sine");
+      scheduleTone(ctx, master, 174, now + .08, .52, .018, 232, "triangle");
+      break;
+    case "roots":
+      scheduleTone(ctx, master, 72, now, .78, .038, 96, "sine");
+      scheduleTone(ctx, master, 144, now + .06, .56, .013, 168, "triangle");
+      break;
+    case "trunk":
+      scheduleTone(ctx, master, 105, now, .82, .032, 260, "sine");
+      scheduleTone(ctx, master, 210, now + .1, .64, .014, 520, "triangle");
+      break;
+    case "nodes":
+      [392, 523.25, 659.25].forEach((freq, index) =>
+        scheduleTone(ctx, master, freq, now + index * .13, .42, .022, freq * 1.015, "sine"),
+      );
+      break;
+    case "canopy":
+      [196, 293.66, 440].forEach((freq, index) =>
+        scheduleTone(ctx, master, freq, now + index * .035, 1.0, .017, freq * 1.08, "sine"),
+      );
+      scheduleNoise(ctx, master, now + .08, .66, .012);
+      break;
+    case "processing":
+      scheduleTone(ctx, master, 98, now, .62, .018, 123, "sine");
+      scheduleTone(ctx, master, 294, now + .08, .48, .008, 330, "triangle");
+      break;
+    case "eruption":
+      scheduleTone(ctx, master, 46, now, 1.2, .065, 72, "sine");
+      scheduleNoise(ctx, master, now, .9, .026);
+      [329.63, 493.88, 659.25, 987.77].forEach((freq, index) =>
+        scheduleTone(ctx, master, freq, now + .12 + index * .075, .95, .025, freq * 1.03, "sine"),
+      );
+      break;
+    case "select":
+      scheduleTone(ctx, master, 523.25, now, .24, .022, 659.25, "sine");
+      scheduleTone(ctx, master, 1046.5, now + .08, .28, .012, 1174.66, "sine");
+      break;
+    case "blend":
+      [261.63, 392, 523.25, 783.99].forEach((freq, index) =>
+        scheduleTone(ctx, master, freq, now + index * .04, .62, .021, freq * 1.025, "sine"),
+      );
+      break;
+    case "open":
+      scheduleTone(ctx, master, 164.81, now, .52, .026, 329.63, "sine");
+      scheduleTone(ctx, master, 659.25, now + .14, .48, .018, 987.77, "triangle");
+      break;
+  }
+
+  window.setTimeout(() => {
+    try {
+      master.disconnect();
+      compressor.disconnect();
+    } catch {
+      // Nodes may already be disconnected by the browser.
+    }
+  }, 1800);
 }
 
 function cleanDisplayText(value: string) {
@@ -812,6 +964,8 @@ export function Engage() {
   const [revealed, setRevealed] = useState(false);
   const [treeChoiceId, setTreeChoiceId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const sequenceTimers = useRef<number[]>([]);
   const burstRun = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -832,14 +986,34 @@ export function Engage() {
     }
     const draft = read(DRAFT);
     if (draft) setObjective(draft);
+    const storedSound = read(SOUND_PREF);
+    if (storedSound === "off") setSoundEnabled(false);
   }, []);
 
   useEffect(
     () => () => {
       sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+      const context = audioContextRef.current;
+      if (context && context.state !== "closed") void context.close();
     },
     [],
   );
+
+  const sound = (cue: AscensionSoundCue) => {
+    if (!soundEnabled) return;
+    playAscensionSound(audioContextRef, cue);
+  };
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    save(SOUND_PREF, next ? "on" : "off");
+    if (next) {
+      playAscensionSound(audioContextRef, "select");
+    } else if (audioContextRef.current?.state === "running") {
+      void audioContextRef.current.suspend();
+    }
+  };
 
   const runQuery = useQuery({
     queryKey: ["ascension", "run", active, access],
@@ -1023,6 +1197,7 @@ export function Engage() {
       // The tree is the result event. Hold the eruption state instead of
       // treating it as a short transition into a separate scrolling page.
       setBookSequence("eruption");
+      sound("eruption");
       return;
     }
     if (!TERMINAL.has(run.status)) return;
@@ -1066,7 +1241,17 @@ export function Engage() {
     window.setTimeout(() => inputRef.current?.focus(), 250);
   };
 
+  const selectTreeReality = (id: string | null) => {
+    setTreeChoiceId(id);
+    if (!id) {
+      sound("select");
+      return;
+    }
+    sound(delivery?.blend?.id === id ? "blend" : "select");
+  };
+
   const openTreeReality = (pathway: ObjectiveDelivery["pathways"][number]) => {
+    sound("open");
     setTreeChoiceId(pathway.id);
     setDetailsOpen(true);
     setBookSequence("eruption");
@@ -1084,7 +1269,9 @@ export function Engage() {
     sequenceTimers.current = [];
     setBookOpen(true);
     setRevealed(false);
+    sound("engage");
     setBookSequence("roots");
+    sound("roots");
 
     const phase = (
       delay: number,
@@ -1093,6 +1280,7 @@ export function Engage() {
     ) => {
       const timer = window.setTimeout(() => {
         setBookSequence(next);
+        sound(next);
         if (reveal) {
           setRevealed(true);
           window.setTimeout(
@@ -1136,10 +1324,19 @@ export function Engage() {
             <TreeKnowledgeEruption
               delivery={delivery}
               selectedId={treeChoiceId}
-              onSelect={setTreeChoiceId}
+              onSelect={selectTreeReality}
               onUse={openTreeReality}
             />
           )}
+
+          <button
+            type="button"
+            className="ascension-sound-toggle"
+            aria-pressed={soundEnabled}
+            onClick={toggleSound}
+          >
+            {soundEnabled ? "SOUND ON" : "SOUND OFF"}
+          </button>
 
           <label
             htmlFor="objective"

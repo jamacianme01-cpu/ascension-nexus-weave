@@ -722,10 +722,13 @@ function statusText(run: ObjectiveRun, produced: boolean | null) {
 }
 
 export function ResultContent({ delivery, source }: { delivery: ObjectiveDelivery; source?: "governed" | "external_draft" | null }) {
-  const drawing = delivery.files.find((file) => /\.svg$/i.test(file.name));
-  const body = splitResultBody(delivery.body);
-  const otherFiles = delivery.files.filter((file) => file !== drawing);
   const hasVisualChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
+  // ENVISION's interactive 3D scene is the primary visual whenever pathways exist.
+  // Keep legacy SVG artifacts out of the main presentation so the experience
+  // cannot fall back to a flat drawing after a holographic reality is selected.
+  const drawing = hasVisualChoices ? undefined : delivery.files.find((file) => /\.svg$/i.test(file.name));
+  const body = splitResultBody(delivery.body);
+  const otherFiles = delivery.files.filter((file) => file !== drawing && !(/\.svg$/i.test(file.name) && hasVisualChoices));
 
   return (
     <div className="space-y-4">

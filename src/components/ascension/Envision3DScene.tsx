@@ -13,10 +13,10 @@ type Vec3 = [number, number, number];
 type Mesh = { buffer: WebGLBuffer; count: number };
 
 const PATH_SLOTS = [
-  { left: "17%", top: "24%", pos: [-3.25, 1.35, 0.25] as Vec3 },
-  { left: "83%", top: "24%", pos: [3.25, 1.35, 0.25] as Vec3 },
-  { left: "19%", top: "67%", pos: [-3.05, -1.55, 0.35] as Vec3 },
-  { left: "81%", top: "67%", pos: [3.05, -1.55, 0.35] as Vec3 },
+  { left: "22%", top: "24%", labelTop: "38%", pos: [-2.55, 1.30, 0.10] as Vec3 },
+  { left: "78%", top: "24%", labelTop: "38%", pos: [2.55, 1.30, 0.10] as Vec3 },
+  { left: "24%", top: "62%", labelTop: "76%", pos: [-2.35, -1.18, 0.14] as Vec3 },
+  { left: "76%", top: "62%", labelTop: "76%", pos: [2.35, -1.18, 0.14] as Vec3 },
 ];
 
 function matIdentity() {
@@ -102,7 +102,7 @@ function pathwayKind(path:Pathway):HoloKind{
 function shader(gl:WebGLRenderingContext,type:number,src:string){const s=gl.createShader(type);if(!s)throw new Error("shader");gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)||"shader");return s;}
 function program(gl:WebGLRenderingContext){
   const vs=shader(gl,gl.VERTEX_SHADER,`attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform mat4 uVP;varying vec3 vN;varying vec3 vW;void main(){vec4 w=uM*vec4(aP,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);gl_Position=uVP*w;}`);
-  const fs=shader(gl,gl.FRAGMENT_SHADER,`precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.8),scan=.96+.04*sin(vW.y*42.0);vec3 c=(uC*(.16+d*.50)+uC*rim*(.42+uGlow*.48))*scan;c+=vec3(.03,.13,.18)*uGlow*.18;gl_FragColor=vec4(min(c,vec3(.92)),.84);}`);
+  const fs=shader(gl,gl.FRAGMENT_SHADER,`precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.8);float scan=.94+.06*sin((vW.y+vW.x*.14)*48.0);vec3 c=(uC*(.18+d*.56)+uC*rim*(.34+uGlow*.42))*scan;c+=vec3(.025,.11,.16)*uGlow*.14;gl_FragColor=vec4(min(c,vec3(.90)),uAlpha);}`);
   const p=gl.createProgram();if(!p)throw new Error("program");gl.attachShader(p,vs);gl.attachShader(p,fs);gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p)||"link");gl.deleteShader(vs);gl.deleteShader(fs);return p;
 }
 function mesh(gl:WebGLRenderingContext,data:Float32Array):Mesh{const b=gl.createBuffer();if(!b)throw new Error("buffer");gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);return{buffer:b,count:data.length/6};}
@@ -129,16 +129,30 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
     if(!gl){setWebglError(true);return;}
     let p:WebGLProgram,cube:Mesh,torus:Mesh,sphere:Mesh,cylinder:Mesh,nozzle:Mesh,raf=0,dead=false;
     try{p=program(gl);cube=mesh(gl,cubeVertices());torus=mesh(gl,torusVertices());sphere=mesh(gl,sphereVertices());cylinder=mesh(gl,cylinderVertices());nozzle=mesh(gl,cylinderVertices(30,true));}catch{setWebglError(true);return;}
-    const aP=gl.getAttribLocation(p,"aP"),aN=gl.getAttribLocation(p,"aN"),uM=gl.getUniformLocation(p,"uM"),uVP=gl.getUniformLocation(p,"uVP"),uC=gl.getUniformLocation(p,"uC"),uEye=gl.getUniformLocation(p,"uEye"),uGlow=gl.getUniformLocation(p,"uGlow");
+    const aP=gl.getAttribLocation(p,"aP"),aN=gl.getAttribLocation(p,"aN"),uM=gl.getUniformLocation(p,"uM"),uVP=gl.getUniformLocation(p,"uVP"),uC=gl.getUniformLocation(p,"uC"),uEye=gl.getUniformLocation(p,"uEye"),uGlow=gl.getUniformLocation(p,"uGlow"),uAlpha=gl.getUniformLocation(p,"uAlpha");
     gl.useProgram(p);gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(0,0,0,0);
     const bind=(m:Mesh)=>{gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(aN);gl.vertexAttribPointer(aN,3,gl.FLOAT,false,24,12);};
-    const draw=(m:Mesh,model:Float32Array,vp:Float32Array,color:Vec3,glow:number)=>{bind(m);gl.uniformMatrix4fv(uM,false,model);gl.uniformMatrix4fv(uVP,false,vp);gl.uniform3f(uC,...color);gl.uniform1f(uGlow,glow);gl.drawArrays(gl.TRIANGLES,0,m.count);};
+    const draw=(m:Mesh,model:Float32Array,vp:Float32Array,color:Vec3,glow:number,alpha=.88)=>{bind(m);gl.uniformMatrix4fv(uM,false,model);gl.uniformMatrix4fv(uVP,false,vp);gl.uniform3f(uC,...color);gl.uniform1f(uGlow,glow);gl.uniform1f(uAlpha,alpha);gl.drawArrays(gl.TRIANGLES,0,m.count);};
+    const projector=(vp:Float32Array,base:Vec3,color:Vec3,size:number,focus=false,blend=false)=>{
+      const y=base[1]-(focus?1.15:.78)*size;
+      const ringColor:Vec3=blend?[.95,.62,.18]:[.14,.72,.92];
+      // Physical projector base.
+      draw(cylinder,compose([base[0],y,base[2]],[0,0,Math.PI/2],[.07*size,.54*size,.54*size]),vp,[.025,.08,.11],.10,.92);
+      draw(torus,compose([base[0],y+.05*size,base[2]],[Math.PI/2,0,0],[.56*size,.56*size,.56*size]),vp,ringColor,.28,.62);
+      draw(torus,compose([base[0],y+.11*size,base[2]],[Math.PI/2,0,0],[.39*size,.39*size,.39*size]),vp,color,.22,.48);
+      // Faint projection cone: enough to read as a hologram without hiding the design.
+      draw(nozzle,compose([base[0],y+.52*size,base[2]],[0,0,-Math.PI/2],[.50*size,.42*size,.42*size]),vp,ringColor,.06,.10);
+      if(focus){
+        draw(torus,compose([base[0],base[1]-.83*size,base[2]],[Math.PI/2,0,0],[.88*size,.88*size,.88*size]),vp,ringColor,.18,.28);
+      }
+    };
+
     const renderAssembly=(vp:Float32Array,path:Pathway,pos:Vec3,color:Vec3,active:boolean,t:number,index:number,blend=false)=>{
       const focus=selectedRef.current!==null&&active;
-      const k=focus ? .92*zoomRef.current : .72;
+      const k=focus ? 1.02*zoomRef.current : .48;
       const r=focus?rotationRef.current:{x:-.12,y:t*.055+index*.58};
-      const base=focus?[0,.2,.05] as Vec3:pos;
-      const glow=focus ? .34 : (active ? .52 : .26);
+      const base=focus?[0,.38,.00] as Vec3:pos;
+      const glow=focus ? .26 : (active ? .38 : .20);
       const kind=blend?"generic":pathwayKind(path);
       const rotateLocal=(x:number,y:number,z:number):Vec3=>{
         const cx=Math.cos(r.x),sx=Math.sin(r.x),cy=Math.cos(r.y),sy=Math.sin(r.y);
@@ -147,8 +161,10 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
         return [base[0]+x2*k,base[1]+y1*k,base[2]+z2*k];
       };
       const world=(x:number,y:number,z:number):Vec3=>rotateLocal(x,y,z);
-      const model=(m:Mesh,p:Vec3,rot:Vec3,s:Vec3,col:Vec3,g=glow)=>
-        draw(m,compose(p,[r.x+rot[0],r.y+rot[1],rot[2]],s),vp,col,g);
+      const model=(m:Mesh,p:Vec3,rot:Vec3,s:Vec3,col:Vec3,g=glow,a=focus?.94:.78)=>
+        draw(m,compose(p,[r.x+rot[0],r.y+rot[1],rot[2]],s),vp,col,g,a);
+
+      projector(vp,base,color,focus?1.10:.92,focus,blend);
 
       if(blend){
         // BLEND deliberately combines three visual grammars: rail spine, chamber core and ion rings.
@@ -238,8 +254,8 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
   return <div className="ascension-envision-3d" data-focused={selectedId?"true":"false"}>
     <canvas ref={canvasRef} className={dragging?"is-dragging":""} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onWheel={wheel} aria-label="Interactive 3D holographic ENVISION scene" />
     <div className="ascension-envision-heading"><span>ENVISION MODE</span><strong>{selected?"HOLOGRAPHIC REALITY · DRAG TO ROTATE · SCROLL TO ZOOM":"SELECT A HOLOGRAPHIC REALITY"}</strong></div>
-    {!selected&&paths.map((path,i)=><button key={path.id} className="ascension-holo-hit" style={{left:PATH_SLOTS[i]?.left,top:PATH_SLOTS[i]?.top}} onClick={()=>onSelect(path.id)}><span>PATH {String(i+1).padStart(2,"0")}</span><strong>{path.label}</strong>{path.outcome_score!==null&&<em>{Math.round(path.outcome_score*100)}%</em>}</button>)}
-    {!selected&&delivery.blend&&<button className="ascension-holo-hit ascension-holo-hit--blend" style={{left:"50%",top:"50%"}} onClick={()=>onSelect(delivery.blend!.id)}><span>BLEND REALITIES</span><strong>SPIRAL + OUTCOME</strong>{delivery.blend.outcome_score!==null&&<em>{Math.round(delivery.blend.outcome_score*100)}%</em>}</button>}
+    {!selected&&paths.map((path,i)=><button key={path.id} className="ascension-holo-hit" style={{left:PATH_SLOTS[i]?.left,top:PATH_SLOTS[i]?.labelTop}} onClick={()=>onSelect(path.id)}><span>PATH {String(i+1).padStart(2,"0")}</span><strong>{path.label}</strong>{path.outcome_score!==null&&<em>{Math.round(path.outcome_score*100)}%</em>}</button>)}
+    {!selected&&delivery.blend&&<button className="ascension-holo-hit ascension-holo-hit--blend" style={{left:"50%",top:"61%"}} onClick={()=>onSelect(delivery.blend!.id)}><span>BLEND REALITIES</span><strong>SPIRAL + OUTCOME</strong>{delivery.blend.outcome_score!==null&&<em>{Math.round(delivery.blend.outcome_score*100)}%</em>}</button>}
     {webglError&&<div className="ascension-holo-error">3D acceleration is unavailable in this browser.</div>}
     {selected&&<div className={isBlend?"ascension-holo-focus ascension-holo-focus--blend":"ascension-holo-focus"}><div><p>{isBlend?"BLEND REALITY":"ENVISIONED REALITY"}</p><h3>{selected.label}</h3><span>{selected.summary}</span></div><div className="ascension-holo-actions"><button onClick={()=>{rotationRef.current={x:-.18,y:.45};zoomRef.current=1;}}>RESET VIEW</button><button onClick={()=>onSelect(null)}>BACK</button><button onClick={()=>onUse(selected)}>{isBlend?"OPEN BLEND":"OPEN REALITY"}</button></div></div>}
   </div>;

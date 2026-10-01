@@ -101,8 +101,8 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
     const bind=(m:Mesh)=>{gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(aN);gl.vertexAttribPointer(aN,3,gl.FLOAT,false,24,12);};
     const draw=(m:Mesh,model:Float32Array,vp:Float32Array,color:Vec3,glow:number)=>{bind(m);gl.uniformMatrix4fv(uM,false,model);gl.uniformMatrix4fv(uVP,false,vp);gl.uniform3f(uC,...color);gl.uniform1f(uGlow,glow);gl.drawArrays(gl.TRIANGLES,0,m.count);};
     const engine=(vp:Float32Array,pos:Vec3,color:Vec3,active:boolean,t:number,index:number,blend=false)=>{
-      const focus=selectedRef.current!==null&&active, k=focus?.92*zoomRef.current:1, r=focus?rotationRef.current:{x:-.16,y:t*.08+index*.72};
-      const base=focus?[0,.22,.15] as Vec3:pos, glow=focus?.42:(active?.72:.34);
+      const focus=selectedRef.current!==null&&active, k=focus ? .92*zoomRef.current : 1, r=focus?rotationRef.current:{x:-.16,y:t*.08+index*.72};
+      const base=focus?[0,.22,.15] as Vec3:pos, glow=focus ? .42 : (active ? .72 : .34);
       // Stable inspection silhouette: twin rails, central core, three coil stations and a forward energy guide.
       draw(cube,compose([base[0],base[1]-.68*k,base[2]],[0,r.y*.12,0],[1.38*k,.055,.62*k]),vp,[.035,.12,.18],glow*.22);
       draw(cube,compose(base,[r.x,r.y,0],[.92*k,.22*k,.30*k]),vp,blend?[.88,.45,.08]:color,glow*.72);

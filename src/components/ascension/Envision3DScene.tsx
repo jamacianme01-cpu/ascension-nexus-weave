@@ -73,7 +73,7 @@ function cylinderVertices(segments=28, tapered=false){
   for(let i=0;i<segments;i++){
     const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;
     const ca=Math.cos(a),sa=Math.sin(a),cb=Math.cos(b),sb=Math.sin(b);
-    const r0=1,r1=tapered ? .42 : 1;
+    const r0=tapered ? .42 : 1,r1=1;
     const p1:[Vec3,Vec3]=[[-1,ca*r0,sa*r0],[-1,0,0]];
     const p2:[Vec3,Vec3]=[[1,ca*r1,sa*r1],[1,0,0]];
     const p3:[Vec3,Vec3]=[[1,cb*r1,sb*r1],[1,0,0]];
@@ -166,7 +166,7 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
         model(torus,world(-.92,0,0),[0,Math.PI/2,0],[.54*k,.54*k,.54*k],[.18,.78,1],.32);
         model(sphere,world(-.86,0,0),[0,0,0],[.19*k,.19*k,.19*k],[.52,.88,1],.28);
         for(let s=-2;s<=2;s++) model(torus,world(s*.30,0,0),[0,Math.PI/2,0],[.34*k,.34*k,.34*k],s===0?[.72,.92,1]:color,.26);
-        for(let blade=0;blade<8;blade++){const a=blade*Math.PI/4+r.y;model(cube,world(-.88,Math.cos(a)*.25,Math.sin(a)*.25),[a,0,0],[.035*k,.24*k,.055*k],[.34,.82,1],.20);}
+        for(let blade=0;blade<8;blade++){const a=blade*Math.PI/4;model(cube,world(-.88,Math.cos(a)*.25,Math.sin(a)*.25),[a,0,0],[.035*k,.24*k,.055*k],[.34,.82,1],.20);}
         model(nozzle,world(.93,0,0),[0,0,0],[.45*k,.44*k,.44*k],[.12,.58,.82],.26);
         return;
       }

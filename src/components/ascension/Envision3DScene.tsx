@@ -69,7 +69,7 @@ function sphereVertices(lat=16,lon=22){
 function shader(gl:WebGLRenderingContext,type:number,src:string){const s=gl.createShader(type);if(!s)throw new Error("shader");gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)||"shader");return s;}
 function program(gl:WebGLRenderingContext){
   const vs=shader(gl,gl.VERTEX_SHADER,`attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform mat4 uVP;varying vec3 vN;varying vec3 vW;void main(){vec4 w=uM*vec4(aP,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);gl_Position=uVP*w;}`);
-  const fs=shader(gl,gl.FRAGMENT_SHADER,`precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.5,.8,.75)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.4),scan=.92+.08*sin(vW.y*55.0);vec3 c=(uC*(.18+d*.72)+uC*rim*(1.1+uGlow*1.6))*scan;c+=vec3(.08,.35,.48)*uGlow*.24;gl_FragColor=vec4(c,.88);}`);
+  const fs=shader(gl,gl.FRAGMENT_SHADER,`precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.8),scan=.96+.04*sin(vW.y*42.0);vec3 c=(uC*(.16+d*.50)+uC*rim*(.42+uGlow*.48))*scan;c+=vec3(.03,.13,.18)*uGlow*.18;gl_FragColor=vec4(min(c,vec3(.92)),.84);}`);
   const p=gl.createProgram();if(!p)throw new Error("program");gl.attachShader(p,vs);gl.attachShader(p,fs);gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p)||"link");gl.deleteShader(vs);gl.deleteShader(fs);return p;
 }
 function mesh(gl:WebGLRenderingContext,data:Float32Array):Mesh{const b=gl.createBuffer();if(!b)throw new Error("buffer");gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);return{buffer:b,count:data.length/6};}
@@ -101,16 +101,17 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
     const bind=(m:Mesh)=>{gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(aN);gl.vertexAttribPointer(aN,3,gl.FLOAT,false,24,12);};
     const draw=(m:Mesh,model:Float32Array,vp:Float32Array,color:Vec3,glow:number)=>{bind(m);gl.uniformMatrix4fv(uM,false,model);gl.uniformMatrix4fv(uVP,false,vp);gl.uniform3f(uC,...color);gl.uniform1f(uGlow,glow);gl.drawArrays(gl.TRIANGLES,0,m.count);};
     const engine=(vp:Float32Array,pos:Vec3,color:Vec3,active:boolean,t:number,index:number,blend=false)=>{
-      const focus=selectedRef.current!==null&&active, k=focus?1.55*zoomRef.current:1, r=focus?rotationRef.current:{x:-.16,y:t*.2+index*.72};
-      const base=focus?[0,.05,.75] as Vec3:pos, glow=active?1:.48;
-      draw(cube,compose([base[0],base[1]-1.02*k,base[2]],[0,r.y*.15,0],[1.55*k,.07,.92*k]),vp,[.08,.25,.36],glow*.35);
-      draw(cube,compose(base,[r.x,r.y,0],[.72*k,.38*k,.52*k]),vp,blend?[1,.58,.12]:color,glow);
-      for(let q=-1;q<=1;q+=2)draw(cube,compose([base[0],base[1]+q*.52*k,base[2]-.08],[r.x*.3,r.y,0],[1.18*k,.045,.045]),vp,color,glow*.75);
-      for(let ring=-1;ring<=1;ring++)draw(torus,compose([base[0]+ring*.52*k,base[1],base[2]],[Math.PI/2+r.x,r.y+ring*.3,0],[.46*k,.46*k,.46*k]),vp,ring===0?[.78,.94,1]:color,glow+.12);
-      draw(cube,compose([base[0]+1.15*k,base[1],base[2]],[0,0,0],[.58*k,.026,.026]),vp,[.68,.94,1],1);
-      if(blend){draw(torus,compose(base,[0,t*.42,Math.PI/3],[1.25*k,1.25*k,1.25*k]),vp,[1,.74,.24],1);draw(sphere,compose(base,[0,t*.2,0],[.54*k,.54*k,.54*k]),vp,[1,.64,.14],1);}
+      const focus=selectedRef.current!==null&&active, k=focus?.92*zoomRef.current:1, r=focus?rotationRef.current:{x:-.16,y:t*.08+index*.72};
+      const base=focus?[0,.22,.15] as Vec3:pos, glow=focus?.42:(active?.72:.34);
+      // Stable inspection silhouette: twin rails, central core, three coil stations and a forward energy guide.
+      draw(cube,compose([base[0],base[1]-.68*k,base[2]],[0,r.y*.12,0],[1.38*k,.055,.62*k]),vp,[.035,.12,.18],glow*.22);
+      draw(cube,compose(base,[r.x,r.y,0],[.92*k,.22*k,.30*k]),vp,blend?[.88,.45,.08]:color,glow*.72);
+      for(let q=-1;q<=1;q+=2)draw(cube,compose([base[0],base[1]+q*.42*k,base[2]-.02],[r.x*.18,r.y,0],[1.35*k,.038,.038]),vp,color,glow*.68);
+      for(let ring=-1;ring<=1;ring++)draw(torus,compose([base[0]+ring*.58*k,base[1],base[2]],[Math.PI/2+r.x*.55,r.y,0],[.34*k,.34*k,.34*k]),vp,ring===0?[.42,.86,1]:color,glow*.72);
+      draw(cube,compose([base[0]+1.48*k,base[1],base[2]],[0,0,0],[.66*k,.018,.018]),vp,[.30,.78,.96],.56);
+      if(blend){draw(torus,compose(base,[0,focus?r.y:t*.12,Math.PI/3],[.90*k,.90*k,.90*k]),vp,[.88,.56,.12],.48);draw(sphere,compose(base,[0,focus?0:t*.08,0],[.32*k,.32*k,.32*k]),vp,[.80,.42,.08],.42);}
     };
-    const render=(ms:number)=>{if(dead)return;const t=ms*.001,rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);const eye:Vec3=[Math.sin(t*.12)*.22,Math.sin(t*.15)*.08,9.4],vp=matMul(perspective(Math.PI/4.3,w/h,.1,40),lookAt(eye,[0,0,0],[0,1,0]));gl.uniform3f(uEye,...eye);
+    const render=(ms:number)=>{if(dead)return;const t=ms*.001,rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);const eye:Vec3=[selectedRef.current?0:Math.sin(t*.08)*.12,selectedRef.current?0:Math.sin(t*.1)*.04,10.4],vp=matMul(perspective(Math.PI/4.3,w/h,.1,40),lookAt(eye,[0,0,0],[0,1,0]));gl.uniform3f(uEye,...eye);
       const focused=selectedRef.current;
       if(focused){const path=paths.find(x=>x.id===focused);if(path){const i=paths.indexOf(path);engine(vp,[0,0,.7],hue(i),true,t,i,false);}else if(delivery.blend?.id===focused){engine(vp,[0,0,.7],[1,.66,.18],true,t,4,true);}}
       else{paths.forEach((path,i)=>engine(vp,PATH_SLOTS[i]?.pos??[0,0,0],hue(i),false,t,i,false));if(delivery.blend)engine(vp,[0,-.12,.78],[1,.66,.18],false,t,4,true);}

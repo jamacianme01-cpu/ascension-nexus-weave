@@ -1367,3 +1367,47 @@ body:has(.ascension-world > .ascension-command) main {
     font-size: .5rem;
   }
 }
+
+
+/* Focused ENVISION inspection: calm the scene so geometry is readable. */
+.ascension-envision-3d[data-focused="true"]::before {
+  z-index: 2;
+  opacity: 1;
+  mix-blend-mode: normal;
+  background:
+    radial-gradient(circle at 50% 43%, rgb(7 34 48 / 12%) 0 18%, rgb(1 8 14 / 58%) 48%, rgb(0 3 8 / 78%) 82%),
+    rgb(0 5 10 / 50%);
+  backdrop-filter: brightness(.48) saturate(.72) blur(1.2px);
+}
+
+.ascension-envision-3d[data-focused="true"]::after {
+  z-index: 2;
+  width: min(31vw, 25rem);
+  opacity: .16;
+  animation-duration: 28s;
+}
+
+.ascension-envision-3d[data-focused="true"] > canvas {
+  z-index: 4;
+  filter:
+    drop-shadow(0 0 7px rgb(73 194 232 / 20%))
+    drop-shadow(0 0 16px rgb(73 194 232 / 8%));
+}
+
+.ascension-envision-3d[data-focused="true"] .ascension-envision-heading {
+  z-index: 8;
+}
+
+.ascension-envision-3d[data-focused="true"] .ascension-holo-focus {
+  background:
+    linear-gradient(145deg, rgb(2 14 24 / 94%), rgb(1 7 13 / 96%));
+  box-shadow:
+    0 18px 48px rgb(0 0 0 / 58%),
+    0 0 22px rgb(77 203 247 / 9%);
+}
+
+.ascension-envision-3d[data-focused="true"] .ascension-holo-focus--blend {
+  box-shadow:
+    0 18px 48px rgb(0 0 0 / 60%),
+    0 0 24px rgb(238 194 101 / 11%);
+}

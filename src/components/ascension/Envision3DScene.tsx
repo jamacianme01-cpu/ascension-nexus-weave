@@ -66,6 +66,39 @@ function sphereVertices(lat=16,lon=22){
   for(let i=0;i<lat;i++){const a0=i/lat*Math.PI,a1=(i+1)/lat*Math.PI;for(let j=0;j<lon;j++){const b0=j/lon*Math.PI*2,b1=(j+1)/lon*Math.PI*2,A=v(a0,b0),B=v(a1,b0),C=v(a1,b1),E=v(a0,b1);q(A);q(B);q(C);q(A);q(C);q(E);}}
   return new Float32Array(d);
 }
+
+function cylinderVertices(segments=28, tapered=false){
+  const d:number[]=[];
+  const q=(p:Vec3,n:Vec3)=>d.push(...p,...n);
+  for(let i=0;i<segments;i++){
+    const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;
+    const ca=Math.cos(a),sa=Math.sin(a),cb=Math.cos(b),sb=Math.sin(b);
+    const r0=1,r1=tapered?.42:1;
+    const p1:[Vec3,Vec3]=[[-1,ca*r0,sa*r0],[-1,0,0]];
+    const p2:[Vec3,Vec3]=[[1,ca*r1,sa*r1],[1,0,0]];
+    const p3:[Vec3,Vec3]=[[1,cb*r1,sb*r1],[1,0,0]];
+    const p4:[Vec3,Vec3]=[[-1,cb*r0,sb*r0],[-1,0,0]];
+    const nx=(r0-r1)*.5;
+    const na=norm([nx,ca,sa]), nb=norm([nx,cb,sb]);
+    q(p1[0],na);q(p2[0],na);q(p3[0],nb);q(p1[0],na);q(p3[0],nb);q(p4[0],nb);
+    q([-1,0,0],[-1,0,0]);q(p4[0],[-1,0,0]);q(p1[0],[-1,0,0]);
+    q([1,0,0],[1,0,0]);q(p2[0],[1,0,0]);q(p3[0],[1,0,0]);
+  }
+  return new Float32Array(d);
+}
+
+type HoloKind="turbofan"|"rocket"|"ion"|"linear"|"plasma"|"fluid"|"generic";
+function pathwayKind(path:Pathway):HoloKind{
+  const text=`${path.label} ${path.summary} ${path.spiral_form ?? ""}`.toLowerCase();
+  if(/turbofan|turbine|jet engine|compressor|bypass/.test(text)) return "turbofan";
+  if(/rocket|combustion chamber|nozzle/.test(text)) return "rocket";
+  if(/ion thruster|ion propulsion|electrostatic/.test(text)) return "ion";
+  if(/linear|rail|coil|maglev|electromagnetic rail|induction/.test(text)) return "linear";
+  if(/plasma/.test(text)) return "plasma";
+  if(/fluid|hydraulic|pneumatic/.test(text)) return "fluid";
+  return "generic";
+}
+
 function shader(gl:WebGLRenderingContext,type:number,src:string){const s=gl.createShader(type);if(!s)throw new Error("shader");gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)||"shader");return s;}
 function program(gl:WebGLRenderingContext){
   const vs=shader(gl,gl.VERTEX_SHADER,`attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform mat4 uVP;varying vec3 vN;varying vec3 vW;void main(){vec4 w=uM*vec4(aP,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);gl_Position=uVP*w;}`);
@@ -94,30 +127,100 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
     const canvas=canvasRef.current;if(!canvas)return;
     const gl=canvas.getContext("webgl",{alpha:true,antialias:true,premultipliedAlpha:false});
     if(!gl){setWebglError(true);return;}
-    let p:WebGLProgram,cube:Mesh,torus:Mesh,sphere:Mesh,raf=0,dead=false;
-    try{p=program(gl);cube=mesh(gl,cubeVertices());torus=mesh(gl,torusVertices());sphere=mesh(gl,sphereVertices());}catch{setWebglError(true);return;}
+    let p:WebGLProgram,cube:Mesh,torus:Mesh,sphere:Mesh,cylinder:Mesh,nozzle:Mesh,raf=0,dead=false;
+    try{p=program(gl);cube=mesh(gl,cubeVertices());torus=mesh(gl,torusVertices());sphere=mesh(gl,sphereVertices());cylinder=mesh(gl,cylinderVertices());nozzle=mesh(gl,cylinderVertices(30,true));}catch{setWebglError(true);return;}
     const aP=gl.getAttribLocation(p,"aP"),aN=gl.getAttribLocation(p,"aN"),uM=gl.getUniformLocation(p,"uM"),uVP=gl.getUniformLocation(p,"uVP"),uC=gl.getUniformLocation(p,"uC"),uEye=gl.getUniformLocation(p,"uEye"),uGlow=gl.getUniformLocation(p,"uGlow");
     gl.useProgram(p);gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(0,0,0,0);
     const bind=(m:Mesh)=>{gl.bindBuffer(gl.ARRAY_BUFFER,m.buffer);gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(aN);gl.vertexAttribPointer(aN,3,gl.FLOAT,false,24,12);};
     const draw=(m:Mesh,model:Float32Array,vp:Float32Array,color:Vec3,glow:number)=>{bind(m);gl.uniformMatrix4fv(uM,false,model);gl.uniformMatrix4fv(uVP,false,vp);gl.uniform3f(uC,...color);gl.uniform1f(uGlow,glow);gl.drawArrays(gl.TRIANGLES,0,m.count);};
-    const engine=(vp:Float32Array,pos:Vec3,color:Vec3,active:boolean,t:number,index:number,blend=false)=>{
-      const focus=selectedRef.current!==null&&active, k=focus ? .92*zoomRef.current : 1, r=focus?rotationRef.current:{x:-.16,y:t*.08+index*.72};
-      const base=focus?[0,.22,.15] as Vec3:pos, glow=focus ? .42 : (active ? .72 : .34);
-      // Stable inspection silhouette: twin rails, central core, three coil stations and a forward energy guide.
-      draw(cube,compose([base[0],base[1]-.68*k,base[2]],[0,r.y*.12,0],[1.38*k,.055,.62*k]),vp,[.035,.12,.18],glow*.22);
-      draw(cube,compose(base,[r.x,r.y,0],[.92*k,.22*k,.30*k]),vp,blend?[.88,.45,.08]:color,glow*.72);
-      for(let q=-1;q<=1;q+=2)draw(cube,compose([base[0],base[1]+q*.42*k,base[2]-.02],[r.x*.18,r.y,0],[1.35*k,.038,.038]),vp,color,glow*.68);
-      for(let ring=-1;ring<=1;ring++)draw(torus,compose([base[0]+ring*.58*k,base[1],base[2]],[Math.PI/2+r.x*.55,r.y,0],[.34*k,.34*k,.34*k]),vp,ring===0?[.42,.86,1]:color,glow*.72);
-      draw(cube,compose([base[0]+1.48*k,base[1],base[2]],[0,0,0],[.66*k,.018,.018]),vp,[.30,.78,.96],.56);
-      if(blend){draw(torus,compose(base,[0,focus?r.y:t*.12,Math.PI/3],[.90*k,.90*k,.90*k]),vp,[.88,.56,.12],.48);draw(sphere,compose(base,[0,focus?0:t*.08,0],[.32*k,.32*k,.32*k]),vp,[.80,.42,.08],.42);}
+    const renderAssembly=(vp:Float32Array,path:Pathway,pos:Vec3,color:Vec3,active:boolean,t:number,index:number,blend=false)=>{
+      const focus=selectedRef.current!==null&&active;
+      const k=focus ? .92*zoomRef.current : .72;
+      const r=focus?rotationRef.current:{x:-.12,y:t*.055+index*.58};
+      const base=focus?[0,.2,.05] as Vec3:pos;
+      const glow=focus ? .34 : (active ? .52 : .26);
+      const kind=blend?"generic":pathwayKind(path);
+      const model=(m:Mesh,p:Vec3,rot:Vec3,s:Vec3,col:Vec3,g=glow)=>draw(m,compose(p,rot,s),vp,col,g);
+      const world=(x:number,y:number,z:number):Vec3=>[base[0]+x*k,base[1]+y*k,base[2]+z*k];
+
+      if(blend){
+        // BLEND deliberately combines three visual grammars: rail spine, chamber core and ion rings.
+        model(cube,world(0,-.52,0),[0,r.y*.16,0],[1.42*k,.045,.42*k],[.04,.13,.18],.20);
+        for(let q=-1;q<=1;q+=2) model(cube,world(0,q*.36,0),[0,r.y,0],[1.42*k,.034,.034],[.12,.70,.92],.34);
+        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.48,0,0),[Math.PI/2+r.x*.45,r.y,0],[.30*k,.30*k,.30*k],[1,.60,.16],.42);
+        model(nozzle,world(.95,0,0),[0,r.y,0],[.58*k,.42*k,.42*k],[.90,.42,.08],.36);
+        model(sphere,world(-.10,0,0),[r.x,r.y,0],[.28*k,.28*k,.28*k],[.18,.72,.95],.32);
+        return;
+      }
+
+      if(kind==="turbofan"){
+        // Axial engine: intake ring, fan hub, compressor stages, core and exhaust.
+        model(cylinder,world(0,0,0),[0,r.y,0],[1.05*k,.52*k,.52*k],[.08,.26,.34],.18);
+        model(torus,world(-.92,0,0),[0,Math.PI/2+r.y,0],[.54*k,.54*k,.54*k],[.18,.78,1],.32);
+        model(sphere,world(-.86,0,0),[0,0,0],[.19*k,.19*k,.19*k],[.52,.88,1],.28);
+        for(let s=-2;s<=2;s++) model(torus,world(s*.30,0,0),[0,Math.PI/2+r.y,0],[.34*k,.34*k,.34*k],s===0?[.72,.92,1]:color,.26);
+        for(let blade=0;blade<8;blade++){const a=blade*Math.PI/4+r.y;model(cube,world(-.88,Math.cos(a)*.25,Math.sin(a)*.25),[a,0,r.y],[.035*k,.24*k,.055*k],[.34,.82,1],.20);}
+        model(nozzle,world(.93,0,0),[0,r.y,0],[.45*k,.44*k,.44*k],[.12,.58,.82],.26);
+        return;
+      }
+
+      if(kind==="rocket"){
+        // Combustion chamber + injector + converging/diverging nozzle.
+        model(cylinder,world(-.42,0,0),[0,r.y,0],[.56*k,.34*k,.34*k],[.16,.48,.72],.26);
+        model(torus,world(-.84,0,0),[0,Math.PI/2+r.y,0],[.34*k,.34*k,.34*k],[.28,.78,1],.28);
+        model(sphere,world(-.28,0,0),[r.x,r.y,0],[.24*k,.24*k,.24*k],[1,.48,.18],.30);
+        model(nozzle,world(.48,0,0),[0,r.y,0],[.82*k,.62*k,.62*k],[.86,.30,.12],.34);
+        model(torus,world(.90,0,0),[0,Math.PI/2+r.y,0],[.58*k,.58*k,.58*k],[1,.58,.18],.30);
+        model(cube,world(1.42,0,0),[0,0,0],[.52*k,.016,.016],[1,.68,.28],.22);
+        return;
+      }
+
+      if(kind==="ion"){
+        // Ion thruster: source chamber, stacked acceleration grids and narrow exhaust beam.
+        model(cylinder,world(-.42,0,0),[0,r.y,0],[.48*k,.42*k,.42*k],[.08,.30,.44],.18);
+        model(sphere,world(-.48,0,0),[r.x,r.y,0],[.25*k,.25*k,.25*k],[.14,.72,.95],.26);
+        for(let g=0;g<4;g++) model(torus,world(.08+g*.20,0,0),[0,Math.PI/2+r.y,0],[.40*k,.40*k,.40*k],g%2?[.56,.52,1]:[.12,.86,1],.30);
+        for(let q=-1;q<=1;q+=2) model(cube,world(.34,q*.28,0),[0,r.y,0],[.82*k,.018,.018],[.18,.64,.92],.18);
+        model(cube,world(1.28,0,0),[0,0,0],[.76*k,.012,.012],[.48,.78,1],.26);
+        return;
+      }
+
+      if(kind==="linear"){
+        // Linear propulsion: three coil stations along twin rails with a central moving core.
+        for(let q=-1;q<=1;q+=2) model(cube,world(0,q*.40,0),[0,r.y,0],[1.50*k,.035,.035],[.08,.70,.92],.30);
+        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.62,0,0),[Math.PI/2+r.x*.4,r.y,0],[.34*k,.34*k,.34*k],ring===0?[.48,.88,1]:color,.34);
+        model(cube,world(0,0,0),[r.x,r.y,0],[.54*k,.20*k,.28*k],[.18,.62,.86],.28);
+        model(cube,world(1.55,0,0),[0,0,0],[.62*k,.015,.015],[.42,.88,1],.26);
+        return;
+      }
+
+      if(kind==="plasma"){
+        model(cylinder,world(-.42,0,0),[0,r.y,0],[.54*k,.36*k,.36*k],[.10,.22,.36],.18);
+        model(sphere,world(-.22,0,0),[r.x,r.y,0],[.30*k,.30*k,.30*k],[.30,.72,1],.34);
+        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.46,0,0),[0,Math.PI/2+r.y,0],[.38*k,.38*k,.38*k],ring===0?[.72,.28,1]:[.16,.80,1],.34);
+        model(nozzle,world(.78,0,0),[0,r.y,0],[.72*k,.50*k,.50*k],[.28,.44,.88],.28);
+        return;
+      }
+
+      if(kind==="fluid"){
+        model(cylinder,world(-.34,0,0),[0,r.y,0],[.72*k,.34*k,.34*k],[.10,.48,.66],.22);
+        for(let v=-1;v<=1;v++) model(torus,world(v*.45,0,0),[0,Math.PI/2+r.y,0],[.31*k,.31*k,.31*k],[.14,.72,.92],.24);
+        model(nozzle,world(.82,0,0),[0,r.y,0],[.60*k,.46*k,.46*k],[.12,.58,.76],.24);
+        return;
+      }
+
+      // Generic fallback remains dimensional, but restrained.
+      model(cube,world(0,0,0),[r.x,r.y,0],[.72*k,.24*k,.32*k],color,.26);
+      model(torus,world(-.52,0,0),[Math.PI/2+r.x*.4,r.y,0],[.32*k,.32*k,.32*k],[.32,.82,1],.28);
+      model(torus,world(.52,0,0),[Math.PI/2+r.x*.4,r.y,0],[.32*k,.32*k,.32*k],[.32,.82,1],.28);
     };
     const render=(ms:number)=>{if(dead)return;const t=ms*.001,rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);const eye:Vec3=[selectedRef.current?0:Math.sin(t*.08)*.12,selectedRef.current?0:Math.sin(t*.1)*.04,10.4],vp=matMul(perspective(Math.PI/4.3,w/h,.1,40),lookAt(eye,[0,0,0],[0,1,0]));gl.uniform3f(uEye,...eye);
       const focused=selectedRef.current;
-      if(focused){const path=paths.find(x=>x.id===focused);if(path){const i=paths.indexOf(path);engine(vp,[0,0,.7],hue(i),true,t,i,false);}else if(delivery.blend?.id===focused){engine(vp,[0,0,.7],[1,.66,.18],true,t,4,true);}}
-      else{paths.forEach((path,i)=>engine(vp,PATH_SLOTS[i]?.pos??[0,0,0],hue(i),false,t,i,false));if(delivery.blend)engine(vp,[0,-.12,.78],[1,.66,.18],false,t,4,true);}
+      if(focused){const path=paths.find(x=>x.id===focused);if(path){const i=paths.indexOf(path);renderAssembly(vp,path,[0,0,.7],hue(i),true,t,i,false);}else if(delivery.blend?.id===focused){renderAssembly(vp,delivery.blend,[0,0,.7],[1,.66,.18],true,t,4,true);}}
+      else{paths.forEach((path,i)=>renderAssembly(vp,path,PATH_SLOTS[i]?.pos??[0,0,0],hue(i),false,t,i,false));if(delivery.blend)renderAssembly(vp,delivery.blend,[0,-.12,.78],[1,.66,.18],false,t,4,true);}
       raf=requestAnimationFrame(render);
     };raf=requestAnimationFrame(render);
-    return()=>{dead=true;cancelAnimationFrame(raf);[cube,torus,sphere].forEach(m=>gl.deleteBuffer(m.buffer));gl.deleteProgram(p);};
+    return()=>{dead=true;cancelAnimationFrame(raf);[cube,torus,sphere,cylinder,nozzle].forEach(m=>gl.deleteBuffer(m.buffer));gl.deleteProgram(p);};
   },[delivery.blend,paths]);
 
   const pointerDown=(e:PointerEvent<HTMLCanvasElement>)=>{if(!selectedId)return;dragRef.current={x:e.clientX,y:e.clientY,active:true,moved:false};setDragging(true);e.currentTarget.setPointerCapture(e.pointerId);};

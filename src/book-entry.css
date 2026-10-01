@@ -1002,3 +1002,368 @@ body:has(.ascension-world > .ascension-command) main {
     font-size: .62rem;
   }
 }
+
+
+/* ------------------------------------------------------------------ */
+/* ENVISION 3D holographic scene                                      */
+/* ------------------------------------------------------------------ */
+.ascension-envision-3d {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ascension-envision-3d::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgb(96 211 255 / 0%) 0 5px,
+      rgb(96 211 255 / 5%) 6px,
+      rgb(96 211 255 / 0%) 7px 10px
+    ),
+    radial-gradient(circle at 50% 46%, rgb(75 197 255 / 12%), transparent 36%);
+  mix-blend-mode: screen;
+  opacity: .7;
+}
+
+.ascension-envision-3d::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 48%;
+  width: min(42vw, 34rem);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    repeating-conic-gradient(
+      from 0deg,
+      transparent 0deg 9deg,
+      rgb(93 214 255 / 18%) 10deg 11deg,
+      transparent 12deg 23deg,
+      rgb(243 201 111 / 11%) 24deg 25deg
+    );
+  mask-image: radial-gradient(circle, transparent 0 22%, #000 30% 67%, transparent 78%);
+  opacity: .42;
+  animation: ascension-holo-ring 14s linear infinite;
+}
+
+@keyframes ascension-holo-ring {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.ascension-envision-3d > canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  pointer-events: auto;
+  cursor: default;
+  filter:
+    drop-shadow(0 0 12px rgb(82 205 255 / 34%))
+    drop-shadow(0 0 28px rgb(82 205 255 / 14%));
+}
+
+.ascension-envision-3d[data-focused="true"] > canvas {
+  cursor: grab;
+}
+
+.ascension-envision-3d > canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.ascension-envision-heading {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: clamp(.65rem, 1.8vh, 1.15rem);
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: .22rem;
+  width: min(52rem, 76vw);
+  pointer-events: none;
+  text-align: center;
+  text-shadow:
+    0 2px 14px rgb(0 0 0 / 82%),
+    0 0 16px rgb(76 196 255 / 24%);
+}
+
+.ascension-envision-heading > span {
+  color: rgb(239 207 137);
+  font-family: "Cinzel", serif;
+  font-size: clamp(.72rem, 1.2vw, 1rem);
+  letter-spacing: .28em;
+}
+
+.ascension-envision-heading > strong {
+  color: rgb(167 222 242);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: clamp(.48rem, .68vw, .62rem);
+  font-weight: 500;
+  letter-spacing: .07em;
+}
+
+.ascension-holo-hit {
+  position: absolute;
+  z-index: 7;
+  transform: translate(-50%, -50%);
+  display: grid;
+  width: clamp(9.8rem, 15vw, 13rem);
+  min-height: 4.2rem;
+  align-content: center;
+  gap: .16rem;
+  border: 1px solid rgb(95 215 255 / 24%);
+  border-radius: .85rem;
+  background:
+    linear-gradient(180deg, rgb(4 22 34 / 32%), rgb(2 8 15 / 16%));
+  box-shadow:
+    inset 0 0 18px rgb(82 201 240 / 4%),
+    0 0 24px rgb(71 198 244 / 5%);
+  padding: .56rem .7rem;
+  color: white;
+  pointer-events: auto;
+  text-align: left;
+  backdrop-filter: blur(1px);
+  cursor: pointer;
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    transform .18s ease,
+    background .18s ease;
+}
+
+.ascension-holo-hit:hover,
+.ascension-holo-hit:focus-visible {
+  transform: translate(-50%, -50%) scale(1.04);
+  border-color: rgb(122 225 255 / 68%);
+  background:
+    linear-gradient(180deg, rgb(5 31 47 / 52%), rgb(2 11 20 / 30%));
+  box-shadow:
+    0 0 28px rgb(82 207 249 / 18%),
+    inset 0 0 24px rgb(82 207 249 / 7%);
+  outline: none;
+}
+
+.ascension-holo-hit > span {
+  color: rgb(96 216 248);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .52rem;
+  letter-spacing: .15em;
+}
+
+.ascension-holo-hit > strong {
+  overflow: hidden;
+  color: rgb(238 247 250);
+  font-family: "Inter Tight", system-ui, sans-serif;
+  font-size: .78rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ascension-holo-hit > em {
+  justify-self: start;
+  color: rgb(173 227 246);
+  font-size: .6rem;
+  font-style: normal;
+}
+
+.ascension-holo-hit--blend {
+  width: clamp(11rem, 17vw, 15rem);
+  min-height: 4.6rem;
+  border-color: rgb(240 198 110 / 48%);
+  background:
+    radial-gradient(circle at 50% 0%, rgb(242 197 104 / 12%), transparent 66%),
+    linear-gradient(180deg, rgb(24 18 9 / 44%), rgb(7 9 12 / 18%));
+  box-shadow:
+    0 0 36px rgb(239 195 105 / 11%),
+    inset 0 0 22px rgb(239 195 105 / 5%);
+  text-align: center;
+}
+
+.ascension-holo-hit--blend > span {
+  color: rgb(242 205 126);
+  font-family: "Cinzel", serif;
+  font-size: .64rem;
+  letter-spacing: .14em;
+}
+
+.ascension-holo-hit--blend > strong {
+  color: rgb(171 227 247);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .53rem;
+  font-weight: 500;
+  letter-spacing: .06em;
+}
+
+.ascension-holo-focus {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: clamp(6.8rem, 13vh, 8.8rem);
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  width: min(49rem, 82vw);
+  border: 1px solid rgb(100 213 251 / 40%);
+  border-radius: 1rem;
+  background:
+    linear-gradient(145deg, rgb(3 17 29 / 84%), rgb(1 8 15 / 88%));
+  box-shadow:
+    0 22px 60px rgb(0 0 0 / 62%),
+    0 0 34px rgb(77 203 247 / 15%);
+  padding: .88rem 1rem;
+  color: white;
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+}
+
+.ascension-holo-focus--blend {
+  border-color: rgb(240 198 109 / 54%);
+  box-shadow:
+    0 22px 60px rgb(0 0 0 / 64%),
+    0 0 42px rgb(238 194 101 / 18%);
+}
+
+.ascension-holo-focus p {
+  margin: 0;
+  color: rgb(99 217 249);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .53rem;
+  letter-spacing: .16em;
+}
+
+.ascension-holo-focus--blend p {
+  color: rgb(241 203 122);
+}
+
+.ascension-holo-focus h3 {
+  margin: .25rem 0 0;
+  color: rgb(247 249 250);
+  font-size: clamp(.92rem, 1.35vw, 1.18rem);
+}
+
+.ascension-holo-focus h3 + span {
+  display: block;
+  margin-top: .35rem;
+  max-width: 62ch;
+  color: rgb(188 205 214);
+  font-size: .76rem;
+  line-height: 1.38;
+}
+
+.ascension-holo-actions {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.ascension-holo-actions button {
+  min-height: 2.45rem;
+  border: 1px solid rgb(97 210 247 / 34%);
+  border-radius: 999px;
+  background: rgb(5 29 45 / 68%);
+  padding: 0 .8rem;
+  color: rgb(141 225 251);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .56rem;
+  letter-spacing: .07em;
+  cursor: pointer;
+}
+
+.ascension-holo-actions button:last-child {
+  border-color: rgb(237 197 112 / 48%);
+  color: rgb(241 207 138);
+}
+
+.ascension-holo-error {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgb(228 91 91 / 46%);
+  border-radius: .9rem;
+  background: rgb(38 5 8 / 88%);
+  padding: .85rem 1rem;
+  color: rgb(255 193 193);
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .ascension-holo-hit {
+    width: min(10rem, 31vw);
+  }
+
+  .ascension-holo-focus {
+    bottom: 6.4rem;
+    grid-template-columns: 1fr;
+    width: 90vw;
+  }
+
+  .ascension-holo-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 620px) {
+  .ascension-envision-heading {
+    top: .42rem;
+    width: 72vw;
+  }
+
+  .ascension-envision-heading > span {
+    font-size: .6rem;
+  }
+
+  .ascension-envision-heading > strong {
+    font-size: .4rem;
+  }
+
+  .ascension-holo-hit {
+    width: 36vw;
+    min-height: 3.55rem;
+    padding: .42rem .5rem;
+  }
+
+  .ascension-holo-hit > strong {
+    font-size: .63rem;
+  }
+
+  .ascension-holo-hit--blend {
+    width: 42vw;
+  }
+
+  .ascension-holo-focus {
+    bottom: 6rem;
+    padding: .7rem;
+  }
+
+  .ascension-holo-focus h3 + span {
+    max-height: 3.7em;
+    overflow: hidden;
+  }
+
+  .ascension-holo-actions button {
+    min-height: 2.2rem;
+    padding: 0 .62rem;
+    font-size: .5rem;
+  }
+}

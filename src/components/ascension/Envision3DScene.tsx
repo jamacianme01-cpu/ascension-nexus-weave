@@ -73,7 +73,7 @@ function cylinderVertices(segments=28, tapered=false){
   for(let i=0;i<segments;i++){
     const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;
     const ca=Math.cos(a),sa=Math.sin(a),cb=Math.cos(b),sb=Math.sin(b);
-    const r0=1,r1=tapered?.42:1;
+    const r0=1,r1=tapered ? .42 : 1;
     const p1:[Vec3,Vec3]=[[-1,ca*r0,sa*r0],[-1,0,0]];
     const p2:[Vec3,Vec3]=[[1,ca*r1,sa*r1],[1,0,0]];
     const p3:[Vec3,Vec3]=[[1,cb*r1,sb*r1],[1,0,0]];
@@ -140,79 +140,86 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
       const base=focus?[0,.2,.05] as Vec3:pos;
       const glow=focus ? .34 : (active ? .52 : .26);
       const kind=blend?"generic":pathwayKind(path);
-      const model=(m:Mesh,p:Vec3,rot:Vec3,s:Vec3,col:Vec3,g=glow)=>draw(m,compose(p,rot,s),vp,col,g);
-      const world=(x:number,y:number,z:number):Vec3=>[base[0]+x*k,base[1]+y*k,base[2]+z*k];
+      const rotateLocal=(x:number,y:number,z:number):Vec3=>{
+        const cx=Math.cos(r.x),sx=Math.sin(r.x),cy=Math.cos(r.y),sy=Math.sin(r.y);
+        const y1=y*cx-z*sx,z1=y*sx+z*cx;
+        const x2=x*cy+z1*sy,z2=-x*sy+z1*cy;
+        return [base[0]+x2*k,base[1]+y1*k,base[2]+z2*k];
+      };
+      const world=(x:number,y:number,z:number):Vec3=>rotateLocal(x,y,z);
+      const model=(m:Mesh,p:Vec3,rot:Vec3,s:Vec3,col:Vec3,g=glow)=>
+        draw(m,compose(p,[r.x+rot[0],r.y+rot[1],rot[2]],s),vp,col,g);
 
       if(blend){
         // BLEND deliberately combines three visual grammars: rail spine, chamber core and ion rings.
-        model(cube,world(0,-.52,0),[0,r.y*.16,0],[1.42*k,.045,.42*k],[.04,.13,.18],.20);
-        for(let q=-1;q<=1;q+=2) model(cube,world(0,q*.36,0),[0,r.y,0],[1.42*k,.034,.034],[.12,.70,.92],.34);
-        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.48,0,0),[Math.PI/2+r.x*.45,r.y,0],[.30*k,.30*k,.30*k],[1,.60,.16],.42);
-        model(nozzle,world(.95,0,0),[0,r.y,0],[.58*k,.42*k,.42*k],[.90,.42,.08],.36);
-        model(sphere,world(-.10,0,0),[r.x,r.y,0],[.28*k,.28*k,.28*k],[.18,.72,.95],.32);
+        model(cube,world(0,-.52,0),[0,0,0],[1.42*k,.045,.42*k],[.04,.13,.18],.20);
+        for(let q=-1;q<=1;q+=2) model(cube,world(0,q*.36,0),[0,0,0],[1.42*k,.034,.034],[.12,.70,.92],.34);
+        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.48,0,0),[Math.PI/2,0,0],[.30*k,.30*k,.30*k],[1,.60,.16],.42);
+        model(nozzle,world(.95,0,0),[0,0,0],[.58*k,.42*k,.42*k],[.90,.42,.08],.36);
+        model(sphere,world(-.10,0,0),[0,0,0],[.28*k,.28*k,.28*k],[.18,.72,.95],.32);
         return;
       }
 
       if(kind==="turbofan"){
         // Axial engine: intake ring, fan hub, compressor stages, core and exhaust.
-        model(cylinder,world(0,0,0),[0,r.y,0],[1.05*k,.52*k,.52*k],[.08,.26,.34],.18);
-        model(torus,world(-.92,0,0),[0,Math.PI/2+r.y,0],[.54*k,.54*k,.54*k],[.18,.78,1],.32);
+        model(cylinder,world(0,0,0),[0,0,0],[1.05*k,.52*k,.52*k],[.08,.26,.34],.18);
+        model(torus,world(-.92,0,0),[0,Math.PI/2,0],[.54*k,.54*k,.54*k],[.18,.78,1],.32);
         model(sphere,world(-.86,0,0),[0,0,0],[.19*k,.19*k,.19*k],[.52,.88,1],.28);
-        for(let s=-2;s<=2;s++) model(torus,world(s*.30,0,0),[0,Math.PI/2+r.y,0],[.34*k,.34*k,.34*k],s===0?[.72,.92,1]:color,.26);
-        for(let blade=0;blade<8;blade++){const a=blade*Math.PI/4+r.y;model(cube,world(-.88,Math.cos(a)*.25,Math.sin(a)*.25),[a,0,r.y],[.035*k,.24*k,.055*k],[.34,.82,1],.20);}
-        model(nozzle,world(.93,0,0),[0,r.y,0],[.45*k,.44*k,.44*k],[.12,.58,.82],.26);
+        for(let s=-2;s<=2;s++) model(torus,world(s*.30,0,0),[0,Math.PI/2,0],[.34*k,.34*k,.34*k],s===0?[.72,.92,1]:color,.26);
+        for(let blade=0;blade<8;blade++){const a=blade*Math.PI/4+r.y;model(cube,world(-.88,Math.cos(a)*.25,Math.sin(a)*.25),[a,0,0],[.035*k,.24*k,.055*k],[.34,.82,1],.20);}
+        model(nozzle,world(.93,0,0),[0,0,0],[.45*k,.44*k,.44*k],[.12,.58,.82],.26);
         return;
       }
 
       if(kind==="rocket"){
         // Combustion chamber + injector + converging/diverging nozzle.
-        model(cylinder,world(-.42,0,0),[0,r.y,0],[.56*k,.34*k,.34*k],[.16,.48,.72],.26);
-        model(torus,world(-.84,0,0),[0,Math.PI/2+r.y,0],[.34*k,.34*k,.34*k],[.28,.78,1],.28);
-        model(sphere,world(-.28,0,0),[r.x,r.y,0],[.24*k,.24*k,.24*k],[1,.48,.18],.30);
-        model(nozzle,world(.48,0,0),[0,r.y,0],[.82*k,.62*k,.62*k],[.86,.30,.12],.34);
-        model(torus,world(.90,0,0),[0,Math.PI/2+r.y,0],[.58*k,.58*k,.58*k],[1,.58,.18],.30);
+        model(cylinder,world(-.42,0,0),[0,0,0],[.56*k,.34*k,.34*k],[.16,.48,.72],.26);
+        model(torus,world(-.84,0,0),[0,Math.PI/2,0],[.34*k,.34*k,.34*k],[.28,.78,1],.28);
+        model(sphere,world(-.28,0,0),[0,0,0],[.24*k,.24*k,.24*k],[1,.48,.18],.30);
+        model(nozzle,world(.48,0,0),[0,0,0],[.82*k,.62*k,.62*k],[.86,.30,.12],.34);
+        model(torus,world(.90,0,0),[0,Math.PI/2,0],[.58*k,.58*k,.58*k],[1,.58,.18],.30);
         model(cube,world(1.42,0,0),[0,0,0],[.52*k,.016,.016],[1,.68,.28],.22);
         return;
       }
 
       if(kind==="ion"){
         // Ion thruster: source chamber, stacked acceleration grids and narrow exhaust beam.
-        model(cylinder,world(-.42,0,0),[0,r.y,0],[.48*k,.42*k,.42*k],[.08,.30,.44],.18);
-        model(sphere,world(-.48,0,0),[r.x,r.y,0],[.25*k,.25*k,.25*k],[.14,.72,.95],.26);
-        for(let g=0;g<4;g++) model(torus,world(.08+g*.20,0,0),[0,Math.PI/2+r.y,0],[.40*k,.40*k,.40*k],g%2?[.56,.52,1]:[.12,.86,1],.30);
-        for(let q=-1;q<=1;q+=2) model(cube,world(.34,q*.28,0),[0,r.y,0],[.82*k,.018,.018],[.18,.64,.92],.18);
+        model(cylinder,world(-.42,0,0),[0,0,0],[.48*k,.42*k,.42*k],[.08,.30,.44],.18);
+        model(sphere,world(-.48,0,0),[0,0,0],[.25*k,.25*k,.25*k],[.14,.72,.95],.26);
+        for(let g=0;g<4;g++) model(torus,world(.08+g*.20,0,0),[0,Math.PI/2,0],[.40*k,.40*k,.40*k],g%2?[.56,.52,1]:[.12,.86,1],.30);
+        for(let q=-1;q<=1;q+=2) model(cube,world(.34,q*.28,0),[0,0,0],[.82*k,.018,.018],[.18,.64,.92],.18);
         model(cube,world(1.28,0,0),[0,0,0],[.76*k,.012,.012],[.48,.78,1],.26);
         return;
       }
 
       if(kind==="linear"){
         // Linear propulsion: three coil stations along twin rails with a central moving core.
-        for(let q=-1;q<=1;q+=2) model(cube,world(0,q*.40,0),[0,r.y,0],[1.50*k,.035,.035],[.08,.70,.92],.30);
-        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.62,0,0),[Math.PI/2+r.x*.4,r.y,0],[.34*k,.34*k,.34*k],ring===0?[.48,.88,1]:color,.34);
-        model(cube,world(0,0,0),[r.x,r.y,0],[.54*k,.20*k,.28*k],[.18,.62,.86],.28);
+        for(let q=-1;q<=1;q+=2) model(cube,world(0,q*.40,0),[0,0,0],[1.50*k,.035,.035],[.08,.70,.92],.30);
+        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.62,0,0),[Math.PI/2,0,0],[.34*k,.34*k,.34*k],ring===0?[.48,.88,1]:color,.34);
+        model(cube,world(0,0,0),[0,0,0],[.54*k,.20*k,.28*k],[.18,.62,.86],.28);
         model(cube,world(1.55,0,0),[0,0,0],[.62*k,.015,.015],[.42,.88,1],.26);
         return;
       }
 
       if(kind==="plasma"){
-        model(cylinder,world(-.42,0,0),[0,r.y,0],[.54*k,.36*k,.36*k],[.10,.22,.36],.18);
-        model(sphere,world(-.22,0,0),[r.x,r.y,0],[.30*k,.30*k,.30*k],[.30,.72,1],.34);
-        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.46,0,0),[0,Math.PI/2+r.y,0],[.38*k,.38*k,.38*k],ring===0?[.72,.28,1]:[.16,.80,1],.34);
-        model(nozzle,world(.78,0,0),[0,r.y,0],[.72*k,.50*k,.50*k],[.28,.44,.88],.28);
+        model(cylinder,world(-.42,0,0),[0,0,0],[.54*k,.36*k,.36*k],[.10,.22,.36],.18);
+        model(sphere,world(-.22,0,0),[0,0,0],[.30*k,.30*k,.30*k],[.30,.72,1],.34);
+        for(let ring=-1;ring<=1;ring++) model(torus,world(ring*.46,0,0),[0,Math.PI/2,0],[.38*k,.38*k,.38*k],ring===0?[.72,.28,1]:[.16,.80,1],.34);
+        model(nozzle,world(.78,0,0),[0,0,0],[.72*k,.50*k,.50*k],[.28,.44,.88],.28);
         return;
       }
 
       if(kind==="fluid"){
-        model(cylinder,world(-.34,0,0),[0,r.y,0],[.72*k,.34*k,.34*k],[.10,.48,.66],.22);
-        for(let v=-1;v<=1;v++) model(torus,world(v*.45,0,0),[0,Math.PI/2+r.y,0],[.31*k,.31*k,.31*k],[.14,.72,.92],.24);
-        model(nozzle,world(.82,0,0),[0,r.y,0],[.60*k,.46*k,.46*k],[.12,.58,.76],.24);
+        model(cylinder,world(-.34,0,0),[0,0,0],[.72*k,.34*k,.34*k],[.10,.48,.66],.22);
+        for(let v=-1;v<=1;v++) model(torus,world(v*.45,0,0),[0,Math.PI/2,0],[.31*k,.31*k,.31*k],[.14,.72,.92],.24);
+        model(nozzle,world(.82,0,0),[0,0,0],[.60*k,.46*k,.46*k],[.12,.58,.76],.24);
         return;
       }
 
       // Generic fallback remains dimensional, but restrained.
-      model(cube,world(0,0,0),[r.x,r.y,0],[.72*k,.24*k,.32*k],color,.26);
-      model(torus,world(-.52,0,0),[Math.PI/2+r.x*.4,r.y,0],[.32*k,.32*k,.32*k],[.32,.82,1],.28);
-      model(torus,world(.52,0,0),[Math.PI/2+r.x*.4,r.y,0],[.32*k,.32*k,.32*k],[.32,.82,1],.28);
+      model(cube,world(0,0,0),[0,0,0],[.72*k,.24*k,.32*k],color,.26);
+      model(torus,world(-.52,0,0),[Math.PI/2,0,0],[.32*k,.32*k,.32*k],[.32,.82,1],.28);
+      model(torus,world(.52,0,0),[Math.PI/2,0,0],[.32*k,.32*k,.32*k],[.32,.82,1],.28);
     };
     const render=(ms:number)=>{if(dead)return;const t=ms*.001,rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);const eye:Vec3=[selectedRef.current?0:Math.sin(t*.08)*.12,selectedRef.current?0:Math.sin(t*.1)*.04,10.4],vp=matMul(perspective(Math.PI/4.3,w/h,.1,40),lookAt(eye,[0,0,0],[0,1,0]));gl.uniform3f(uEye,...eye);
       const focused=selectedRef.current;

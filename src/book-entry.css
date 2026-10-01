@@ -1411,3 +1411,143 @@ body:has(.ascension-world > .ascension-command) main {
     0 18px 48px rgb(0 0 0 / 60%),
     0 0 24px rgb(238 194 101 / 11%);
 }
+
+
+/* Hologram-station refinement: contained overview, clean inspection handoff. */
+.ascension-envision-3d:not([data-focused="true"])::before {
+  opacity: .34;
+  background:
+    radial-gradient(circle at 50% 46%, rgb(68 190 235 / 6%), transparent 34%),
+    linear-gradient(180deg, transparent, rgb(0 8 15 / 10%));
+}
+
+.ascension-envision-3d:not([data-focused="true"])::after {
+  width: min(28vw, 22rem);
+  opacity: .16;
+  animation-duration: 24s;
+}
+
+.ascension-envision-3d:not([data-focused="true"]) > canvas {
+  filter:
+    drop-shadow(0 0 7px rgb(82 205 255 / 17%))
+    drop-shadow(0 0 13px rgb(82 205 255 / 6%));
+}
+
+.ascension-holo-hit {
+  width: clamp(8.2rem, 11.5vw, 10.8rem);
+  min-height: 2.7rem;
+  gap: .08rem;
+  border-color: rgb(103 218 252 / 15%);
+  border-radius: .65rem;
+  background: rgb(1 11 18 / 28%);
+  box-shadow:
+    0 5px 18px rgb(0 0 0 / 20%),
+    inset 0 0 10px rgb(85 204 243 / 3%);
+  padding: .38rem .55rem;
+  text-align: center;
+  backdrop-filter: blur(4px);
+}
+
+.ascension-holo-hit:hover,
+.ascension-holo-hit:focus-visible {
+  transform: translate(-50%, -50%) scale(1.025);
+  border-color: rgb(126 226 255 / 48%);
+  background: rgb(2 19 29 / 48%);
+  box-shadow:
+    0 7px 22px rgb(0 0 0 / 28%),
+    0 0 18px rgb(82 207 249 / 10%);
+}
+
+.ascension-holo-hit > span {
+  font-size: .45rem;
+  letter-spacing: .13em;
+}
+
+.ascension-holo-hit > strong {
+  font-size: .68rem;
+  text-align: center;
+}
+
+.ascension-holo-hit > em {
+  justify-self: center;
+  font-size: .52rem;
+}
+
+.ascension-holo-hit--blend {
+  width: clamp(9.4rem, 13.5vw, 12.2rem);
+  min-height: 3.15rem;
+  border-color: rgb(240 198 110 / 28%);
+  background:
+    radial-gradient(circle at 50% 0%, rgb(242 197 104 / 7%), transparent 68%),
+    rgb(12 10 7 / 36%);
+  box-shadow:
+    0 7px 24px rgb(0 0 0 / 24%),
+    0 0 18px rgb(239 195 105 / 7%);
+}
+
+.ascension-holo-hit--blend > span {
+  font-size: .56rem;
+}
+
+.ascension-holo-hit--blend > strong {
+  font-size: .47rem;
+}
+
+.ascension-envision-3d[data-focused="true"]::before {
+  background:
+    radial-gradient(circle at 50% 43%, rgb(4 24 35 / 4%) 0 17%, rgb(0 6 11 / 72%) 48%, rgb(0 2 6 / 90%) 82%),
+    rgb(0 4 8 / 68%);
+  backdrop-filter: brightness(.34) saturate(.58) blur(1.8px);
+}
+
+.ascension-envision-3d[data-focused="true"]::after {
+  width: min(23vw, 19rem);
+  opacity: .11;
+}
+
+.ascension-envision-3d[data-focused="true"] > canvas {
+  filter:
+    drop-shadow(0 0 5px rgb(73 194 232 / 12%))
+    drop-shadow(0 0 10px rgb(73 194 232 / 5%));
+}
+
+.ascension-envision-3d[data-focused="true"] .ascension-holo-focus {
+  bottom: clamp(4.8rem, 9vh, 6.2rem);
+  width: min(45rem, 76vw);
+  border-color: rgb(96 211 246 / 26%);
+  background:
+    linear-gradient(145deg, rgb(2 12 20 / 94%), rgb(0 6 11 / 97%));
+  box-shadow:
+    0 16px 42px rgb(0 0 0 / 62%),
+    0 0 14px rgb(77 203 247 / 6%);
+}
+
+.ascension-envision-heading {
+  top: clamp(.45rem, 1.4vh, .9rem);
+}
+
+@media (max-width: 900px) {
+  .ascension-holo-hit {
+    width: min(8.8rem, 25vw);
+  }
+
+  .ascension-holo-hit--blend {
+    width: min(10rem, 30vw);
+  }
+}
+
+@media (max-width: 620px) {
+  .ascension-holo-hit {
+    width: 29vw;
+    min-height: 2.45rem;
+    padding: .3rem .4rem;
+  }
+
+  .ascension-holo-hit > strong {
+    font-size: .58rem;
+  }
+
+  .ascension-holo-hit--blend {
+    width: 36vw;
+  }
+}

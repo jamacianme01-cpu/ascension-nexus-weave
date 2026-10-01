@@ -161,7 +161,7 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
         return [base[0]+x2*k,base[1]+y1*k,base[2]+z2*k];
       };
       const world=(x:number,y:number,z:number):Vec3=>rotateLocal(x,y,z);
-      const model=(m:Mesh,p:Vec3,rot:Vec3,s:Vec3,col:Vec3,g=glow,a=focus?.94:.78)=>
+      const model=(m:Mesh,p:Vec3,rot:Vec3,s:Vec3,col:Vec3,g=glow,a=focus ? .94 : .78)=>
         draw(m,compose(p,[r.x+rot[0],r.y+rot[1],rot[2]],s),vp,col,g,a);
 
       projector(vp,base,color,focus?1.10:.92,focus,blend);

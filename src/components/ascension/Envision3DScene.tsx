@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type Pathway = ObjectiveDelivery["pathways"][number];
@@ -83,7 +83,7 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
   const dragRef=useRef<{x:number;y:number;active:boolean;moved:boolean}>({x:0,y:0,active:false,moved:false});
   const [dragging,setDragging]=useState(false);
   const [webglError,setWebglError]=useState(false);
-  const paths=delivery.pathways.slice(0,4);
+  const paths=useMemo(()=>delivery.pathways.slice(0,4),[delivery.pathways]);
   const choices=useMemo(()=>delivery.blend?[...paths,delivery.blend]:paths,[paths,delivery.blend]);
   const selected=choices.find(x=>x.id===selectedId)??null;
   const isBlend=Boolean(selected&&delivery.blend?.id===selected.id);
@@ -119,10 +119,10 @@ export function Envision3DScene({delivery,selectedId,onSelect,onUse}:Props){
     return()=>{dead=true;cancelAnimationFrame(raf);[cube,torus,sphere].forEach(m=>gl.deleteBuffer(m.buffer));gl.deleteProgram(p);};
   },[delivery.blend,paths]);
 
-  const pointerDown=(e:React.PointerEvent<HTMLCanvasElement>)=>{if(!selectedId)return;dragRef.current={x:e.clientX,y:e.clientY,active:true,moved:false};setDragging(true);e.currentTarget.setPointerCapture(e.pointerId);};
-  const pointerMove=(e:React.PointerEvent<HTMLCanvasElement>)=>{const d=dragRef.current;if(!d.active||!selectedId)return;const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.abs(dx)+Math.abs(dy)>2)d.moved=true;rotationRef.current.y+=dx*.009;rotationRef.current.x+=dy*.009;d.x=e.clientX;d.y=e.clientY;};
-  const pointerUp=(e:React.PointerEvent<HTMLCanvasElement>)=>{dragRef.current.active=false;setDragging(false);try{e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
-  const wheel=(e:React.WheelEvent<HTMLCanvasElement>)=>{if(!selectedId)return;e.preventDefault();zoomRef.current=Math.min(1.85,Math.max(.65,zoomRef.current-e.deltaY*.001));};
+  const pointerDown=(e:PointerEvent<HTMLCanvasElement>)=>{if(!selectedId)return;dragRef.current={x:e.clientX,y:e.clientY,active:true,moved:false};setDragging(true);e.currentTarget.setPointerCapture(e.pointerId);};
+  const pointerMove=(e:PointerEvent<HTMLCanvasElement>)=>{const d=dragRef.current;if(!d.active||!selectedId)return;const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.abs(dx)+Math.abs(dy)>2)d.moved=true;rotationRef.current.y+=dx*.009;rotationRef.current.x+=dy*.009;d.x=e.clientX;d.y=e.clientY;};
+  const pointerUp=(e:PointerEvent<HTMLCanvasElement>)=>{dragRef.current.active=false;setDragging(false);try{e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
+  const wheel=(e:WheelEvent<HTMLCanvasElement>)=>{if(!selectedId)return;e.preventDefault();zoomRef.current=Math.min(1.85,Math.max(.65,zoomRef.current-e.deltaY*.001));};
 
   return <div className="ascension-envision-3d" data-focused={selectedId?"true":"false"}>
     <canvas ref={canvasRef} className={dragging?"is-dragging":""} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onWheel={wheel} aria-label="Interactive 3D holographic ENVISION scene" />

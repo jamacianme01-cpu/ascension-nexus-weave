@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Envision3DScene } from "@/components/ascension/Envision3DScene";
 import {
   getObjectiveStatus,
   listMyObjectives,
@@ -299,108 +300,15 @@ function TreeKnowledgeEruption({
   onSelect: (id: string | null) => void;
   onUse: (pathway: ObjectiveDelivery["pathways"][number]) => void;
 }) {
-  const paths = delivery.pathways;
-  const choices = delivery.blend ? [...paths, delivery.blend] : paths;
-  const selected = choices.find((choice) => choice.id === selectedId) ?? null;
-  const selectedIsBlend = Boolean(selected && delivery.blend?.id === selected.id);
-
-  if (!choices.length) return null;
-
+  const hasChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
+  if (!hasChoices) return null;
   return (
-    <div className="ascension-tree-knowledge" aria-label="ENVISION MODE">
-      <div className="ascension-envision-mode-banner">
-        <span>ENVISION MODE</span>
-        <strong>See the possible realities before you choose one.</strong>
-      </div>
-
-      <div className="ascension-knowledge-core" aria-hidden="true">
-        <span>KNOWLEDGE</span>
-      </div>
-
-      <div className="ascension-knowledge-shards">
-        {paths.slice(0, 4).map((pathway, index) => {
-          const active = pathway.id === selectedId;
-          return (
-            <button
-              key={pathway.id}
-              type="button"
-              data-shard={index + 1}
-              data-active={active ? "true" : undefined}
-              className="ascension-knowledge-shard"
-              onClick={() => onSelect(active ? null : pathway.id)}
-            >
-              <div className="ascension-shard-visual">
-                {pathway.visual_svg ? (
-                  <img
-                    src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(pathway.visual_svg)}`}
-                    alt=""
-                  />
-                ) : (
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                )}
-              </div>
-              <div className="ascension-shard-caption">
-                <span>{`PATH ${String(index + 1).padStart(2, "0")}`}</span>
-                <strong>{cleanDisplayText(pathway.label)}</strong>
-                {pathway.outcome_score !== null && (
-                  <em>{Math.round(pathway.outcome_score * 100)}%</em>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {delivery.blend && (
-        <button
-          type="button"
-          className="ascension-blend-gate"
-          data-active={delivery.blend.id === selectedId ? "true" : undefined}
-          onClick={() =>
-            onSelect(delivery.blend!.id === selectedId ? null : delivery.blend!.id)
-          }
-        >
-          <span>BLEND REALITIES</span>
-          <strong>SPIRAL + OUTCOME PREDICTOR</strong>
-          <em>
-            {delivery.blend.outcome_score !== null
-              ? `${Math.round(delivery.blend.outcome_score * 100)}% projected`
-              : "combined reality"}
-          </em>
-        </button>
-      )}
-
-      {selected && (
-        <div
-          className={
-            selectedIsBlend
-              ? "ascension-tree-choice-panel ascension-tree-choice-panel--blend"
-              : "ascension-tree-choice-panel"
-          }
-        >
-          <div>
-            <p className={selectedIsBlend ? "text-gold" : "text-primary"}>
-              {selectedIsBlend ? "BLEND REALITY · SPIRAL + OUTCOME" : "ENVISIONED REALITY"}
-            </p>
-            <h3>{cleanDisplayText(selected.label)}</h3>
-            <p>{cleanDisplayText(selected.summary)}</p>
-            {selectedIsBlend && delivery.blend?.blend_reason && (
-              <p className="ascension-tree-blend-reason">
-                {cleanDisplayText(delivery.blend.blend_reason)}
-              </p>
-            )}
-          </div>
-          <div className="ascension-tree-choice-actions">
-            <button type="button" onClick={() => onSelect(null)}>
-              BACK
-            </button>
-            <button type="button" onClick={() => onUse(selected)}>
-              {selectedIsBlend ? "ENVISION BLEND" : "OPEN THIS REALITY"}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    <Envision3DScene
+      delivery={delivery}
+      selectedId={selectedId}
+      onSelect={onSelect}
+      onUse={onUse}
+    />
   );
 }
 
@@ -426,16 +334,6 @@ function SelectedRealityDetails({
           : "overflow-hidden rounded-2xl border border-primary/35 bg-primary/[0.03]"
       }
     >
-      {selected.visual_svg && (
-        <div className="ascension-artifact-canvas relative flex min-h-[360px] items-center justify-center p-4 sm:min-h-[520px] sm:p-8">
-          <img
-            src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(selected.visual_svg)}`}
-            alt={`Selected reality: ${selected.label}`}
-            className="max-h-[68vh] w-full object-contain"
-          />
-        </div>
-      )}
-
       <div className="space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Envision3DScene } from "@/components/ascension/Envision3DScene";
+import type { ManifestationPhase } from "@/lib/ascension/manifestation";
 import {
   getObjectiveStatus,
   listMyObjectives,
@@ -21,7 +22,6 @@ import {
 } from "@/lib/ascension/guest.functions";
 import {
   assessResult,
-  branchTitle,
   governedPersisted,
   notProducedMessage,
   parseDelivery,
@@ -58,7 +58,6 @@ function read(key: string) {
   }
 }
 
-
 type AscensionSoundCue =
   | "engage"
   | "roots"
@@ -67,6 +66,10 @@ type AscensionSoundCue =
   | "canopy"
   | "processing"
   | "eruption"
+  | "possibility"
+  | "condensation"
+  | "reveal"
+  | "stabilize"
   | "select"
   | "blend"
   | "open";
@@ -100,12 +103,15 @@ function scheduleTone(
     osc.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
   }
   gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(Math.max(volume, 0.0002), start + Math.min(.045, duration / 4));
+  gain.gain.exponentialRampToValueAtTime(
+    Math.max(volume, 0.0002),
+    start + Math.min(0.045, duration / 4),
+  );
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
   osc.connect(gain);
   gain.connect(destination);
   osc.start(start);
-  osc.stop(start + duration + .02);
+  osc.stop(start + duration + 0.02);
 }
 
 function scheduleNoise(
@@ -126,15 +132,15 @@ function scheduleNoise(
   filter.type = "bandpass";
   filter.frequency.setValueAtTime(1400, start);
   filter.frequency.exponentialRampToValueAtTime(5200, start + duration);
-  filter.Q.value = .7;
+  filter.Q.value = 0.7;
   gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(volume, start + .03);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.03);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
   source.connect(filter);
   filter.connect(gain);
   gain.connect(destination);
   source.start(start);
-  source.stop(start + duration + .02);
+  source.stop(start + duration + 0.02);
 }
 
 function playAscensionSound(ref: { current: AudioContext | null }, cue: AscensionSoundCue) {
@@ -144,58 +150,90 @@ function playAscensionSound(ref: { current: AudioContext | null }, cue: Ascensio
 
   const master = ctx.createGain();
   const compressor = ctx.createDynamicsCompressor();
-  master.gain.value = .72;
+  master.gain.value = 0.72;
   master.connect(compressor);
   compressor.connect(ctx.destination);
-  const now = ctx.currentTime + .015;
+  const now = ctx.currentTime + 0.015;
 
   switch (cue) {
     case "engage":
-      scheduleTone(ctx, master, 58, now, .7, .055, 86, "sine");
-      scheduleTone(ctx, master, 174, now + .08, .52, .018, 232, "triangle");
+      scheduleTone(ctx, master, 58, now, 0.7, 0.055, 86, "sine");
+      scheduleTone(ctx, master, 174, now + 0.08, 0.52, 0.018, 232, "triangle");
       break;
     case "roots":
-      scheduleTone(ctx, master, 72, now, .78, .038, 96, "sine");
-      scheduleTone(ctx, master, 144, now + .06, .56, .013, 168, "triangle");
+      scheduleTone(ctx, master, 72, now, 0.78, 0.038, 96, "sine");
+      scheduleTone(ctx, master, 144, now + 0.06, 0.56, 0.013, 168, "triangle");
       break;
     case "trunk":
-      scheduleTone(ctx, master, 105, now, .82, .032, 260, "sine");
-      scheduleTone(ctx, master, 210, now + .1, .64, .014, 520, "triangle");
+      scheduleTone(ctx, master, 105, now, 0.82, 0.032, 260, "sine");
+      scheduleTone(ctx, master, 210, now + 0.1, 0.64, 0.014, 520, "triangle");
       break;
     case "nodes":
       [392, 523.25, 659.25].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + index * .13, .42, .022, freq * 1.015, "sine"),
+        scheduleTone(ctx, master, freq, now + index * 0.13, 0.42, 0.022, freq * 1.015, "sine"),
       );
       break;
     case "canopy":
       [196, 293.66, 440].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + index * .035, 1.0, .017, freq * 1.08, "sine"),
+        scheduleTone(ctx, master, freq, now + index * 0.035, 1.0, 0.017, freq * 1.08, "sine"),
       );
-      scheduleNoise(ctx, master, now + .08, .66, .012);
+      scheduleNoise(ctx, master, now + 0.08, 0.66, 0.012);
       break;
     case "processing":
-      scheduleTone(ctx, master, 98, now, .62, .018, 123, "sine");
-      scheduleTone(ctx, master, 294, now + .08, .48, .008, 330, "triangle");
+      scheduleTone(ctx, master, 98, now, 0.62, 0.018, 123, "sine");
+      scheduleTone(ctx, master, 294, now + 0.08, 0.48, 0.008, 330, "triangle");
       break;
     case "eruption":
-      scheduleTone(ctx, master, 46, now, 1.2, .065, 72, "sine");
-      scheduleNoise(ctx, master, now, .9, .026);
+      scheduleTone(ctx, master, 46, now, 1.2, 0.065, 72, "sine");
+      scheduleNoise(ctx, master, now, 0.9, 0.026);
       [329.63, 493.88, 659.25, 987.77].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + .12 + index * .075, .95, .025, freq * 1.03, "sine"),
+        scheduleTone(
+          ctx,
+          master,
+          freq,
+          now + 0.12 + index * 0.075,
+          0.95,
+          0.025,
+          freq * 1.03,
+          "sine",
+        ),
       );
       break;
     case "select":
-      scheduleTone(ctx, master, 523.25, now, .24, .022, 659.25, "sine");
-      scheduleTone(ctx, master, 1046.5, now + .08, .28, .012, 1174.66, "sine");
+      scheduleTone(ctx, master, 523.25, now, 0.24, 0.022, 659.25, "sine");
+      scheduleTone(ctx, master, 1046.5, now + 0.08, 0.28, 0.012, 1174.66, "sine");
+      break;
+    case "possibility":
+      // Low spatial hum: unstable knowledge gathering.
+      scheduleTone(ctx, master, 55, now, 1.1, 0.03, 62, "sine");
+      scheduleTone(ctx, master, 58.5, now + 0.05, 1.0, 0.018, 64, "sine");
+      scheduleNoise(ctx, master, now + 0.04, 0.8, 0.008);
+      break;
+    case "condensation":
+      // Rising controlled tone: energy tightening inward.
+      scheduleTone(ctx, master, 110, now, 0.8, 0.026, 220, "triangle");
+      scheduleTone(ctx, master, 220, now + 0.3, 0.5, 0.014, 330, "sine");
+      break;
+    case "reveal":
+      // Knowledge chimes / crystalline assembly.
+      [523.25, 659.25, 783.99, 1046.5].forEach((freq, index) =>
+        scheduleTone(ctx, master, freq, now + index * 0.09, 0.34, 0.02, freq * 1.01, "sine"),
+      );
+      break;
+    case "stabilize":
+      // Clean confirmation chord.
+      [261.63, 329.63, 392, 523.25].forEach((freq, index) =>
+        scheduleTone(ctx, master, freq, now + index * 0.02, 0.95, 0.017, freq, "sine"),
+      );
       break;
     case "blend":
       [261.63, 392, 523.25, 783.99].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + index * .04, .62, .021, freq * 1.025, "sine"),
+        scheduleTone(ctx, master, freq, now + index * 0.04, 0.62, 0.021, freq * 1.025, "sine"),
       );
       break;
     case "open":
-      scheduleTone(ctx, master, 164.81, now, .52, .026, 329.63, "sine");
-      scheduleTone(ctx, master, 659.25, now + .14, .48, .018, 987.77, "triangle");
+      scheduleTone(ctx, master, 164.81, now, 0.52, 0.026, 329.63, "sine");
+      scheduleTone(ctx, master, 659.25, now + 0.14, 0.48, 0.018, 987.77, "triangle");
       break;
   }
 
@@ -225,22 +263,12 @@ function cleanDisplayText(value: string) {
     .trim();
 }
 
-
-function labelToken(value: string) {
-  return value
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-
 function splitResultBody(value: string) {
   const cleaned = cleanDisplayText(value);
   const marker = "General-knowledge explanation:";
   const markerIndex = cleaned.indexOf(marker);
-  const internal =
-    markerIndex >= 0 ? cleaned.slice(0, markerIndex).trim() : "";
-  const main =
-    markerIndex >= 0 ? cleaned.slice(markerIndex + marker.length).trim() : cleaned;
+  const internal = markerIndex >= 0 ? cleaned.slice(0, markerIndex).trim() : "";
+  const main = markerIndex >= 0 ? cleaned.slice(markerIndex + marker.length).trim() : cleaned;
 
   const firstBreak = main.search(/\n\s*\n/);
   let summary = firstBreak > 0 ? main.slice(0, firstBreak).trim() : main;
@@ -259,14 +287,12 @@ function splitResultBody(value: string) {
 function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: ObjectiveDelivery }) {
   const planning = planningFor(run.result);
   const result = record(run.result);
-  const pathCount =
-    delivery.pathways.length + (delivery.blend ? 1 : 0) || planning.branches.length;
+  const pathCount = delivery.pathways.length + (delivery.blend ? 1 : 0) || planning.branches.length;
   const guardian = run.guardian_verdict ?? "—";
   const autosync = String(result["autosync_verdict"] ?? "—");
-  const delta =
-    governedPersisted(run)
-      ? `K+${String(result["delta_k"] ?? 0)} · W+${String(result["delta_w"] ?? 0)} · U+${String(result["delta_u"] ?? 0)}`
-      : "PENDING";
+  const delta = governedPersisted(run)
+    ? `K+${String(result["delta_k"] ?? 0)} · W+${String(result["delta_w"] ?? 0)} · U+${String(result["delta_u"] ?? 0)}`
+    : "PENDING";
 
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -288,17 +314,20 @@ function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: Objec
   );
 }
 
-
 function TreeKnowledgeEruption({
   delivery,
   selectedId,
   onSelect,
   onUse,
+  objectiveText,
+  onPhaseChange,
 }: {
   delivery: ObjectiveDelivery;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onUse: (pathway: ObjectiveDelivery["pathways"][number]) => void;
+  objectiveText: string;
+  onPhaseChange: (phase: ManifestationPhase, info: { blend: boolean }) => void;
 }) {
   const hasChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
   if (!hasChoices) return null;
@@ -308,6 +337,8 @@ function TreeKnowledgeEruption({
       selectedId={selectedId}
       onSelect={onSelect}
       onUse={onUse}
+      objectiveText={objectiveText}
+      onPhaseChange={onPhaseChange}
     />
   );
 }
@@ -421,284 +452,12 @@ function SelectedRealityDetails({
   );
 }
 
-function SpiralPathways({
-  run,
-  delivery,
-  onChoosePathway,
-}: {
-  run: ObjectiveRun;
-  delivery: ObjectiveDelivery;
-  onChoosePathway: (pathway: ObjectiveDelivery["pathways"][number]) => void;
-}) {
-  const planning = planningFor(run.result);
-  const planningRecord = record(record(run.result)["objective_planning"]);
-  const mesh = record(planningRecord["engine_mesh"]);
-  const engines = record(mesh["engines"]);
-  const spiral = record(engines["Spiral"]);
-  const spiralOutput = Array.isArray(spiral["output"]) ? spiral["output"].map(record) : [];
-  const expandedForms = [
-    ...new Set(
-      spiralOutput.flatMap((item) =>
-        Array.isArray(item["expanded_forms"])
-          ? item["expanded_forms"].filter((value): value is string => typeof value === "string")
-          : [],
-      ),
-    ),
-  ];
-  const selectedId =
-    typeof planning.selected["branch_id"] === "string" ? planning.selected["branch_id"] : null;
-  const choices = delivery.blend
-    ? [...delivery.pathways, delivery.blend]
-    : delivery.pathways;
-  const [activeChoiceId, setActiveChoiceId] = useState<string | null>(null);
-  const activeChoice = choices.find((choice) => choice.id === activeChoiceId) ?? null;
-  const activeIsBlend = Boolean(activeChoice && delivery.blend?.id === activeChoice.id);
-
-  if (!planning.branches.length && !expandedForms.length && !choices.length) return null;
-
-  return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="label-eyebrow text-primary">SPIRAL · OUTCOME PREDICTOR</p>
-          <h3 className="mt-1 font-display text-xl text-foreground">Choose a reality</h3>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Read the possibilities visually first. Choose one to reveal its reasoning, steps and
-            tradeoffs.
-          </p>
-        </div>
-        {expandedForms.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {expandedForms.map((form) => (
-              <span
-                key={form}
-                className="rounded-full border border-primary/25 bg-primary/[0.04] px-2.5 py-1 text-[0.65rem] text-primary"
-              >
-                {labelToken(form)}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {choices.length > 0 && (
-        <div className="ascension-pathway-strip flex snap-x gap-3 overflow-x-auto pb-2">
-          {choices.map((pathway, index) => {
-            const isBlend = delivery.blend?.id === pathway.id;
-            const isActive = activeChoiceId === pathway.id;
-            return (
-              <button
-                key={pathway.id}
-                type="button"
-                onClick={() => setActiveChoiceId(pathway.id)}
-                aria-pressed={isActive}
-                className={
-                  isBlend
-                    ? "group min-w-[84%] snap-start overflow-hidden rounded-2xl border border-gold/55 bg-gradient-to-br from-gold/[0.12] to-background/20 text-left shadow-xl transition sm:min-w-[380px] sm:max-w-[440px]"
-                    : isActive
-                      ? "group min-w-[84%] snap-start overflow-hidden rounded-2xl border border-primary/65 bg-primary/[0.08] text-left shadow-xl transition sm:min-w-[380px] sm:max-w-[440px]"
-                      : "group min-w-[84%] snap-start overflow-hidden rounded-2xl border border-primary/25 bg-background/20 text-left transition hover:border-primary/45 sm:min-w-[380px] sm:max-w-[440px]"
-                }
-              >
-                <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#f4f7f9]">
-                  {pathway.visual_svg ? (
-                    <img
-                      src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(pathway.visual_svg)}`}
-                      alt={`Visual pathway: ${pathway.label}`}
-                      className="h-full w-full object-contain p-2"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_center,rgba(54,205,228,.18),transparent_60%)]">
-                      <span className="font-display text-4xl text-primary/70">
-                        {isBlend ? "BLEND" : String(index + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-                  )}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-4 pb-3 pt-10">
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <p
-                          className={
-                            isBlend
-                              ? "text-[0.62rem] tracking-[0.18em] text-gold uppercase"
-                              : "text-[0.62rem] tracking-[0.18em] text-primary uppercase"
-                          }
-                        >
-                          {isBlend ? "BLEND · SPIRAL + OUTCOME" : `PATH ${String(index + 1).padStart(2, "0")}`}
-                        </p>
-                        <h4 className="mt-1 text-base font-medium text-white">
-                          {cleanDisplayText(pathway.label)}
-                        </h4>
-                      </div>
-                      {pathway.outcome_score !== null && (
-                        <span className="rounded-full border border-white/30 bg-black/35 px-2.5 py-1 text-[0.65rem] text-white">
-                          {Math.round(pathway.outcome_score * 100)}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {activeChoice && (
-        <div
-          className={
-            activeIsBlend
-              ? "rounded-2xl border border-gold/45 bg-gold/[0.05] p-4 sm:p-5"
-              : "rounded-2xl border border-primary/35 bg-primary/[0.04] p-4 sm:p-5"
-          }
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className={activeIsBlend ? "label-eyebrow text-gold" : "label-eyebrow text-primary"}>
-                {activeIsBlend ? "BLEND SELECTED" : "PATH SELECTED"}
-              </p>
-              <h4 className="mt-1 font-display text-xl text-foreground">
-                {cleanDisplayText(activeChoice.label)}
-              </h4>
-            </div>
-            {activeChoice.spiral_form && (
-              <span
-                className={
-                  activeIsBlend
-                    ? "rounded-full border border-gold/35 px-2.5 py-1 text-xs text-gold"
-                    : "rounded-full border border-primary/30 px-2.5 py-1 text-xs text-primary"
-                }
-              >
-                {labelToken(activeChoice.spiral_form)}
-              </span>
-            )}
-          </div>
-
-          <p className="mt-3 text-sm leading-6 text-foreground/90">
-            {cleanDisplayText(activeChoice.summary)}
-          </p>
-
-          {activeIsBlend && delivery.blend && (
-            <div className="mt-3 rounded-xl border border-gold/20 bg-background/20 p-3">
-              <p className="text-xs font-medium tracking-wide text-gold">WHY THIS BLEND</p>
-              <p className="mt-2 text-sm leading-6 text-foreground/85">
-                {cleanDisplayText(delivery.blend.blend_reason)}
-              </p>
-              {delivery.blend.blend_from.length > 0 && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Combines: {delivery.blend.blend_from.map(cleanDisplayText).join(" · ")}
-                </p>
-              )}
-            </div>
-          )}
-
-          {activeChoice.outcome_reason && (
-            <div className="mt-3">
-              <p className="text-xs font-medium text-foreground/75">Outcome Predictor</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {cleanDisplayText(activeChoice.outcome_reason)}
-              </p>
-            </div>
-          )}
-
-          {activeChoice.steps.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-medium text-foreground/80">Steps</p>
-              <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-foreground/90">
-                {activeChoice.steps.map((step, stepIndex) => (
-                  <li key={stepIndex}>{cleanDisplayText(step)}</li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {activeChoice.tradeoffs.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-medium text-foreground/80">Tradeoffs</p>
-              <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-                {activeChoice.tradeoffs.map((tradeoff, tradeoffIndex) => (
-                  <li key={tradeoffIndex}>{cleanDisplayText(tradeoff)}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onChoosePathway(activeChoice)}
-              className={
-                activeIsBlend
-                  ? "rounded-full border border-gold/55 bg-gold/12 px-5 py-3 text-xs font-medium tracking-[0.1em] text-gold"
-                  : "rounded-full border border-primary/50 bg-primary/10 px-5 py-3 text-xs font-medium tracking-[0.1em] text-primary"
-              }
-            >
-              USE THIS PATH
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveChoiceId(null)}
-              className="rounded-full border border-border px-4 py-3 text-xs text-muted-foreground"
-            >
-              BACK TO VISUALS
-            </button>
-          </div>
-        </div>
-      )}
-
-      {planning.branches.length > 0 && (
-        <details className="rounded-xl border border-border/70 bg-void/30 px-4 py-3">
-          <summary className="cursor-pointer text-sm text-muted-foreground">
-            Governed DTF execution branches · {planning.branches.length}
-          </summary>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            {planning.branches.map((branch, index) => {
-              const branchId =
-                typeof branch["branch_id"] === "string"
-                  ? branch["branch_id"]
-                  : typeof branch["id"] === "string"
-                    ? branch["id"]
-                    : `path-${index + 1}`;
-              const selected = selectedId === branchId;
-              const evaluation = record(branch["evaluation"]);
-              const confidence =
-                typeof branch["confidence"] === "number"
-                  ? branch["confidence"]
-                  : typeof evaluation["confidence"] === "number"
-                    ? evaluation["confidence"]
-                    : null;
-              const risks = strings(branch["risks"]);
-              return (
-                <div
-                  key={branchId}
-                  className={
-                    selected
-                      ? "rounded-lg border border-gold/45 bg-gold/5 p-3"
-                      : "rounded-lg border border-border/60 p-3"
-                  }
-                >
-                  <p className="text-xs font-medium text-foreground">{branchTitle(branch)}</p>
-                  <p className="mt-1 text-[0.65rem] text-muted-foreground">
-                    {selected ? "CLARITY SELECTED" : String(branch["status"] ?? "SIMULATED")}
-                    {confidence !== null ? ` · ${Math.round(confidence * 100)}%` : ""}
-                  </p>
-                  {risks[0] && (
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      Risk: {cleanDisplayText(risks[0])}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </details>
-      )}
-    </section>
-  );
-}
-
 function download(name: string, content: string) {
-  const mime = /\.svg$/i.test(name) ? "image/svg+xml" : /\.html?$/i.test(name) ? "text/html" : "text/plain";
+  const mime = /\.svg$/i.test(name)
+    ? "image/svg+xml"
+    : /\.html?$/i.test(name)
+      ? "text/html"
+      : "text/plain";
   const url = URL.createObjectURL(new Blob([content], { type: `${mime};charset=utf-8` }));
   const a = document.createElement("a");
   a.href = url;
@@ -709,7 +468,8 @@ function download(name: string, content: string) {
 
 function statusText(run: ObjectiveRun, produced: boolean | null) {
   if (run.status === "queued") return "Objective received. Waiting for ASCENSION runtime.";
-  if (run.status === "claimed" || run.status === "running") return "ASCENSION is processing your objective.";
+  if (run.status === "claimed" || run.status === "running")
+    return "ASCENSION is processing your objective.";
   if (run.status === "rejected") return "Governance rejected this objective.";
   if (run.status === "failed") return "The run failed.";
   if (run.status === "verified")
@@ -721,14 +481,24 @@ function statusText(run: ObjectiveRun, produced: boolean | null) {
   return run.status;
 }
 
-export function ResultContent({ delivery, source }: { delivery: ObjectiveDelivery; source?: "governed" | "external_draft" | null }) {
+export function ResultContent({
+  delivery,
+  source,
+}: {
+  delivery: ObjectiveDelivery;
+  source?: "governed" | "external_draft" | null;
+}) {
   const hasVisualChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
   // ENVISION's interactive 3D scene is the primary visual whenever pathways exist.
   // Keep legacy SVG artifacts out of the main presentation so the experience
   // cannot fall back to a flat drawing after a holographic reality is selected.
-  const drawing = hasVisualChoices ? undefined : delivery.files.find((file) => /\.svg$/i.test(file.name));
+  const drawing = hasVisualChoices
+    ? undefined
+    : delivery.files.find((file) => /\.svg$/i.test(file.name));
   const body = splitResultBody(delivery.body);
-  const otherFiles = delivery.files.filter((file) => file !== drawing && !(/\.svg$/i.test(file.name) && hasVisualChoices));
+  const otherFiles = delivery.files.filter(
+    (file) => file !== drawing && !(/\.svg$/i.test(file.name) && hasVisualChoices),
+  );
 
   return (
     <div className="space-y-4">
@@ -760,7 +530,9 @@ export function ResultContent({ delivery, source }: { delivery: ObjectiveDeliver
       <div className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="label-eyebrow text-primary">{drawing ? "DESIGN READOUT" : "ASCENSION RESULT"}</p>
+            <p className="label-eyebrow text-primary">
+              {drawing ? "DESIGN READOUT" : "ASCENSION RESULT"}
+            </p>
             <h2 className="mt-1 font-display text-2xl tracking-wide text-foreground sm:text-3xl">
               {cleanDisplayText(delivery.title)}
             </h2>
@@ -889,7 +661,9 @@ export function Engage() {
   const [guestToken, setGuestToken] = useState<string | null>(null);
   const [follow, setFollow] = useState<FollowState | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [bookSequence, setBookSequence] = useState<"idle" | "roots" | "trunk" | "nodes" | "canopy" | "eruption" | "processing">("idle");
+  const [bookSequence, setBookSequence] = useState<
+    "idle" | "roots" | "trunk" | "nodes" | "canopy" | "eruption" | "processing"
+  >("idle");
   const [bookOpen, setBookOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [treeChoiceId, setTreeChoiceId] = useState<string | null>(null);
@@ -943,6 +717,20 @@ export function Engage() {
     } else if (audioContextRef.current?.state === "running") {
       void audioContextRef.current.suspend();
     }
+  };
+
+  // Manifestation phases and sound share one timeline: possibility hum,
+  // condensation rise, crystalline reveal, stabilization chord. BLEND fuses
+  // with its own harmonic synthesis while realities merge.
+  const handleManifestationPhase = (phase: ManifestationPhase, info: { blend: boolean }) => {
+    if (info.blend && phase === "condensation") {
+      sound("blend");
+      return;
+    }
+    if (phase === "possibility") sound("possibility");
+    else if (phase === "condensation") sound("condensation");
+    else if (phase === "reveal") sound("reveal");
+    else if (phase === "stabilized") sound("stabilize");
   };
 
   const runQuery = useQuery({
@@ -1086,32 +874,38 @@ export function Engage() {
     },
   });
 
-  let delivery: ObjectiveDelivery | null = null;
-  let invalidDelivery: string | null = null;
-  let notProduced: string | null = null;
-  if (deliveryQuery.data?.status === "completed" && run) {
-    try {
-      const parsed = parseDelivery(deliveryQuery.data.response_payload);
-      // Re-check on screen too: a stale projection must never pass as a result.
-      const visualSvgs = [
-        ...parsed.pathways
-          .map((pathway) => pathway.visual_svg)
-          .filter((value): value is string => Boolean(value)),
-        ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
-      ];
-      const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
-      if (parsed.kind === "not_produced" || !check.produced) {
-        notProduced =
-          parsed.kind === "not_produced"
-            ? parsed.body
-            : `${notProducedMessage(check.kind)} What came back${check.reason ? ` — ${check.reason}` : ""} — is not the result you asked for.`;
-      } else {
-        delivery = { ...parsed, files: check.files };
+  // Parse once per fetch, not once per render: the ENVISION scene depends on
+  // this object staying referentially stable so its WebGL state and
+  // manifestation clocks survive unrelated re-renders.
+  const { delivery, invalidDelivery, notProduced } = useMemo(() => {
+    let parsedDelivery: ObjectiveDelivery | null = null;
+    let parseError: string | null = null;
+    let unproduced: string | null = null;
+    if (deliveryQuery.data?.status === "completed" && run) {
+      try {
+        const parsed = parseDelivery(deliveryQuery.data.response_payload);
+        // Re-check on screen too: a stale projection must never pass as a result.
+        const visualSvgs = [
+          ...parsed.pathways
+            .map((pathway) => pathway.visual_svg)
+            .filter((value): value is string => Boolean(value)),
+          ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
+        ];
+        const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
+        if (parsed.kind === "not_produced" || !check.produced) {
+          unproduced =
+            parsed.kind === "not_produced"
+              ? parsed.body
+              : `${notProducedMessage(check.kind)} What came back${check.reason ? ` — ${check.reason}` : ""} — is not the result you asked for.`;
+        } else {
+          parsedDelivery = { ...parsed, files: check.files };
+        }
+      } catch (cause) {
+        parseError = cause instanceof Error ? cause.message : String(cause);
       }
-    } catch (cause) {
-      invalidDelivery = cause instanceof Error ? cause.message : String(cause);
     }
-  }
+    return { delivery: parsedDelivery, invalidDelivery: parseError, notProduced: unproduced };
+  }, [deliveryQuery.data, run]);
   const produced = delivery ? true : notProduced ? false : null;
 
   useEffect(() => {
@@ -1161,7 +955,8 @@ export function Engage() {
         steps: pathway.steps,
         tradeoffs: pathway.tradeoffs,
       },
-      instruction: "Use this selected Spiral pathway as the direction for the next governed objective.",
+      instruction:
+        "Use this selected Spiral pathway as the direction for the next governed objective.",
     });
     setFollow({ id: run.id, kind: "refine", pathwayLabel: pathway.label });
     setObjective(run.objective);
@@ -1242,20 +1037,17 @@ export function Engage() {
       <section aria-label="Engage ASCENSION" className="ascension-command">
         <div className="ascension-stage">
           <div className="ascension-scene-hero" aria-hidden="true">
-            <img
-              className="ascension-tree-scene"
-              src={BOOK_TREE_SCENE}
-              alt=""
-              draggable={false}
-            />
+            <img className="ascension-tree-scene" src={BOOK_TREE_SCENE} alt="" draggable={false} />
           </div>
 
-          {delivery && bookSequence === "eruption" && (
+          {delivery && run && bookSequence === "eruption" && (
             <TreeKnowledgeEruption
               delivery={delivery}
               selectedId={treeChoiceId}
               onSelect={selectTreeReality}
               onUse={openTreeReality}
+              objectiveText={run.objective}
+              onPhaseChange={handleManifestationPhase}
             />
           )}
 
@@ -1446,8 +1238,8 @@ export function Engage() {
                 <p className="mt-3 text-sm text-foreground/85">{deliveryQuery.data.error}</p>
               )}
               <p className="mt-3 text-sm text-muted-foreground">
-                A finished or verified run is not the same as your result. Nothing here is
-                offered for download.
+                A finished or verified run is not the same as your result. Nothing here is offered
+                for download.
               </p>
               <button
                 type="button"

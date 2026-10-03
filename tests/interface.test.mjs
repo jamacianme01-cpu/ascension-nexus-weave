@@ -20,6 +20,8 @@ try {
   const { callZai } = await server.ssrLoadModule("/src/lib/ascension/engine/zai.server.ts");
   const access = await server.ssrLoadModule("/src/lib/ascension/source-access.ts");
   const codeWalker = await server.ssrLoadModule("/src/lib/ascension/code-walker.ts");
+  const manifestation = await server.ssrLoadModule("/src/lib/ascension/manifestation.ts");
+  const modelProvider = await server.ssrLoadModule("/src/lib/ascension/model-provider.ts");
   const run = JSON.parse(await readFile("tests/fixtures/objective-run.json", "utf8"));
   const live = JSON.parse(await readFile("tests/fixtures/world-publication.json", "utf8"));
   const base = { entities: {}, worldModel: {}, chamber: {}, live };
@@ -132,6 +134,8 @@ try {
     kind: "artifact",
     title: "Archive guide",
     body: "Created guide for review.",
+    pathways: [],
+    blend: null,
     files: [{ name: "guide.md", content: "# Guide\nComplete draft." }],
     limitations: ["Draft requires review."],
   };
@@ -629,6 +633,144 @@ try {
     if (priorKey === undefined) delete process.env.ZAI_API_KEY;
     else process.env.ZAI_API_KEY = priorKey;
   }
+  /* -------------------- ENVISION manifestation + model provider -------------------- */
+
+  check("manifestation phases follow the 700/1500/2300 boundaries", () => {
+    const phase = manifestation.manifestationPhase;
+    assert.equal(phase(-1), "idle");
+    assert.equal(phase(0), "possibility");
+    assert.equal(phase(699), "possibility");
+    assert.equal(phase(700), "condensation");
+    assert.equal(phase(1499), "condensation");
+    assert.equal(phase(1500), "reveal");
+    assert.equal(phase(2299), "reveal");
+    assert.equal(phase(2300), "stabilized");
+    assert.equal(phase(99999), "stabilized");
+  });
+  check("manifestation progress stays clamped and completes", () => {
+    assert.equal(manifestation.phaseProgress(-5), 0);
+    assert.equal(manifestation.phaseProgress(2300), 1);
+    assert.equal(manifestation.phaseProgress(50000), 1);
+    for (let ms = 0; ms <= 2400; ms += 50) {
+      const p = manifestation.phaseProgress(ms);
+      assert.ok(p >= 0 && p <= 1, `progress out of range at ${ms}ms`);
+    }
+  });
+  check("assembly spin decelerates monotonically into a living drift", () => {
+    let prev = 0;
+    for (let ms = 0; ms <= 4000; ms += 100) {
+      const spin = manifestation.assemblySpin(ms / 1000);
+      assert.ok(spin >= prev - 1e-9, `spin went backwards at ${ms}ms`);
+      prev = spin;
+    }
+    assert.equal(manifestation.assemblySpin(0), 0);
+    // After stabilization only a slow drift remains.
+    const late = manifestation.assemblySpin(4) - manifestation.assemblySpin(3);
+    const early = manifestation.assemblySpin(0.5) - manifestation.assemblySpin(0);
+    assert.ok(late < early / 8, "stabilized spin must be far calmer than possibility");
+  });
+  check("parts lock sequentially and always finish before stabilization", () => {
+    for (let i = 0; i < 40; i++) {
+      const lock = manifestation.partLockMs(i, i * 0.31);
+      assert.ok(lock >= 1700 && lock < 2300, `lock out of reveal window at ${i}: ${lock}`);
+    }
+  });
+  check("linear propulsion specs only appear when the knowledge identifies them", () => {
+    const unrelated = manifestation.linearSpecFromText("design a turbofan engine", "Turbofan bypass concept", null);
+    assert.equal(unrelated, null);
+    const generic = manifestation.linearSpecFromText("draw a linear propulsion engine", "Linear propulsion concept", "uses coils along rails");
+    assert.notEqual(generic, null);
+    assert.equal(generic.volts, null);
+    assert.equal(generic.coils, 3);
+    assert.equal(generic.rails, 2);
+    const owned = manifestation.linearSpecFromText(
+      "draw my linear propulsion engine",
+      "Linear propulsion concept",
+      "48 V system, 9 coils on 3 rails with stasis levitation and piezoelectric silicone rails",
+    );
+    assert.notEqual(owned, null);
+    assert.equal(owned.volts, 48);
+    assert.equal(owned.coils, 9);
+    assert.equal(owned.rails, 3);
+    assert.equal(owned.stasis, true);
+    assert.equal(owned.piezo, true);
+  });
+  check("hunyuan3d is honestly reported as not wired without configuration", () => {
+    const status = modelProvider.hunyuan3DStatus();
+    assert.equal(status.wired, false);
+    assert.match(status.detail, /not connected/i);
+  });
+  check("unconfigured provider resolves to null without fetching", async () => {
+    const original = globalThis.fetch;
+    let fetched = false;
+    globalThis.fetch = async () => {
+      fetched = true;
+      return new Response("{}", { status: 200 });
+    };
+    try {
+      const resolved = await modelProvider.resolvePathwayModel({
+        id: "path-1",
+        label: "Linear propulsion",
+        summary: "concept",
+        spiralForm: null,
+      });
+      assert.equal(resolved, null);
+      assert.equal(fetched, false);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+  check("glb parser reads triangulated meshes and fails closed on junk", () => {
+    const buildTestGlb = () => {
+      const positions = new Float32Array([-1, 0, 0, 1, 0, 0, 0, 1, 0]);
+      const indices = new Uint16Array([0, 1, 2]);
+      const bin = new Uint8Array(44);
+      bin.set(new Uint8Array(positions.buffer), 0);
+      bin.set(new Uint8Array(indices.buffer), 36);
+      const gltf = {
+        asset: { version: "2.0" },
+        scene: 0,
+        scenes: [{ nodes: [0] }],
+        nodes: [{ mesh: 0, translation: [0, 5, 0] }],
+        meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
+        accessors: [
+          { componentType: 5126, type: "VEC3", count: 3, bufferView: 0 },
+          { componentType: 5123, type: "SCALAR", count: 3, bufferView: 1 },
+        ],
+        bufferViews: [
+          { buffer: 0, byteOffset: 0, byteLength: 36 },
+          { buffer: 0, byteOffset: 36, byteLength: 6 },
+        ],
+        buffers: [{ byteLength: 44 }],
+      };
+      const jsonBytes = new TextEncoder().encode(JSON.stringify(gltf));
+      const jsonPad = (4 - (jsonBytes.length % 4)) % 4;
+      const total = 28 + jsonBytes.length + jsonPad + bin.length;
+      const buffer = new ArrayBuffer(total);
+      const view = new DataView(buffer);
+      const bytes = new Uint8Array(buffer);
+      view.setUint32(0, 0x46546c67, true);
+      view.setUint32(4, 2, true);
+      view.setUint32(8, total, true);
+      view.setUint32(12, jsonBytes.length + jsonPad, true);
+      view.setUint32(16, 0x4e4f534a, true);
+      bytes.set(jsonBytes, 20);
+      for (let i = 0; i < jsonPad; i++) bytes[20 + jsonBytes.length + i] = 0x20; // spec: space padding
+      view.setUint32(20 + jsonBytes.length + jsonPad, bin.length, true);
+      view.setUint32(24 + jsonBytes.length + jsonPad, 0x004e4942, true);
+      bytes.set(bin, 28 + jsonBytes.length + jsonPad);
+      return buffer;
+    };
+    const parsed = modelProvider.parseGlbVertices(buildTestGlb());
+    assert.notEqual(parsed, null);
+    assert.equal(parsed.length, 18);
+    assert.ok(Math.abs(parsed[0] + 1) < 1e-5);
+    assert.ok(Math.abs(parsed[1] - 5) < 1e-5);
+    assert.ok(Math.abs(parsed[5] - 1) < 1e-5, "flat normal should face +z");
+    assert.equal(modelProvider.parseGlbVertices(new ArrayBuffer(12)), null);
+    assert.equal(modelProvider.parseGlbVertices(new TextEncoder().encode("not a glb at all").buffer), null);
+  });
+
   process.stdout.write(`${passed} interface contract checks passed\n`);
 } finally {
   await server.close();

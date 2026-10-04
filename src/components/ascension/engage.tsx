@@ -854,7 +854,7 @@ export function Engage() {
       setBookOpen(Boolean(run));
       setRevealed(Boolean(run));
     },
-    onSuccess: ({ request, access: nextAccess, guestToken: nextGuestToken }) => {
+    onSuccess: async ({ request, access: nextAccess, guestToken: nextGuestToken }) => {
       setAccess(nextAccess);
       save(ACCESS, nextAccess);
       if (nextAccess === "guest" && nextGuestToken) {
@@ -878,9 +878,33 @@ export function Engage() {
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
 
-      // Show the queued result area as soon as the request is accepted.
+      // ENGAGE must produce the hosted user-facing result immediately.
+      // Governed execution remains independent and may supersede this draft later.
       setBookOpen(true);
       setRevealed(true);
+      setBookSequence("processing");
+      try {
+        const immediateDelivery =
+          nextAccess === "guest" && nextGuestToken
+            ? await prepareGuestObjectiveDelivery({
+                data: {
+                  requestId: request.id,
+                  guestToken: nextGuestToken,
+                  retry: false,
+                },
+              })
+            : await prepareObjectiveDelivery({
+                data: { requestId: request.id, retry: false },
+              });
+        client.setQueryData(
+          ["ascension", "delivery", request.id, nextAccess, request.status],
+          immediateDelivery,
+        );
+      } finally {
+        void client.invalidateQueries({
+          queryKey: ["ascension", "delivery", request.id],
+        });
+      }
     },
   });
 

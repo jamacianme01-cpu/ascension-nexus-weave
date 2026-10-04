@@ -1714,3 +1714,33 @@ body:has(.ascension-world > .ascension-command) main {
     backdrop-filter: none;
   }
 }
+
+
+/* ENVISION calm mode: no energetic flow, rays, scan fields, or animated halos. */
+.ascension-stage:has(.ascension-envision-3d) .ascension-scene-hero::before,
+.ascension-stage:has(.ascension-envision-3d) .ascension-scene-hero::after,
+.ascension-envision-3d::before,
+.ascension-envision-3d::after {
+  display: none !important;
+  content: none !important;
+  animation: none !important;
+}
+
+.ascension-stage:has(.ascension-envision-3d) .ascension-tree-scene,
+.ascension-envision-3d > canvas {
+  animation: none !important;
+}
+
+.ascension-envision-3d > canvas {
+  filter: none !important;
+}
+
+@media (max-width: 620px) {
+  .ascension-stage:has(.ascension-envision-3d) .ascension-scene-hero {
+    min-height: 0 !important;
+  }
+
+  .ascension-envision-3d {
+    background: transparent !important;
+  }
+}

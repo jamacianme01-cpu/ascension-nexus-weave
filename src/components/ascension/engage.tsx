@@ -772,8 +772,26 @@ export function Engage() {
     // after the run status, and a substantive governed result supersedes a draft.
     refetchInterval: (q) => {
       if (!active) return false;
-      if (q.state.data?.status !== "completed") return 2500;
-      if (q.state.data?.source !== "external_draft") return false;
+      const delivery = q.state.data;
+      if (delivery?.status !== "completed") return 2500;
+
+      const modelChoices = delivery.response_payload
+        ? delivery.response_payload.blend
+          ? [...delivery.response_payload.pathways, delivery.response_payload.blend]
+          : delivery.response_payload.pathways
+        : [];
+      const waitingForHunyuan = modelChoices.some(
+        (pathway) => Boolean(pathway.model_spec) && Boolean(pathway.visual_svg) && !pathway.model_url,
+      );
+      const deliveryAt = Date.parse(delivery.created_at ?? "");
+      if (
+        waitingForHunyuan &&
+        (!Number.isFinite(deliveryAt) || Date.now() - deliveryAt < 15 * 60_000)
+      ) {
+        return 3000;
+      }
+
+      if (delivery.source !== "external_draft") return false;
       const finishedAt = Date.parse(runQuery.data?.completed_at ?? "");
       return runQuery.data?.status === "verified" &&
         Number.isFinite(finishedAt) &&

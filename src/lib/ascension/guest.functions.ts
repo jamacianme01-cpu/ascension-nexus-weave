@@ -162,6 +162,14 @@ async function projectGuestDelivery(
       },
     },
   });
+  if (state.status === "completed" && state.response_payload) {
+    const modelJobs = await import("./model-jobs.server");
+    try {
+      await modelJobs.enqueueDeliveryModels(requestId, state.response_payload);
+    } catch {
+      // Model generation is asynchronous and must not break guest answer delivery.
+    }
+  }
   return state as unknown as GuestDeliveryState;
 }
 

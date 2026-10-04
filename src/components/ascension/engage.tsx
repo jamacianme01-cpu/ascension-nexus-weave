@@ -676,7 +676,10 @@ export function Engage() {
   const answerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const id = new URL(window.location.href).searchParams.get("run") ?? read(ACTIVE);
+    // A normal visit must always open on a fresh command surface.
+    // Resume a previous run only when the URL explicitly names that run
+    // (for example, after the user selects Past results or follows a saved run link).
+    const id = new URL(window.location.href).searchParams.get("run");
     if (id && /^[a-f0-9-]{36}$/i.test(id)) {
       setActive(id);
       const storedAccess = read(ACCESS) === "auth" ? "auth" : "guest";
@@ -687,6 +690,13 @@ export function Engage() {
       }
       setBookOpen(true);
       setRevealed(true);
+    } else {
+      setActive(null);
+      setBookOpen(false);
+      setRevealed(false);
+      setBookSequence("idle");
+      setTreeChoiceId(null);
+      setDetailsOpen(false);
     }
     const draft = read(DRAFT);
     if (draft) setObjective(draft);
@@ -1062,7 +1072,7 @@ export function Engage() {
 
           <label
             htmlFor="objective"
-            className="block text-center font-display text-lg tracking-wide text-foreground/95"
+            className="relative z-[30] block text-center font-display text-lg tracking-wide text-foreground/95"
           >
             What do you want to accomplish?
           </label>
@@ -1095,10 +1105,10 @@ export function Engage() {
             rows={5}
             maxLength={4000}
             disabled={engage.isPending}
-            className="w-full resize-y rounded-xl border border-gold/30 bg-void/70 px-5 py-4 text-base leading-relaxed focus:border-gold/60 focus:outline-none"
+            className="relative z-[30] w-full resize-y rounded-xl border border-gold/30 bg-void/85 px-5 py-4 text-base leading-relaxed focus:border-gold/60 focus:outline-none"
           />
 
-          <details className="rounded-xl border border-border/60 px-4 py-3 text-sm text-muted-foreground">
+          <details className="relative z-[30] rounded-xl border border-border/60 bg-void/70 px-4 py-3 text-sm text-muted-foreground">
             <summary className="cursor-pointer">
               Optional: add source evidence or constraints
             </summary>
@@ -1128,7 +1138,7 @@ export function Engage() {
             </div>
           </details>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative z-[30] flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => setHistoryOpen((v) => !v)}

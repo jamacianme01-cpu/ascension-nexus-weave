@@ -436,7 +436,7 @@ function solidProgram(gl: WebGLRenderingContext) {
     `attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform mat4 uVP;varying vec3 vN;varying vec3 vW;void main(){vec4 w=uM*vec4(aP,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);gl_Position=uVP*w;}`,
     // Gilded-glass look matched to the approved Tree artwork: luminous bodies,
     // warm gold rim light, cool core, no matte black silhouettes.
-    `precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.4),heart=pow(max(dot(n,v),0.0),2.2);float scan=.97+.03*sin((vW.y+vW.x*.14)*30.0);vec3 gold=vec3(1.0,.82,.44);vec3 c=uC*(.30+d*.40)+mix(uC,gold,.38)*rim*(.55+uGlow*.5)+vec3(1.0,.9,.66)*heart*(.05+uGlow*.13);c+=vec3(.03,.10,.15)*uGlow*.16;gl_FragColor=vec4(min(c,vec3(.97)),uAlpha);}`,
+    `precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.4),heart=pow(max(dot(n,v),0.0),2.2);float scan=.97+.03*sin((vW.y+vW.x*.14)*30.0);vec3 gold=vec3(1.0,.82,.44);vec3 c=uC*(.58+d*.52)+mix(uC,gold,.30)*rim*(.42+uGlow*.36)+vec3(1.0,.9,.66)*heart*(.08+uGlow*.12);c+=vec3(.03,.08,.12)*uGlow*.10;gl_FragColor=vec4(min(c,vec3(1.0)),uAlpha);}`,
   );
 }
 function lineProgram(gl: WebGLRenderingContext) {
@@ -949,7 +949,7 @@ export function Envision3DScene({
           dir[1] * (1 - converge) * 0.95,
           dir[2] * (1 - converge) * 0.95,
         ] as Vec3,
-        alpha: (focus && ph === "stabilized" ? 1 : focus ? 0.98 : 0.84) * alpha * fade,
+        alpha: (ph === "stabilized" ? 1 : focus ? 0.98 : 0.9) * alpha * fade,
         glowBoost,
       };
     };
@@ -1033,7 +1033,7 @@ export function Envision3DScene({
         );
       };
 
-      projector(vp, base, color, focus ? 1.1 : 0.92, focus, blend);
+      projector(vp, base, color, focus ? 0.9 : 0.68, focus, blend);
 
       // Field arcs: strong while energy is loose, faint once stabilized.
       const arcEnergy =
@@ -1094,7 +1094,7 @@ export function Envision3DScene({
           alpha * fade,
         );
       };
-      const orbitEnergy = stationPhase === "stabilized" ? 0.4 : 0.3 + 0.12 * Math.sin(t * 1.3);
+      const orbitEnergy = stationPhase === "stabilized" ? 0.18 : 0.26 + 0.08 * Math.sin(t * 1.3);
       orbitRing(1.42 * k, 0.42 + Math.sin(t * 0.21) * 0.05, 0.18, orbitEnergy);
       orbitRing(1.68 * k, -0.3 + Math.cos(t * 0.17) * 0.05, -0.42, orbitEnergy * 0.7);
 

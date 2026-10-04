@@ -3,6 +3,7 @@ import {
   assessResult,
   notProducedMessage,
   parseDelivery,
+  requestedKind,
   type ObjectiveDelivery,
 } from "../result-model";
 
@@ -371,7 +372,89 @@ export async function externalProductDraft(
     );
   }
 
-  const parsed = parseDelivery(candidate);
+  let parsed = parseDelivery(candidate);
+
+  // Physical/design objectives are not allowed to fall back to a canned
+  // renderer. Every pathway must carry its own model_spec. If the first answer
+  // omitted one, make one focused repair call; if it still fails, reject the
+  // draft rather than showing the user a fake generic object.
+  const requested = requestedKind(run.objective);
+  const needsPathwayModels =
+    (requested === "drawing" || requested === "design") &&
+    parsed.pathways.length > 0 &&
+    parsed.pathways.some((pathway) => pathway.model_spec === null);
+  if (needsPathwayModels) {
+    const repairInput = parsed.pathways.map((pathway) => ({
+      id: pathway.id,
+      label: pathway.label,
+      summary: pathway.summary,
+      spiral_form: pathway.spiral_form,
+      existing_model_spec: pathway.model_spec,
+    }));
+    const repaired = await callZai({
+      system: [
+        "You are repairing ASCENSION ENVISION 3D model specifications.",
+        "Return exactly one JSON object with key models.",
+        "models must be an array with one object for every supplied pathway, preserving each pathway id exactly.",
+        "Each model object must contain id and model_spec.",
+        "model_spec must contain title, description, hero_rotation, hero_scale, parts.",
+        "parts must describe the actual pathway object, not a generic engine or placeholder.",
+        "Allowed primitive values: box, cylinder, ring, sphere, nozzle.",
+        "Allowed material values: gold, gold_deep, copper, blue, blue_deep, ice, cyan, warm, steel, dark.",
+        "Each part must contain name, primitive, position, rotation, scale, material.",
+        "Use 8-40 meaningful parts for a normal physical design when useful.",
+        "All geometry is normalized around [0,0,0]. Rotations are radians.",
+        "Use the objective and pathway wording as the design authority. Do not invent exact measurements not supplied.",
+        "Do not return prose outside the JSON object.",
+      ].join(" "),
+      user: [
+        `OBJECTIVE:\n${run.objective}`,
+        `PATHWAYS:\n${JSON.stringify(repairInput)}`,
+        "Create the missing pathway-specific 3D model specifications now.",
+      ].join("\n\n"),
+      knowledgeQuery: run.objective,
+      temperature: 0.15,
+    });
+    const repairJson = repaired.json;
+    const models =
+      repairJson && Array.isArray(repairJson["models"])
+        ? (repairJson["models"] as unknown[])
+        : [];
+    const modelById = new Map<string, unknown>();
+    for (const raw of models) {
+      const item = record(raw);
+      if (typeof item["id"] === "string" && item["model_spec"]) {
+        modelById.set(item["id"], item["model_spec"]);
+      }
+    }
+    if (modelById.size) {
+      const patched = {
+        ...candidate,
+        pathways: Array.isArray(candidate["pathways"])
+          ? candidate["pathways"].map((raw) => {
+              const p = record(raw);
+              const id = typeof p["id"] === "string" ? p["id"] : "";
+              return modelById.has(id) ? { ...p, model_spec: modelById.get(id) } : p;
+            })
+          : [],
+      } as Record<string, unknown>;
+      if (candidate["blend"] && typeof candidate["blend"] === "object") {
+        const blendRecord = record(candidate["blend"]);
+        const blendId = typeof blendRecord["id"] === "string" ? blendRecord["id"] : "";
+        patched["blend"] = modelById.has(blendId)
+          ? { ...blendRecord, model_spec: modelById.get(blendId) }
+          : blendRecord;
+      }
+      parsed = parseDelivery(patched);
+    }
+    const stillMissing = parsed.pathways.some((pathway) => pathway.model_spec === null);
+    if (stillMissing) {
+      throw new Error(
+        "ENVISION did not produce an objective-specific 3D model for every pathway. Generic fallback models are disabled for this request.",
+      );
+    }
+  }
+
   const visualSvgs = [
     ...parsed.pathways.map((pathway) => pathway.visual_svg).filter((value): value is string => Boolean(value)),
     ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),

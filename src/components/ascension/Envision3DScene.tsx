@@ -310,6 +310,40 @@ function cylinderVertices(segments = 28, tapered = false) {
   }
   return new Float32Array(d);
 }
+/** Thin ornamental orbit band (large radius, slender tube) for gilded halo rings. */
+function orbitVertices(seg = 64, tube = 8) {
+  const d: number[] = [];
+  const v = (u: number, w: number): { p: Vec3; n: Vec3 } => {
+    const cu = Math.cos(u),
+      su = Math.sin(u),
+      cw = Math.cos(w),
+      sw = Math.sin(w),
+      R = 1,
+      r = 0.035;
+    return { p: [(R + r * cw) * cu, (R + r * cw) * su, r * sw], n: [cw * cu, cw * su, sw] };
+  };
+  const q = (x: { p: Vec3; n: Vec3 }) => d.push(...x.p, ...x.n);
+  for (let i = 0; i < seg; i++) {
+    const u0 = (i / seg) * Math.PI * 2,
+      u1 = ((i + 1) / seg) * Math.PI * 2;
+    for (let j = 0; j < tube; j++) {
+      const w0 = (j / tube) * Math.PI * 2,
+        w1 = ((j + 1) / tube) * Math.PI * 2,
+        a = v(u0, w0),
+        b = v(u1, w0),
+        c = v(u1, w1),
+        e = v(u0, w1);
+      q(a);
+      q(b);
+      q(c);
+      q(a);
+      q(c);
+      q(e);
+    }
+  }
+  return new Float32Array(d);
+}
+
 /** Luminous filaments: two woven helices winding the assembly axis (unit space, X axis). */
 function helixVertices(segments = 54) {
   const d: number[] = [];
@@ -400,7 +434,9 @@ function solidProgram(gl: WebGLRenderingContext) {
   return buildProgram(
     gl,
     `attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform mat4 uVP;varying vec3 vN;varying vec3 vW;void main(){vec4 w=uM*vec4(aP,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);gl_Position=uVP*w;}`,
-    `precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.8);float scan=.94+.06*sin((vW.y+vW.x*.14)*48.0);vec3 c=(uC*(.18+d*.56)+uC*rim*(.34+uGlow*.42))*scan;c+=vec3(.025,.11,.16)*uGlow*.14;gl_FragColor=vec4(min(c,vec3(.90)),uAlpha);}`,
+    // Gilded-glass look matched to the approved Tree artwork: luminous bodies,
+    // warm gold rim light, cool core, no matte black silhouettes.
+    `precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.4),heart=pow(max(dot(n,v),0.0),2.2);float scan=.97+.03*sin((vW.y+vW.x*.14)*30.0);vec3 gold=vec3(1.0,.82,.44);vec3 c=uC*(.30+d*.40)+mix(uC,gold,.38)*rim*(.55+uGlow*.5)+vec3(1.0,.9,.66)*heart*(.05+uGlow*.13);c+=vec3(.03,.10,.15)*uGlow*.16;gl_FragColor=vec4(min(c,vec3(.97)),uAlpha);}`,
   );
 }
 function lineProgram(gl: WebGLRenderingContext) {
@@ -446,6 +482,16 @@ function hue(i: number): Vec3 {
         ? [0.08, 1, 0.68]
         : [1, 0.38, 0.22];
 }
+
+/** Gilded palette taken from the approved Tree artwork: gold filigree structure,
+ *  deep blue glass bodies, cyan energy, one warm light heart. */
+const GOLD: Vec3 = [1, 0.8, 0.38];
+const GOLD_DEEP: Vec3 = [0.86, 0.6, 0.24];
+const BLUE_GLASS: Vec3 = [0.34, 0.58, 0.98];
+const BLUE_GLASS_DEEP: Vec3 = [0.18, 0.36, 0.72];
+const ICE: Vec3 = [0.62, 0.88, 1];
+const CYAN: Vec3 = [0.28, 0.84, 0.95];
+const WARM_LIGHT: Vec3 = [1, 0.92, 0.7];
 
 /* deterministic particle field */
 type Particle = {
@@ -622,6 +668,7 @@ export function Envision3DScene({
       cylinder: Mesh,
       nozzle: Mesh,
       helixM: Mesh,
+      orbitM: Mesh,
       arcM: Mesh;
     let cyanBuf: WebGLBuffer, goldBuf: WebGLBuffer, strandBuf: WebGLBuffer;
     let generatedBuf: WebGLBuffer | null = null,
@@ -643,6 +690,7 @@ export function Envision3DScene({
       cylinder = mesh(gl, cylinderVertices());
       nozzle = mesh(gl, cylinderVertices(30, true));
       helixM = lineMesh(gl, helixVertices());
+      orbitM = mesh(gl, orbitVertices());
       arcM = lineMesh(gl, arcVertices());
       cyanBuf = dynamicBuffer(gl);
       goldBuf = dynamicBuffer(gl);
@@ -783,7 +831,8 @@ export function Envision3DScene({
       blend: boolean,
     ) => {
       const y = base[1] - (focus ? 1.15 : 0.78) * size;
-      const ringColor: Vec3 = blend ? [0.95, 0.62, 0.18] : [0.14, 0.72, 0.92];
+      const ringColor: Vec3 = blend ? [0.95, 0.62, 0.18] : CYAN;
+      // Gilded podium dish: blue-glass body framed in gold, echoing the artwork base.
       drawSolid(
         cylinder,
         compose(
@@ -792,9 +841,9 @@ export function Envision3DScene({
           [0.07 * size, 0.54 * size, 0.54 * size],
         ),
         vp,
-        [0.025, 0.08, 0.11],
-        0.1,
-        0.92,
+        BLUE_GLASS_DEEP,
+        0.24,
+        0.55,
       );
       drawSolid(
         torus,
@@ -804,9 +853,9 @@ export function Envision3DScene({
           [0.56 * size, 0.56 * size, 0.56 * size],
         ),
         vp,
-        ringColor,
-        0.28,
-        0.62,
+        blend ? ringColor : GOLD,
+        0.4,
+        0.7,
       );
       drawSolid(
         torus,
@@ -817,8 +866,8 @@ export function Envision3DScene({
         ),
         vp,
         color,
-        0.22,
-        0.48,
+        0.3,
+        0.55,
       );
       drawSolid(
         nozzle,
@@ -828,9 +877,9 @@ export function Envision3DScene({
           [0.5 * size, 0.42 * size, 0.42 * size],
         ),
         vp,
-        ringColor,
-        0.06,
-        0.1,
+        blend ? [0.98, 0.7, 0.2] : GOLD_DEEP,
+        0.2,
+        0.34,
       );
       if (focus) {
         drawSolid(
@@ -841,9 +890,9 @@ export function Envision3DScene({
             [0.88 * size, 0.88 * size, 0.88 * size],
           ),
           vp,
-          ringColor,
-          0.18,
-          0.28,
+          GOLD,
+          0.34,
+          0.42,
         );
       }
     };
@@ -1004,7 +1053,7 @@ export function Envision3DScene({
           [arcScale, arcScale, arcScale],
         ),
         vp,
-        blend ? [0.98, 0.72, 0.2] : [0.2, 0.85, 1],
+        blend ? [0.98, 0.72, 0.2] : [0.24, 0.8, 0.96],
         0.5,
         arcEnergy * (focus ? 1 : 0.85) * fade,
         t,
@@ -1023,11 +1072,31 @@ export function Envision3DScene({
         helixM,
         stationRot,
         vp,
-        blend ? [1, 0.7, 0.18] : [0.16, 0.88, 1],
+        blend ? [1, 0.7, 0.18] : [1, 0.74, 0.3],
         0.42,
         helixEnergy * fade,
         t,
       );
+
+      // Ornamental gold orbit rings, echoing the artwork's rings around the
+      // canopy. They ride their own slow drift so the assembly feels forged
+      // from the same material as the Tree.
+      const orbitRing = (radius: number, tiltX: number, tiltZ: number, alpha: number) => {
+        drawSolid(
+          orbitM,
+          matMul(
+            stationRot,
+            compose([0, 0, 0], [Math.PI / 2 + tiltX, 0, tiltZ], [radius, radius, radius]),
+          ),
+          vp,
+          GOLD,
+          0.36,
+          alpha * fade,
+        );
+      };
+      const orbitEnergy = stationPhase === "stabilized" ? 0.4 : 0.3 + 0.12 * Math.sin(t * 1.3);
+      orbitRing(1.42 * k, 0.42 + Math.sin(t * 0.21) * 0.05, 0.18, orbitEnergy);
+      orbitRing(1.68 * k, -0.3 + Math.cos(t * 0.17) * 0.05, -0.42, orbitEnergy * 0.7);
 
       // Manifestation flash when the sequence starts.
       if (elapsedMs < 650) {
@@ -1076,7 +1145,7 @@ export function Envision3DScene({
                   cube,
                   matMul(srcRot, compose([0, q * 0.34, 0], [0, 0, 0], [1.1, 0.03, 0.03])),
                   vp,
-                  [0.12, 0.7, 0.92],
+                  ICE,
                   0.4,
                   sAlpha,
                 );
@@ -1088,7 +1157,7 @@ export function Envision3DScene({
                     compose([ring * 0.4, 0, 0], [Math.PI / 2, 0, 0], [0.26, 0.26, 0.26]),
                   ),
                   vp,
-                  [0.14, 0.8, 1],
+                  GOLD,
                   0.4,
                   sAlpha,
                 );
@@ -1097,7 +1166,7 @@ export function Envision3DScene({
                 cylinder,
                 matMul(srcRot, compose([-0.2, 0, 0], [0, 0, 0], [0.42, 0.3, 0.3])),
                 vp,
-                [0.16, 0.5, 0.72],
+                BLUE_GLASS,
                 0.4,
                 sAlpha,
               );
@@ -1105,7 +1174,7 @@ export function Envision3DScene({
                 sphere,
                 matMul(srcRot, compose([0.05, 0, 0], [0, 0, 0], [0.2, 0.2, 0.2])),
                 vp,
-                [1, 0.6, 0.16],
+                WARM_LIGHT,
                 0.5,
                 sAlpha,
               );
@@ -1113,7 +1182,7 @@ export function Envision3DScene({
                 nozzle,
                 matMul(srcRot, compose([0.62, 0, 0], [0, 0, 0], [0.44, 0.34, 0.34])),
                 vp,
-                [0.9, 0.42, 0.08],
+                GOLD_DEEP,
                 0.4,
                 sAlpha,
               );
@@ -1155,33 +1224,19 @@ export function Envision3DScene({
           }
         }
         // Combined assembly: rail spine + ion rings + chamber core + exhaust, gold synthesis.
-        model(cube, [0, -0.52, 0], [0, 0, 0], [1.42 * k, 0.045, 0.42 * k], [0.04, 0.13, 0.18], 0.2);
+        model(cube, [0, -0.52, 0], [0, 0, 0], [1.42 * k, 0.045, 0.42 * k], BLUE_GLASS_DEEP, 0.24);
         for (let q = -1; q <= 1; q += 2)
-          model(
-            cube,
-            [0, q * 0.36, 0],
-            [0, 0, 0],
-            [1.42 * k, 0.034, 0.034],
-            [0.12, 0.7, 0.92],
-            0.34,
-          );
+          model(cube, [0, q * 0.36, 0], [0, 0, 0], [1.42 * k, 0.034, 0.034], ICE, 0.34);
         for (let ring = -1; ring <= 1; ring++)
           model(
             torus,
             [ring * 0.48, 0, 0],
             [Math.PI / 2, 0, 0],
             [0.3 * k, 0.3 * k, 0.3 * k],
-            [1, 0.6, 0.16],
+            GOLD,
             0.42,
           );
-        model(
-          nozzle,
-          [0.95, 0, 0],
-          [0, 0, 0],
-          [0.58 * k, 0.42 * k, 0.42 * k],
-          [0.9, 0.42, 0.08],
-          0.36,
-        );
+        model(nozzle, [0.95, 0, 0], [0, 0, 0], [0.58 * k, 0.42 * k, 0.42 * k], GOLD_DEEP, 0.36);
         model(
           sphere,
           [-0.1, 0, 0],
@@ -1199,7 +1254,7 @@ export function Envision3DScene({
           [0, 0, 0],
           [0, 0, 0],
           [1.05 * k, 0.52 * k, 0.52 * k],
-          [0.08, 0.26, 0.34],
+          BLUE_GLASS_DEEP,
           0.18,
         );
         model(
@@ -1207,24 +1262,17 @@ export function Envision3DScene({
           [-0.92, 0, 0],
           [0, Math.PI / 2, 0],
           [0.54 * k, 0.54 * k, 0.54 * k],
-          [0.18, 0.78, 1],
+          GOLD,
           0.32,
         );
-        model(
-          sphere,
-          [-0.86, 0, 0],
-          [0, 0, 0],
-          [0.19 * k, 0.19 * k, 0.19 * k],
-          [0.52, 0.88, 1],
-          0.28,
-        );
+        model(sphere, [-0.86, 0, 0], [0, 0, 0], [0.19 * k, 0.19 * k, 0.19 * k], WARM_LIGHT, 0.28);
         for (let s = -2; s <= 2; s++)
           model(
             torus,
             [s * 0.3, 0, 0],
             [0, Math.PI / 2, 0],
             [0.34 * k, 0.34 * k, 0.34 * k],
-            s === 0 ? [0.72, 0.92, 1] : color,
+            s === 0 ? WARM_LIGHT : GOLD,
             0.26,
           );
         for (let blade = 0; blade < 8; blade++) {
@@ -1234,49 +1282,28 @@ export function Envision3DScene({
             [-0.88, Math.cos(a) * 0.25, Math.sin(a) * 0.25],
             [a, 0, 0],
             [0.035 * k, 0.24 * k, 0.055 * k],
-            [0.34, 0.82, 1],
+            ICE,
             0.2,
           );
         }
-        model(
-          nozzle,
-          [0.93, 0, 0],
-          [0, 0, 0],
-          [0.45 * k, 0.44 * k, 0.44 * k],
-          [0.12, 0.58, 0.82],
-          0.26,
-        );
+        model(nozzle, [0.93, 0, 0], [0, 0, 0], [0.45 * k, 0.44 * k, 0.44 * k], BLUE_GLASS, 0.26);
       } else if (kind === "rocket") {
-        model(
-          cylinder,
-          [-0.42, 0, 0],
-          [0, 0, 0],
-          [0.56 * k, 0.34 * k, 0.34 * k],
-          [0.16, 0.48, 0.72],
-          0.26,
-        );
+        model(cylinder, [-0.42, 0, 0], [0, 0, 0], [0.56 * k, 0.34 * k, 0.34 * k], BLUE_GLASS, 0.26);
         model(
           torus,
           [-0.84, 0, 0],
           [0, Math.PI / 2, 0],
           [0.34 * k, 0.34 * k, 0.34 * k],
-          [0.28, 0.78, 1],
+          GOLD,
           0.28,
         );
-        model(
-          sphere,
-          [-0.28, 0, 0],
-          [0, 0, 0],
-          [0.24 * k, 0.24 * k, 0.24 * k],
-          [1, 0.48, 0.18],
-          0.3,
-        );
+        model(sphere, [-0.28, 0, 0], [0, 0, 0], [0.24 * k, 0.24 * k, 0.24 * k], WARM_LIGHT, 0.3);
         model(
           nozzle,
           [0.48, 0, 0],
           [0, 0, 0],
           [0.82 * k, 0.62 * k, 0.62 * k],
-          [0.86, 0.3, 0.12],
+          [0.98, 0.45, 0.16],
           0.34,
         );
         model(
@@ -1294,130 +1321,74 @@ export function Envision3DScene({
           [-0.42, 0, 0],
           [0, 0, 0],
           [0.48 * k, 0.42 * k, 0.42 * k],
-          [0.08, 0.3, 0.44],
+          BLUE_GLASS_DEEP,
           0.18,
         );
-        model(
-          sphere,
-          [-0.48, 0, 0],
-          [0, 0, 0],
-          [0.25 * k, 0.25 * k, 0.25 * k],
-          [0.14, 0.72, 0.95],
-          0.26,
-        );
+        model(sphere, [-0.48, 0, 0], [0, 0, 0], [0.25 * k, 0.25 * k, 0.25 * k], ICE, 0.26);
         for (let g = 0; g < 4; g++)
           model(
             torus,
             [0.08 + g * 0.2, 0, 0],
             [0, Math.PI / 2, 0],
             [0.4 * k, 0.4 * k, 0.4 * k],
-            g % 2 ? [0.56, 0.52, 1] : [0.12, 0.86, 1],
+            g % 2 ? GOLD : ICE,
             0.3,
           );
         for (let q = -1; q <= 1; q += 2)
-          model(
-            cube,
-            [0.34, q * 0.28, 0],
-            [0, 0, 0],
-            [0.82 * k, 0.018, 0.018],
-            [0.18, 0.64, 0.92],
-            0.18,
-          );
-        model(cube, [1.28, 0, 0], [0, 0, 0], [0.76 * k, 0.012, 0.012], [0.48, 0.78, 1], 0.26);
+          model(cube, [0.34, q * 0.28, 0], [0, 0, 0], [0.82 * k, 0.018, 0.018], ICE, 0.18);
+        model(cube, [1.28, 0, 0], [0, 0, 0], [0.76 * k, 0.012, 0.012], BLUE_GLASS, 0.26);
       } else if (kind === "linear") {
         // Linear propulsion — enriched only when the user's own specs are identified.
         const rails = spec?.rails ?? 2;
         const coils = spec?.coils ?? 3;
         for (let r = 0; r < rails; r++) {
           const off = (r - (rails - 1) / 2) * 0.3;
-          model(cube, [0, off, 0], [0, 0, 0], [1.5 * k, 0.035, 0.035], [0.08, 0.7, 0.92], 0.3);
+          model(cube, [0, off, 0], [0, 0, 0], [1.5 * k, 0.035, 0.035], CYAN, 0.32);
         }
         const spacing = coils > 3 ? 0.28 : 0.62;
         for (let cIdx = 0; cIdx < coils; cIdx++) {
           const x = (cIdx - (coils - 1) / 2) * spacing;
-          model(
-            torus,
-            [x, 0, 0],
-            [Math.PI / 2, 0, 0],
-            [0.3 * k, 0.3 * k, 0.3 * k],
-            cIdx % 3 === 0 ? [1, 0.66, 0.18] : [0.48, 0.88, 1],
-            0.34,
-          );
+          model(torus, [x, 0, 0], [Math.PI / 2, 0, 0], [0.3 * k, 0.3 * k, 0.3 * k], GOLD, 0.34);
         }
         // Higher glow keeps the core readable as glass instead of a black wedge.
-        model(cube, [0, 0, 0], [0, 0, 0], [0.54 * k, 0.2 * k, 0.28 * k], [0.3, 0.74, 0.95], 0.6);
+        model(cube, [0, 0, 0], [0, 0, 0], [0.54 * k, 0.2 * k, 0.28 * k], BLUE_GLASS, 0.5);
         if (spec?.stasis)
-          model(
-            torus,
-            [0, 0, 0],
-            [0, Math.PI / 2, 0],
-            [0.62 * k, 0.62 * k, 0.62 * k],
-            [1, 0.78, 0.3],
-            0.44,
-          );
+          model(torus, [0, 0, 0], [0, Math.PI / 2, 0], [0.62 * k, 0.62 * k, 0.62 * k], GOLD, 0.44);
         if (spec?.piezo)
           for (let q = -1; q <= 1; q += 2)
-            model(
-              cube,
-              [0, q * 0.42, 0],
-              [0, 0, 0],
-              [1.44 * k, 0.012, 0.05],
-              [0.2, 0.9, 0.85],
-              0.3,
-            );
+            model(cube, [0, q * 0.42, 0], [0, 0, 0], [1.44 * k, 0.012, 0.05], ICE, 0.3);
         if (spec?.lidar)
-          model(
-            sphere,
-            [-1.05, 0, 0],
-            [0, 0, 0],
-            [0.12 * k, 0.12 * k, 0.12 * k],
-            [0.2, 0.95, 0.9],
-            0.4,
-          );
-        model(cube, [1.55, 0, 0], [0, 0, 0], [0.62 * k, 0.015, 0.015], [0.42, 0.88, 1], 0.26);
+          model(sphere, [-1.05, 0, 0], [0, 0, 0], [0.12 * k, 0.12 * k, 0.12 * k], WARM_LIGHT, 0.4);
+        model(cube, [1.55, 0, 0], [0, 0, 0], [0.62 * k, 0.015, 0.015], BLUE_GLASS, 0.26);
       } else if (kind === "plasma") {
         model(
           cylinder,
           [-0.42, 0, 0],
           [0, 0, 0],
           [0.54 * k, 0.36 * k, 0.36 * k],
-          [0.1, 0.22, 0.36],
+          BLUE_GLASS_DEEP,
           0.18,
         );
-        model(sphere, [-0.22, 0, 0], [0, 0, 0], [0.3 * k, 0.3 * k, 0.3 * k], [0.3, 0.72, 1], 0.34);
+        model(sphere, [-0.22, 0, 0], [0, 0, 0], [0.3 * k, 0.3 * k, 0.3 * k], WARM_LIGHT, 0.36);
         for (let ring = -1; ring <= 1; ring++)
           model(
             torus,
             [ring * 0.46, 0, 0],
             [0, Math.PI / 2, 0],
             [0.38 * k, 0.38 * k, 0.38 * k],
-            ring === 0 ? [0.72, 0.28, 1] : [0.16, 0.8, 1],
+            ring === 0 ? GOLD : CYAN,
             0.34,
           );
-        model(
-          nozzle,
-          [0.78, 0, 0],
-          [0, 0, 0],
-          [0.72 * k, 0.5 * k, 0.5 * k],
-          [0.28, 0.44, 0.88],
-          0.28,
-        );
+        model(nozzle, [0.78, 0, 0], [0, 0, 0], [0.72 * k, 0.5 * k, 0.5 * k], BLUE_GLASS, 0.28);
       } else if (kind === "fluid") {
-        model(
-          cylinder,
-          [-0.34, 0, 0],
-          [0, 0, 0],
-          [0.72 * k, 0.34 * k, 0.34 * k],
-          [0.1, 0.48, 0.66],
-          0.22,
-        );
+        model(cylinder, [-0.34, 0, 0], [0, 0, 0], [0.72 * k, 0.34 * k, 0.34 * k], BLUE_GLASS, 0.22);
         for (let v = -1; v <= 1; v++)
           model(
             torus,
             [v * 0.45, 0, 0],
             [0, Math.PI / 2, 0],
             [0.31 * k, 0.31 * k, 0.31 * k],
-            [0.14, 0.72, 0.92],
+            GOLD,
             0.24,
           );
         model(
@@ -1425,7 +1396,7 @@ export function Envision3DScene({
           [0.82, 0, 0],
           [0, 0, 0],
           [0.6 * k, 0.46 * k, 0.46 * k],
-          [0.12, 0.58, 0.76],
+          BLUE_GLASS_DEEP,
           0.24,
         );
       } else {
@@ -1435,17 +1406,10 @@ export function Envision3DScene({
           [-0.52, 0, 0],
           [Math.PI / 2, 0, 0],
           [0.32 * k, 0.32 * k, 0.32 * k],
-          [0.32, 0.82, 1],
+          GOLD,
           0.28,
         );
-        model(
-          torus,
-          [0.52, 0, 0],
-          [Math.PI / 2, 0, 0],
-          [0.32 * k, 0.32 * k, 0.32 * k],
-          [0.32, 0.82, 1],
-          0.28,
-        );
+        model(torus, [0.52, 0, 0], [Math.PI / 2, 0, 0], [0.32 * k, 0.32 * k, 0.32 * k], GOLD, 0.28);
       }
 
       // A generated Hunyuan3D model, once fetched and parsed, becomes the
@@ -1498,8 +1462,8 @@ export function Envision3DScene({
           generatedCount,
           stationRot,
           vp,
-          [0.3, 0.85, 1],
-          glowBase + 0.1,
+          [0.52, 0.76, 1],
+          glowBase + 0.3,
           alpha,
         );
       }
@@ -1602,7 +1566,7 @@ export function Envision3DScene({
           cyanData,
           cyanUsed,
           vp,
-          [0.35, 0.9, 1],
+          [0.6, 0.88, 1],
           0.5 * fade,
           dpr * (focusedHere ? 1.2 : 1),
         );
@@ -1611,7 +1575,7 @@ export function Envision3DScene({
           goldData,
           goldUsed,
           vp,
-          [1, 0.72, 0.24],
+          [1, 0.78, 0.32],
           0.55 * fade,
           dpr * (focusedHere ? 1.2 : 1),
         );
@@ -1653,7 +1617,7 @@ export function Envision3DScene({
       dead = true;
       cancelAnimationFrame(raf);
       [cube, torus, sphere, cylinder, nozzle].forEach((m) => gl.deleteBuffer(m.buffer));
-      [helixM, arcM].forEach((m) => gl.deleteBuffer(m.buffer));
+      [helixM, arcM, orbitM].forEach((m) => gl.deleteBuffer(m.buffer));
       [cyanBuf, goldBuf, strandBuf].forEach((b) => gl.deleteBuffer(b));
       if (generatedBuf) gl.deleteBuffer(generatedBuf);
       [solidP, lineP, pointP].forEach((p) => gl.deleteProgram(p));

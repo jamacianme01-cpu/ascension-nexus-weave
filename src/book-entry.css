@@ -1081,7 +1081,7 @@ body:has(.ascension-world > .ascension-command) main {
   touch-action: none;
   pointer-events: auto;
   cursor: default;
-  filter: drop-shadow(0 0 12px rgb(82 205 255 / 34%)) drop-shadow(0 0 28px rgb(82 205 255 / 14%));
+  filter: drop-shadow(0 0 12px rgb(82 205 255 / 30%)) drop-shadow(0 0 26px rgb(238 198 110 / 16%));
 }
 
 .ascension-envision-3d[data-focused="true"] > canvas {
@@ -1321,7 +1321,7 @@ body:has(.ascension-world > .ascension-command) main {
 }
 
 .ascension-stage:has(.ascension-envision-3d[data-focused="true"]) .ascension-tree-scene {
-  filter: brightness(0.42) saturate(0.85);
+  filter: brightness(0.8) saturate(1.02);
 }
 
 /* Phase HUD: the heading names the manifestation state. */
@@ -1438,7 +1438,8 @@ body:has(.ascension-world > .ascension-command) main {
   }
 }
 
-/* Focused ENVISION inspection: calm the scene so geometry is readable. */
+/* Focused ENVISION inspection: the artwork stays part of the world; only a
+   soft vignette calms the edges so the gilded hologram reads clearly. */
 .ascension-envision-3d[data-focused="true"]::before {
   z-index: 2;
   opacity: 1;
@@ -1446,12 +1447,12 @@ body:has(.ascension-world > .ascension-command) main {
   background:
     radial-gradient(
       circle at 50% 43%,
-      rgb(7 34 48 / 12%) 0 18%,
-      rgb(1 8 14 / 58%) 48%,
-      rgb(0 3 8 / 78%) 82%
+      rgb(7 34 48 / 4%) 0 18%,
+      rgb(1 8 14 / 22%) 48%,
+      rgb(0 3 8 / 46%) 82%
     ),
-    rgb(0 5 10 / 50%);
-  backdrop-filter: brightness(0.48) saturate(0.72) blur(1.2px);
+    rgb(0 5 10 / 14%);
+  backdrop-filter: brightness(0.88) saturate(0.96) blur(0.6px);
 }
 
 .ascension-envision-3d[data-focused="true"]::after {
@@ -1463,7 +1464,7 @@ body:has(.ascension-world > .ascension-command) main {
 
 .ascension-envision-3d[data-focused="true"] > canvas {
   z-index: 4;
-  filter: drop-shadow(0 0 7px rgb(73 194 232 / 20%)) drop-shadow(0 0 16px rgb(73 194 232 / 8%));
+  filter: drop-shadow(0 0 7px rgb(73 194 232 / 20%)) drop-shadow(0 0 18px rgb(240 200 110 / 14%));
 }
 
 .ascension-envision-3d[data-focused="true"] .ascension-envision-heading {
@@ -1564,12 +1565,12 @@ body:has(.ascension-world > .ascension-command) main {
   background:
     radial-gradient(
       circle at 50% 43%,
-      rgb(4 24 35 / 4%) 0 17%,
-      rgb(0 6 11 / 72%) 48%,
-      rgb(0 2 6 / 90%) 82%
+      rgb(4 24 35 / 0%) 0 17%,
+      rgb(0 6 11 / 26%) 48%,
+      rgb(0 2 6 / 52%) 82%
     ),
-    rgb(0 4 8 / 68%);
-  backdrop-filter: brightness(0.34) saturate(0.58) blur(1.8px);
+    rgb(0 4 8 / 12%);
+  backdrop-filter: brightness(0.86) saturate(0.94) blur(0.6px);
 }
 
 .ascension-envision-3d[data-focused="true"]::after {
@@ -1578,7 +1579,7 @@ body:has(.ascension-world > .ascension-command) main {
 }
 
 .ascension-envision-3d[data-focused="true"] > canvas {
-  filter: drop-shadow(0 0 5px rgb(73 194 232 / 12%)) drop-shadow(0 0 10px rgb(73 194 232 / 5%));
+  filter: drop-shadow(0 0 7px rgb(73 194 232 / 18%)) drop-shadow(0 0 18px rgb(240 200 110 / 14%));
 }
 
 .ascension-envision-3d[data-focused="true"] .ascension-holo-focus {

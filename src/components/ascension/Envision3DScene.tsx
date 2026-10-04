@@ -884,7 +884,7 @@ export function Envision3DScene({
       gl.enable(gl.POLYGON_OFFSET_FILL);
       gl.polygonOffset(1.2, 1.2);
       drawLines(w.feature, model, vp, [0.78, 0.93, 1], alpha, 1, 0, gl.LINES);
-      drawLines(w.all, model, vp, [0.62, 0.85, 1], alpha * 0.16, 1, 0, gl.LINES);
+      drawLines(w.all, model, vp, [0.62, 0.85, 1], alpha * 0.055, 1, 0, gl.LINES);
       gl.disable(gl.POLYGON_OFFSET_FILL);
     };
     const drawParticles = (
@@ -991,137 +991,69 @@ export function Envision3DScene({
      * knowledge hall — glass enclosure, grand dais, engraved floor rings,
      * gilded columns and floating lantern orbs. Drawn around/behind the exhibit.
      */
-    const environmentSet = (vp: Float32Array, base: Vec3, k: number, fade: number, t: number) => {
-      const y0 = base[1] - 1.15 * 1.1; // assembly dish plane (focus projector size 1.1)
-      // Enclosure shell: a faint warm glass vault around the exhibit. Depth
-      // writes stay off so the vault never occludes the invention inside it.
-      gl.depthMask(false);
+    const environmentSet = (
+      vp: Float32Array,
+      base: Vec3,
+      k: number,
+      fade: number,
+      _t: number,
+    ) => {
+      // ENVIRONMENT uses the existing ASCENSION Knowledge Hall artwork as the
+      // world. Only a restrained physical exhibit pedestal is added here so the
+      // SAME invention remains the subject instead of being buried in scenery.
+      const y0 = base[1] - 0.78;
+
+      // Broad polished black/blue plinth.
       drawSolid(
-        sphere,
-        compose([base[0], y0 + 0.8, base[2]], [0, 0, 0], [4.1 * k, 3.3 * k, 4.1 * k]),
+        cube,
+        compose([base[0], y0, base[2] + 0.05], [0, 0, 0], [1.58 * k, 0.10, 0.88 * k]),
         vp,
-        [0.5, 0.4, 0.22],
-        0.06,
-        0.08 * fade,
+        [0.018, 0.035, 0.055],
+        0.08,
+        0.98 * fade,
       );
-      gl.depthMask(true);
-      // Grand dais: two glass tiers with gold rims beneath the projector dish.
+
+      // Raised presentation deck.
       drawSolid(
-        cylinder,
-        compose([base[0], y0 - 0.22, base[2]], [0, 0, Math.PI / 2], [0.07, 1.05 * k, 1.05 * k]),
-        vp,
-        BLUE_GLASS_DEEP,
-        0.24,
-        0.75 * fade,
-      );
-      drawSolid(
-        torus,
-        compose([base[0], y0 - 0.16, base[2]], [Math.PI / 2, 0, 0], [1.05 * k, 1.05 * k, 1.05 * k]),
-        vp,
-        GOLD,
-        0.44,
-        0.7 * fade,
-      );
-      drawSolid(
-        cylinder,
-        compose([base[0], y0 - 0.42, base[2]], [0, 0, Math.PI / 2], [0.07, 0.78 * k, 0.78 * k]),
+        cube,
+        compose([base[0], y0 + 0.14, base[2]], [0, 0, 0], [1.34 * k, 0.045, 0.68 * k]),
         vp,
         BLUE_GLASS_DEEP,
-        0.2,
-        0.5 * fade,
+        0.12,
+        0.96 * fade,
       );
-      drawSolid(
-        torus,
-        compose([base[0], y0 - 0.36, base[2]], [Math.PI / 2, 0, 0], [0.78 * k, 0.78 * k, 0.78 * k]),
-        vp,
-        GOLD_DEEP,
-        0.3,
-        0.45 * fade,
-      );
-      // Engraved floor rings radiating from the dais.
-      drawSolid(
-        orbitM,
-        compose([base[0], y0 - 0.62, base[2]], [Math.PI / 2, 0, 0], [1.7 * k, 1.7 * k, 1.7 * k]),
-        vp,
-        GOLD,
-        0.34,
-        0.3 * fade,
-      );
-      drawSolid(
-        orbitM,
-        compose([base[0], y0 - 0.62, base[2]], [Math.PI / 2, 0, 0], [2.4 * k, 2.4 * k, 2.4 * k]),
-        vp,
-        GOLD,
-        0.3,
-        0.22 * fade,
-      );
-      drawSolid(
-        orbitM,
-        compose([base[0], y0 - 0.62, base[2]], [Math.PI / 2, 0, 0], [3.0 * k, 3.0 * k, 3.0 * k]),
-        vp,
-        [0.24, 0.7, 0.9],
-        0.24,
-        0.14 * fade,
-      );
-      // Hall columns with gilded caps, bases and lantern heads.
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        const cx = base[0] + Math.cos(a) * 3.4 * k;
-        const cz = base[2] + Math.sin(a) * 3.4 * k * 0.72;
+
+      // Gold trim rails around the deck — static architectural detail, not energy.
+      for (let q = -1; q <= 1; q += 2) {
         drawSolid(
-          cylinder,
-          compose([cx, y0 + 0.54, cz], [0, 0, Math.PI / 2], [1.15, 0.085 * k, 0.085 * k]),
-          vp,
-          BLUE_GLASS_DEEP,
-          0.22,
-          0.5 * fade,
-        );
-        drawSolid(
-          torus,
-          compose([cx, y0 + 1.7, cz], [Math.PI / 2, 0, 0], [0.17 * k, 0.17 * k, 0.17 * k]),
+          cube,
+          compose([base[0], y0 + 0.20, base[2] + q * 0.64 * k], [0, 0, 0], [1.36 * k, 0.018, 0.018]),
           vp,
           GOLD,
-          0.44,
-          0.5 * fade,
-        );
-        drawSolid(
-          torus,
-          compose([cx, y0 - 0.58, cz], [Math.PI / 2, 0, 0], [0.19 * k, 0.19 * k, 0.19 * k]),
-          vp,
-          GOLD_DEEP,
-          0.3,
-          0.4 * fade,
-        );
-        drawSolid(
-          sphere,
-          compose([cx, y0 + 1.88, cz], [0, 0, 0], [0.075 * k, 0.075 * k, 0.075 * k]),
-          vp,
-          WARM_LIGHT,
-          0.5,
-          0.5 * fade,
+          0.16,
+          0.92 * fade,
         );
       }
-      // Floating lantern orbs flanking the exhibit.
       for (let q = -1; q <= 1; q += 2) {
-        const bob = Math.sin(t * 0.9 + q) * 0.06;
-        const lx = base[0] + q * 2.6 * k,
-          ly = y0 + 2.4 + bob,
-          lz = base[2] - 0.4;
         drawSolid(
-          sphere,
-          compose([lx, ly, lz], [0, 0, 0], [0.09 * k, 0.09 * k, 0.09 * k]),
+          cube,
+          compose([base[0] + q * 1.30 * k, y0 + 0.20, base[2]], [0, 0, 0], [0.018, 0.018, 0.66 * k]),
           vp,
-          WARM_LIGHT,
-          0.55,
-          0.55 * fade,
+          GOLD_DEEP,
+          0.14,
+          0.88 * fade,
         );
+      }
+
+      // Short structural feet like the approved exhibit render.
+      for (let q = -1; q <= 1; q += 2) {
         drawSolid(
-          torus,
-          compose([lx, ly, lz], [Math.PI / 2, 0, 0], [0.15 * k, 0.15 * k, 0.15 * k]),
+          cube,
+          compose([base[0] + q * 0.95 * k, y0 + 0.34, base[2]], [0, 0, 0], [0.09, 0.20, 0.10]),
           vp,
-          GOLD,
-          0.4,
-          0.4 * fade,
+          [0.08, 0.12, 0.17],
+          0.08,
+          0.95 * fade,
         );
       }
     };
@@ -1204,6 +1136,9 @@ export function Envision3DScene({
       const prog = phaseProgress(elapsedMs);
       const fade = stationFadeRef.current[index] ?? 1;
       const zoom = focus ? zoomRef.current : 1;
+      const kind = blend ? "generic" : pathwayKind(path);
+      const spec = blend ? null : (linearSpecs.get(path.id) ?? null);
+
       // Focused realities glide from their overview slot into the inspection field.
       const glide = easeOutCubic(Math.min(1, (focus ? clocks.focus : 0) / 450));
       const base: Vec3 = focus
@@ -1213,13 +1148,24 @@ export function Envision3DScene({
             lerp(pos[2], FOCUS_BASE[2], glide),
           ]
         : pos;
-      const k = focus ? 1.02 * zoom : 0.48;
+
+      // The approved rail-accelerator reference is larger and settles into a
+      // deliberate three-quarter hero angle. User drag offsets that pose.
+      const k = focus ? (kind === "linear" ? 1.22 : 1.02) * zoom : 0.48;
+      const animatedSpin = assemblySpin(elapsedMs / 1000, index);
+      const linearHero =
+        -0.48 + (rotationRef.current.y - 0.55);
       const spin =
-        assemblySpin(elapsedMs / 1000, index) + (focus ? rotationRef.current.y - 0.45 : 0);
+        focus && stationPhase === "stabilized" && kind === "linear"
+          ? linearHero
+          : animatedSpin + (focus ? rotationRef.current.y - 0.45 : 0);
       const idle = 0;
+      const linearPitch = -0.13 + (rotationRef.current.x + 0.22);
       const pitch =
-        (focus ? rotationRef.current.x : -0.12) +
-        (stationPhase === "stabilized" ? idle * 0.5 : idle * 0.2);
+        focus && stationPhase === "stabilized" && kind === "linear"
+          ? linearPitch
+          : (focus ? rotationRef.current.x : -0.12) +
+            (stationPhase === "stabilized" ? idle * 0.5 : idle * 0.2);
       const glowBase =
         stationPhase === "possibility"
           ? 0.52
@@ -1228,8 +1174,6 @@ export function Envision3DScene({
             : stationPhase === "reveal"
               ? 0.32
               : 0.2;
-      const kind = blend ? "generic" : pathwayKind(path);
-      const spec = blend ? null : (linearSpecs.get(path.id) ?? null);
 
       // Coherent assembly transform: the WHOLE model rotates as one.
       let stationRot = translate(base[0], base[1], base[2]);
@@ -1385,42 +1329,186 @@ export function Envision3DScene({
           model(cube, [0.34, q * 0.28, 0], [0, 0, 0], [0.82 * k, 0.018, 0.018], ICE, 0.18);
         model(cube, [1.28, 0, 0], [0, 0, 0], [0.76 * k, 0.012, 0.012], BLUE_GLASS, 0.26);
       } else if (kind === "linear") {
-        // Linear propulsion — enriched only when the user's own specs are identified.
-        // Cutaway reads like a premium exhibit: solid steel-blue rails, three gilded
-        // ring housings, and a copper winding stack visible between them.
-        const rails = spec?.rails ?? 2;
-        const coils = spec?.coils ?? 3;
-        const railBody: Vec3 = [0.1, 0.3, 0.64];
-        // Core glass paints first so the internals read over it, not under it.
-        model(cube, [0, 0, 0], [0, 0, 0], [0.54 * k, 0.2 * k, 0.28 * k], BLUE_GLASS, 0.4);
-        for (let r = 0; r < rails; r++) {
-          const off = (r - (rails - 1) / 2) * 0.36;
-          model(cube, [0, off, 0], [0, 0, 0], [1.5 * k, 0.085, 0.085], railBody, 0.18, 0.97);
+        // APPROVED REFERENCE MODEL:
+        // three gilded circular housings + visible copper winding packs +
+        // long blue support rails + dark structural spine + physical base.
+        // CUTAWAY, BLUEPRINT and ENVIRONMENT all render THIS SAME geometry.
+        const copper: Vec3 = [0.88, 0.34, 0.10];
+        const railBlue: Vec3 = [0.025, 0.30, 0.62];
+        const steel: Vec3 = [0.10, 0.14, 0.19];
+        const darkSteel: Vec3 = [0.035, 0.055, 0.075];
+
+        // Exhibition base from the approved cutaway reference.
+        model(
+          cube,
+          [0, -0.72, 0.06],
+          [0, 0, 0],
+          [0.92 * k, 0.085, 0.58 * k],
+          darkSteel,
+          0.08,
+          1,
+        );
+        model(
+          cube,
+          [0, -0.61, 0.02],
+          [0, 0, 0],
+          [0.78 * k, 0.035, 0.46 * k],
+          railBlue,
+          0.12,
+          0.98,
+        );
+
+        // Dark central load-bearing spine running through the entire machine.
+        model(
+          cylinder,
+          [0, 0, 0],
+          [0, 0, 0],
+          [1.35 * k, 0.11 * k, 0.11 * k],
+          steel,
+          0.08,
+          1,
+        );
+
+        // Long support rails. Use the user's identified rail count when known;
+        // otherwise the four-beam exhibit arrangement from the approved image.
+        const railCount = spec?.rails ?? 4;
+        const railSlots: Vec3[] =
+          railCount === 3
+            ? [
+                [0, 0.34, 0],
+                [0, -0.28, 0.24],
+                [0, -0.28, -0.24],
+              ]
+            : [
+                [0, 0.34, 0.22],
+                [0, 0.34, -0.22],
+                [0, -0.34, 0.22],
+                [0, -0.34, -0.22],
+              ];
+        for (const [, y, z] of railSlots) {
+          model(
+            cube,
+            [0, y, z],
+            [0, 0, 0],
+            [1.58 * k, 0.055, 0.055],
+            railBlue,
+            0.14,
+            1,
+          );
+          // Gold end caps echo the approved exhibit model.
+          for (let q = -1; q <= 1; q += 2)
+            model(
+              cube,
+              [q * 1.54 * k, y, z],
+              [0, 0, 0],
+              [0.06, 0.072, 0.072],
+              GOLD_DEEP,
+              0.12,
+              1,
+            );
         }
-        // Ring housings: one per coil trio so dense specs stay readable.
-        const housings = coils > 6 ? 3 : coils > 1 ? 2 : 1;
-        for (let h = 0; h < housings; h++) {
-          const x = (h - (housings - 1) / 2) * 0.58;
-          model(torus, [x, 0, 0], [Math.PI / 2, 0, 0], [0.32 * k, 0.32 * k, 0.32 * k], GOLD, 0.3);
-        }
-        // Copper winding stack between the housings — the visible internal structure.
-        for (let w = -1; w <= 1; w++)
+
+        // Three large ring housings arranged along the propulsion axis.
+        const housingX = [-0.78, 0, 0.78];
+        for (let h = 0; h < housingX.length; h++) {
+          const x = housingX[h] ?? 0;
           model(
             torus,
-            [w * 0.13, 0, 0],
-            [Math.PI / 2, 0, 0],
-            [0.17 * k, 0.17 * k, 0.17 * k],
-            [0.85, 0.48, 0.24],
-            0.3,
+            [x, 0, 0],
+            [0, Math.PI / 2, 0],
+            [0.50 * k, 0.50 * k, 0.50 * k],
+            h === 1 ? [0.66, 0.56, 0.38] : GOLD,
+            0.18,
+            1,
           );
-        if (spec?.stasis)
-          model(torus, [0, 0, 0], [0, Math.PI / 2, 0], [0.56 * k, 0.56 * k, 0.56 * k], GOLD, 0.44);
-        if (spec?.piezo)
+          // Inner structural ring visible through the cutaway.
+          model(
+            torus,
+            [x, 0, 0],
+            [0, Math.PI / 2, 0],
+            [0.38 * k, 0.38 * k, 0.38 * k],
+            steel,
+            0.08,
+            1,
+          );
+
+          // Copper winding pack inside each housing: a stack of tightly spaced
+          // turns around the X-axis, not a single flat symbolic ring.
+          const turns = spec?.coils && spec.coils >= 9 ? 9 : 7;
+          for (let turn = 0; turn < turns; turn++) {
+            const tx = x + (turn - (turns - 1) / 2) * 0.032 * k;
+            model(
+              torus,
+              [tx, 0, 0],
+              [0, Math.PI / 2, 0],
+              [0.235 * k, 0.235 * k, 0.235 * k],
+              copper,
+              0.16,
+              1,
+            );
+          }
+
+          // Central core visible inside the copper pack.
+          model(
+            cylinder,
+            [x, 0, 0],
+            [0, 0, 0],
+            [0.22 * k, 0.105 * k, 0.105 * k],
+            darkSteel,
+            0.06,
+            1,
+          );
+        }
+
+        // Horizontal braces linking the three housings.
+        for (let q = -1; q <= 1; q += 2) {
+          model(
+            cube,
+            [0, q * 0.48, 0],
+            [0, 0, 0],
+            [1.02 * k, 0.035, 0.075],
+            [0.18, 0.22, 0.26],
+            0.08,
+            1,
+          );
+        }
+
+        // Optional user-specific components are additive; they do not alter the
+        // approved base model for unrelated objectives.
+        if (spec?.stasis) {
+          model(
+            torus,
+            [0, 0, 0],
+            [0, Math.PI / 2, 0],
+            [0.61 * k, 0.61 * k, 0.61 * k],
+            [0.30, 0.72, 0.92],
+            0.16,
+            0.72,
+          );
+        }
+        if (spec?.piezo) {
           for (let q = -1; q <= 1; q += 2)
-            model(cube, [0, q * 0.5, 0], [0, 0, 0], [1.44 * k, 0.022, 0.06], ICE, 0.26);
-        if (spec?.lidar)
-          model(sphere, [-1.05, 0, 0], [0, 0, 0], [0.12 * k, 0.12 * k, 0.12 * k], WARM_LIGHT, 0.4);
-        model(cube, [1.55, 0, 0], [0, 0, 0], [0.62 * k, 0.015, 0.015], BLUE_GLASS, 0.26);
+            model(
+              cube,
+              [0, q * 0.43, -0.28],
+              [0, 0, 0],
+              [1.42 * k, 0.018, 0.035],
+              ICE,
+              0.10,
+              0.9,
+            );
+        }
+        if (spec?.lidar) {
+          model(
+            sphere,
+            [-1.20 * k, 0.56, 0],
+            [0, 0, 0],
+            [0.10 * k, 0.10 * k, 0.10 * k],
+            WARM_LIGHT,
+            0.16,
+            1,
+          );
+        }
       } else if (kind === "plasma") {
         model(
           cylinder,
@@ -1478,6 +1566,7 @@ export function Envision3DScene({
       const generated = generatedRef.current;
       if (
         focus &&
+        kind !== "linear" &&
         generated &&
         generated.id === path.id &&
         stationPhase !== "possibility" &&

@@ -122,6 +122,8 @@ export interface ObjectivePathway {
   spiral_form: string | null;
   visual_svg: string | null;
   model_spec: ObjectiveModelSpec | null;
+  /** Real generated GLB for this pathway when Hunyuan3D has completed it. */
+  model_url: string | null;
   outcome_score: number | null;
   outcome_reason: string | null;
 }
@@ -267,6 +269,10 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
         ? p["visual_svg"].slice(0, 100000)
         : null;
     const modelSpec = parseModelSpec(p["model_spec"]);
+    const modelUrl =
+      typeof p["model_url"] === "string" && /^https:\/\//i.test(p["model_url"].trim())
+        ? p["model_url"].trim().slice(0, 4000)
+        : null;
     const outcomeScore =
       typeof p["outcome_score"] === "number" &&
       Number.isFinite(p["outcome_score"]) &&
@@ -290,6 +296,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       spiral_form: spiralForm,
       visual_svg: visualSvg,
       model_spec: modelSpec,
+      model_url: modelUrl,
       outcome_score: outcomeScore,
       outcome_reason: outcomeReason,
     };

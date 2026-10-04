@@ -269,13 +269,23 @@ export async function externalProductDraft(
     "Return exactly one JSON object with keys: kind, title, body, pathways, blend, files, limitations.",
     "The body must be clean readable plain text. Do not emit Markdown markers, escaped Markdown, or HTML entities.",
     "pathways must be an array. When a SPIRAL EXPANSION is supplied, create one substantive user-facing solution pathway for each Spiral form instead of collapsing them into one answer.",
-    "Each pathway object must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, outcome_score, outcome_reason. steps and tradeoffs are string arrays.",
+    "Each pathway object must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, model_spec, outcome_score, outcome_reason. steps and tradeoffs are string arrays.",
     "visual_svg must be a compact self-contained SVG that visually communicates that pathway. Use a landscape viewBox, strong contrast, meaningful geometry and very little text. The visual should make the pathways distinguishable at a glance.",
+    "model_spec is the authoritative 3D scene graph for that specific pathway. Do not return a generic engine/object category when the pathway describes a specific invention, product, machine, structure, wearable, vehicle, device, room, or physical system.",
+    "model_spec must be an object with: title, description, hero_rotation, hero_scale, parts.",
+    "model_spec.parts must be an array of 3D parts that together visibly resemble the actual pathway. Each part must contain name, primitive, position, rotation, scale, material.",
+    "Allowed primitive values are only: box, cylinder, ring, sphere, nozzle.",
+    "Allowed material values are only: gold, gold_deep, copper, blue, blue_deep, ice, cyan, warm, steel, dark.",
+    "All positions/scales use normalized model space. Keep the complete object centered near [0,0,0], usually within about -1.6..1.6 on each axis. Rotations are radians.",
+    "Use enough parts to communicate the actual design clearly. Prefer 8-40 meaningful parts for physical designs instead of a symbolic 2-3 primitive placeholder.",
+    "When the objective supplies concrete geometry, component counts, orientation, proportions, or arrangement, encode those facts in model_spec. Do not invent exact measurements that were not supplied.",
+    "For nonphysical conceptual pathways where a literal object does not make sense, model_spec may be null. For physical/design/drawing objectives, model_spec should normally be non-null.",
+    "CUTAWAY, BLUEPRINT and ENVIRONMENT in the UI all derive from this same model_spec, so model_spec must describe one coherent object rather than three different illustrations.",
     "outcome_score is 0..1 when a grounded relative assessment can be made from the supplied context; otherwise use null. outcome_reason must briefly explain the basis without pretending the score is physically verified.",
     "The pathway content is a Spiral-guided user-facing synthesis, not a claim that the governed runtime physically executed or verified that solution.",
     "Make the pathways materially different approaches to accomplishing the objective. Do not merely rename the same answer.",
     "When Spiral supplies three forms, return three pathways unless one form genuinely cannot produce a distinct useful route; do not silently collapse them.",
-    "blend must be an object when two or more useful pathways exist. It must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, outcome_score, outcome_reason, blend_from, blend_reason.",
+    "blend must be an object when two or more useful pathways exist. It must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, model_spec, outcome_score, outcome_reason, blend_from, blend_reason.",
     "The BLEND pathway is where Spiral and Outcome Predictor work together: combine complementary strengths from the distinct pathways, explicitly account for their tradeoffs and the supplied Outcome Predictor context, and explain the blend in blend_reason. Do not simply concatenate every pathway.",
     "blend_from is an array of the pathway ids or labels whose strongest elements were combined. Use spiral_form 'spiral_outcome_blend'.",
     "If fewer than two useful pathways exist, return blend as null.",
@@ -434,7 +444,7 @@ export interface DeliveryRun {
   created_at: string;
 }
 
-const DRAFT_SCHEMA_VERSION = "visual-pathways-v2";
+const DRAFT_SCHEMA_VERSION = "objective-model-spec-v3";
 
 /** Stable identity of the transported artifacts and delivery contract a projection was made from. */
 export function artifactSourceKey(runId: string, files: { name: string; content: string }[]) {

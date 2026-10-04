@@ -43,3 +43,42 @@ export async function enqueueDeliveryModels(
   });
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Merge completed local Hunyuan3D jobs back into the delivery projection.
+ * The answer payload stays immutable in the draft stage; generated mesh URLs
+ * are a later asynchronous projection from ascension_model_jobs.
+ */
+export async function attachCompletedModels(
+  requestId: string,
+  delivery: ObjectiveDelivery | null,
+): Promise<ObjectiveDelivery | null> {
+  if (!delivery) return null;
+
+  const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
+  const { data, error } = await table
+    .select("pathway_id, model_url, status")
+    .eq("request_id", requestId)
+    .eq("status", "completed")
+    .not("model_url", "is", null);
+  if (error) throw new Error(error.message);
+
+  const urls = new Map<string, string>();
+  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+    const id = typeof row["pathway_id"] === "string" ? row["pathway_id"] : "";
+    const url = typeof row["model_url"] === "string" ? row["model_url"] : "";
+    if (id && /^https:\/\//i.test(url)) urls.set(id, url);
+  }
+  if (!urls.size) return delivery;
+
+  const withUrl = <T extends ObjectiveDelivery["pathways"][number]>(pathway: T): T => {
+    const url = urls.get(pathway.id);
+    return url ? ({ ...pathway, model_url: url } as T) : pathway;
+  };
+
+  return {
+    ...delivery,
+    pathways: delivery.pathways.map(withUrl),
+    blend: delivery.blend ? withUrl(delivery.blend) : null,
+  };
+}

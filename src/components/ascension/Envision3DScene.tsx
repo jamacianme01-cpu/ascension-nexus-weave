@@ -949,7 +949,7 @@ export function Envision3DScene({
           dir[1] * (1 - converge) * 0.95,
           dir[2] * (1 - converge) * 0.95,
         ] as Vec3,
-        alpha: (focus && stationPhase === "stabilized" ? 1 : focus ? 0.98 : 0.84) * alpha * fade,
+        alpha: (focus && ph === "stabilized" ? 1 : focus ? 0.98 : 0.84) * alpha * fade,
         glowBoost,
       };
     };

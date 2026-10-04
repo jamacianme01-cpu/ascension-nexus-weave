@@ -1138,6 +1138,7 @@ export function Envision3DScene({
       const zoom = focus ? zoomRef.current : 1;
       const kind = blend ? "generic" : pathwayKind(path);
       const spec = blend ? null : (linearSpecs.get(path.id) ?? null);
+      const semanticModel = path.model_spec;
 
       // Focused realities glide from their overview slot into the inspection field.
       const glide = easeOutCubic(Math.min(1, (focus ? clocks.focus : 0) / 450));
@@ -1149,23 +1150,32 @@ export function Envision3DScene({
           ]
         : pos;
 
-      // The approved rail-accelerator reference is larger and settles into a
-      // deliberate three-quarter hero angle. User drag offsets that pose.
-      const k = focus ? (kind === "linear" ? 1.22 : 1.02) * zoom : 0.48;
+      // Every new pathway can carry its own normalized 3D scene graph and
+      // preferred inspection pose. That objective-specific model is authoritative.
+      // Category geometry below is fallback only for older deliveries.
+      const modelScale = semanticModel?.hero_scale ?? (kind === "linear" ? 1.22 : 1.02);
+      const k = focus ? modelScale * zoom : 0.48;
       const animatedSpin = assemblySpin(elapsedMs / 1000, index);
-      const linearHero =
-        -0.48 + (rotationRef.current.y - 0.55);
+      const hero = semanticModel?.hero_rotation ?? null;
+      const semanticHeroY = hero ? hero[1] + (rotationRef.current.y - 0.55) : 0;
+      const semanticHeroX = hero ? hero[0] + (rotationRef.current.x + 0.22) : 0;
+      const semanticHeroZ = hero?.[2] ?? 0;
+      const linearHero = -0.48 + (rotationRef.current.y - 0.55);
       const spin =
-        focus && stationPhase === "stabilized" && kind === "linear"
-          ? linearHero
-          : animatedSpin + (focus ? rotationRef.current.y - 0.45 : 0);
+        focus && stationPhase === "stabilized" && hero
+          ? semanticHeroY
+          : focus && stationPhase === "stabilized" && kind === "linear"
+            ? linearHero
+            : animatedSpin + (focus ? rotationRef.current.y - 0.45 : 0);
       const idle = 0;
       const linearPitch = -0.13 + (rotationRef.current.x + 0.22);
       const pitch =
-        focus && stationPhase === "stabilized" && kind === "linear"
-          ? linearPitch
-          : (focus ? rotationRef.current.x : -0.12) +
-            (stationPhase === "stabilized" ? idle * 0.5 : idle * 0.2);
+        focus && stationPhase === "stabilized" && hero
+          ? semanticHeroX
+          : focus && stationPhase === "stabilized" && kind === "linear"
+            ? linearPitch
+            : (focus ? rotationRef.current.x : -0.12) +
+              (stationPhase === "stabilized" ? idle * 0.5 : idle * 0.2);
       const glowBase =
         stationPhase === "possibility"
           ? 0.52
@@ -1179,6 +1189,9 @@ export function Envision3DScene({
       let stationRot = translate(base[0], base[1], base[2]);
       stationRot = matMul(stationRot, rotY(spin));
       stationRot = matMul(stationRot, rotX(pitch));
+      if (focus && stationPhase === "stabilized" && semanticModel) {
+        stationRot = matMul(stationRot, rotZ(semanticHeroZ));
+      }
 
       let partIndex = 0;
       const model = (m: Mesh, pLocal: Vec3, rot: Vec3, s: Vec3, col: Vec3, g = glowBase, a = 1) => {
@@ -1211,6 +1224,65 @@ export function Envision3DScene({
 
       // ENVIRONMENT: chamber set dressing staged behind the exhibit.
       if (visual === "environment" && focus) environmentSet(vp, base, k, fade, t);
+
+      // Objective-specific 3D scene graph generated from THIS pathway.
+      // CUTAWAY renders the solid parts, BLUEPRINT routes the exact same parts
+      // through model()'s drafting branch, and ENVIRONMENT stages those same
+      // parts in the hall. No question-specific renderer code is needed.
+      if (semanticModel?.parts.length) {
+        const materialColor = (material: (typeof semanticModel.parts)[number]["material"]): Vec3 => {
+          switch (material) {
+            case "gold":
+              return GOLD;
+            case "gold_deep":
+              return GOLD_DEEP;
+            case "copper":
+              return [0.88, 0.34, 0.1];
+            case "blue":
+              return BLUE_GLASS;
+            case "blue_deep":
+              return BLUE_GLASS_DEEP;
+            case "ice":
+              return ICE;
+            case "cyan":
+              return CYAN;
+            case "warm":
+              return WARM_LIGHT;
+            case "steel":
+              return [0.14, 0.2, 0.27];
+            case "dark":
+              return [0.035, 0.055, 0.075];
+          }
+        };
+        const meshFor = (primitive: (typeof semanticModel.parts)[number]["primitive"]): Mesh => {
+          switch (primitive) {
+            case "box":
+              return cube;
+            case "cylinder":
+              return cylinder;
+            case "ring":
+              return torus;
+            case "sphere":
+              return sphere;
+            case "nozzle":
+              return nozzle;
+          }
+        };
+        for (const part of semanticModel.parts) {
+          const p: Vec3 = [
+            part.position[0] * k,
+            part.position[1] * k,
+            part.position[2] * k,
+          ];
+          const s: Vec3 = [
+            part.scale[0] * k,
+            part.scale[1] * k,
+            part.scale[2] * k,
+          ];
+          model(meshFor(part.primitive), p, part.rotation, s, materialColor(part.material), 0.12, 1);
+        }
+        return;
+      }
 
       if (blend) {
         // BLEND is shown directly as one solid synthesized assembly; no orbiting source-energy animation.
@@ -1566,6 +1638,7 @@ export function Envision3DScene({
       const generated = generatedRef.current;
       if (
         focus &&
+        !semanticModel &&
         kind !== "linear" &&
         generated &&
         generated.id === path.id &&

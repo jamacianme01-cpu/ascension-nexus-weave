@@ -436,7 +436,7 @@ function solidProgram(gl: WebGLRenderingContext) {
     `attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform mat4 uVP;varying vec3 vN;varying vec3 vW;void main(){vec4 w=uM*vec4(aP,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);gl_Position=uVP*w;}`,
     // Gilded-glass look matched to the approved Tree artwork: luminous bodies,
     // warm gold rim light, cool core, no matte black silhouettes.
-    `precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.4),heart=pow(max(dot(n,v),0.0),2.2);float scan=.97+.03*sin((vW.y+vW.x*.14)*30.0);vec3 gold=vec3(1.0,.82,.44);vec3 c=uC*(.58+d*.52)+mix(uC,gold,.30)*rim*(.42+uGlow*.36)+vec3(1.0,.9,.66)*heart*(.08+uGlow*.12);c+=vec3(.03,.08,.12)*uGlow*.10;gl_FragColor=vec4(min(c,vec3(1.0)),uAlpha);}`,
+    `precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.4),heart=pow(max(dot(n,v),0.0),2.2);vec3 gold=vec3(1.0,.82,.44);vec3 c=uC*(.58+d*.52)+mix(uC,gold,.30)*rim*(.42+uGlow*.36)+vec3(1.0,.9,.66)*heart*(.08+uGlow*.12);c+=vec3(.03,.08,.12)*uGlow*.10;gl_FragColor=vec4(min(c,vec3(1.0)),uAlpha);}`,
   );
 }
 function lineProgram(gl: WebGLRenderingContext) {
@@ -985,7 +985,7 @@ export function Envision3DScene({
       const k = focus ? 1.02 * zoom : 0.48;
       const spin =
         assemblySpin(elapsedMs / 1000, index) + (focus ? rotationRef.current.y - 0.45 : 0);
-      const idle = Math.sin(t * 0.8) * 0.02;
+      const idle = 0;
       const pitch =
         (focus ? rotationRef.current.x : -0.12) +
         (stationPhase === "stabilized" ? idle * 0.5 : idle * 0.2);
@@ -1035,194 +1035,10 @@ export function Envision3DScene({
 
       projector(vp, base, color, focus ? 0.9 : 0.68, focus, blend);
 
-      // Field arcs: strong while energy is loose, faint once stabilized.
-      const arcEnergy =
-        stationPhase === "possibility"
-          ? 1
-          : stationPhase === "condensation"
-            ? lerp(1, 0.55, prog)
-            : stationPhase === "reveal"
-              ? lerp(0.55, 0.3, prog)
-              : 0.16;
-      const arcScale = focus ? 1.25 : 0.95;
-      drawLines(
-        arcM,
-        compose(
-          [base[0], base[1] - (focus ? 1.15 : 0.78) * 0.92, base[2]],
-          [0, 0, 0],
-          [arcScale, arcScale, arcScale],
-        ),
-        vp,
-        blend ? [0.98, 0.72, 0.2] : [0.24, 0.8, 0.96],
-        0.5,
-        arcEnergy * (focus ? 1 : 0.85) * fade,
-        t,
-      );
-
-      // Woven filaments ride the assembly spin — knowledge weaving the form.
-      const helixEnergy =
-        stationPhase === "possibility"
-          ? 0.9
-          : stationPhase === "condensation"
-            ? 0.7
-            : stationPhase === "reveal"
-              ? 0.5
-              : 0.24;
-      drawLines(
-        helixM,
-        stationRot,
-        vp,
-        blend ? [1, 0.7, 0.18] : [1, 0.74, 0.3],
-        0.42,
-        helixEnergy * fade,
-        t,
-      );
-
-      // Ornamental gold orbit rings, echoing the artwork's rings around the
-      // canopy. They ride their own slow drift so the assembly feels forged
-      // from the same material as the Tree.
-      const orbitRing = (radius: number, tiltX: number, tiltZ: number, alpha: number) => {
-        drawSolid(
-          orbitM,
-          matMul(
-            stationRot,
-            compose([0, 0, 0], [Math.PI / 2 + tiltX, 0, tiltZ], [radius, radius, radius]),
-          ),
-          vp,
-          GOLD,
-          0.36,
-          alpha * fade,
-        );
-      };
-      const orbitEnergy = stationPhase === "stabilized" ? 0.18 : 0.26 + 0.08 * Math.sin(t * 1.3);
-      orbitRing(1.42 * k, 0.42 + Math.sin(t * 0.21) * 0.05, 0.18, orbitEnergy);
-      orbitRing(1.68 * k, -0.3 + Math.cos(t * 0.17) * 0.05, -0.42, orbitEnergy * 0.7);
-
-      // Manifestation flash when the sequence starts.
-      if (elapsedMs < 650) {
-        const ft = Math.max(0, Math.min(1, elapsedMs / 650));
-        const fr = (0.3 + 1.7 * easeOutCubic(ft)) * (focus ? 1.5 : 1);
-        drawSolid(
-          torus,
-          compose([base[0], base[1], base[2]], [Math.PI / 2, 0, 0], [fr, fr, fr]),
-          vp,
-          blend ? [1, 0.66, 0.18] : [0.2, 0.9, 1],
-          0.6,
-          (1 - ft) * 0.5 * fade,
-        );
-      }
+      // Decorative energy-flow effects intentionally removed. The manifested reality is the visual subject.
 
       if (blend) {
-        // BLEND fusion: source realities spiral inward, components interlock, gold synthesis settles.
-        const converge =
-          stationPhase === "possibility"
-            ? 0
-            : stationPhase === "condensation"
-              ? easeOutCubic(prog)
-              : 1;
-        const sourceR = lerp(1.5, 0.18, converge);
-        for (let src = 0; src < 2; src++) {
-          const ang = assemblySpin(elapsedMs / 1000, src) * 1.35 + src * Math.PI;
-          const sPos: Vec3 = [
-            base[0] + Math.cos(ang) * sourceR,
-            base[1] + Math.sin(ang * 0.5) * 0.22,
-            base[2] + Math.sin(ang) * sourceR * 0.6,
-          ];
-          const sAlpha =
-            (stationPhase === "possibility"
-              ? 0.3
-              : stationPhase === "condensation"
-                ? lerp(0.3, 0.1, prog)
-                : lerp(0.1, 0, Math.min(1, prog * 2))) * fade;
-          if (sAlpha > 0.01) {
-            const srcRot = matMul(
-              translate(sPos[0], sPos[1], sPos[2]),
-              matMul(rotY(spin * 1.6 + src), rotX(pitch)),
-            );
-            if (src === 0) {
-              for (let q = -1; q <= 1; q += 2)
-                drawSolid(
-                  cube,
-                  matMul(srcRot, compose([0, q * 0.34, 0], [0, 0, 0], [1.1, 0.03, 0.03])),
-                  vp,
-                  ICE,
-                  0.4,
-                  sAlpha,
-                );
-              for (let ring = -1; ring <= 1; ring++)
-                drawSolid(
-                  torus,
-                  matMul(
-                    srcRot,
-                    compose([ring * 0.4, 0, 0], [Math.PI / 2, 0, 0], [0.26, 0.26, 0.26]),
-                  ),
-                  vp,
-                  GOLD,
-                  0.4,
-                  sAlpha,
-                );
-            } else {
-              drawSolid(
-                cylinder,
-                matMul(srcRot, compose([-0.2, 0, 0], [0, 0, 0], [0.42, 0.3, 0.3])),
-                vp,
-                BLUE_GLASS,
-                0.4,
-                sAlpha,
-              );
-              drawSolid(
-                sphere,
-                matMul(srcRot, compose([0.05, 0, 0], [0, 0, 0], [0.2, 0.2, 0.2])),
-                vp,
-                WARM_LIGHT,
-                0.5,
-                sAlpha,
-              );
-              drawSolid(
-                nozzle,
-                matMul(srcRot, compose([0.62, 0, 0], [0, 0, 0], [0.44, 0.34, 0.34])),
-                vp,
-                GOLD_DEEP,
-                0.4,
-                sAlpha,
-              );
-            }
-          }
-          // Energy strands pulling the sources together during condensation.
-          if (stationPhase === "condensation" && src === 0) {
-            strandData[0] = sPos[0];
-            strandData[1] = sPos[1];
-            strandData[2] = sPos[2];
-            strandData[3] = 0;
-            strandData[4] = sPos[0];
-            strandData[5] = sPos[1];
-            strandData[6] = sPos[2];
-            strandData[7] = 1;
-            strandData[8] = base[0];
-            strandData[9] = base[1];
-            strandData[10] = base[2];
-            strandData[11] = 0;
-            strandData[12] = base[0];
-            strandData[13] = base[1];
-            strandData[14] = base[2];
-            strandData[15] = 1;
-            gl.useProgram(lineP);
-            gl.bindBuffer(gl.ARRAY_BUFFER, strandBuf);
-            gl.bufferData(gl.ARRAY_BUFFER, strandData, gl.DYNAMIC_DRAW);
-            gl.enableVertexAttribArray(laP);
-            gl.vertexAttribPointer(laP, 3, gl.FLOAT, false, 16, 0);
-            gl.enableVertexAttribArray(laT);
-            gl.vertexAttribPointer(laT, 1, gl.FLOAT, false, 16, 12);
-            gl.uniformMatrix4fv(lu.M, false, matIdentity());
-            gl.uniformMatrix4fv(lu.VP, false, vp);
-            gl.uniform3f(lu.C, 1, 0.74, 0.2);
-            gl.uniform1f(lu.Alpha, 0.5 * fade);
-            gl.uniform1f(lu.Energy, 1);
-            gl.uniform1f(lu.Time, t);
-            gl.drawArrays(gl.LINES, 0, 4);
-            gl.useProgram(solidP);
-          }
-        }
+        // BLEND is shown directly as one solid synthesized assembly; no orbiting source-energy animation.
         // Combined assembly: rail spine + ion rings + chamber core + exhaust, gold synthesis.
         model(cube, [0, -0.52, 0], [0, 0, 0], [1.42 * k, 0.045, 0.42 * k], BLUE_GLASS_DEEP, 0.24);
         for (let q = -1; q <= 1; q += 2)
@@ -1523,93 +1339,21 @@ export function Envision3DScene({
         stationFadeRef.current[i] = cur + ((fadeTargets[i] ?? 1) - cur) * Math.min(1, 0.09);
       }
 
-      const particlesFor = (stationIndex: number, pos: Vec3, fade: number) => {
-        if (fade <= 0.02) return;
-        const focusedHere = Boolean(
-          focused && (paths[stationIndex]?.id === focused || delivery.blend?.id === focused),
-        );
-        const elapsed = Math.max(
-          0,
-          (focusedHere ? clocks.focus : clocks.overview) -
-            (focusedHere ? 0 : stationIndex * STATION_STAGGER_MS),
-        );
-        const ph = manifestationPhase(elapsed);
-        const pr = phaseProgress(elapsed);
-        const converge = ph === "possibility" ? 0 : ph === "condensation" ? easeOutCubic(pr) : 1;
-        let cyanUsed = 0,
-          goldUsed = 0;
-        const seed = stationIndex * 0.73 + 1;
-        for (let i = 0; i < PARTICLES_PER_STATION; i++) {
-          const p = particles[i];
-          if (!p) continue;
-          let bright: number;
-          if (ph === "possibility") bright = 0.85;
-          else if (ph === "condensation") bright = lerp(0.85, 0.5, pr);
-          else if (ph === "reveal") bright = lerp(0.5, 0.16, pr);
-          else bright = i % 6 === 0 ? 0.3 : 0;
-          if (bright <= 0) continue;
-          const ang =
-            p.phase +
-            (elapsed / 1000) * p.speed * (1 - 0.75 * converge) * (reducedMotion ? 0.25 : 1);
-          const R = (1.8 - 0.95 * converge) * (0.62 + partHash(i + 7, seed) * 0.75);
-          const wob = Math.sin(t * p.wobble + p.phase) * 0.12 * (1 - converge);
-          const o = (p.gold ? goldUsed : cyanUsed) * 5;
-          const target = p.gold ? goldData : cyanData;
-          target[o] = pos[0] + p.dir[0] * R;
-          target[o + 1] = pos[1] + p.dir[1] * R + wob;
-          target[o + 2] = pos[2] + p.dir[2] * R;
-          target[o + 3] = p.size;
-          target[o + 4] = bright;
-          if (p.gold) goldUsed++;
-          else cyanUsed++;
-        }
-        drawParticles(
-          cyanBuf,
-          cyanData,
-          cyanUsed,
-          vp,
-          [0.6, 0.88, 1],
-          0.5 * fade,
-          dpr * (focusedHere ? 1.2 : 1),
-        );
-        drawParticles(
-          goldBuf,
-          goldData,
-          goldUsed,
-          vp,
-          [1, 0.78, 0.32],
-          0.55 * fade,
-          dpr * (focusedHere ? 1.2 : 1),
-        );
-      };
-
-      if (focused) {
+if (focused) {
         if (focusPath && focusIndex >= 0) {
           const slot = PATH_SLOTS[focusIndex]?.pos ?? [0, 0, 0];
           renderAssembly(vp, focusPath, slot, hue(focusIndex), true, t, focusIndex, clocks, false);
-          particlesFor(
-            focusIndex,
-            [
-              lerp(slot[0], FOCUS_BASE[0], easeOutCubic(Math.min(1, clocks.focus / 450))),
-              FOCUS_BASE[1],
-              0,
-            ],
-            stationFadeRef.current[focusIndex] ?? 1,
-          );
-        } else if (delivery.blend && focusBlend) {
+                  } else if (delivery.blend && focusBlend) {
           renderAssembly(vp, delivery.blend, BLEND_POS, [1, 0.66, 0.18], true, t, 4, clocks, true);
-          particlesFor(4, BLEND_POS, stationFadeRef.current[4] ?? 1);
-        }
+                  }
       } else {
         paths.forEach((path, i) => {
           const pos = PATH_SLOTS[i]?.pos ?? [0, 0, 0];
           renderAssembly(vp, path, pos, hue(i), false, t, i, clocks, false);
-          particlesFor(i, pos, stationFadeRef.current[i] ?? 1);
-        });
+                  });
         if (delivery.blend) {
           renderAssembly(vp, delivery.blend, BLEND_POS, [1, 0.66, 0.18], false, t, 4, clocks, true);
-          particlesFor(4, BLEND_POS, stationFadeRef.current[4] ?? 1);
-        }
+                  }
       }
       raf = requestAnimationFrame(render);
     };

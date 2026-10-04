@@ -22,6 +22,8 @@ import {
 } from "@/lib/ascension/model-provider";
 
 type Pathway = ObjectiveDelivery["pathways"][number];
+/** Presentation modes for a focused reality: exhibition cutaway, drafting plate, in-world hall. */
+type VisualMode = "cutaway" | "blueprint" | "environment";
 type Props = {
   delivery: ObjectiveDelivery;
   selectedId: string | null;
@@ -344,6 +346,62 @@ function orbitVertices(seg = 64, tube = 8) {
   return new Float32Array(d);
 }
 
+/**
+ * Technical-drawing wireframes for BLUEPRINT mode. Walks the same triangle
+ * soup the cutaway renders and keeps only drafting linework: boundary edges
+ * plus creases sharper than ~30°. Output is line-vertex pairs (pos + t=0) so
+ * the drawing stays steady instead of flowing like energy filaments.
+ */
+function wireEdges(src: Float32Array): { feature: Float32Array; all: Float32Array } {
+  const key = (v: number) => Math.round(v * 2000) / 2000;
+  type EdgeAcc = { a: Vec3; b: Vec3; n: Vec3; count: number; creased: boolean };
+  const seen = new Map<string, EdgeAcc>();
+  const all: number[] = [];
+  const verts: Vec3[] = [];
+  for (let i = 0; i < src.length; i += 18) {
+    verts.length = 0;
+    for (let v = 0; v < 3; v++)
+      verts.push([src[i + v * 3] ?? 0, src[i + v * 3 + 1] ?? 0, src[i + v * 3 + 2] ?? 0]);
+    const [a, b, c] = verts as [Vec3, Vec3, Vec3];
+    const ux = b[0] - a[0],
+      uy = b[1] - a[1],
+      uz = b[2] - a[2],
+      vx = c[0] - a[0],
+      vy = c[1] - a[1],
+      vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy,
+      ny = uz * vx - ux * vz,
+      nz = ux * vy - uy * vx;
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    nx /= nl;
+    ny /= nl;
+    nz /= nl;
+    const pairs: [Vec3, Vec3][] = [
+      [a, b],
+      [b, c],
+      [c, a],
+    ];
+    for (const [m, n] of pairs) {
+      all.push(m[0], m[1], m[2], 0, n[0], n[1], n[2], 0);
+      const k1 = `${key(m[0])},${key(m[1])},${key(m[2])}`,
+        k2 = `${key(n[0])},${key(n[1])},${key(n[2])}`;
+      const ek = k1 < k2 ? `${k1}|${k2}` : `${k2}|${k1}`;
+      const acc = seen.get(ek);
+      if (!acc) seen.set(ek, { a: m, b: n, n: [nx, ny, nz], count: 1, creased: false });
+      else {
+        acc.count++;
+        if (acc.n[0] * nx + acc.n[1] * ny + acc.n[2] * nz < 0.86) acc.creased = true;
+      }
+    }
+  }
+  const feature: number[] = [];
+  for (const e of seen.values()) {
+    if (e.count === 1 || e.creased)
+      feature.push(e.a[0], e.a[1], e.a[2], 0, e.b[0], e.b[1], e.b[2], 0);
+  }
+  return { feature: new Float32Array(feature), all: new Float32Array(all) };
+}
+
 /** Luminous filaments: two woven helices winding the assembly axis (unit space, X axis). */
 function helixVertices(segments = 54) {
   const d: number[] = [];
@@ -436,7 +494,7 @@ function solidProgram(gl: WebGLRenderingContext) {
     `attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform mat4 uVP;varying vec3 vN;varying vec3 vW;void main(){vec4 w=uM*vec4(aP,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);gl_Position=uVP*w;}`,
     // Gilded-glass look matched to the approved Tree artwork: luminous bodies,
     // warm gold rim light, cool core, no matte black silhouettes.
-    `precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.4),heart=pow(max(dot(n,v),0.0),2.2);vec3 gold=vec3(1.0,.82,.44);vec3 c=uC*(.58+d*.52)+mix(uC,gold,.30)*rim*(.42+uGlow*.36)+vec3(1.0,.9,.66)*heart*(.08+uGlow*.12);c+=vec3(.03,.08,.12)*uGlow*.10;gl_FragColor=vec4(min(c,vec3(1.0)),uAlpha);}`,
+    `precision mediump float;uniform vec3 uC;uniform vec3 uEye;uniform float uGlow;uniform float uAlpha;varying vec3 vN;varying vec3 vW;void main(){vec3 n=normalize(vN),l=normalize(vec3(-.45,.72,.68)),v=normalize(uEye-vW);float d=max(dot(n,l),0.0),rim=pow(1.0-max(dot(n,v),0.0),2.4),heart=pow(max(dot(n,v),0.0),2.2);float scan=.99+.01*sin((vW.y+vW.x*.14)*18.0);vec3 gold=vec3(1.0,.82,.44);vec3 c=uC*(.30+d*.40)+mix(uC,gold,.38)*rim*(.55+uGlow*.5)+vec3(1.0,.9,.66)*heart*(.04+uGlow*.1);c+=vec3(.03,.10,.15)*uGlow*.16;gl_FragColor=vec4(min(c,vec3(.97)),uAlpha);}`,
   );
 }
 function lineProgram(gl: WebGLRenderingContext) {
@@ -536,7 +594,7 @@ export function Envision3DScene({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
-  const rotationRef = useRef({ x: -0.18, y: 0.45 });
+  const rotationRef = useRef({ x: -0.22, y: 0.55 });
   const zoomRef = useRef(1);
   const dragRef = useRef<{ x: number; y: number; active: boolean; moved: boolean }>({
     x: 0,
@@ -567,6 +625,11 @@ export function Envision3DScene({
     setGenerated(value);
   };
   onPhaseChangeRef.current = onPhaseChange;
+  // Presentation mode of the focused reality. The RAF closure reads the ref so
+  // switching modes never rebuilds the WebGL pipeline.
+  const [visualMode, setVisualMode] = useState<VisualMode>("cutaway");
+  const visualModeRef = useRef<VisualMode>("cutaway");
+  visualModeRef.current = visualMode;
 
   const paths = useMemo(() => delivery.pathways.slice(0, 4), [delivery.pathways]);
   const choices = useMemo(
@@ -600,10 +663,11 @@ export function Envision3DScene({
   }, [sceneSignature]);
   useEffect(() => {
     focusStartRef.current = performance.now();
-    rotationRef.current = { x: -0.18, y: 0.45 };
+    rotationRef.current = { x: -0.22, y: 0.55 };
     zoomRef.current = 1;
     lastPhaseRef.current = "idle";
     setPhase("possibility");
+    setVisualMode("cutaway");
   }, [selectedId]);
 
   // Hunyuan3D adapter: only fetches when an endpoint is actually configured;
@@ -674,6 +738,21 @@ export function Envision3DScene({
     let generatedBuf: WebGLBuffer | null = null,
       generatedCount = 0,
       generatedBuiltFor: Float32Array | null = null;
+    // BLUEPRINT linework, derived from the exact triangle data each solid uses.
+    type WirePair = { feature: Mesh; all: Mesh };
+    const wires = new Map<Mesh, WirePair>();
+    const buildWire = (data: Float32Array): WirePair => {
+      const w = wireEdges(data);
+      return { feature: lineMesh(gl, w.feature), all: lineMesh(gl, w.all) };
+    };
+    // Generated Hunyuan3D linework, built when the model buffer is built.
+    let generatedWire: {
+      feature: WebGLBuffer;
+      all: WebGLBuffer;
+      featureCount: number;
+      allCount: number;
+      forMesh: Float32Array | null;
+    } | null = null;
     let raf = 0,
       dead = false;
     const cyanData = new Float32Array(PARTICLES_PER_STATION * 5 * 5);
@@ -695,6 +774,11 @@ export function Envision3DScene({
       cyanBuf = dynamicBuffer(gl);
       goldBuf = dynamicBuffer(gl);
       strandBuf = dynamicBuffer(gl);
+      wires.set(cube, buildWire(cubeVertices()));
+      wires.set(torus, buildWire(torusVertices()));
+      wires.set(sphere, buildWire(sphereVertices()));
+      wires.set(cylinder, buildWire(cylinderVertices()));
+      wires.set(nozzle, buildWire(cylinderVertices(30, true)));
     } catch {
       setWebglError(true);
       return;
@@ -776,6 +860,7 @@ export function Envision3DScene({
       alpha: number,
       energy: number,
       time: number,
+      primitive: number = gl.LINE_STRIP,
     ) => {
       if (alpha <= 0.004 || energy <= 0.004) return;
       gl.useProgram(lineP);
@@ -790,8 +875,17 @@ export function Envision3DScene({
       gl.uniform1f(lu.Alpha, alpha);
       gl.uniform1f(lu.Energy, energy);
       gl.uniform1f(lu.Time, time);
-      gl.drawArrays(gl.LINE_STRIP, 0, m.count);
+      gl.drawArrays(primitive, 0, m.count);
       gl.useProgram(solidP);
+    };
+    /** Drafting stroke: steady linework drawn as GL LINES (wireframe pairs). */
+    const drawDraft = (w: WirePair, model: Float32Array, vp: Float32Array, alpha: number) => {
+      if (alpha <= 0.004) return;
+      gl.enable(gl.POLYGON_OFFSET_FILL);
+      gl.polygonOffset(1.2, 1.2);
+      drawLines(w.feature, model, vp, [0.78, 0.93, 1], alpha, 1, 0, gl.LINES);
+      drawLines(w.all, model, vp, [0.62, 0.85, 1], alpha * 0.16, 1, 0, gl.LINES);
+      gl.disable(gl.POLYGON_OFFSET_FILL);
     };
     const drawParticles = (
       buffer: WebGLBuffer,
@@ -829,58 +923,53 @@ export function Envision3DScene({
       size: number,
       focus: boolean,
       blend: boolean,
+      drafting: boolean,
     ) => {
       const y = base[1] - (focus ? 1.15 : 0.78) * size;
       const ringColor: Vec3 = blend ? [0.95, 0.62, 0.18] : CYAN;
-      // Gilded podium dish: blue-glass body framed in gold, echoing the artwork base.
-      drawSolid(
-        cylinder,
-        compose(
-          [base[0], y, base[2]],
-          [0, 0, Math.PI / 2],
-          [0.07 * size, 0.54 * size, 0.54 * size],
-        ),
-        vp,
-        BLUE_GLASS_DEEP,
-        0.24,
-        0.55,
+      const dishXf = compose(
+        [base[0], y, base[2]],
+        [0, 0, Math.PI / 2],
+        [0.07 * size, 0.54 * size, 0.54 * size],
       );
-      drawSolid(
-        torus,
-        compose(
-          [base[0], y + 0.05 * size, base[2]],
-          [Math.PI / 2, 0, 0],
-          [0.56 * size, 0.56 * size, 0.56 * size],
-        ),
-        vp,
-        blend ? ringColor : GOLD,
-        0.4,
-        0.7,
+      const goldRingXf = compose(
+        [base[0], y + 0.05 * size, base[2]],
+        [Math.PI / 2, 0, 0],
+        [0.56 * size, 0.56 * size, 0.56 * size],
       );
-      drawSolid(
-        torus,
-        compose(
-          [base[0], y + 0.11 * size, base[2]],
-          [Math.PI / 2, 0, 0],
-          [0.39 * size, 0.39 * size, 0.39 * size],
-        ),
-        vp,
-        color,
-        0.3,
-        0.55,
+      const hueRingXf = compose(
+        [base[0], y + 0.11 * size, base[2]],
+        [Math.PI / 2, 0, 0],
+        [0.39 * size, 0.39 * size, 0.39 * size],
       );
-      drawSolid(
-        nozzle,
-        compose(
-          [base[0], y + 0.52 * size, base[2]],
-          [0, 0, -Math.PI / 2],
-          [0.5 * size, 0.42 * size, 0.42 * size],
-        ),
-        vp,
-        blend ? [0.98, 0.7, 0.2] : GOLD_DEEP,
-        0.2,
-        0.34,
+      const spikeXf = compose(
+        [base[0], y + 0.5 * size, base[2]],
+        [0, 0, -Math.PI / 2],
+        [0.4 * size, 0.3 * size, 0.3 * size],
       );
+      if (drafting) {
+        drawDraft(wires.get(cylinder)!, dishXf, vp, 0.6);
+        drawDraft(wires.get(torus)!, goldRingXf, vp, 0.7);
+        drawDraft(wires.get(torus)!, hueRingXf, vp, 0.55);
+        drawDraft(wires.get(nozzle)!, spikeXf, vp, 0.45);
+        if (focus)
+          drawDraft(
+            wires.get(torus)!,
+            compose(
+              [base[0], base[1] - 0.83 * size, base[2]],
+              [Math.PI / 2, 0, 0],
+              [0.88 * size, 0.88 * size, 0.88 * size],
+            ),
+            vp,
+            0.3,
+          );
+        return;
+      }
+      const dishQuiet = focus ? 0.5 : 1;
+      drawSolid(cylinder, dishXf, vp, BLUE_GLASS_DEEP, 0.24, 0.34 * dishQuiet);
+      drawSolid(torus, goldRingXf, vp, blend ? ringColor : GOLD, 0.4, 0.55 * dishQuiet);
+      drawSolid(torus, hueRingXf, vp, color, 0.3, 0.4 * dishQuiet);
+      drawSolid(nozzle, spikeXf, vp, blend ? [0.98, 0.7, 0.2] : GOLD_DEEP, 0.14, 0.12 * dishQuiet);
       if (focus) {
         drawSolid(
           torus,
@@ -893,6 +982,146 @@ export function Envision3DScene({
           GOLD,
           0.34,
           0.42,
+        );
+      }
+    };
+
+    /**
+     * ENVIRONMENT mode set dressing: the invention staged inside an ASCENSION
+     * knowledge hall — glass enclosure, grand dais, engraved floor rings,
+     * gilded columns and floating lantern orbs. Drawn around/behind the exhibit.
+     */
+    const environmentSet = (vp: Float32Array, base: Vec3, k: number, fade: number, t: number) => {
+      const y0 = base[1] - 1.15 * 1.1; // assembly dish plane (focus projector size 1.1)
+      // Enclosure shell: a faint warm glass vault around the exhibit. Depth
+      // writes stay off so the vault never occludes the invention inside it.
+      gl.depthMask(false);
+      drawSolid(
+        sphere,
+        compose([base[0], y0 + 0.8, base[2]], [0, 0, 0], [4.1 * k, 3.3 * k, 4.1 * k]),
+        vp,
+        [0.5, 0.4, 0.22],
+        0.06,
+        0.08 * fade,
+      );
+      gl.depthMask(true);
+      // Grand dais: two glass tiers with gold rims beneath the projector dish.
+      drawSolid(
+        cylinder,
+        compose([base[0], y0 - 0.22, base[2]], [0, 0, Math.PI / 2], [0.07, 1.05 * k, 1.05 * k]),
+        vp,
+        BLUE_GLASS_DEEP,
+        0.24,
+        0.75 * fade,
+      );
+      drawSolid(
+        torus,
+        compose([base[0], y0 - 0.16, base[2]], [Math.PI / 2, 0, 0], [1.05 * k, 1.05 * k, 1.05 * k]),
+        vp,
+        GOLD,
+        0.44,
+        0.7 * fade,
+      );
+      drawSolid(
+        cylinder,
+        compose([base[0], y0 - 0.42, base[2]], [0, 0, Math.PI / 2], [0.07, 0.78 * k, 0.78 * k]),
+        vp,
+        BLUE_GLASS_DEEP,
+        0.2,
+        0.5 * fade,
+      );
+      drawSolid(
+        torus,
+        compose([base[0], y0 - 0.36, base[2]], [Math.PI / 2, 0, 0], [0.78 * k, 0.78 * k, 0.78 * k]),
+        vp,
+        GOLD_DEEP,
+        0.3,
+        0.45 * fade,
+      );
+      // Engraved floor rings radiating from the dais.
+      drawSolid(
+        orbitM,
+        compose([base[0], y0 - 0.62, base[2]], [Math.PI / 2, 0, 0], [1.7 * k, 1.7 * k, 1.7 * k]),
+        vp,
+        GOLD,
+        0.34,
+        0.3 * fade,
+      );
+      drawSolid(
+        orbitM,
+        compose([base[0], y0 - 0.62, base[2]], [Math.PI / 2, 0, 0], [2.4 * k, 2.4 * k, 2.4 * k]),
+        vp,
+        GOLD,
+        0.3,
+        0.22 * fade,
+      );
+      drawSolid(
+        orbitM,
+        compose([base[0], y0 - 0.62, base[2]], [Math.PI / 2, 0, 0], [3.0 * k, 3.0 * k, 3.0 * k]),
+        vp,
+        [0.24, 0.7, 0.9],
+        0.24,
+        0.14 * fade,
+      );
+      // Hall columns with gilded caps, bases and lantern heads.
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const cx = base[0] + Math.cos(a) * 3.4 * k;
+        const cz = base[2] + Math.sin(a) * 3.4 * k * 0.72;
+        drawSolid(
+          cylinder,
+          compose([cx, y0 + 0.54, cz], [0, 0, Math.PI / 2], [1.15, 0.085 * k, 0.085 * k]),
+          vp,
+          BLUE_GLASS_DEEP,
+          0.22,
+          0.5 * fade,
+        );
+        drawSolid(
+          torus,
+          compose([cx, y0 + 1.7, cz], [Math.PI / 2, 0, 0], [0.17 * k, 0.17 * k, 0.17 * k]),
+          vp,
+          GOLD,
+          0.44,
+          0.5 * fade,
+        );
+        drawSolid(
+          torus,
+          compose([cx, y0 - 0.58, cz], [Math.PI / 2, 0, 0], [0.19 * k, 0.19 * k, 0.19 * k]),
+          vp,
+          GOLD_DEEP,
+          0.3,
+          0.4 * fade,
+        );
+        drawSolid(
+          sphere,
+          compose([cx, y0 + 1.88, cz], [0, 0, 0], [0.075 * k, 0.075 * k, 0.075 * k]),
+          vp,
+          WARM_LIGHT,
+          0.5,
+          0.5 * fade,
+        );
+      }
+      // Floating lantern orbs flanking the exhibit.
+      for (let q = -1; q <= 1; q += 2) {
+        const bob = Math.sin(t * 0.9 + q) * 0.06;
+        const lx = base[0] + q * 2.6 * k,
+          ly = y0 + 2.4 + bob,
+          lz = base[2] - 0.4;
+        drawSolid(
+          sphere,
+          compose([lx, ly, lz], [0, 0, 0], [0.09 * k, 0.09 * k, 0.09 * k]),
+          vp,
+          WARM_LIGHT,
+          0.55,
+          0.55 * fade,
+        );
+        drawSolid(
+          torus,
+          compose([lx, ly, lz], [Math.PI / 2, 0, 0], [0.15 * k, 0.15 * k, 0.15 * k]),
+          vp,
+          GOLD,
+          0.4,
+          0.4 * fade,
         );
       }
     };
@@ -964,8 +1193,10 @@ export function Envision3DScene({
       index: number,
       clocks: { overview: number; focus: number },
       blend = false,
+      visual: VisualMode = "cutaway",
     ) => {
       const focus = selectedRef.current !== null && active;
+      const drafting = visual === "blueprint";
       const seed = index * 0.73 + 1;
       const rawElapsed = focus ? clocks.focus : clocks.overview;
       const elapsedMs = Math.max(0, rawElapsed - (focus ? 0 : index * STATION_STAGGER_MS));
@@ -1006,15 +1237,7 @@ export function Envision3DScene({
       stationRot = matMul(stationRot, rotX(pitch));
 
       let partIndex = 0;
-      const model = (
-        m: Mesh,
-        pLocal: Vec3,
-        rot: Vec3,
-        s: Vec3,
-        col: Vec3,
-        g = glowBase,
-        a = 0.8,
-      ) => {
+      const model = (m: Mesh, pLocal: Vec3, rot: Vec3, s: Vec3, col: Vec3, g = glowBase, a = 1) => {
         const state = partState(partIndex, elapsedMs, seed, focus, fade);
         partIndex++;
         if (!state.visible) return;
@@ -1023,19 +1246,27 @@ export function Envision3DScene({
           pLocal[1] + state.offset[1],
           pLocal[2] + state.offset[2],
         ];
-        drawSolid(
-          m,
-          matMul(stationRot, compose(p2, rot, s)),
-          vp,
-          col,
-          g + state.glowBoost,
-          state.alpha,
-        );
+        const xf = matMul(stationRot, compose(p2, rot, s));
+        if (drafting) {
+          // BLUEPRINT: technical linework of the same part. A faint glass fill
+          // gives hidden-line depth; the drafting strokes carry the shape.
+          drawSolid(m, xf, vp, [0.05, 0.13, 0.24], 0, state.alpha * 0.3);
+          const w = wires.get(m);
+          if (w) drawDraft(w, xf, vp, state.alpha * 0.95);
+          return;
+        }
+        drawSolid(m, xf, vp, col, g + state.glowBoost, state.alpha * a);
       };
 
-      projector(vp, base, color, focus ? 0.9 : 0.68, focus, blend);
+      // The projector anchors the overview stations; in focused inspection it
+      // steps aside so the invention stays the star (the environment dais
+      // takes over as the pedestal).
+      if (!focus) projector(vp, base, color, 0.68, false, blend, drafting);
 
       // Decorative energy-flow effects intentionally removed. The manifested reality is the visual subject.
+
+      // ENVIRONMENT: chamber set dressing staged behind the exhibit.
+      if (visual === "environment" && focus) environmentSet(vp, base, k, fade, t);
 
       if (blend) {
         // BLEND is shown directly as one solid synthesized assembly; no orbiting source-energy animation.
@@ -1155,24 +1386,38 @@ export function Envision3DScene({
         model(cube, [1.28, 0, 0], [0, 0, 0], [0.76 * k, 0.012, 0.012], BLUE_GLASS, 0.26);
       } else if (kind === "linear") {
         // Linear propulsion — enriched only when the user's own specs are identified.
+        // Cutaway reads like a premium exhibit: solid steel-blue rails, three gilded
+        // ring housings, and a copper winding stack visible between them.
         const rails = spec?.rails ?? 2;
         const coils = spec?.coils ?? 3;
+        const railBody: Vec3 = [0.1, 0.3, 0.64];
+        // Core glass paints first so the internals read over it, not under it.
+        model(cube, [0, 0, 0], [0, 0, 0], [0.54 * k, 0.2 * k, 0.28 * k], BLUE_GLASS, 0.4);
         for (let r = 0; r < rails; r++) {
-          const off = (r - (rails - 1) / 2) * 0.3;
-          model(cube, [0, off, 0], [0, 0, 0], [1.5 * k, 0.035, 0.035], CYAN, 0.32);
+          const off = (r - (rails - 1) / 2) * 0.36;
+          model(cube, [0, off, 0], [0, 0, 0], [1.5 * k, 0.085, 0.085], railBody, 0.18, 0.97);
         }
-        const spacing = coils > 3 ? 0.28 : 0.62;
-        for (let cIdx = 0; cIdx < coils; cIdx++) {
-          const x = (cIdx - (coils - 1) / 2) * spacing;
-          model(torus, [x, 0, 0], [Math.PI / 2, 0, 0], [0.3 * k, 0.3 * k, 0.3 * k], GOLD, 0.34);
+        // Ring housings: one per coil trio so dense specs stay readable.
+        const housings = coils > 6 ? 3 : coils > 1 ? 2 : 1;
+        for (let h = 0; h < housings; h++) {
+          const x = (h - (housings - 1) / 2) * 0.58;
+          model(torus, [x, 0, 0], [Math.PI / 2, 0, 0], [0.32 * k, 0.32 * k, 0.32 * k], GOLD, 0.3);
         }
-        // Higher glow keeps the core readable as glass instead of a black wedge.
-        model(cube, [0, 0, 0], [0, 0, 0], [0.54 * k, 0.2 * k, 0.28 * k], BLUE_GLASS, 0.5);
+        // Copper winding stack between the housings — the visible internal structure.
+        for (let w = -1; w <= 1; w++)
+          model(
+            torus,
+            [w * 0.13, 0, 0],
+            [Math.PI / 2, 0, 0],
+            [0.17 * k, 0.17 * k, 0.17 * k],
+            [0.85, 0.48, 0.24],
+            0.3,
+          );
         if (spec?.stasis)
-          model(torus, [0, 0, 0], [0, Math.PI / 2, 0], [0.62 * k, 0.62 * k, 0.62 * k], GOLD, 0.44);
+          model(torus, [0, 0, 0], [0, Math.PI / 2, 0], [0.56 * k, 0.56 * k, 0.56 * k], GOLD, 0.44);
         if (spec?.piezo)
           for (let q = -1; q <= 1; q += 2)
-            model(cube, [0, q * 0.42, 0], [0, 0, 0], [1.44 * k, 0.012, 0.05], ICE, 0.3);
+            model(cube, [0, q * 0.5, 0], [0, 0, 0], [1.44 * k, 0.022, 0.06], ICE, 0.26);
         if (spec?.lidar)
           model(sphere, [-1.05, 0, 0], [0, 0, 0], [0.12 * k, 0.12 * k, 0.12 * k], WARM_LIGHT, 0.4);
         model(cube, [1.55, 0, 0], [0, 0, 0], [0.62 * k, 0.015, 0.015], BLUE_GLASS, 0.26);
@@ -1270,20 +1515,74 @@ export function Envision3DScene({
           gl.bufferData(gl.ARRAY_BUFFER, normalized, gl.STATIC_DRAW);
           generatedCount = normalized.length / 6;
           generatedBuiltFor = generated.mesh;
+          // BLUEPRINT linework for the generated mesh, from its own triangles.
+          if (generatedWire) {
+            gl.deleteBuffer(generatedWire.feature);
+            gl.deleteBuffer(generatedWire.all);
+          }
+          const gw = wireEdges(normalized);
+          generatedWire = {
+            feature: dynamicBuffer(gl),
+            all: dynamicBuffer(gl),
+            featureCount: gw.feature.length / 4,
+            allCount: gw.all.length / 4,
+            forMesh: generated.mesh,
+          };
+          gl.bindBuffer(gl.ARRAY_BUFFER, generatedWire.feature);
+          gl.bufferData(gl.ARRAY_BUFFER, gw.feature, gl.STATIC_DRAW);
+          gl.bindBuffer(gl.ARRAY_BUFFER, generatedWire.all);
+          gl.bufferData(gl.ARRAY_BUFFER, gw.all, gl.STATIC_DRAW);
         }
         const alpha =
           (stationPhase === "reveal" ? lerp(0.5, 1, prog) : 1) *
           (focus && stationPhase === "stabilized" ? 1 : focus ? 0.98 : 0.84) *
           fade;
-        drawSolidCount(
-          generatedBuf,
-          generatedCount,
-          stationRot,
-          vp,
-          [0.52, 0.76, 1],
-          glowBase + 0.3,
-          alpha,
-        );
+        if (drafting && generatedWire && generatedWire.forMesh === generated.mesh) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, generatedBuf);
+          gl.enableVertexAttribArray(saP);
+          gl.vertexAttribPointer(saP, 3, gl.FLOAT, false, 24, 0);
+          gl.enableVertexAttribArray(saN);
+          gl.vertexAttribPointer(saN, 3, gl.FLOAT, false, 24, 12);
+          gl.uniformMatrix4fv(su.M, false, stationRot);
+          gl.uniformMatrix4fv(su.VP, false, vp);
+          gl.uniform3f(su.C, 0.05, 0.13, 0.24);
+          gl.uniform1f(su.Glow, 0);
+          gl.uniform1f(su.Alpha, alpha * 0.3);
+          gl.enable(gl.POLYGON_OFFSET_FILL);
+          gl.polygonOffset(1.2, 1.2);
+          gl.drawArrays(gl.TRIANGLES, 0, generatedCount);
+          gl.disable(gl.POLYGON_OFFSET_FILL);
+          gl.useProgram(lineP);
+          gl.enable(gl.BLEND);
+          const stroke = (buf: WebGLBuffer, count: number, col: Vec3, a: number) => {
+            if (a <= 0.004) return;
+            gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+            gl.enableVertexAttribArray(laP);
+            gl.vertexAttribPointer(laP, 3, gl.FLOAT, false, 16, 0);
+            gl.enableVertexAttribArray(laT);
+            gl.vertexAttribPointer(laT, 1, gl.FLOAT, false, 16, 12);
+            gl.uniformMatrix4fv(lu.M, false, stationRot);
+            gl.uniformMatrix4fv(lu.VP, false, vp);
+            gl.uniform3f(lu.C, ...col);
+            gl.uniform1f(lu.Alpha, a);
+            gl.uniform1f(lu.Energy, 1);
+            gl.uniform1f(lu.Time, 0);
+            gl.drawArrays(gl.LINES, 0, count);
+          };
+          stroke(generatedWire.feature, generatedWire.featureCount, [0.78, 0.93, 1], alpha * 0.95);
+          stroke(generatedWire.all, generatedWire.allCount, [0.62, 0.85, 1], alpha * 0.16);
+          gl.useProgram(solidP);
+        } else {
+          drawSolidCount(
+            generatedBuf,
+            generatedCount,
+            stationRot,
+            vp,
+            [0.52, 0.76, 1],
+            glowBase + 0.3,
+            alpha,
+          );
+        }
       }
     };
 
@@ -1339,21 +1638,44 @@ export function Envision3DScene({
         stationFadeRef.current[i] = cur + ((fadeTargets[i] ?? 1) - cur) * Math.min(1, 0.09);
       }
 
-if (focused) {
+      if (focused) {
+        const visual = visualModeRef.current;
         if (focusPath && focusIndex >= 0) {
           const slot = PATH_SLOTS[focusIndex]?.pos ?? [0, 0, 0];
-          renderAssembly(vp, focusPath, slot, hue(focusIndex), true, t, focusIndex, clocks, false);
-                  } else if (delivery.blend && focusBlend) {
-          renderAssembly(vp, delivery.blend, BLEND_POS, [1, 0.66, 0.18], true, t, 4, clocks, true);
-                  }
+          renderAssembly(
+            vp,
+            focusPath,
+            slot,
+            hue(focusIndex),
+            true,
+            t,
+            focusIndex,
+            clocks,
+            false,
+            visual,
+          );
+        } else if (delivery.blend && focusBlend) {
+          renderAssembly(
+            vp,
+            delivery.blend,
+            BLEND_POS,
+            [1, 0.66, 0.18],
+            true,
+            t,
+            4,
+            clocks,
+            true,
+            visual,
+          );
+        }
       } else {
         paths.forEach((path, i) => {
           const pos = PATH_SLOTS[i]?.pos ?? [0, 0, 0];
           renderAssembly(vp, path, pos, hue(i), false, t, i, clocks, false);
-                  });
+        });
         if (delivery.blend) {
           renderAssembly(vp, delivery.blend, BLEND_POS, [1, 0.66, 0.18], false, t, 4, clocks, true);
-                  }
+        }
       }
       raf = requestAnimationFrame(render);
     };
@@ -1364,8 +1686,16 @@ if (focused) {
       cancelAnimationFrame(raf);
       [cube, torus, sphere, cylinder, nozzle].forEach((m) => gl.deleteBuffer(m.buffer));
       [helixM, arcM, orbitM].forEach((m) => gl.deleteBuffer(m.buffer));
+      for (const w of wires.values()) {
+        gl.deleteBuffer(w.feature.buffer);
+        gl.deleteBuffer(w.all.buffer);
+      }
       [cyanBuf, goldBuf, strandBuf].forEach((b) => gl.deleteBuffer(b));
       if (generatedBuf) gl.deleteBuffer(generatedBuf);
+      if (generatedWire) {
+        gl.deleteBuffer(generatedWire.feature);
+        gl.deleteBuffer(generatedWire.all);
+      }
       [solidP, lineP, pointP].forEach((p) => gl.deleteProgram(p));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1424,12 +1754,19 @@ if (focused) {
   };
 
   const phaseLabel = MANIFESTATION_PHASE_LABEL[phase];
+  const modeHint =
+    visualMode === "blueprint"
+      ? "BLUEPRINT · TECHNICAL DRAWING · DRAG TO ROTATE · SCROLL TO ZOOM"
+      : visualMode === "environment"
+        ? "ENVIRONMENT · KNOWLEDGE HALL · DRAG TO ROTATE · SCROLL TO ZOOM"
+        : "CUTAWAY · INTERNAL STRUCTURE · DRAG TO ROTATE · SCROLL TO ZOOM";
 
   return (
     <div
       className="ascension-envision-3d"
       data-focused={selectedId ? "true" : "false"}
       data-phase={phase}
+      data-mode={selected ? visualMode : "cutaway"}
     >
       <canvas
         ref={canvasRef}
@@ -1444,16 +1781,30 @@ if (focused) {
       <div className="ascension-envision-heading">
         <span>ENVISION MODE</span>
         <strong data-phase={phase}>
-          {selected
-            ? phase === "stabilized"
-              ? "HOLOGRAPHIC REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
-              : phaseLabel
-            : phaseLabel}
+          {selected ? (phase === "stabilized" ? modeHint : phaseLabel) : phaseLabel}
         </strong>
         {selected && !isBlend && selectedSpec?.label && (
           <em className="ascension-holo-spec">{selectedSpec.label}</em>
         )}
       </div>
+      {selected && visualMode === "blueprint" && (
+        <div className="ascension-blueprint-plate" aria-hidden="true">
+          <i className="ascension-bp-corner ascension-bp-corner--tl" />
+          <i className="ascension-bp-corner ascension-bp-corner--tr" />
+          <i className="ascension-bp-corner ascension-bp-corner--bl" />
+          <i className="ascension-bp-corner ascension-bp-corner--br" />
+          <div className="ascension-bp-titleblock">
+            <strong>{selected.label}</strong>
+            <span>
+              ASCENSION · ENVISION TECHNICAL PLATE ·{" "}
+              {selectedSpec?.label ?? "IDENTIFIED SPECIMEN DRAWING"}
+              {selected.outcome_score !== null
+                ? ` · OUTCOME ${Math.round(selected.outcome_score * 100)}%`
+                : ""}
+            </span>
+          </div>
+        </div>
+      )}
       {!selected &&
         paths.map((path, i) => (
           <button
@@ -1489,6 +1840,20 @@ if (focused) {
             isBlend ? "ascension-holo-focus ascension-holo-focus--blend" : "ascension-holo-focus"
           }
         >
+          <div className="ascension-mode-switch" role="tablist" aria-label="Presentation mode">
+            {(["cutaway", "blueprint", "environment"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={visualMode === m}
+                data-active={visualMode === m ? "true" : undefined}
+                onClick={() => setVisualMode(m)}
+              >
+                {m.toUpperCase()}
+              </button>
+            ))}
+          </div>
           <div>
             <p>
               {isBlend
@@ -1503,7 +1868,7 @@ if (focused) {
           <div className="ascension-holo-actions">
             <button
               onClick={() => {
-                rotationRef.current = { x: -0.18, y: 0.45 };
+                rotationRef.current = { x: -0.22, y: 0.55 };
                 zoomRef.current = 1;
               }}
             >

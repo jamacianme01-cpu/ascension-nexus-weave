@@ -949,7 +949,7 @@ export function Envision3DScene({
           dir[1] * (1 - converge) * 0.95,
           dir[2] * (1 - converge) * 0.95,
         ] as Vec3,
-        alpha: (focus ? 0.94 : 0.8) * alpha * fade,
+        alpha: (focus && stationPhase === "stabilized" ? 1 : focus ? 0.98 : 0.84) * alpha * fade,
         glowBoost,
       };
     };
@@ -1456,7 +1456,9 @@ export function Envision3DScene({
           generatedBuiltFor = generated.mesh;
         }
         const alpha =
-          (stationPhase === "reveal" ? lerp(0.5, 1, prog) : 1) * (focus ? 0.94 : 0.8) * fade;
+          (stationPhase === "reveal" ? lerp(0.5, 1, prog) : 1) *
+          (focus && stationPhase === "stabilized" ? 1 : focus ? 0.98 : 0.84) *
+          fade;
         drawSolidCount(
           generatedBuf,
           generatedCount,

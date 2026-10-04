@@ -1622,3 +1622,95 @@ body:has(.ascension-world > .ascension-command) main {
     width: 36vw;
   }
 }
+
+
+/* ENVISION readability pass: the Tree is the world, the realities are the subject.
+   Once ENVISION is present, stop the old power-up rays from competing with the models. */
+.ascension-stage:has(.ascension-envision-3d) .ascension-scene-hero::before,
+.ascension-stage:has(.ascension-envision-3d) .ascension-scene-hero::after {
+  opacity: 0 !important;
+  animation: none !important;
+}
+
+.ascension-stage:has(.ascension-envision-3d) .ascension-tree-scene {
+  filter: brightness(0.62) saturate(0.9);
+}
+
+.ascension-envision-3d:not([data-focused="true"]) .ascension-holo-hit {
+  border-color: rgb(103 218 252 / 48%);
+  background: linear-gradient(180deg, rgb(2 15 24 / 88%), rgb(1 7 13 / 92%));
+  box-shadow:
+    0 8px 22px rgb(0 0 0 / 58%),
+    inset 0 0 12px rgb(85 204 243 / 8%);
+  backdrop-filter: blur(8px);
+}
+
+.ascension-envision-3d:not([data-focused="true"]) .ascension-holo-hit--blend {
+  border-color: rgb(240 198 110 / 62%);
+  background:
+    radial-gradient(circle at 50% 0%, rgb(242 197 104 / 14%), transparent 68%),
+    rgb(8 8 8 / 94%);
+}
+
+@media (max-width: 620px) {
+  .ascension-stage:has(.ascension-envision-3d) .ascension-tree-scene {
+    object-fit: cover;
+    object-position: 50% 50%;
+    filter: brightness(0.56) saturate(0.88);
+    transform: none;
+  }
+
+  .ascension-envision-3d::after {
+    display: none;
+  }
+
+  .ascension-envision-3d::before {
+    opacity: 0.16;
+    mix-blend-mode: normal;
+    background: linear-gradient(180deg, rgb(0 4 9 / 10%), rgb(0 4 9 / 28%));
+  }
+
+  .ascension-envision-heading {
+    top: 0.7rem;
+    width: 58vw;
+  }
+
+  .ascension-envision-heading > span {
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+  }
+
+  .ascension-envision-heading > strong {
+    margin-top: 0.12rem;
+    font-size: 0.48rem;
+  }
+
+  .ascension-holo-hit {
+    width: 40vw;
+    min-height: 3.45rem;
+    border-width: 1px;
+    padding: 0.46rem 0.5rem;
+  }
+
+  .ascension-holo-hit > span {
+    font-size: 0.48rem;
+  }
+
+  .ascension-holo-hit > strong {
+    font-size: 0.68rem;
+  }
+
+  .ascension-holo-hit > em {
+    font-size: 0.58rem;
+  }
+
+  .ascension-holo-hit--blend {
+    width: 48vw;
+    min-height: 3.8rem;
+  }
+
+  .ascension-envision-3d[data-focused="true"]::before {
+    background: rgb(0 4 9 / 34%);
+    backdrop-filter: none;
+  }
+}

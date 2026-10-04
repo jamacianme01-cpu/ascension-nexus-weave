@@ -78,6 +78,41 @@ export function receiptFiles(
   });
 }
 
+export type ObjectiveModelPrimitive = "box" | "cylinder" | "ring" | "sphere" | "nozzle";
+export type ObjectiveModelMaterial =
+  | "gold"
+  | "gold_deep"
+  | "copper"
+  | "blue"
+  | "blue_deep"
+  | "ice"
+  | "cyan"
+  | "warm"
+  | "steel"
+  | "dark";
+
+export interface ObjectiveModelPart {
+  name: string;
+  primitive: ObjectiveModelPrimitive;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  material: ObjectiveModelMaterial;
+}
+
+export interface ObjectiveModelSpec {
+  /** Short semantic name for the modeled object. */
+  title: string;
+  /** Normalized scene graph generated for THIS pathway, not a generic category. */
+  parts: ObjectiveModelPart[];
+  /** Preferred stabilized inspection pose in radians. */
+  hero_rotation: [number, number, number];
+  /** Relative inspection scale; clamped by the parser. */
+  hero_scale: number;
+  /** Short factual description of what the geometry represents. */
+  description: string;
+}
+
 export interface ObjectivePathway {
   id: string;
   label: string;
@@ -86,6 +121,7 @@ export interface ObjectivePathway {
   tradeoffs: string[];
   spiral_form: string | null;
   visual_svg: string | null;
+  model_spec: ObjectiveModelSpec | null;
   outcome_score: number | null;
   outcome_reason: string | null;
 }
@@ -143,6 +179,78 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       "The answer engine returned a generic architecture template instead of answering the objective. Retry this result.",
     );
   }
+  const number3 = (
+    value: unknown,
+    fallback: [number, number, number],
+    min: number,
+    max: number,
+  ): [number, number, number] => {
+    if (!Array.isArray(value) || value.length !== 3) return fallback;
+    return value.map((item, i) => {
+      const n = typeof item === "number" && Number.isFinite(item) ? item : fallback[i]!;
+      return Math.min(max, Math.max(min, n));
+    }) as [number, number, number];
+  };
+  const parseModelSpec = (value: unknown): ObjectiveModelSpec | null => {
+    const m = record(value);
+    if (!Object.keys(m).length) return null;
+    const title = typeof m["title"] === "string" ? m["title"].trim().slice(0, 160) : "";
+    const description =
+      typeof m["description"] === "string" ? m["description"].trim().slice(0, 1200) : "";
+    const rawParts = Array.isArray(m["parts"]) ? m["parts"].slice(0, 64) : [];
+    const allowedPrimitives = new Set<ObjectiveModelPrimitive>([
+      "box",
+      "cylinder",
+      "ring",
+      "sphere",
+      "nozzle",
+    ]);
+    const allowedMaterials = new Set<ObjectiveModelMaterial>([
+      "gold",
+      "gold_deep",
+      "copper",
+      "blue",
+      "blue_deep",
+      "ice",
+      "cyan",
+      "warm",
+      "steel",
+      "dark",
+    ]);
+    const parts = rawParts.flatMap((rawPart, index): ObjectiveModelPart[] => {
+      const p = record(rawPart);
+      const primitive = String(p["primitive"] ?? "") as ObjectiveModelPrimitive;
+      const material = String(p["material"] ?? "") as ObjectiveModelMaterial;
+      if (!allowedPrimitives.has(primitive) || !allowedMaterials.has(material)) return [];
+      const name =
+        typeof p["name"] === "string" && p["name"].trim()
+          ? p["name"].trim().slice(0, 120)
+          : `part-${index + 1}`;
+      return [
+        {
+          name,
+          primitive,
+          position: number3(p["position"], [0, 0, 0], -3.5, 3.5),
+          rotation: number3(p["rotation"], [0, 0, 0], -Math.PI * 2, Math.PI * 2),
+          scale: number3(p["scale"], [0.2, 0.2, 0.2], 0.015, 3.5),
+          material,
+        },
+      ];
+    });
+    if (!title || !description || parts.length < 2) return null;
+    const rawHeroScale =
+      typeof m["hero_scale"] === "number" && Number.isFinite(m["hero_scale"])
+        ? m["hero_scale"]
+        : 1;
+    return {
+      title,
+      description,
+      parts,
+      hero_rotation: number3(m["hero_rotation"], [-0.18, -0.45, 0], -Math.PI * 2, Math.PI * 2),
+      hero_scale: Math.min(1.8, Math.max(0.55, rawHeroScale)),
+    };
+  };
+
   const parsePathway = (raw: unknown, index: number): ObjectivePathway => {
     const p = record(raw);
     const id = typeof p["id"] === "string" && p["id"].trim() ? p["id"].trim() : `path-${index + 1}`;
@@ -158,6 +266,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       typeof p["visual_svg"] === "string" && /<svg[\s>]/i.test(p["visual_svg"])
         ? p["visual_svg"].slice(0, 100000)
         : null;
+    const modelSpec = parseModelSpec(p["model_spec"]);
     const outcomeScore =
       typeof p["outcome_score"] === "number" &&
       Number.isFinite(p["outcome_score"]) &&
@@ -180,6 +289,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       tradeoffs,
       spiral_form: spiralForm,
       visual_svg: visualSvg,
+      model_spec: modelSpec,
       outcome_score: outcomeScore,
       outcome_reason: outcomeReason,
     };

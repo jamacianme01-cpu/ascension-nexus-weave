@@ -53,7 +53,9 @@ async function resolveForOwner(
   if (state.status === "completed" && state.response_payload) {
     const modelJobs = await import("./model-jobs.server");
     try {
-      await modelJobs.enqueueDeliveryModels(requestId, state.response_payload);
+      const hydrated = await modelJobs.attachCompletedModels(requestId, state.response_payload);
+      await modelJobs.enqueueDeliveryModels(requestId, hydrated);
+      return { ...state, response_payload: hydrated };
     } catch {
       // Hunyuan model generation is asynchronous; answer delivery must not fail if queueing does.
     }

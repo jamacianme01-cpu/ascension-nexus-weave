@@ -43,13 +43,22 @@ async function resolveForOwner(
   const byOrdinal = (n: number) =>
     (stages as { ordinal: number }[] | null)?.find((s) => s.ordinal === n) ?? null;
   const engine = await import("./engine/delivery.server");
-  return engine.resolveDelivery({
+  const state = await engine.resolveDelivery({
     run,
     artifactStage: byOrdinal(101) as { status: string; response_payload: unknown } | null,
     draft: engine.draftFromStage(byOrdinal(102)),
     store: await engine.adminDraftStore(requestId),
     retry,
   });
+  if (state.status === "completed" && state.response_payload) {
+    const modelJobs = await import("./model-jobs.server");
+    try {
+      await modelJobs.enqueueDeliveryModels(requestId, state.response_payload);
+    } catch {
+      // Hunyuan model generation is asynchronous; answer delivery must not fail if queueing does.
+    }
+  }
+  return state;
 }
 
 /** Read what the answer panel should show for this run (never terminal mid-run). */

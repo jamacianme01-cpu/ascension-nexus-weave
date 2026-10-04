@@ -68,7 +68,7 @@ export function easeOutCubic(t: number): number {
 /**
  * Assembly spin (radians) at elapsed seconds. Fast controlled rotation in
  * possibility, visible deceleration through condensation/reveal, then only a
- * slow living drift once stabilized. Pure so every station and the sound
+ * complete stop once stabilized. Pure so every station and the sound
  * timeline stay in sync.
  */
 export function assemblySpin(elapsedSec: number, stationSeed = 0): number {
@@ -86,7 +86,7 @@ export function assemblySpin(elapsedSec: number, stationSeed = 0): number {
     const t = e - r;
     theta = 2.51 + 0.5 * t - 0.2625 * t * t; // ω 0.5 → 0.08
   } else {
-    theta = 2.742 + 0.08 * (e - s);
+    theta = 2.742;
   }
   return theta + stationSeed * 0.58;
 }

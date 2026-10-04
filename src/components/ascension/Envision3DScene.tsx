@@ -651,7 +651,10 @@ export function Envision3DScene({
   }, [choices, objectiveText]);
   const selectedSpec = selected ? (linearSpecs.get(selected.id) ?? null) : null;
 
-  const sceneSignature = useMemo(() => choices.map((c) => c.id).join("|"), [choices]);
+  const sceneSignature = useMemo(
+    () => choices.map((c) => `${c.id}:${c.model_url ?? ""}`).join("|"),
+    [choices],
+  );
 
   // Manifestation clocks: the overview manifests once when realities erupt
   // from the tree; selecting a reality restarts ITS sequence so it can finish
@@ -670,24 +673,29 @@ export function Envision3DScene({
     setVisualMode("cutaway");
   }, [selectedId]);
 
-  // Hunyuan3D adapter: only fetches when an endpoint is actually configured;
-  // any failure keeps the procedural hologram without waiting or pretending.
+  // Prefer the completed GLB attached by the local Hunyuan worker. The older
+  // direct provider seam remains only as a secondary compatibility path.
   useEffect(() => {
-    if (!selectedId || isBlend) return;
+    if (!selectedId) return;
     let cancelled = false;
     const controller = new AbortController();
     const request = choices.find((x) => x.id === selectedId);
     if (!request) return;
     void (async () => {
-      const model: PathwayModel | null = await resolvePathwayModel(
-        {
-          id: request.id,
-          label: request.label,
-          summary: request.summary,
-          spiralForm: request.spiral_form,
-        },
-        controller.signal,
-      );
+      const direct: PathwayModel | null = request.model_url
+        ? { kind: "gltf", url: request.model_url }
+        : null;
+      const model: PathwayModel | null =
+        direct ??
+        (await resolvePathwayModel(
+          {
+            id: request.id,
+            label: request.label,
+            summary: request.summary,
+            spiralForm: request.spiral_form,
+          },
+          controller.signal,
+        ));
       if (!model || cancelled) return;
       try {
         const response = await fetch(model.url, { signal: controller.signal });
@@ -696,14 +704,14 @@ export function Envision3DScene({
         if (parsed && !cancelled)
           publishGenerated({ id: request.id, mesh: parsed, url: model.url });
       } catch {
-        /* keep the procedural hologram */
+        /* keep the objective-specific scene graph until a real GLB is readable */
       }
     })();
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [selectedId, isBlend, choices]);
+  }, [selectedId, choices]);
   useEffect(() => {
     publishGenerated(null);
   }, [sceneSignature]);

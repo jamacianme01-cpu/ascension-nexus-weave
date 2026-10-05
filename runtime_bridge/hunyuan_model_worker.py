@@ -198,15 +198,14 @@ def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
     upload_url = item.get("upload_url")
     label = str(item.get("label") or item.get("pathway_id") or job_id)
     has_source_image = isinstance(source_image_url, str) and source_image_url.startswith("https://")
-    has_svg = isinstance(visual_svg, str) and "<svg" in visual_svg.lower()
-    if not job_id or not isinstance(upload_url, str) or not (has_source_image or has_svg):
+    if not job_id or not isinstance(upload_url, str) or not has_source_image:
         if job_id:
             _report(
                 queue_url,
                 token,
                 job_id,
                 "failed",
-                "Model queue item had neither a generated source image nor a usable SVG fallback.",
+                "Model queue item did not include a real generated source image.",
             )
         return True
 
@@ -215,12 +214,8 @@ def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
         _report(queue_url, token, job_id, "running")
         with tempfile.TemporaryDirectory(prefix="ascension-hunyuan-") as temp:
             work = Path(temp)
-            if has_source_image:
-                print("[Hunyuan] using generated concept image", flush=True)
-                png_path = _download_source_image(source_image_url, work)
-            else:
-                print("[Hunyuan] generated image unavailable; using SVG fallback", flush=True)
-                png_path = _svg_to_png(visual_svg, work)
+            print("[Hunyuan] using generated concept image", flush=True)
+            png_path = _download_source_image(source_image_url, work)
             glb = _generate_glb(hunyuan_url, png_path)
             _upload_glb(upload_url, glb)
         result = _report(queue_url, token, job_id, "completed")

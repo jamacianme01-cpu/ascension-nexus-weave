@@ -70,6 +70,32 @@ def _browser() -> str:
     raise RuntimeError("Microsoft Edge or Google Chrome was not found for SVG rasterization")
 
 
+def _download_source_image(url: str, work: Path) -> Path:
+    output = work / "reference.png"
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={
+            "accept": "image/*",
+            "user-agent": "Mozilla/5.0 ASCENSION-Hunyuan-Worker/1.0",
+            "cache-control": "no-cache",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            data = response.read()
+            content_type = (response.headers.get("content-type") or "").lower()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")
+        raise RuntimeError(
+            "source image download failed HTTP " + str(exc.code) + ": " + detail[:1200]
+        ) from exc
+    if len(data) < 100 or ("image/" not in content_type and data[:8] != b"\x89PNG\r\n\x1a\n"):
+        raise RuntimeError("generated source image was not a readable image response")
+    output.write_bytes(data)
+    return output
+
+
 def _svg_to_png(svg: str, work: Path) -> Path:
     svg_path = work / "reference.svg"
     png_path = work / "reference.png"
@@ -167,19 +193,34 @@ def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
         return False
 
     job_id = str(item.get("id") or "")
+    source_image_url = item.get("source_image_url")
     visual_svg = item.get("visual_svg")
     upload_url = item.get("upload_url")
     label = str(item.get("label") or item.get("pathway_id") or job_id)
-    if not job_id or not isinstance(visual_svg, str) or not isinstance(upload_url, str):
+    has_source_image = isinstance(source_image_url, str) and source_image_url.startswith("https://")
+    has_svg = isinstance(visual_svg, str) and "<svg" in visual_svg.lower()
+    if not job_id or not isinstance(upload_url, str) or not (has_source_image or has_svg):
         if job_id:
-            _report(queue_url, token, job_id, "failed", "Model queue item was incomplete.")
+            _report(
+                queue_url,
+                token,
+                job_id,
+                "failed",
+                "Model queue item had neither a generated source image nor a usable SVG fallback.",
+            )
         return True
 
     print("[Hunyuan] claimed " + job_id + " | " + label, flush=True)
     try:
         _report(queue_url, token, job_id, "running")
         with tempfile.TemporaryDirectory(prefix="ascension-hunyuan-") as temp:
-            png_path = _svg_to_png(visual_svg, Path(temp))
+            work = Path(temp)
+            if has_source_image:
+                print("[Hunyuan] using generated concept image", flush=True)
+                png_path = _download_source_image(source_image_url, work)
+            else:
+                print("[Hunyuan] generated image unavailable; using SVG fallback", flush=True)
+                png_path = _svg_to_png(visual_svg, work)
             glb = _generate_glb(hunyuan_url, png_path)
             _upload_glb(upload_url, glb)
         result = _report(queue_url, token, job_id, "completed")

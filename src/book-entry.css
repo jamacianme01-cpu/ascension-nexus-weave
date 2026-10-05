@@ -1943,3 +1943,131 @@ body:has(.ascension-world > .ascension-command) main {
     font-size: 0.46rem;
   }
 }
+
+/* ============================================================
+   IMAGE-FIRST ENVISION: real generated concept visuals
+   ============================================================ */
+
+/* Overview: each pathway's real generated concept image sits at its station. */
+.ascension-holo-poster {
+  position: absolute;
+  z-index: 6;
+  width: clamp(9rem, 15vw, 12.5rem);
+  aspect-ratio: 2 / 1;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgb(243 201 111 / 34%);
+  border-radius: 0.55rem;
+  background: rgb(1 8 14 / 72%);
+  box-shadow:
+    0 14px 34px rgb(0 0 0 / 55%),
+    0 0 18px rgb(243 201 111 / 10%);
+  pointer-events: none;
+}
+
+.ascension-holo-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0.94;
+}
+
+.ascension-holo-poster--blend {
+  width: clamp(10rem, 17vw, 14rem);
+  border-color: rgb(243 201 111 / 52%);
+  box-shadow:
+    0 16px 40px rgb(0 0 0 / 60%),
+    0 0 24px rgb(243 201 111 / 16%);
+}
+
+/* Focused inspection: the generated concept is the exhibit. */
+.ascension-visual-frame {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  width: min(46rem, 62vw);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgb(243 201 111 / 42%);
+  border-radius: 0.8rem;
+  background: rgb(1 8 14 / 66%);
+  box-shadow:
+    0 26px 70px rgb(0 0 0 / 62%),
+    0 0 34px rgb(243 201 111 / 12%);
+  pointer-events: none;
+}
+
+.ascension-visual-frame img {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  display: block;
+}
+
+.ascension-visual-frame figcaption {
+  padding: 0.42rem 0.8rem;
+  border-top: 1px solid rgb(243 201 111 / 24%);
+  background: rgb(2 12 20 / 78%);
+  font-size: 0.54rem;
+  letter-spacing: 0.2em;
+  color: rgb(246 213 138 / 88%);
+  text-align: center;
+}
+
+/* BLUEPRINT: derived presentation of the generated concept — the same asset
+   driven into a drafting treatment over the blueprint plate. */
+.ascension-visual-frame--blueprint {
+  border-color: rgb(120 200 255 / 40%);
+  box-shadow:
+    0 26px 70px rgb(0 0 0 / 62%),
+    0 0 30px rgb(96 200 255 / 12%);
+}
+
+.ascension-visual-frame--blueprint img {
+  filter: grayscale(1) brightness(1.06) contrast(1.18) invert(0.92) sepia(0.28) hue-rotate(175deg)
+    saturate(2.4);
+  mix-blend-mode: screen;
+  opacity: 0.94;
+}
+
+.ascension-visual-frame--blueprint figcaption {
+  border-top-color: rgb(120 200 255 / 26%);
+  color: rgb(170 218 244 / 88%);
+}
+
+/* ENVIRONMENT: the generated concept staged as a lit exhibit in the hall. */
+.ascension-visual-frame--environment {
+  border-color: rgb(243 201 111 / 55%);
+  box-shadow:
+    0 30px 80px rgb(0 0 0 / 70%),
+    0 0 46px rgb(243 201 111 / 18%);
+}
+
+.ascension-visual-frame--environment::before {
+  content: "";
+  position: absolute;
+  inset: auto -12% -9% -12%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgb(243 201 111 / 26%), transparent 70%);
+  pointer-events: none;
+}
+
+@media (max-width: 620px) {
+  .ascension-holo-poster {
+    width: 38vw;
+  }
+
+  .ascension-visual-frame {
+    width: min(30rem, 86vw);
+    top: 40%;
+  }
+
+  .ascension-visual-frame figcaption {
+    font-size: 0.48rem;
+  }
+}

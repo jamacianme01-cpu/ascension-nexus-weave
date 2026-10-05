@@ -193,7 +193,10 @@ export async function externalProductDraft(
   },
   transportedFiles: { name: string; content: string }[],
 ): Promise<ObjectiveDelivery> {
-  const normalizedObjective = run.objective.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const normalizedObjective = run.objective
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
   const asksCapabilities =
     /^(what|wat) (can|do) (u|you) do$/.test(normalizedObjective) ||
     /^(what|wat) can ascension do$/.test(normalizedObjective) ||
@@ -215,7 +218,7 @@ export async function externalProductDraft(
         "",
         "In this web app, I can immediately answer questions, generate specifications, write code and create supported digital artifacts. When a connected governed execution engine is required, ASCENSION sends the objective through that runtime and reports the verified result when it comes back.",
         "",
-        "The operating loop is: Objective -> Meaning -> Knowledge -> Pathways -> Evaluation -> Guardian -> Execution -> AutoSync verification -> Persisted result -> Delta learning."
+        "The operating loop is: Objective -> Meaning -> Knowledge -> Pathways -> Evaluation -> Guardian -> Execution -> AutoSync verification -> Persisted result -> Delta learning.",
       ].join("\n"),
       pathways: [],
       blend: null,
@@ -303,10 +306,18 @@ export async function externalProductDraft(
   ].join(" ");
 
   const evidenceContext = Array.isArray(run.evidence)
-    ? run.evidence.map((item) => String(item)).filter(Boolean).slice(0, 32).join("\n")
+    ? run.evidence
+        .map((item) => String(item))
+        .filter(Boolean)
+        .slice(0, 32)
+        .join("\n")
     : "";
   const constraintContext = Array.isArray(run.constraints)
-    ? run.constraints.map((item) => String(item)).filter(Boolean).slice(0, 32).join("\n")
+    ? run.constraints
+        .map((item) => String(item))
+        .filter(Boolean)
+        .slice(0, 32)
+        .join("\n")
     : "";
 
   const user = [
@@ -417,9 +428,7 @@ export async function externalProductDraft(
     });
     const repairJson = repaired.json;
     const models =
-      repairJson && Array.isArray(repairJson["models"])
-        ? (repairJson["models"] as unknown[])
-        : [];
+      repairJson && Array.isArray(repairJson["models"]) ? (repairJson["models"] as unknown[]) : [];
     const modelById = new Map<string, unknown>();
     for (const raw of models) {
       const item = record(raw);
@@ -455,8 +464,33 @@ export async function externalProductDraft(
     }
   }
 
+  // VISUAL objectives: generate a real concept image for every pathway and the
+  // blend through the configured image-generation engine. The images are the
+  // primary ENVISION visuals; procedural geometry is fallback-only. A pathway
+  // whose image call fails simply keeps its honest procedural fallback.
+  if (requested === "drawing" || requested === "design") {
+    const { generatePathwayImages } = await import("./image.server");
+    const visualChoices = parsed.blend ? [...parsed.pathways, parsed.blend] : parsed.pathways;
+    const imageUrls = await generatePathwayImages(run.objective, visualChoices);
+    if (imageUrls.size) {
+      const withImage = <T extends { id: string; generated_image_url: string | null }>(
+        pathway: T,
+      ): T => {
+        const url = imageUrls.get(pathway.id);
+        return url ? { ...pathway, generated_image_url: url } : pathway;
+      };
+      parsed = {
+        ...parsed,
+        pathways: parsed.pathways.map(withImage),
+        blend: parsed.blend ? withImage(parsed.blend) : null,
+      };
+    }
+  }
+
   const visualSvgs = [
-    ...parsed.pathways.map((pathway) => pathway.visual_svg).filter((value): value is string => Boolean(value)),
+    ...parsed.pathways
+      .map((pathway) => pathway.visual_svg)
+      .filter((value): value is string => Boolean(value)),
     ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
   ];
   const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
@@ -667,16 +701,17 @@ export async function resolveDelivery(args: {
     return {
       ...base,
       status: "completed",
-      response_payload: governed ?? parseDelivery({
-        kind: "not_produced",
-        title: run.objective.slice(0, 200) || "ASCENSION result",
-        body: notProducedMessage(assessResult(run.objective, "", []).kind),
-        files: [],
-        limitations: [],
-      }),
+      response_payload:
+        governed ??
+        parseDelivery({
+          kind: "not_produced",
+          title: run.objective.slice(0, 200) || "ASCENSION result",
+          body: notProducedMessage(assessResult(run.objective, "", []).kind),
+          files: [],
+          limitations: [],
+        }),
       error:
-        draft?.error ??
-        "No hosted answer engine is available. Enable Lovable AI for this project.",
+        draft?.error ?? "No hosted answer engine is available. Enable Lovable AI for this project.",
       note: null,
       source: "governed",
     };

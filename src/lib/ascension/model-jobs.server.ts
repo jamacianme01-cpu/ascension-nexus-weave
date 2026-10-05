@@ -19,7 +19,7 @@ export async function enqueueDeliveryModels(
     .filter(
       (pathway) =>
         Boolean(pathway.model_spec) &&
-        Boolean(pathway.visual_svg) &&
+        Boolean(pathway.visual_svg || pathway.generated_image_url) &&
         !pathway.model_url,
     )
     .map((pathway) => ({
@@ -27,7 +27,9 @@ export async function enqueueDeliveryModels(
       pathway_id: pathway.id,
       label: pathway.label.slice(0, 200),
       summary: pathway.summary.slice(0, 5000),
-      visual_svg: pathway.visual_svg!,
+      visual_svg: pathway.visual_svg ?? "",
+      // Image-to-3D: the real generated concept image is the Hunyuan3D source.
+      source_image_url: pathway.generated_image_url,
       status: "queued",
       updated_at: new Date().toISOString(),
     }));

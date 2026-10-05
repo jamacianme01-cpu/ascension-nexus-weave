@@ -122,6 +122,12 @@ export interface ObjectivePathway {
   spiral_form: string | null;
   visual_svg: string | null;
   model_spec: ObjectiveModelSpec | null;
+  /** Real generated concept image for this pathway (image-generation engine). */
+  generated_image_url: string | null;
+  /** Optional blueprint-style derivative of the generated concept. */
+  generated_blueprint_url: string | null;
+  /** Optional environment-scene derivative of the generated concept. */
+  generated_environment_url: string | null;
   /** Real generated GLB for this pathway when Hunyuan3D has completed it. */
   model_url: string | null;
   outcome_score: number | null;
@@ -241,9 +247,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     });
     if (!title || !description || parts.length < 2) return null;
     const rawHeroScale =
-      typeof m["hero_scale"] === "number" && Number.isFinite(m["hero_scale"])
-        ? m["hero_scale"]
-        : 1;
+      typeof m["hero_scale"] === "number" && Number.isFinite(m["hero_scale"]) ? m["hero_scale"] : 1;
     return {
       title,
       description,
@@ -269,10 +273,14 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
         ? p["visual_svg"].slice(0, 100000)
         : null;
     const modelSpec = parseModelSpec(p["model_spec"]);
-    const modelUrl =
-      typeof p["model_url"] === "string" && /^https:\/\//i.test(p["model_url"].trim())
-        ? p["model_url"].trim().slice(0, 4000)
+    const httpsUrl = (value: unknown): string | null =>
+      typeof value === "string" && /^https:\/\//i.test(value.trim())
+        ? value.trim().slice(0, 4000)
         : null;
+    const generatedImageUrl = httpsUrl(p["generated_image_url"]);
+    const generatedBlueprintUrl = httpsUrl(p["generated_blueprint_url"]);
+    const generatedEnvironmentUrl = httpsUrl(p["generated_environment_url"]);
+    const modelUrl = httpsUrl(p["model_url"]);
     const outcomeScore =
       typeof p["outcome_score"] === "number" &&
       Number.isFinite(p["outcome_score"]) &&
@@ -296,6 +304,9 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       spiral_form: spiralForm,
       visual_svg: visualSvg,
       model_spec: modelSpec,
+      generated_image_url: generatedImageUrl,
+      generated_blueprint_url: generatedBlueprintUrl,
+      generated_environment_url: generatedEnvironmentUrl,
       model_url: modelUrl,
       outcome_score: outcomeScore,
       outcome_reason: outcomeReason,
@@ -363,9 +374,16 @@ export function requestedKind(objective: string): RequestedKind {
   // explicitly commands creation. The noun alone is not an output format.
   if (/^(?:how|why|what|when|where|who|which|does|do|is|are|explain|tell me|describe)\b/.test(o))
     return "answer";
-  if (/^can (?:you|we)\b/.test(o) && !/\b(draw|sketch|build|make|create|design|write|generate)\b/.test(o))
+  if (
+    /^can (?:you|we)\b/.test(o) &&
+    !/\b(draw|sketch|build|make|create|design|write|generate)\b/.test(o)
+  )
     return "answer";
-  if (/\b(draw|drawing|sketch|diagram|illustrat\w*|render|picture|image|blueprint|schematic)\b/.test(o))
+  if (
+    /\b(draw|drawing|sketch|diagram|illustrat\w*|render|picture|image|blueprint|schematic|visuali[sz]\w*|concept|show|showcase)\b/.test(
+      o,
+    )
+  )
     return "drawing";
   if (/\b(app|application|website|web ?site|program|script|code|software|game|tool|bot)\b/.test(o))
     return "app";
@@ -375,29 +393,55 @@ export function requestedKind(objective: string): RequestedKind {
 
 const SCAFFOLD_LINE =
   /^(#+\s*)?(knowledge form|selected future|actions?:|verification receipts?|governed runtime|recorded artifact|transaction|autosync|revision|meaning elements?|tokens?|chromosome|genesis|lineage|phenotype|sid|id|branch|approach|pathway)\b/i;
-const APPROACH_TOKEN = /\b(single_?pass_?construct|staged_?construct|minimal_?seeded_?construct|singlepassconstruct|stagedconstruct|minimalseededconstruct)\b/i;
+const APPROACH_TOKEN =
+  /\b(single_?pass_?construct|staged_?construct|minimal_?seeded_?construct|singlepassconstruct|stagedconstruct|minimalseededconstruct)\b/i;
 
 function normalize(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 /** Why a piece of text is not a real result, or null when it is substantive. */
 export function scaffoldReason(text: string, objective: string): string | null {
   const trimmed = text.trim();
   if (!trimmed) return "it is empty";
-  if (/^\s*#*\s*knowledge form\b/im.test(trimmed)) return "it is a Knowledge Form, not the requested result";
-  if (/^#\s*ASCENSION Result\b/im.test(trimmed) && /\b(?:Workspace|Capability|Output|Folder|Files|Validation):/i.test(trimmed))
+  if (/^\s*#*\s*knowledge form\b/im.test(trimmed))
+    return "it is a Knowledge Form, not the requested result";
+  if (
+    /^#\s*ASCENSION Result\b/im.test(trimmed) &&
+    /\b(?:Workspace|Capability|Output|Folder|Files|Validation):/i.test(trimmed)
+  )
     return "it is a runtime file receipt, not the requested result";
-  if (/this document turns the command into a clear reviewable artifact with context, structure, and next action/i.test(trimmed))
+  if (
+    /this document turns the command into a clear reviewable artifact with context, structure, and next action/i.test(
+      trimmed,
+    )
+  )
     return "it is a placeholder document, not the requested result";
-  if (/Small working application generated through the ASCENSION AutoSync bridge|Verified runnable app artifact\.|AutoSync Built Application[\s\S]*Status: running/i.test(trimmed))
+  if (
+    /Small working application generated through the ASCENSION AutoSync bridge|Verified runnable app artifact\.|AutoSync Built Application[\s\S]*Status: running/i.test(
+      trimmed,
+    )
+  )
     return "it is the AutoSync status stub, not an app that performs the requested task";
-  const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const content = lines.filter(
-    (l) => !SCAFFOLD_LINE.test(l.replace(/^[-*•]\s*/, "")) && !APPROACH_TOKEN.test(l) && !/^[a-f0-9]{16,}$/i.test(l),
+    (l) =>
+      !SCAFFOLD_LINE.test(l.replace(/^[-*•]\s*/, "")) &&
+      !APPROACH_TOKEN.test(l) &&
+      !/^[a-f0-9]{16,}$/i.test(l),
   );
   const shortLines = content.filter((l) => l.replace(/^[-*•\d.)\s]+/, "").split(/\s+/).length <= 3);
-  if (content.length && shortLines.length / content.length >= 0.6 && !/```|<svg|<html|function |=>|def |class /i.test(trimmed))
+  if (
+    content.length &&
+    shortLines.length / content.length >= 0.6 &&
+    !/```|<svg|<html|function |=>|def |class /i.test(trimmed)
+  )
     return "it is a token list, not the requested result";
   const obj = normalize(objective);
   const rest = normalize(content.join(" ")).replace(obj, " ").replace(/\s+/g, " ").trim();
@@ -413,7 +457,8 @@ export interface ResultAssessment {
 }
 
 const CODE_FILE = /\.(html?|js|jsx|ts|tsx|py|java|kt|swift|go|rs|rb|php|c|cpp|cs|sh|vue|svelte)$/i;
-const INTERNAL_FILE = /^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|acceptance_result\.json|metadata\.json|lineage\.json|knowledgeform_.*\.md)$/i;
+const INTERNAL_FILE =
+  /^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|acceptance_result\.json|metadata\.json|lineage\.json|knowledgeform_.*\.md)$/i;
 
 /**
  * Decide whether delivered text/files are the thing the user asked for.
@@ -428,7 +473,11 @@ export function assessResult(
   const kind = requestedKind(objective);
   const realFiles = files.filter((f) => {
     if (INTERNAL_FILE.test(f.name)) return false;
-    if (/\.svg$/i.test(f.name)) return /<svg[\s>]/i.test(f.content) && /<(path|line|rect|circle|polyline|polygon|ellipse|g)\b/i.test(f.content);
+    if (/\.svg$/i.test(f.name))
+      return (
+        /<svg[\s>]/i.test(f.content) &&
+        /<(path|line|rect|circle|polyline|polygon|ellipse|g)\b/i.test(f.content)
+      );
     return scaffoldReason(f.content, objective) === null;
   });
   const bodyOk = scaffoldReason(body, objective) === null;
@@ -455,7 +504,10 @@ export function assessResult(
     return {
       produced: false,
       kind,
-      reason: realFiles.length || bodyOk ? "no app code was returned" : scaffoldReason(files[0]?.content ?? body, objective),
+      reason:
+        realFiles.length || bodyOk
+          ? "no app code was returned"
+          : scaffoldReason(files[0]?.content ?? body, objective),
       files: [],
     };
   }

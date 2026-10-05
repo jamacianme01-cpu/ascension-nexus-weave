@@ -12,7 +12,7 @@
  *   2. OpenAI-compatible — IMAGE_API_KEY (+ optional IMAGE_BASE_URL, IMAGE_MODEL)
  */
 
-const DEFAULT_ZAI_IMAGE_MODEL = "cogview-3-flash";
+const DEFAULT_ZAI_IMAGE_MODEL = "glm-image";
 const DEFAULT_IMAGE_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-1";
 const IMAGE_TIMEOUT_MS = 90_000;
@@ -86,11 +86,21 @@ export async function generateConceptImage(prompt: string): Promise<string | nul
         prompt: trimmed,
         // Concept plates read best landscape; engines that only support one
         // size will reject this and the call resolves null honestly.
-        size: "1440x720",
+        size: "1728x960",
         n: 1,
       }),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => "")).slice(0, 1200);
+      console.error(
+        "[ASCENSION image] provider rejected generation",
+        info.provider,
+        info.model,
+        response.status,
+        detail,
+      );
+      return null;
+    }
     const payload = (await response.json().catch(() => null)) as {
       data?: Array<{ url?: unknown; b64_json?: unknown }>;
     } | null;

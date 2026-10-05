@@ -485,6 +485,11 @@ export async function externalProductDraft(
         blend: parsed.blend ? withImage(parsed.blend) : null,
       };
     }
+    if (requested === "drawing" && imageUrls.size === 0) {
+      throw new Error(
+        "The image-generation engine did not return a real image. ASCENSION will not replace the requested drawing with primitive SVG or 3D geometry.",
+      );
+    }
   }
 
   const visualSvgs = [
@@ -561,7 +566,7 @@ export interface DeliveryRun {
   created_at: string;
 }
 
-const DRAFT_SCHEMA_VERSION = "image-first-v4";
+const DRAFT_SCHEMA_VERSION = "image-first-v5";
 
 /** Stable identity of the transported artifacts and delivery contract a projection was made from. */
 export function artifactSourceKey(runId: string, files: { name: string; content: string }[]) {

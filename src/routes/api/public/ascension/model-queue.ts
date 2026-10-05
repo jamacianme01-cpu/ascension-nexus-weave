@@ -75,7 +75,7 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
 
         const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
         const { data: pending, error: readError } = await table
-          .select("id, request_id, pathway_id, label, summary, visual_svg, created_at")
+          .select("id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at")
           .eq("status", "queued")
           .order("created_at", { ascending: true })
           .limit(1);
@@ -95,7 +95,7 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
           })
           .eq("id", next.id)
           .eq("status", "queued")
-          .select("id, request_id, pathway_id, label, summary, visual_svg, created_at")
+          .select("id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at")
           .maybeSingle();
         if (claimError) return json({ error: "model_claim_failed" }, 500);
         if (!claimed) return json({ item: null });

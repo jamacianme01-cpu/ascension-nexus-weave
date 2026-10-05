@@ -19,7 +19,7 @@ export async function enqueueDeliveryModels(
     .filter(
       (pathway) =>
         Boolean(pathway.model_spec) &&
-        Boolean(pathway.visual_svg || pathway.generated_image_url) &&
+        Boolean(pathway.generated_image_url) &&
         !pathway.model_url,
     )
     .map((pathway) => ({

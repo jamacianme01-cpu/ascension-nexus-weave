@@ -561,7 +561,7 @@ export interface DeliveryRun {
   created_at: string;
 }
 
-const DRAFT_SCHEMA_VERSION = "objective-model-spec-v3";
+const DRAFT_SCHEMA_VERSION = "image-first-v4";
 
 /** Stable identity of the transported artifacts and delivery contract a projection was made from. */
 export function artifactSourceKey(runId: string, files: { name: string; content: string }[]) {

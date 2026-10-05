@@ -288,13 +288,17 @@ export async function externalProductDraft(
     "outcome_score is 0..1 when a grounded relative assessment can be made from the supplied context; otherwise use null. outcome_reason must briefly explain the basis without pretending the score is physically verified.",
     "The pathway content is a Spiral-guided user-facing synthesis, not a claim that the governed runtime physically executed or verified that solution.",
     "Make the pathways materially different approaches to accomplishing the objective. Do not merely rename the same answer.",
+    "For ordinary objectives with multiple useful routes, return 3 materially different pathways even when Spiral context is sparse. Do not collapse to one pathway merely because one route is safer, more conventional, or more cautious.",
     "When Spiral supplies three forms, return three pathways unless one form genuinely cannot produce a distinct useful route; do not silently collapse them.",
+    "When a request has safety, security, legal, or authorization implications, do not assume the user's skill level, ownership, motive, or situation. Do not moralize or turn the entire answer into a warning.",
+    "If any requested operational detail cannot be safely supplied, state that boundary once and briefly, then still answer the safe portion directly and provide at least 3 useful alternative pathways such as diagnosis, authorized repair/replacement, and emergency recovery. A safety caveat may be one pathway; it must not erase the rest of the useful answer.",
+    "For troubleshooting requests, prioritize practical fault isolation and restoration steps over generic architecture prose.",
     "blend must be an object when two or more useful pathways exist. It must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, model_spec, outcome_score, outcome_reason, blend_from, blend_reason.",
     "The BLEND pathway is where Spiral and Outcome Predictor work together: combine complementary strengths from the distinct pathways, explicitly account for their tradeoffs and the supplied Outcome Predictor context, and explain the blend in blend_reason. Do not simply concatenate every pathway.",
     "blend_from is an array of the pathway ids or labels whose strongest elements were combined. Use spiral_form 'spiral_outcome_blend'.",
     "If fewer than two useful pathways exist, return blend as null.",
     'kind must be "answer" or "artifact".',
-    "For ordinary questions or product/invention requests, give a substantive direct result in body.",
+    "For ordinary questions or product/invention requests, give a substantive direct result in body. Start by addressing what the user actually asked; do not substitute a generic overview, lecture, or architecture explanation.",
     "For app/code requests, include complete runnable source files.",
     "For drawing/image/diagram requests, the visual is the primary result. Include a complete polished SVG, not a token diagram or placeholder.",
     "For SVG drawings, use a generous landscape viewBox, strong readable contrast, meaningful geometry, component labels where useful, a clear visual hierarchy, and enough detail that the user can understand the design without reading the prose. Avoid tiny default canvases, invisible strokes, generic rectangles-only schematics, or unlabeled placeholder shapes.",
@@ -566,7 +570,7 @@ export interface DeliveryRun {
   created_at: string;
 }
 
-const DRAFT_SCHEMA_VERSION = "image-first-v5";
+const DRAFT_SCHEMA_VERSION = "direct-multipath-v6";
 
 /** Stable identity of the transported artifacts and delivery contract a projection was made from. */
 export function artifactSourceKey(runId: string, files: { name: string; content: string }[]) {

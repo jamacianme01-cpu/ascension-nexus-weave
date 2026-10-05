@@ -993,11 +993,24 @@ export function Engage() {
       sequenceTimers.current = [];
       setBookOpen(true);
       setRevealed(true);
-      setDetailsOpen(false);
+
+      // Visual creation requests enter ENVISION first. Ordinary answers and
+      // app/code results have no visual reality to "open", so reveal the
+      // answer panel immediately instead of leaving it permanently hidden.
+      const kind = requestedKind(run.objective);
+      const usesEnvision = kind === "drawing" || kind === "design";
+      setDetailsOpen(!usesEnvision);
+
       // The tree is the result event. Hold the eruption state instead of
       // treating it as a short transition into a separate scrolling page.
       setBookSequence("eruption");
       sound("eruption");
+      if (!usesEnvision) {
+        window.setTimeout(
+          () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+          120,
+        );
+      }
       return;
     }
     if (!TERMINAL.has(run.status)) return;

@@ -28,6 +28,7 @@ import {
   planningFor,
   receiptFiles,
   record,
+  requestedKind,
   strings,
   type ObjectiveDelivery,
 } from "@/lib/ascension/result-model";
@@ -331,6 +332,29 @@ function TreeKnowledgeEruption({
 }) {
   const hasChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
   if (!hasChoices) return null;
+
+  // Only creation/design objectives enter ENVISION. Ordinary answers can still
+  // have Spiral pathways, but they must not be turned into arbitrary 3D objects
+  // (for example, "how to make apple pie" must remain an answer, not a pie mesh).
+  const visualKind = requestedKind(objectiveText);
+  if (visualKind !== "drawing" && visualKind !== "design") return null;
+
+  const choices = delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways;
+  const hasRealVisual = choices.some(
+    (pathway) => Boolean(pathway.generated_image_url) || Boolean(pathway.model_url),
+  );
+  if (!hasRealVisual) {
+    return (
+      <section className="rounded-2xl border border-gold/35 bg-background/35 p-5 text-center">
+        <p className="label-eyebrow text-gold">VISUAL GENERATION UNAVAILABLE</p>
+        <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          The image engine did not return a real visual asset. ASCENSION will not substitute
+          primitive boxes, cylinders, or a fake 3D model for this request.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <Envision3DScene
       delivery={delivery}

@@ -37,13 +37,23 @@ def _json_request(url: str, token: str, method: str = "GET", payload=None, timeo
     headers = {
         "accept": "application/json",
         "x-ascension-publish-token": token,
+        # Lovable's public edge rejects some bare Python urllib clients before
+        # the request reaches our route. Present a normal browser-compatible UA.
+        "user-agent": "Mozilla/5.0 ASCENSION-Hunyuan-Worker/1.0",
+        "cache-control": "no-cache",
     }
     if body is not None:
         headers["content-type"] = "application/json"
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as response:
-        raw = response.read()
-        return json.loads(raw.decode("utf-8")) if raw else {}
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            raw = response.read()
+            return json.loads(raw.decode("utf-8")) if raw else {}
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")
+        raise RuntimeError(
+            "queue HTTP " + str(exc.code) + " from " + url + ": " + detail[:1200]
+        ) from exc
 
 
 def _browser() -> str:

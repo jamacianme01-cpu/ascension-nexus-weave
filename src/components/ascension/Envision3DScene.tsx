@@ -15,11 +15,7 @@ import {
   type LinearSpec,
   type ManifestationPhase,
 } from "@/lib/ascension/manifestation";
-import {
-  parseGlbVertices,
-  resolvePathwayModel,
-  type PathwayModel,
-} from "@/lib/ascension/model-provider";
+import { parseGlbVertices, type PathwayModel } from "@/lib/ascension/model-provider";
 
 type Pathway = ObjectiveDelivery["pathways"][number];
 /** Presentation modes for a focused reality: exhibition cutaway, drafting plate, in-world hall. */
@@ -690,20 +686,12 @@ export function Envision3DScene({
     const request = choices.find((x) => x.id === selectedId);
     if (!request) return;
     void (async () => {
-      const direct: PathwayModel | null = request.model_url
+      // The only model ENVISION may load is the completed GLB attached by
+      // ASCENSION's Hunyuan model-job pipeline. Internal reference images and
+      // browser-configured direct endpoints are not presentation sources.
+      const model: PathwayModel | null = request.model_url
         ? { kind: "gltf", url: request.model_url }
         : null;
-      const model: PathwayModel | null =
-        direct ??
-        (await resolvePathwayModel(
-          {
-            id: request.id,
-            label: request.label,
-            summary: request.summary,
-            spiralForm: request.spiral_form,
-          },
-          controller.signal,
-        ));
       if (!model || cancelled) return;
       try {
         const response = await fetch(model.url, { signal: controller.signal });
@@ -1937,20 +1925,9 @@ export function Envision3DScene({
     setModelViewState("loading");
     void (async () => {
       try {
-        const direct: PathwayModel | null = request.model_url
+        const model: PathwayModel | null = request.model_url
           ? { kind: "gltf", url: request.model_url }
           : null;
-        const model: PathwayModel | null =
-          direct ??
-          (await resolvePathwayModel(
-            {
-              id: request.id,
-              label: request.label,
-              summary: request.summary,
-              spiralForm: request.spiral_form,
-            },
-            new AbortController().signal,
-          ));
         if (!model) {
           setModelViewState("unavailable");
           return;
@@ -2099,12 +2076,11 @@ export function Envision3DScene({
               RESET VIEW
             </button>
             <button onClick={() => onSelect(null)}>BACK</button>
-            {selected.generated_image_url &&
-              (generated?.id === selected.id ? (
-                <button onClick={enterModelView}>3D READY</button>
-              ) : (
-                <button type="button" disabled>3D GENERATING…</button>
-              ))}
+            {generated?.id === selected.id ? (
+              <button onClick={enterModelView}>3D READY</button>
+            ) : (
+              <button type="button" disabled>3D GENERATING…</button>
+            )}
             {generated && generated.id === selected.id && (
               <a
                 className="ascension-holo-model"

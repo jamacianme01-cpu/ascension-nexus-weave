@@ -460,18 +460,14 @@ export async function externalProductDraft(
       }
       parsed = parseDelivery(patched);
     }
-    const stillMissing = parsed.pathways.some((pathway) => pathway.model_spec === null);
-    if (stillMissing) {
-      throw new Error(
-        "ENVISION did not produce an objective-specific 3D model for every pathway. Generic fallback models are disabled for this request.",
-      );
-    }
+    // model_spec is legacy planning metadata only. Real ENVISION geometry
+    // comes from Hunyuan GLB, so a missing primitive scene graph must never
+    // block a visual objective or be substituted for the requested reality.
   }
 
-  // VISUAL objectives: generate a real concept image for every pathway and the
-  // blend through the configured image-generation engine. The images are the
-  // primary ENVISION visuals; procedural geometry is fallback-only. A pathway
-  // whose image call fails simply keeps its honest procedural fallback.
+  // VISUAL objectives: generate an INTERNAL reference image for every pathway
+  // and blend. These references feed Hunyuan image-to-3D and are never the
+  // user-facing ENVISION result. No procedural geometry is a fallback.
   if (requested === "drawing" || requested === "design") {
     const { generatePathwayImages } = await import("./image.server");
     const visualChoices = parsed.blend ? [...parsed.pathways, parsed.blend] : parsed.pathways;
@@ -580,7 +576,7 @@ export interface DeliveryRun {
   created_at: string;
 }
 
-const DRAFT_SCHEMA_VERSION = "direct-multipath-v6";
+const DRAFT_SCHEMA_VERSION = "real-3d-v7";
 
 /** Stable identity of the transported artifacts and delivery contract a projection was made from. */
 export function artifactSourceKey(runId: string, files: { name: string; content: string }[]) {

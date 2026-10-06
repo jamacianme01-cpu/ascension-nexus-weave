@@ -406,6 +406,25 @@ export function requestedKind(objective: string): RequestedKind {
   return "answer";
 }
 
+/**
+ * Whether an objective should get an inspectable ENVISION reality.
+ * This is intentionally narrower than "anything physical": it includes explicit
+ * visual/design creation plus spatial conversion/remodel/layout objectives, while
+ * ordinary how-to questions (for example cooking) remain text-only.
+ */
+export function envisionEligible(objective: string): boolean {
+  const kind = requestedKind(objective);
+  if (kind === "drawing" || kind === "design") return true;
+
+  const o = objective.toLowerCase().replace(/\s+/g, " ").trim();
+  const transformation =
+    /\b(convert|conversion|remodel|renovate|renovation|reconfigure|fit ?out|layout|redesign|transform|turn .* into|build ?out)\b/.test(o);
+  const spatialSubject =
+    /\b(camper|rv|recreational vehicle|trailer|van|bus|room|office|workspace|living space|garage|shop|workshop|shed|cabin|house|home|interior|floor ?plan|vehicle interior)\b/.test(o);
+
+  return transformation && spatialSubject;
+}
+
 const SCAFFOLD_LINE =
   /^(#+\s*)?(knowledge form|selected future|actions?:|verification receipts?|governed runtime|recorded artifact|transaction|autosync|revision|meaning elements?|tokens?|chromosome|genesis|lineage|phenotype|sid|id|branch|approach|pathway)\b/i;
 const APPROACH_TOKEN =

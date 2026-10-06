@@ -368,6 +368,21 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
 
 export type RequestedKind = "drawing" | "app" | "design" | "answer";
 
+export function supportsEnvisionObjective(objective: string): boolean {
+  const o = objective.toLowerCase().trim();
+  const kind = requestedKind(o);
+  if (kind === "drawing" || kind === "design") return true;
+
+  // Physical/spatial transformations are still inspectable realities even when
+  // the user phrases them as a how-to. Keep abstract/software/recipe answers out.
+  const physicalSubject =
+    /\b(camper|rv|motorhome|trailer|van|vehicle|car|truck|room|office|workspace|living space|interior|house|home|building|shop|workshop|shed|garage|cabin|furniture|machine|device|engine|robot|drone|wearable|shoe|box|enclosure)\b/.test(o);
+  const transformation =
+    /\b(convert|conversion|transform|remodel|renovate|reconfigure|redesign|layout|fit[- ]?out|modify|retrofit|build|make|design|create|prototype|engineer)\b/.test(o);
+
+  return physicalSubject && transformation;
+}
+
 export function requestedKind(objective: string): RequestedKind {
   const o = objective.toLowerCase().trim();
   // A question about an app or drawing asks for an explanation unless it

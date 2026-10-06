@@ -45,28 +45,31 @@ export async function generateConceptImage(prompt: string, storagePath: string):
   const key = process.env["LOVABLE_API_KEY"]?.trim();
   if (!key)
     throw new Error("Lovable AI is not available to this deployment (LOVABLE_API_KEY missing).");
-  const response = await fetch(`${GATEWAY}/images/generations`, {
-    method: "POST",
-    // This runs in the worker claim request, after the answer has been delivered.
-    // Bound the provider wait; report failures through the model job.
-    signal: AbortSignal.timeout(120_000),
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: IMAGE_MODEL,
-      prompt: prompt.replace(/\s+/g, " ").trim().slice(0, 3800),
-      size: "1024x1024",
-      quality: "medium",
-    }),
-  });
-  if (!response.ok) {
+  // One total deadline covers all attempts; temporary gateway failures get
+  // two retries without creating an endless or unbounded generation loop.
+  const signal = AbortSignal.timeout(120_000);
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    response = await fetch(`${GATEWAY}/images/generations`, {
+      method: "POST",
+      signal,
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: IMAGE_MODEL,
+        prompt: prompt.replace(/\s+/g, " ").trim().slice(0, 3800),
+        size: "1024x1024",
+        quality: "medium",
+      }),
+    });
+    if (response.ok) break;
     const detail = (await response.text().catch(() => "")).slice(0, 800);
-    throw new Error(
-      `Lovable AI image generation returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
-    );
+    if (![502, 503, 504].includes(response.status) || attempt === 2) {
+      throw new Error(`Lovable AI image generation returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
   }
+  if (!response) throw new Error("Lovable AI image generation returned no response.");
+
   const payload = (await response.json().catch(() => null)) as {
     data?: Array<{ b64_json?: unknown }>;
   } | null;

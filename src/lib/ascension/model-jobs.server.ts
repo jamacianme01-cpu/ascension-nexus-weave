@@ -81,6 +81,12 @@ export async function attachCompletedModels(
 
   return {
     ...delivery,
+    // The persisted draft may contain a historic reference failure. Current
+    // job statuses replace it once every affected choice has a queued job.
+    limitations: (delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways)
+      .every((pathway) => jobs.has(pathway.id))
+      ? delivery.limitations.filter((message) => !message.startsWith("3D generation could not start for "))
+      : delivery.limitations,
     pathways: delivery.pathways.map(withUrl),
     blend: delivery.blend ? withUrl(delivery.blend) : null,
   };

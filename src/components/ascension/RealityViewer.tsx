@@ -573,7 +573,6 @@ export function RealityViewer({
         );
       }
     };
-    buildRoom("Workspace");
     const lines = new THREE.Group();
     scene.add(lines);
     const materials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
@@ -611,6 +610,7 @@ export function RealityViewer({
     roomEnvironment.visible = false;
     scene.add(roomEnvironment);
     const roomMeshes: THREE.Mesh[] = [];
+    buildRoom("Workspace");
     let demoObject: THREE.Mesh | null = null;
     let demoActiveRef = false;
     let demoElapsed = 0;

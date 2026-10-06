@@ -2,8 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
-import { Envision3DScene } from "@/components/ascension/Envision3DScene";
-import type { ManifestationPhase } from "@/lib/ascension/manifestation";
+import { createRealityAtmosphere, playSpatialSwell } from "./reality-audio";
 import {
   getObjectiveStatus,
   listMyObjectives,
@@ -29,7 +28,6 @@ import {
   planningFor,
   receiptFiles,
   record,
-  requestedKind,
   supportsEnvisionObjective,
   strings,
   type ObjectiveDelivery,
@@ -88,166 +86,13 @@ function audioContextFor(ref: { current: AudioContext | null }) {
   return ref.current;
 }
 
-function scheduleTone(
-  ctx: AudioContext,
-  destination: AudioNode,
-  frequency: number,
-  start: number,
-  duration: number,
-  volume: number,
-  endFrequency?: number,
-  type: OscillatorType = "sine",
-) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(frequency, start);
-  if (endFrequency && endFrequency > 0) {
-    osc.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
-  }
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(
-    Math.max(volume, 0.0002),
-    start + Math.min(0.045, duration / 4),
-  );
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  osc.connect(gain);
-  gain.connect(destination);
-  osc.start(start);
-  osc.stop(start + duration + 0.02);
-}
-
-function scheduleNoise(
-  ctx: AudioContext,
-  destination: AudioNode,
-  start: number,
-  duration: number,
-  volume: number,
-) {
-  const frameCount = Math.max(1, Math.floor(ctx.sampleRate * duration));
-  const buffer = ctx.createBuffer(1, frameCount, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < frameCount; i++) data[i] = Math.random() * 2 - 1;
-  const source = ctx.createBufferSource();
-  const filter = ctx.createBiquadFilter();
-  const gain = ctx.createGain();
-  source.buffer = buffer;
-  filter.type = "bandpass";
-  filter.frequency.setValueAtTime(1400, start);
-  filter.frequency.exponentialRampToValueAtTime(5200, start + duration);
-  filter.Q.value = 0.7;
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(volume, start + 0.03);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(destination);
-  source.start(start);
-  source.stop(start + duration + 0.02);
-}
-
 function playAscensionSound(ref: { current: AudioContext | null }, cue: AscensionSoundCue) {
   const ctx = audioContextFor(ref);
   if (!ctx) return;
-  if (ctx.state === "suspended") void ctx.resume();
-
-  const master = ctx.createGain();
-  const compressor = ctx.createDynamicsCompressor();
-  master.gain.value = 0.72;
-  master.connect(compressor);
-  compressor.connect(ctx.destination);
-  const now = ctx.currentTime + 0.015;
-
-  switch (cue) {
-    case "engage":
-      scheduleTone(ctx, master, 58, now, 0.7, 0.055, 86, "sine");
-      scheduleTone(ctx, master, 174, now + 0.08, 0.52, 0.018, 232, "triangle");
-      break;
-    case "roots":
-      scheduleTone(ctx, master, 72, now, 0.78, 0.038, 96, "sine");
-      scheduleTone(ctx, master, 144, now + 0.06, 0.56, 0.013, 168, "triangle");
-      break;
-    case "trunk":
-      scheduleTone(ctx, master, 105, now, 0.82, 0.032, 260, "sine");
-      scheduleTone(ctx, master, 210, now + 0.1, 0.64, 0.014, 520, "triangle");
-      break;
-    case "nodes":
-      [392, 523.25, 659.25].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + index * 0.13, 0.42, 0.022, freq * 1.015, "sine"),
-      );
-      break;
-    case "canopy":
-      [196, 293.66, 440].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + index * 0.035, 1.0, 0.017, freq * 1.08, "sine"),
-      );
-      scheduleNoise(ctx, master, now + 0.08, 0.66, 0.012);
-      break;
-    case "processing":
-      scheduleTone(ctx, master, 98, now, 0.62, 0.018, 123, "sine");
-      scheduleTone(ctx, master, 294, now + 0.08, 0.48, 0.008, 330, "triangle");
-      break;
-    case "eruption":
-      scheduleTone(ctx, master, 46, now, 1.2, 0.065, 72, "sine");
-      scheduleNoise(ctx, master, now, 0.9, 0.026);
-      [329.63, 493.88, 659.25, 987.77].forEach((freq, index) =>
-        scheduleTone(
-          ctx,
-          master,
-          freq,
-          now + 0.12 + index * 0.075,
-          0.95,
-          0.025,
-          freq * 1.03,
-          "sine",
-        ),
-      );
-      break;
-    case "select":
-      scheduleTone(ctx, master, 523.25, now, 0.24, 0.022, 659.25, "sine");
-      scheduleTone(ctx, master, 1046.5, now + 0.08, 0.28, 0.012, 1174.66, "sine");
-      break;
-    case "possibility":
-      // Low spatial hum: unstable knowledge gathering.
-      scheduleTone(ctx, master, 55, now, 1.1, 0.03, 62, "sine");
-      scheduleTone(ctx, master, 58.5, now + 0.05, 1.0, 0.018, 64, "sine");
-      scheduleNoise(ctx, master, now + 0.04, 0.8, 0.008);
-      break;
-    case "condensation":
-      // Rising controlled tone: energy tightening inward.
-      scheduleTone(ctx, master, 110, now, 0.8, 0.026, 220, "triangle");
-      scheduleTone(ctx, master, 220, now + 0.3, 0.5, 0.014, 330, "sine");
-      break;
-    case "reveal":
-      // Knowledge chimes / crystalline assembly.
-      [523.25, 659.25, 783.99, 1046.5].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + index * 0.09, 0.34, 0.02, freq * 1.01, "sine"),
-      );
-      break;
-    case "stabilize":
-      // Clean confirmation chord.
-      [261.63, 329.63, 392, 523.25].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + index * 0.02, 0.95, 0.017, freq, "sine"),
-      );
-      break;
-    case "blend":
-      [261.63, 392, 523.25, 783.99].forEach((freq, index) =>
-        scheduleTone(ctx, master, freq, now + index * 0.04, 0.62, 0.021, freq * 1.025, "sine"),
-      );
-      break;
-    case "open":
-      scheduleTone(ctx, master, 164.81, now, 0.52, 0.026, 329.63, "sine");
-      scheduleTone(ctx, master, 659.25, now + 0.14, 0.48, 0.018, 987.77, "triangle");
-      break;
-  }
-
-  window.setTimeout(() => {
-    try {
-      master.disconnect();
-      compressor.disconnect();
-    } catch {
-      // Nodes may already be disconnected by the browser.
-    }
-  }, 1800);
+  void ctx.resume().catch(() => {});
+  // Broad, low, breathing textures; no melodic UI chimes.
+  if (["engage", "eruption", "open"].includes(cue))
+    playSpatialSwell(ctx, cue === "open" ? 1 : 0.45);
 }
 
 function cleanDisplayText(value: string) {
@@ -322,45 +167,6 @@ function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: Objec
         </div>
       ))}
     </div>
-  );
-}
-
-function TreeKnowledgeEruption({
-  delivery,
-  selectedId,
-  onSelect,
-  onUse,
-  objectiveText,
-  onPhaseChange,
-}: {
-  delivery: ObjectiveDelivery;
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
-  onUse: (pathway: ObjectiveDelivery["pathways"][number], mode?: RealityMode) => void;
-  objectiveText: string;
-  onPhaseChange: (phase: ManifestationPhase, info: { blend: boolean }) => void;
-}) {
-  const hasChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
-  if (!hasChoices) return null;
-
-  // Only creation/design objectives enter ENVISION. Ordinary answers can still
-  // have Spiral pathways, but they must not be turned into arbitrary 3D objects
-  // (for example, "how to make apple pie" must remain an answer, not a pie mesh).
-  if (!supportsEnvisionObjective(objectiveText)) return null;
-
-  // Reference images are server-only Hunyuan inputs. The client enters
-  // ENVISION from visual intent and waits for the completed GLB; it never
-  // treats the internal reference image as a user-facing visual asset.
-
-  return (
-    <Envision3DScene
-      delivery={delivery}
-      selectedId={selectedId}
-      onSelect={onSelect}
-      onUse={onUse}
-      objectiveText={objectiveText}
-      onPhaseChange={onPhaseChange}
-    />
   );
 }
 
@@ -552,68 +358,70 @@ export function ResultContent({
         </section>
       )}
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="label-eyebrow text-primary">
-              {drawing ? "DESIGN READOUT" : "ASCENSION RESULT"}
-            </p>
-            <h2 className="mt-1 font-display text-2xl tracking-wide text-foreground sm:text-3xl">
-              {cleanDisplayText(delivery.title)}
-            </h2>
+      {!canInspect && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="label-eyebrow text-primary">
+                {drawing ? "DESIGN READOUT" : "ASCENSION RESULT"}
+              </p>
+              <h2 className="mt-1 font-display text-2xl tracking-wide text-foreground sm:text-3xl">
+                {cleanDisplayText(delivery.title)}
+              </h2>
+            </div>
+            {source === "governed" && (
+              <span className="rounded-full border border-gold/40 px-3 py-1 text-[0.65rem] tracking-[0.14em] text-gold uppercase">
+                GOVERNED RESULT
+              </span>
+            )}
           </div>
-          {source === "governed" && (
-            <span className="rounded-full border border-gold/40 px-3 py-1 text-[0.65rem] tracking-[0.14em] text-gold uppercase">
-              GOVERNED RESULT
-            </span>
+
+          {body.summary && !hasVisualChoices && (
+            <div className="rounded-xl border border-primary/20 bg-background/20 p-4 sm:p-5">
+              <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground/95">
+                {body.summary}
+              </p>
+            </div>
+          )}
+
+          {body.summary && hasVisualChoices && (
+            <details className="rounded-xl border border-border/60 bg-void/25 px-4 py-3">
+              <summary className="cursor-pointer text-sm text-muted-foreground">Overview</summary>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground/85">
+                {body.summary}
+              </p>
+            </details>
+          )}
+
+          {(body.detail || body.internal) && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {body.detail && (
+                <details className="rounded-xl border border-border/70 bg-void/35 px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-medium text-foreground/85">
+                    Full explanation
+                  </summary>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                    {body.detail}
+                  </p>
+                </details>
+              )}
+              {body.internal && (
+                <details className="rounded-xl border border-border/70 bg-void/35 px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-medium text-foreground/85">
+                    Knowledge used
+                  </summary>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                    {body.internal}
+                  </p>
+                </details>
+              )}
+            </div>
           )}
         </div>
-
-        {body.summary && !hasVisualChoices && (
-          <div className="rounded-xl border border-primary/20 bg-background/20 p-4 sm:p-5">
-            <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground/95">
-              {body.summary}
-            </p>
-          </div>
-        )}
-
-        {body.summary && hasVisualChoices && (
-          <details className="rounded-xl border border-border/60 bg-void/25 px-4 py-3">
-            <summary className="cursor-pointer text-sm text-muted-foreground">Overview</summary>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground/85">
-              {body.summary}
-            </p>
-          </details>
-        )}
-
-        {(body.detail || body.internal) && (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {body.detail && (
-              <details className="rounded-xl border border-border/70 bg-void/35 px-4 py-3">
-                <summary className="cursor-pointer text-sm font-medium text-foreground/85">
-                  Full explanation
-                </summary>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                  {body.detail}
-                </p>
-              </details>
-            )}
-            {body.internal && (
-              <details className="rounded-xl border border-border/70 bg-void/35 px-4 py-3">
-                <summary className="cursor-pointer text-sm font-medium text-foreground/85">
-                  Knowledge used
-                </summary>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                  {body.internal}
-                </p>
-              </details>
-            )}
-          </div>
-        )}
-      </div>
+      )}
 
       {(delivery.pathways.length > 0 || delivery.blend) && (
-        <section className="space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.025] p-4 sm:p-5">
+        <section className="ascension-pathway-cards space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.025] p-4 sm:p-5">
           <div>
             <p className="label-eyebrow text-primary">SPIRAL PATHWAYS</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -642,7 +450,8 @@ export function ResultContent({
                 className={`rounded-xl border border-primary/25 bg-background/25 p-4 ${canInspect ? "cursor-pointer transition hover:border-primary/60 hover:bg-primary/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/45" : ""}`}
               >
                 <p className="text-[0.65rem] tracking-[0.16em] text-primary uppercase">
-                  PATH {index + 1}{pathway.spiral_form ? ` · ${cleanDisplayText(pathway.spiral_form)}` : ""}
+                  PATH {index + 1}
+                  {pathway.spiral_form ? ` · ${cleanDisplayText(pathway.spiral_form)}` : ""}
                 </p>
                 <h3 className="mt-1 font-display text-xl text-foreground">
                   {cleanDisplayText(pathway.label)}
@@ -664,7 +473,7 @@ export function ResultContent({
                 )}
                 {canInspect && (
                   <p className="mt-4 text-xs font-medium tracking-[0.14em] text-primary uppercase">
-                    OPEN REALITY · INSPECT 3D
+                    DIVE INTO REALITY
                   </p>
                 )}
               </article>
@@ -708,7 +517,7 @@ export function ResultContent({
                 )}
                 {canInspect && (
                   <p className="mt-4 text-xs font-medium tracking-[0.14em] text-gold uppercase">
-                    OPEN BLENDED REALITY · INSPECT 3D
+                    DIVE INTO BLENDED REALITY
                   </p>
                 )}
               </article>
@@ -801,6 +610,7 @@ export function Engage() {
   const [reality, setReality] = useState<{ id: string; mode: RealityMode } | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const atmosphere = useRef<ReturnType<typeof createRealityAtmosphere> | null>(null);
   const sequenceTimers = useRef<number[]>([]);
   const burstRun = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -838,14 +648,26 @@ export function Engage() {
   useEffect(
     () => () => {
       sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+      atmosphere.current?.stop();
       const context = audioContextRef.current;
       if (context && context.state !== "closed") void context.close();
     },
     [],
   );
 
+  useEffect(() => {
+    const syncAudio = () => {
+      const ctx = audioContextRef.current;
+      if (!ctx || ctx.state === "closed") return;
+      if (document.hidden || !soundEnabled) void ctx.suspend().catch(() => {});
+      else void ctx.resume().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", syncAudio);
+    return () => document.removeEventListener("visibilitychange", syncAudio);
+  }, [soundEnabled]);
+
   const sound = (cue: AscensionSoundCue) => {
-    if (!soundEnabled) return;
+    if (!soundEnabled || document.hidden) return;
     playAscensionSound(audioContextRef, cue);
   };
 
@@ -854,24 +676,12 @@ export function Engage() {
     setSoundEnabled(next);
     save(SOUND_PREF, next ? "on" : "off");
     if (next) {
-      playAscensionSound(audioContextRef, "select");
+      const ctx = audioContextFor(audioContextRef);
+      if (ctx) void ctx.resume().catch(() => {});
+      if (ctx && reality && !atmosphere.current) atmosphere.current = createRealityAtmosphere(ctx);
     } else if (audioContextRef.current?.state === "running") {
       void audioContextRef.current.suspend();
     }
-  };
-
-  // Manifestation phases and sound share one timeline: possibility hum,
-  // condensation rise, crystalline reveal, stabilization chord. BLEND fuses
-  // with its own harmonic synthesis while realities merge.
-  const handleManifestationPhase = (phase: ManifestationPhase, info: { blend: boolean }) => {
-    if (info.blend && phase === "condensation") {
-      sound("blend");
-      return;
-    }
-    if (phase === "possibility") sound("possibility");
-    else if (phase === "condensation") sound("condensation");
-    else if (phase === "reveal") sound("reveal");
-    else if (phase === "stabilized") sound("stabilize");
   };
 
   const runQuery = useQuery({
@@ -911,8 +721,8 @@ export function Engage() {
           ? [...delivery.response_payload.pathways, delivery.response_payload.blend]
           : delivery.response_payload.pathways
         : [];
-      const waitingForHunyuan = modelChoices.some(
-        (pathway) => ["queued", "claimed", "running"].includes(pathway.model_status ?? ""),
+      const waitingForHunyuan = modelChoices.some((pathway) =>
+        ["queued", "claimed", "running"].includes(pathway.model_status ?? ""),
       );
       if (waitingForHunyuan) return 3000;
 
@@ -1095,23 +905,17 @@ export function Engage() {
       setBookOpen(true);
       setRevealed(true);
 
-      // Visual creation requests enter ENVISION first. Ordinary answers and
-      // app/code results have no visual reality to "open", so reveal the
-      // answer panel immediately instead of leaving it permanently hidden.
-      const kind = requestedKind(run.objective);
-      const usesEnvision = kind === "drawing" || kind === "design";
-      setDetailsOpen(!usesEnvision);
+      // The detailed pathway cards are the single entry into visual realities.
+      setDetailsOpen(true);
 
       // The tree is the result event. Hold the eruption state instead of
       // treating it as a short transition into a separate scrolling page.
       setBookSequence("eruption");
       sound("eruption");
-      if (!usesEnvision) {
-        window.setTimeout(
-          () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-          120,
-        );
-      }
+      window.setTimeout(
+        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        120,
+      );
       return;
     }
     if (!TERMINAL.has(run.status)) return;
@@ -1156,17 +960,16 @@ export function Engage() {
     window.setTimeout(() => inputRef.current?.focus(), 250);
   };
 
-  const selectTreeReality = (id: string | null) => {
-    setTreeChoiceId(id);
-    if (!id) {
-      sound("select");
-      return;
+  const openTreeReality = (
+    pathway: ObjectiveDelivery["pathways"][number],
+    mode: RealityMode = "cutaway",
+  ) => {
+    const ctx = audioContextFor(audioContextRef);
+    if (ctx && soundEnabled) {
+      void ctx.resume().catch(() => {});
+      atmosphere.current?.stop();
+      atmosphere.current = createRealityAtmosphere(ctx);
     }
-    sound(delivery?.blend?.id === id ? "blend" : "select");
-  };
-
-  const openTreeReality = (pathway: ObjectiveDelivery["pathways"][number], mode: RealityMode = "cutaway") => {
-    sound("open");
     setTreeChoiceId(pathway.id);
     setReality({ id: pathway.id, mode });
   };
@@ -1215,9 +1018,23 @@ export function Engage() {
     engage.mutate();
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
-  const realityPathway = reality && delivery
-    ? [...delivery.pathways, ...(delivery.blend ? [delivery.blend] : [])].find((pathway) => pathway.id === reality.id)
-    : null;
+  const closeReality = () => {
+    atmosphere.current?.stop();
+    atmosphere.current = null;
+    setReality(null);
+  };
+  const immersiveChoices = Boolean(
+    delivery &&
+    run &&
+    supportsEnvisionObjective(run.objective) &&
+    (delivery.pathways.length || delivery.blend),
+  );
+  const realityPathway =
+    reality && delivery
+      ? [...delivery.pathways, ...(delivery.blend ? [delivery.blend] : [])].find(
+          (pathway) => pathway.id === reality.id,
+        )
+      : null;
 
   return (
     <div
@@ -1225,24 +1042,23 @@ export function Engage() {
       data-book-sequence={bookSequence === "idle" ? undefined : bookSequence}
       data-book-open={bookOpen ? "true" : undefined}
       data-has-run={run && revealed ? "true" : undefined}
+      data-realities={immersiveChoices && revealed ? "true" : undefined}
     >
-      {reality && realityPathway && <RealityViewer pathway={realityPathway} initialMode={reality.mode} onClose={() => setReality(null)} />}
+      {reality && realityPathway && (
+        <RealityViewer
+          pathway={realityPathway}
+          initialMode={reality.mode}
+          soundEnabled={soundEnabled}
+          onToggleSound={toggleSound}
+          onDive={() => sound("open")}
+          onClose={closeReality}
+        />
+      )}
       <section aria-label="Engage ASCENSION" className="ascension-command">
         <div className="ascension-stage">
           <div className="ascension-scene-hero" aria-hidden="true">
             <img className="ascension-tree-scene" src={BOOK_TREE_SCENE} alt="" draggable={false} />
           </div>
-
-          {delivery && run && bookSequence === "eruption" && (
-            <TreeKnowledgeEruption
-              delivery={delivery}
-              selectedId={treeChoiceId}
-              onSelect={selectTreeReality}
-              onUse={openTreeReality}
-              objectiveText={run.objective}
-              onPhaseChange={handleManifestationPhase}
-            />
-          )}
 
           <button
             type="button"
@@ -1400,22 +1216,24 @@ export function Engage() {
           aria-label="Your answer"
           className="ascension-result-reveal mx-auto max-w-6xl scroll-mt-20 space-y-4 rounded-2xl border border-primary/30 bg-void/85 p-4 shadow-2xl sm:p-6"
         >
-          <div>
-            <p className="label-eyebrow text-primary">ASCENSION RESPONSE</p>
-            <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
-            <p role="status" className="mt-3 text-sm text-foreground/90">
-              {delivery && deliveryQuery.data?.source === "external_draft"
-                ? "Your result is below."
-                : deliveryQuery.data?.note && produced === null
-                  ? deliveryQuery.data.note
-                  : statusText(run, produced)}
-            </p>
-          </div>
+          {!immersiveChoices && (
+            <div>
+              <p className="label-eyebrow text-primary">ASCENSION RESPONSE</p>
+              <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
+              <p role="status" className="mt-3 text-sm text-foreground/90">
+                {delivery && deliveryQuery.data?.source === "external_draft"
+                  ? "Your result is below."
+                  : deliveryQuery.data?.note && produced === null
+                    ? deliveryQuery.data.note
+                    : statusText(run, produced)}
+              </p>
+            </div>
+          )}
 
           {delivery ? (
             <>
-              <AscensionSignal run={run} delivery={delivery} />
-              {treeChoiceId && (
+              {!immersiveChoices && <AscensionSignal run={run} delivery={delivery} />}
+              {!immersiveChoices && treeChoiceId && (
                 <SelectedRealityDetails
                   delivery={delivery}
                   selectedId={treeChoiceId}
@@ -1425,7 +1243,7 @@ export function Engage() {
               <ResultContent
                 delivery={delivery}
                 source={deliveryQuery.data?.source ?? null}
-                canInspect={supportsEnvisionObjective(run.objective)}
+                canInspect={immersiveChoices}
                 onInspect={inspectPathwayReality}
               />
             </>
@@ -1488,4 +1306,3 @@ export function Engage() {
     </div>
   );
 }
-

@@ -23,16 +23,25 @@ export function RealityViewer({
   pathway,
   initialMode,
   onClose,
+  soundEnabled,
+  onToggleSound,
+  onDive,
 }: {
   pathway: ObjectivePathway;
   initialMode: RealityMode;
   onClose: () => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
+  onDive: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const api = useRef<ViewerControls | null>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  const [arrived, setArrived] = useState(false);
+  const dive = useRef(onDive);
+  dive.current = onDive;
   const [mode, setMode] = useState<RealityMode>(initialMode);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +50,16 @@ export function RealityViewer({
   const [attempt, setAttempt] = useState(0);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+
+  useEffect(() => {
+    if (!ready) return;
+    dive.current();
+    const timer = window.setTimeout(
+      () => setArrived(true),
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 1800,
+    );
+    return () => window.clearTimeout(timer);
+  }, [ready]);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -403,12 +422,22 @@ export function RealityViewer({
       ref={dialog}
       className="reality-screen"
       data-mode={mode}
+      data-arrived={arrived}
       aria-label={`${pathway.label} — immersive reality`}
       onCancel={(event) => {
         event.preventDefault();
         close.current();
       }}
     >
+      {!arrived && (
+        <div className="reality-dive" data-entering={ready} aria-hidden="true">
+          <img src="/approved-scene/ascension-tree-behind-book-hq.jpg" alt="" />
+          <div className="reality-dive-title">
+            <span>{ready ? "DIVING INTO" : "AT THE THRESHOLD"}</span>
+            <h2>{pathway.label}</h2>
+          </div>
+        </div>
+      )}
       <header className="reality-header">
         <button className="reality-back" onClick={onClose}>
           ← BACK TO PATHWAYS
@@ -417,6 +446,9 @@ export function RealityViewer({
           <span>ASCENSION / ENVISION</span>
           <h1>{pathway.label}</h1>
         </div>
+        <button className="reality-sound" aria-pressed={soundEnabled} onClick={onToggleSound}>
+          {soundEnabled ? "SOUND ON" : "SOUND OFF"}
+        </button>
         <nav aria-label="Reality view" className="reality-tabs">
           {(["cutaway", "blueprint", "environment"] as const).map((value) => (
             <button key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>

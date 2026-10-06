@@ -1,8 +1,8 @@
 /* ASCENSION Book entry — approved scene with live controls.
    The artwork stays canonical; only real interactive controls are overlaid. */
 
-body:has(.ascension-world > .ascension-command) header,
-body:has(.ascension-world > .ascension-command) footer,
+body:has(.ascension-world > .ascension-command) header:not(.reality-header),
+body:has(.ascension-world > .ascension-command) footer:not(.reality-footer),
 body:has(.ascension-world > .ascension-command) .starfield {
   display: none !important;
 }
@@ -1625,7 +1625,6 @@ body:has(.ascension-world > .ascension-command) main {
   }
 }
 
-
 /* ENVISION readability pass: the Tree is the world, the realities are the subject.
    Once ENVISION is present, stop the old power-up rays from competing with the models. */
 .ascension-stage:has(.ascension-envision-3d) .ascension-scene-hero::before,
@@ -1650,8 +1649,7 @@ body:has(.ascension-world > .ascension-command) main {
 .ascension-envision-3d:not([data-focused="true"]) .ascension-holo-hit--blend {
   border-color: rgb(240 198 110 / 62%);
   background:
-    radial-gradient(circle at 50% 0%, rgb(242 197 104 / 14%), transparent 68%),
-    rgb(8 8 8 / 94%);
+    radial-gradient(circle at 50% 0%, rgb(242 197 104 / 14%), transparent 68%), rgb(8 8 8 / 94%);
 }
 
 @media (max-width: 620px) {
@@ -1716,7 +1714,6 @@ body:has(.ascension-world > .ascension-command) main {
     backdrop-filter: none;
   }
 }
-
 
 /* ENVISION calm mode: no energetic flow, rays, scan fields, or animated halos. */
 .ascension-stage:has(.ascension-envision-3d) .ascension-scene-hero::before,
@@ -1810,9 +1807,7 @@ body:has(.ascension-world > .ascension-command) main {
 
 .ascension-envision-3d[data-mode="blueprint"]::before {
   z-index: 2;
-  background:
-    linear-gradient(180deg, rgb(6 26 46 / 74%), rgb(2 12 24 / 82%)),
-    rgb(2 10 20 / 30%);
+  background: linear-gradient(180deg, rgb(6 26 46 / 74%), rgb(2 12 24 / 82%)), rgb(2 10 20 / 30%);
   backdrop-filter: brightness(0.52) saturate(0.55) blur(1px);
 }
 
@@ -2069,5 +2064,53 @@ body:has(.ascension-world > .ascension-command) main {
 
   .ascension-visual-frame figcaption {
     font-size: 0.48rem;
+  }
+}
+
+/* One pathway selector, with the canonical tree present all the way to entry. */
+.ascension-world[data-realities="true"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(#01040a30, #01040a60),
+    url("/approved-scene/ascension-tree-behind-book-hq.jpg") center / cover no-repeat;
+}
+.ascension-world[data-realities="true"] .ascension-command,
+.ascension-world[data-realities="true"] .ascension-stage {
+  background: transparent !important;
+}
+.ascension-world[data-realities="true"] .ascension-scene-hero {
+  visibility: hidden;
+}
+.ascension-world[data-realities="true"] .ascension-result-reveal {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.ascension-world[data-realities="true"] .ascension-pathway-cards {
+  background: #01091050;
+  border-color: #8bc9e82b;
+}
+.ascension-world[data-realities="true"] .ascension-pathway-cards article {
+  background: #06101edb;
+  backdrop-filter: blur(7px);
+  transition:
+    transform 0.35s ease,
+    border-color 0.35s ease,
+    background 0.35s ease;
+}
+.ascension-world[data-realities="true"] .ascension-pathway-cards article:hover {
+  transform: translateY(-3px);
+  background: #0a2032eb;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ascension-world[data-realities="true"] .ascension-pathway-cards article {
+    transition: none;
+  }
+  .ascension-world[data-realities="true"] .ascension-pathway-cards article:hover {
+    transform: none;
   }
 }

@@ -3,7 +3,7 @@ import {
   assessResult,
   notProducedMessage,
   parseDelivery,
-  requestedKind,
+  requestedKind, supportsEnvisionObjective,
   type ObjectiveDelivery,
 } from "../result-model";
 
@@ -432,7 +432,7 @@ export async function externalProductDraft(
   // VISUAL objectives: generate an INTERNAL reference image for every pathway
   // and blend. These references feed Hunyuan image-to-3D and are never the
   // user-facing ENVISION result. No procedural geometry is a fallback.
-  if (requested === "drawing" || requested === "design") {
+  if (supportsEnvisionObjective(run.objective)) {
     const { generatePathwayImages } = await import("./image.server");
     const visualChoices = parsed.blend ? [...parsed.pathways, parsed.blend] : parsed.pathways;
     const { urls: imageUrls, errors: imageErrors } = await generatePathwayImages(

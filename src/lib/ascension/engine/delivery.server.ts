@@ -273,18 +273,7 @@ export async function externalProductDraft(
     "Return exactly one JSON object with keys: kind, title, body, pathways, blend, files, limitations.",
     "The body must be clean readable plain text. Do not emit Markdown markers, escaped Markdown, or HTML entities.",
     "pathways must be an array. When a SPIRAL EXPANSION is supplied, create one substantive user-facing solution pathway for each Spiral form instead of collapsing them into one answer.",
-    "Each pathway object must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, model_spec, outcome_score, outcome_reason. steps and tradeoffs are string arrays.",
-    "visual_svg must be a compact self-contained SVG that visually communicates that pathway. Use a landscape viewBox, strong contrast, meaningful geometry and very little text. The visual should make the pathways distinguishable at a glance.",
-    "model_spec is the authoritative 3D scene graph for that specific pathway. Do not return a generic engine/object category when the pathway describes a specific invention, product, machine, structure, wearable, vehicle, device, room, or physical system.",
-    "model_spec must be an object with: title, description, hero_rotation, hero_scale, parts.",
-    "model_spec.parts must be an array of 3D parts that together visibly resemble the actual pathway. Each part must contain name, primitive, position, rotation, scale, material.",
-    "Allowed primitive values are only: box, cylinder, ring, sphere, nozzle.",
-    "Allowed material values are only: gold, gold_deep, copper, blue, blue_deep, ice, cyan, warm, steel, dark.",
-    "All positions/scales use normalized model space. Keep the complete object centered near [0,0,0], usually within about -1.6..1.6 on each axis. Rotations are radians.",
-    "Use enough parts to communicate the actual design clearly. Prefer 8-40 meaningful parts for physical designs instead of a symbolic 2-3 primitive placeholder.",
-    "When the objective supplies concrete geometry, component counts, orientation, proportions, or arrangement, encode those facts in model_spec. Do not invent exact measurements that were not supplied.",
-    "For nonphysical conceptual pathways where a literal object does not make sense, model_spec may be null. For physical/design/drawing objectives, model_spec should normally be non-null.",
-    "CUTAWAY, BLUEPRINT and ENVIRONMENT in the UI all derive from this same model_spec, so model_spec must describe one coherent object rather than three different illustrations.",
+    "Each pathway object must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, model_spec, outcome_score, outcome_reason. steps and tradeoffs are string arrays. Set visual_svg and model_spec to null; ENVISION uses only the Hunyuan3D GLB pipeline.",
     "outcome_score is 0..1 when a grounded relative assessment can be made from the supplied context; otherwise use null. outcome_reason must briefly explain the basis without pretending the score is physically verified.",
     "The pathway content is a Spiral-guided user-facing synthesis, not a claim that the governed runtime physically executed or verified that solution.",
     "Make the pathways materially different approaches to accomplishing the objective. Do not merely rename the same answer.",
@@ -293,15 +282,13 @@ export async function externalProductDraft(
     "When a request has safety, security, legal, or authorization implications, do not assume the user's skill level, ownership, motive, or situation. Do not moralize or turn the entire answer into a warning.",
     "If any requested operational detail cannot be safely supplied, state that boundary once and briefly, then still answer the safe portion directly and provide at least 3 useful alternative pathways such as diagnosis, authorized repair/replacement, and emergency recovery. A safety caveat may be one pathway; it must not erase the rest of the useful answer.",
     "For troubleshooting requests, prioritize practical fault isolation and restoration steps over generic architecture prose.",
-    "blend must be an object when two or more useful pathways exist. It must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, model_spec, outcome_score, outcome_reason, blend_from, blend_reason.",
+    "blend must be an object when two or more useful pathways exist. It must contain id, label, summary, steps, tradeoffs, spiral_form, visual_svg, model_spec, outcome_score, outcome_reason, blend_from, blend_reason. Set visual_svg and model_spec to null; the blend's visual authority is its Hunyuan3D GLB.",
     "The BLEND pathway is where Spiral and Outcome Predictor work together: combine complementary strengths from the distinct pathways, explicitly account for their tradeoffs and the supplied Outcome Predictor context, and explain the blend in blend_reason. Do not simply concatenate every pathway.",
     "blend_from is an array of the pathway ids or labels whose strongest elements were combined. Use spiral_form 'spiral_outcome_blend'.",
     "If fewer than two useful pathways exist, return blend as null.",
     'kind must be "answer" or "artifact".',
     "For ordinary questions or product/invention requests, give a substantive direct result in body. Start by addressing what the user actually asked; do not substitute a generic overview, lecture, or architecture explanation.",
     "For app/code requests, include complete runnable source files.",
-    "For drawing/image/diagram requests, the visual is the primary result. Include a complete polished SVG, not a token diagram or placeholder.",
-    "For SVG drawings, use a generous landscape viewBox, strong readable contrast, meaningful geometry, component labels where useful, a clear visual hierarchy, and enough detail that the user can understand the design without reading the prose. Avoid tiny default canvases, invisible strokes, generic rectangles-only schematics, or unlabeled placeholder shapes.",
     "For visual requests keep body concise: briefly explain what was created and the key design logic; do not bury the visual under a long essay.",
     "For product/invention creation requests, create a substantive design/specification rather than a receipt, token list, or plan to make one.",
     "files must be an array of objects with name and content. Use [] when no download is needed.",
@@ -389,81 +376,11 @@ export async function externalProductDraft(
 
   let parsed = parseDelivery(candidate);
 
-  // Physical/design objectives are not allowed to fall back to a canned
-  // renderer. Every pathway must carry its own model_spec. If the first answer
-  // omitted one, make one focused repair call; if it still fails, reject the
-  // draft rather than showing the user a fake generic object.
   const requested = requestedKind(run.objective);
-  const needsPathwayModels =
-    (requested === "drawing" || requested === "design") &&
-    parsed.pathways.length > 0 &&
-    parsed.pathways.some((pathway) => pathway.model_spec === null);
-  if (needsPathwayModels) {
-    const repairInput = parsed.pathways.map((pathway) => ({
-      id: pathway.id,
-      label: pathway.label,
-      summary: pathway.summary,
-      spiral_form: pathway.spiral_form,
-      existing_model_spec: pathway.model_spec,
-    }));
-    const repaired = await callZai({
-      system: [
-        "You are repairing ASCENSION ENVISION 3D model specifications.",
-        "Return exactly one JSON object with key models.",
-        "models must be an array with one object for every supplied pathway, preserving each pathway id exactly.",
-        "Each model object must contain id and model_spec.",
-        "model_spec must contain title, description, hero_rotation, hero_scale, parts.",
-        "parts must describe the actual pathway object, not a generic engine or placeholder.",
-        "Allowed primitive values: box, cylinder, ring, sphere, nozzle.",
-        "Allowed material values: gold, gold_deep, copper, blue, blue_deep, ice, cyan, warm, steel, dark.",
-        "Each part must contain name, primitive, position, rotation, scale, material.",
-        "Use 8-40 meaningful parts for a normal physical design when useful.",
-        "All geometry is normalized around [0,0,0]. Rotations are radians.",
-        "Use the objective and pathway wording as the design authority. Do not invent exact measurements not supplied.",
-        "Do not return prose outside the JSON object.",
-      ].join(" "),
-      user: [
-        `OBJECTIVE:\n${run.objective}`,
-        `PATHWAYS:\n${JSON.stringify(repairInput)}`,
-        "Create the missing pathway-specific 3D model specifications now.",
-      ].join("\n\n"),
-      knowledgeQuery: run.objective,
-      temperature: 0.15,
-    });
-    const repairJson = repaired.json;
-    const models =
-      repairJson && Array.isArray(repairJson["models"]) ? (repairJson["models"] as unknown[]) : [];
-    const modelById = new Map<string, unknown>();
-    for (const raw of models) {
-      const item = record(raw);
-      if (typeof item["id"] === "string" && item["model_spec"]) {
-        modelById.set(item["id"], item["model_spec"]);
-      }
-    }
-    if (modelById.size) {
-      const patched = {
-        ...candidate,
-        pathways: Array.isArray(candidate["pathways"])
-          ? candidate["pathways"].map((raw) => {
-              const p = record(raw);
-              const id = typeof p["id"] === "string" ? p["id"] : "";
-              return modelById.has(id) ? { ...p, model_spec: modelById.get(id) } : p;
-            })
-          : [],
-      } as Record<string, unknown>;
-      if (candidate["blend"] && typeof candidate["blend"] === "object") {
-        const blendRecord = record(candidate["blend"]);
-        const blendId = typeof blendRecord["id"] === "string" ? blendRecord["id"] : "";
-        patched["blend"] = modelById.has(blendId)
-          ? { ...blendRecord, model_spec: modelById.get(blendId) }
-          : blendRecord;
-      }
-      parsed = parseDelivery(patched);
-    }
-    // model_spec is legacy planning metadata only. Real ENVISION geometry
-    // comes from Hunyuan GLB, so a missing primitive scene graph must never
-    // block a visual objective or be substituted for the requested reality.
-  }
+
+  // Primitive model_spec/SVG output is legacy planning metadata only. It must
+  // never trigger a second AI call or become the visual authority. Real visual
+  // delivery is the hidden reference -> Hunyuan3D -> GLB pipeline below.
 
   // VISUAL objectives: generate an INTERNAL reference image for every pathway
   // and blend. These references feed Hunyuan image-to-3D and are never the

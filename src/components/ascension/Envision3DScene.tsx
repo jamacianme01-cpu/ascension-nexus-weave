@@ -1150,12 +1150,11 @@ export function Envision3DScene({
       const spec = blend ? null : (linearSpecs.get(path.id) ?? null);
       const semanticModel = path.model_spec;
 
-      // IMAGE-FIRST: a real generated concept image is the user-facing visual
-      // for this pathway. Procedural geometry draws only when no image exists,
-      // or when the user explicitly enters the 3D model view with a fetched GLB.
-      const generatedImage = path.generated_image_url ?? null;
-      const modelViewActive = focus && modelViewRef.current && generatedRef.current?.id === path.id;
-      if (generatedImage && !modelViewActive) return;
+      // ENVISION is 3D-only. Reference images are internal Hunyuan inputs and
+      // are never rendered to the user. Until the real GLB is loaded, the
+      // pathway remains in an explicit generation state with no fake geometry.
+      const modelViewActive = focus && generatedRef.current?.id === path.id;
+      if (!modelViewActive) return;
 
       // Focused realities glide from their overview slot into the inspection field.
       const glide = easeOutCubic(Math.min(1, (focus ? clocks.focus : 0) / 450));
@@ -1974,25 +1973,16 @@ export function Envision3DScene({
       }
     })();
   };
-  const exitModelView = () => {
-    modelViewRef.current = false;
-    setModelViewState("hidden");
-  };
-
   const phaseLabel = MANIFESTATION_PHASE_LABEL[phase];
-  const imageBacked = Boolean(selected?.generated_image_url) && modelViewState !== "active";
+  const hasReal3D = Boolean(selected && generated?.id === selected.id);
   const modeHint =
-    imageBacked && phase === "stabilized"
-      ? visualMode === "blueprint"
-        ? "BLUEPRINT · DERIVED FROM THE GENERATED CONCEPT"
-        : visualMode === "environment"
-          ? "ENVIRONMENT · GENERATED CONCEPT STAGED IN THE HALL"
-          : "CUTAWAY · GENERATED CONCEPT RENDER"
+    !hasReal3D
+      ? "HUNYUAN3D · GENERATING REALITY"
       : visualMode === "blueprint"
-        ? "BLUEPRINT · TECHNICAL DRAWING · DRAG TO ROTATE · SCROLL TO ZOOM"
+        ? "BLUEPRINT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
         : visualMode === "environment"
-          ? "ENVIRONMENT · KNOWLEDGE HALL · DRAG TO ROTATE · SCROLL TO ZOOM"
-          : "CUTAWAY · INTERNAL STRUCTURE · DRAG TO ROTATE · SCROLL TO ZOOM";
+          ? "ENVIRONMENT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
+          : "CUTAWAY · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM";
 
   return (
     <div
@@ -2039,37 +2029,6 @@ export function Envision3DScene({
           </div>
         </div>
       )}
-      {selected && selected.generated_image_url && modelViewState !== "active" && (
-        <figure
-          className={
-            "ascension-visual-frame" +
-            (visualMode === "blueprint"
-              ? " ascension-visual-frame--blueprint"
-              : visualMode === "environment"
-                ? " ascension-visual-frame--environment"
-                : "")
-          }
-        >
-          <img
-            src={
-              visualMode === "blueprint"
-                ? (selected.generated_blueprint_url ?? selected.generated_image_url)
-                : visualMode === "environment"
-                  ? (selected.generated_environment_url ?? selected.generated_image_url)
-                  : selected.generated_image_url
-            }
-            alt={`${selected.label} generated concept`}
-            draggable={false}
-          />
-          <figcaption>
-            {visualMode === "blueprint"
-              ? "BLUEPRINT DERIVATIVE"
-              : visualMode === "environment"
-                ? "ENVIRONMENT STAGING"
-                : "GENERATED CONCEPT"}
-          </figcaption>
-        </figure>
-      )}
       {!selected &&
         paths.map((path, i) => (
           <button
@@ -2083,36 +2042,6 @@ export function Envision3DScene({
             {path.outcome_score !== null && <em>{Math.round(path.outcome_score * 100)}%</em>}
           </button>
         ))}
-      {!selected &&
-        paths.map((path, i) =>
-          path.generated_image_url ? (
-            <figure
-              key={`${path.id}-poster`}
-              className="ascension-holo-poster"
-              style={{ left: PATH_SLOTS[i]?.left, top: PATH_SLOTS[i]?.top }}
-            >
-              <img
-                src={path.generated_image_url}
-                alt={`${path.label} generated concept`}
-                draggable={false}
-                loading="lazy"
-              />
-            </figure>
-          ) : null,
-        )}
-      {!selected && delivery.blend?.generated_image_url && (
-        <figure
-          className="ascension-holo-poster ascension-holo-poster--blend"
-          style={{ left: "50%", top: "58%" }}
-        >
-          <img
-            src={delivery.blend.generated_image_url}
-            alt={`${delivery.blend.label} generated concept`}
-            draggable={false}
-            loading="lazy"
-          />
-        </figure>
-      )}
       {!selected && delivery.blend && (
         <button
           className="ascension-holo-hit ascension-holo-hit--blend"
@@ -2170,20 +2099,11 @@ export function Envision3DScene({
               RESET VIEW
             </button>
             <button onClick={() => onSelect(null)}>BACK</button>
-            {(selected.generated_image_url || generated?.id === selected.id) &&
-              (modelViewState === "active" ? (
-                <button onClick={exitModelView}>EXIT 3D</button>
+            {selected.generated_image_url &&
+              (generated?.id === selected.id ? (
+                <button onClick={enterModelView}>3D READY</button>
               ) : (
-                <button
-                  onClick={enterModelView}
-                  disabled={modelViewState === "loading" || modelViewState === "unavailable"}
-                >
-                  {modelViewState === "loading"
-                    ? "LOADING 3D…"
-                    : modelViewState === "unavailable"
-                      ? "3D UNAVAILABLE"
-                      : "VIEW 3D"}
-                </button>
+                <button type="button" disabled>3D GENERATING…</button>
               ))}
             {generated && generated.id === selected.id && (
               <a

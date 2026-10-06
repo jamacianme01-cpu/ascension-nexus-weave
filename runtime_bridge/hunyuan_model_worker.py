@@ -21,7 +21,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-DEFAULT_QUEUE_URL = "https://ascension-nexus-weave.lovable.app/api/public/ascension/model-queue"
+DEFAULT_QUEUE_URL = "https://ascensionweave.app/api/public/ascension/model-queue"
 DEFAULT_HUNYUAN_URL = "http://127.0.0.1:8081/generate"
 
 

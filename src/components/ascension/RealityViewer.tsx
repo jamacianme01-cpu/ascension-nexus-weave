@@ -9,6 +9,21 @@ import "./reality-viewer.css";
 
 export type RealityMode = "cutaway" | "blueprint" | "environment";
 type View = "perspective" | "top" | "front" | "side";
+type CatalogKind =
+  | "box"
+  | "sphere"
+  | "cylinder"
+  | "desk"
+  | "chair"
+  | "sofa"
+  | "table"
+  | "cabinet"
+  | "wall"
+  | "door"
+  | "window"
+  | "tub"
+  | "sink"
+  | "light";
 type ViewerControls = {
   mode: (mode: RealityMode) => void;
   fit: () => void;
@@ -18,7 +33,7 @@ type ViewerControls = {
   explore: (enabled: boolean) => void;
   move: (direction: string, down: boolean) => void;
   transform: (mode: "translate" | "rotate" | "scale") => void;
-  add: (kind: "box" | "sphere" | "cylinder") => void;
+  add: (kind: CatalogKind) => void;
   remove: () => void;
   color: (value: string) => void;
   background: (value: string) => void;
@@ -56,7 +71,7 @@ export function RealityViewer({
   );
   const [selectedObject, setSelectedObject] = useState("Nothing selected");
   const [transformMode, setTransformMode] = useState<"translate" | "rotate" | "scale">("translate");
-  const [addKind, setAddKind] = useState<"box" | "sphere" | "cylinder">("box");
+  const [addKind, setAddKind] = useState<CatalogKind>("box");
   const [objectColor, setObjectColor] = useState("#6ed7ff");
   const [backgroundColor, setBackgroundColor] = useState("daylight");
   const [demoActive, setDemoActive] = useState(false);
@@ -178,34 +193,145 @@ export function RealityViewer({
       });
       setObjectColor(value);
     };
-    const addObject = (kind: "box" | "sphere" | "cylinder") => {
-      const geometry =
-        kind === "sphere"
-          ? new THREE.SphereGeometry(0.65, 32, 20)
-          : kind === "cylinder"
-            ? new THREE.CylinderGeometry(0.55, 0.55, 1.1, 32)
-            : new THREE.BoxGeometry(1.1, 1.1, 1.1);
-      const material = new THREE.MeshStandardMaterial({
+    const addObject = (kind: CatalogKind) => {
+      const group = new THREE.Group();
+      const finish = new THREE.MeshStandardMaterial({
         color: objectColor,
-        roughness: 0.34,
-        metalness: 0.18,
+        roughness: 0.38,
+        metalness: 0.16,
       });
-      const object = new THREE.Mesh(geometry, material);
-      object.position.copy(center).add(new THREE.Vector3(0, 0.8, 0));
-      object.userData["ascensionName"] = `Added ${kind}`;
-      editable.add(object);
-      const blue = material.clone();
+      const accent = new THREE.MeshStandardMaterial({
+        color: 0x9dddeb,
+        roughness: 0.28,
+        metalness: 0.28,
+      });
+      const part = (geometry: THREE.BufferGeometry, position: THREE.Vector3, material = finish) => {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(position);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+        return mesh;
+      };
+      if (kind === "sphere") part(new THREE.SphereGeometry(0.65, 32, 20), new THREE.Vector3());
+      else if (kind === "cylinder")
+        part(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 32), new THREE.Vector3());
+      else if (kind === "box") part(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.Vector3());
+      else if (kind === "desk") {
+        part(new THREE.BoxGeometry(4.5, 0.28, 2), new THREE.Vector3(0, 1.45, 0));
+        [-1.9, 1.9].forEach((x) =>
+          [-0.7, 0.7].forEach((z) =>
+            part(new THREE.BoxGeometry(0.22, 1.45, 0.22), new THREE.Vector3(x, 0.7, z)),
+          ),
+        );
+        part(new THREE.BoxGeometry(1.7, 1.05, 0.12), new THREE.Vector3(0, 2.08, -0.55), accent);
+      } else if (kind === "chair") {
+        part(new THREE.BoxGeometry(1.6, 0.22, 1.5), new THREE.Vector3(0, 0.85, 0));
+        part(new THREE.BoxGeometry(1.6, 1.8, 0.2), new THREE.Vector3(0, 1.7, -0.62), accent);
+        [-0.55, 0.55].forEach((x) =>
+          [-0.5, 0.5].forEach((z) =>
+            part(new THREE.BoxGeometry(0.14, 0.85, 0.14), new THREE.Vector3(x, 0.4, z)),
+          ),
+        );
+      } else if (kind === "sofa") {
+        part(new THREE.BoxGeometry(4.5, 1.1, 1.8), new THREE.Vector3(0, 0.65, 0));
+        part(new THREE.BoxGeometry(4.5, 1.45, 0.28), new THREE.Vector3(0, 1.65, -0.75), accent);
+        [-2.1, 2.1].forEach((x) =>
+          part(new THREE.BoxGeometry(0.3, 1.4, 1.8), new THREE.Vector3(x, 1.1, 0), accent),
+        );
+      } else if (kind === "table") {
+        part(new THREE.CylinderGeometry(1.5, 1.5, 0.22, 40), new THREE.Vector3(0, 1.35, 0));
+        part(
+          new THREE.CylinderGeometry(0.18, 0.28, 1.35, 24),
+          new THREE.Vector3(0, 0.65, 0),
+          accent,
+        );
+      } else if (kind === "cabinet") {
+        part(new THREE.BoxGeometry(2.8, 3.2, 0.55), new THREE.Vector3(0, 1.6, 0));
+        [-0.68, 0.68].forEach((x) =>
+          part(new THREE.BoxGeometry(1.28, 2.8, 0.08), new THREE.Vector3(x, 1.6, -0.32), accent),
+        );
+      } else if (kind === "wall") {
+        part(new THREE.BoxGeometry(6, 4, 0.22), new THREE.Vector3(0, 2, 0));
+      } else if (kind === "door") {
+        part(new THREE.BoxGeometry(2.2, 4.6, 0.18), new THREE.Vector3(0, 2.3, 0));
+        part(new THREE.SphereGeometry(0.12, 18, 12), new THREE.Vector3(0.72, 2.2, -0.18), accent);
+      } else if (kind === "window") {
+        part(new THREE.BoxGeometry(4.2, 2.6, 0.12), new THREE.Vector3(0, 2.2, 0), accent);
+        part(
+          new THREE.BoxGeometry(3.8, 2.2, 0.08),
+          new THREE.Vector3(0, 2.2, -0.1),
+          new THREE.MeshStandardMaterial({
+            color: 0x8dddf4,
+            emissive: 0x1c7087,
+            emissiveIntensity: 0.35,
+            roughness: 0.18,
+            metalness: 0.35,
+          }),
+        );
+        part(new THREE.BoxGeometry(0.12, 2.4, 0.16), new THREE.Vector3(0, 2.2, -0.18), finish);
+        part(new THREE.BoxGeometry(4, 0.12, 0.16), new THREE.Vector3(0, 2.2, -0.18), finish);
+      } else if (kind === "tub") {
+        part(new THREE.BoxGeometry(4.2, 0.9, 2.2), new THREE.Vector3(0, 0.5, 0), accent);
+        part(
+          new THREE.BoxGeometry(3.4, 0.12, 1.5),
+          new THREE.Vector3(0, 0.98, 0),
+          new THREE.MeshStandardMaterial({ color: 0xbdebed, roughness: 0.16, metalness: 0.22 }),
+        );
+      } else if (kind === "sink") {
+        part(new THREE.BoxGeometry(2.3, 1.5, 1.2), new THREE.Vector3(0, 0.75, 0));
+        part(
+          new THREE.CylinderGeometry(0.55, 0.55, 0.12, 30),
+          new THREE.Vector3(0, 1.52, 0),
+          accent,
+        );
+        part(
+          new THREE.TorusGeometry(0.28, 0.07, 12, 24, Math.PI),
+          new THREE.Vector3(0.5, 1.8, 0),
+          accent,
+        );
+      } else if (kind === "light") {
+        part(new THREE.CylinderGeometry(0.7, 0.35, 0.3, 32), new THREE.Vector3(0, 2.8, 0), accent);
+        part(
+          new THREE.SphereGeometry(0.42, 24, 16),
+          new THREE.Vector3(0, 2.4, 0),
+          new THREE.MeshStandardMaterial({
+            color: 0xffe4a6,
+            emissive: 0xffb52e,
+            emissiveIntensity: 1.4,
+          }),
+        );
+      }
+      group.position.copy(center).add(new THREE.Vector3(0, 0.8, 0));
+      group.userData["ascensionName"] = `CAD ${kind}`;
+      group.traverse((node) => {
+        node.userData["ascensionRoot"] = group;
+      });
+      editable.add(group);
+      const blue = finish.clone();
       blue.color.set("#6bbbd7");
-      blueprintMaterials.set(object, blue);
-      materials.set(object, material);
-      scene.add(object);
-      setSelected(object);
+      group.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        materials.set(node, node.material);
+        const nodeBlue = (Array.isArray(node.material) ? node.material : [node.material]).map(
+          (material) => {
+            const clone = material.clone();
+            if ("color" in clone && clone.color instanceof THREE.Color) clone.color.set("#6bbbd7");
+            return clone;
+          },
+        );
+        blueprintMaterials.set(node, Array.isArray(node.material) ? nodeBlue : nodeBlue[0]);
+      });
+      scene.add(group);
+      setSelected(group);
     };
     const removeObject = () => {
       if (!selected) return;
       editable.delete(selected);
       selected.traverse((node) => {
         if (node instanceof THREE.Mesh) {
+          materials.delete(node);
+          blueprintMaterials.delete(node);
           node.geometry.dispose();
           (Array.isArray(node.material) ? node.material : [node.material]).forEach((m) =>
             m.dispose(),
@@ -510,15 +636,28 @@ export function RealityViewer({
         orbit.enabled = true;
         const direction =
           view === "top"
-            ? new THREE.Vector3(0, 1, 0.0001)
+            ? new THREE.Vector3(0, 1, 0)
             : view === "front"
               ? new THREE.Vector3(0, 0, 1)
               : view === "side"
                 ? new THREE.Vector3(1, 0, 0)
                 : new THREE.Vector3(0.8, 0.5, 1).normalize();
-        const distance = Math.max(8, camera.position.distanceTo(orbit.target));
+        if (view === "perspective" && !(camera instanceof THREE.PerspectiveCamera)) {
+          orbit.dispose();
+          camera = perspective;
+          transform.camera = camera;
+          orbit = new OrbitControls(camera, renderer.domElement);
+          configureOrbit();
+        } else if (view !== "perspective" && !(camera instanceof THREE.OrthographicCamera)) {
+          orbit.dispose();
+          camera = orthographic;
+          transform.camera = camera;
+          orbit = new OrbitControls(camera, renderer.domElement);
+          configureOrbit();
+        }
+        const distance = Math.max(bounds.length() * 1.35, 8);
         camera.position.copy(center).addScaledVector(direction, distance);
-        camera.up.set(0, 1, 0);
+        camera.up.copy(view === "top" ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0));
         orbit.target.copy(center);
         camera.lookAt(center);
         orbit.update();
@@ -688,7 +827,9 @@ export function RealityViewer({
         );
         raycaster.setFromCamera(pointer, camera);
         const hits = raycaster.intersectObjects([...editable], true);
-        setSelected(hits[0]?.object ?? null);
+        const hit = hits[0]?.object ?? null;
+        const root = hit?.userData["ascensionRoot"] as THREE.Object3D | undefined;
+        setSelected(root ?? hit);
       }
       look.active = false;
     };
@@ -920,9 +1061,28 @@ export function RealityViewer({
               value={addKind}
               onChange={(event) => setAddKind(event.target.value as typeof addKind)}
             >
-              <option value="box">BOX</option>
-              <option value="sphere">SPHERE</option>
-              <option value="cylinder">CYLINDER</option>
+              <optgroup label="BASIC SHAPES">
+                <option value="box">Box</option>
+                <option value="sphere">Sphere</option>
+                <option value="cylinder">Cylinder</option>
+              </optgroup>
+              <optgroup label="FURNITURE">
+                <option value="desk">Desk</option>
+                <option value="chair">Chair</option>
+                <option value="sofa">Sofa</option>
+                <option value="table">Table</option>
+                <option value="cabinet">Cabinet</option>
+              </optgroup>
+              <optgroup label="STRUCTURE">
+                <option value="wall">Wall</option>
+                <option value="door">Door</option>
+                <option value="window">Window</option>
+              </optgroup>
+              <optgroup label="ROOM FIXTURES">
+                <option value="tub">Tub</option>
+                <option value="sink">Sink</option>
+                <option value="light">Light</option>
+              </optgroup>
             </select>
             <button disabled={!ready} onClick={() => api.current?.add(addKind)}>
               ADD

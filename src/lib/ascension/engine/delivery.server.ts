@@ -378,6 +378,51 @@ export async function externalProductDraft(
 
   let parsed = parseDelivery(candidate);
 
+  // Reject the exact failure mode where an ordinary objective is replaced by
+  // a generic compliance/professional disclaimer. One bounded repair call
+  // rewrites the SAME objective; it does not change the user's request.
+  const bodyText = parsed.body.trim();
+  const disclaimerOnly =
+    bodyText.length < 1200 &&
+    /(?:qualified personnel|consult (?:a )?professional|local (?:safety )?codes|manufacturer(?:'s)? manual|owner(?:'s)? manual)/i.test(bodyText);
+
+  if (disclaimerOnly) {
+    const repaired = await callZai({
+      system: [
+        system,
+        "REPAIR REQUIRED: the previous response failed because it replaced the user's objective with a generic disclaimer.",
+        "Return the complete JSON response again.",
+        "The body must directly solve the stated objective with concrete objective-specific guidance.",
+        "Do not center the answer on electrical, plumbing, structural, legal, safety, code, manual, or professional-referral language unless that subsystem is itself the objective.",
+        "Preserve all useful distinct Spiral pathways and BLEND.",
+      ].join(" "),
+      user: [
+        `OBJECTIVE:\n${run.objective}`,
+        `FAILED RESPONSE:\n${JSON.stringify(candidate).slice(0, 12000)}`,
+        "Rewrite it so the requested objective—not a disclaimer or incidental subsystem—is the answer.",
+      ].join("\n\n"),
+      knowledgeQuery: run.objective,
+      temperature: 0.2,
+    });
+    const repairedCandidate =
+      repaired.json ??
+      ({
+        kind: "answer",
+        title: run.objective.slice(0, 200) || "ASCENSION result",
+        body: repaired.text.trim(),
+        pathways: parsed.pathways,
+        blend: parsed.blend,
+        files: [],
+        limitations: [],
+      } as Record<string, unknown>);
+    if (typeof repairedCandidate["limitations"] === "string") {
+      repairedCandidate["limitations"] = [repairedCandidate["limitations"]];
+    } else if (!Array.isArray(repairedCandidate["limitations"])) {
+      repairedCandidate["limitations"] = [];
+    }
+    parsed = parseDelivery(repairedCandidate);
+  }
+
   const requested = requestedKind(run.objective);
 
   // Primitive model_spec/SVG output is legacy planning metadata only. It must

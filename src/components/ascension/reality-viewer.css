@@ -388,3 +388,72 @@
     justify-content: flex-start;
   }
 }
+.reality-live-demo {
+  width: min(1100px, 94vw);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  border: 1px solid #ffcf6b45;
+  border-radius: 10px;
+  background: #211b12d9;
+  color: #f6e5bd;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.reality-live-demo > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.reality-live-demo > div span:last-child {
+  color: #d8c7a4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reality-live-demo button {
+  min-height: 34px !important;
+  padding: 7px 11px !important;
+  font-size: 9px !important;
+  border-color: #e8ba5f66;
+  color: #ffe3a3;
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f2bc53;
+  box-shadow: 0 0 12px #f2bc53;
+}
+.environment-preset {
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  border-radius: 999px !important;
+  font-size: 9px !important;
+}
+.environment-preset.daylight {
+  background: linear-gradient(135deg, #a7d9e9, #e8c789);
+  color: #12222a;
+}
+.environment-preset.dusk {
+  background: linear-gradient(135deg, #655b9c, #c27870);
+}
+.environment-preset.night {
+  background: linear-gradient(135deg, #0b1426, #315178);
+}
+.environment-preset.blueprint {
+  background: linear-gradient(135deg, #071e38, #3b91bd);
+}
+@media (max-width: 760px) {
+  .reality-live-demo {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .reality-live-demo > div span:last-child {
+    white-space: normal;
+  }
+}

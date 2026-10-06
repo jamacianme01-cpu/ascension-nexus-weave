@@ -24,6 +24,7 @@ type ViewerControls = {
   background: (value: string) => void;
   space: (value: string) => void;
   reset: () => void;
+  demo: (enabled: boolean) => void;
 };
 
 /** Dedicated inspection screen. Every displayed object comes from the selected GLB. */
@@ -57,7 +58,9 @@ export function RealityViewer({
   const [transformMode, setTransformMode] = useState<"translate" | "rotate" | "scale">("translate");
   const [addKind, setAddKind] = useState<"box" | "sphere" | "cylinder">("box");
   const [objectColor, setObjectColor] = useState("#6ed7ff");
-  const [backgroundColor, setBackgroundColor] = useState("#071e38");
+  const [backgroundColor, setBackgroundColor] = useState("daylight");
+  const [demoActive, setDemoActive] = useState(false);
+  const [demoEvent, setDemoEvent] = useState("Ready for a live demonstration");
   const [space, setSpace] = useState("Workspace");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export function RealityViewer({
     setSelectedObject("Nothing selected");
     setTransformMode("translate");
     setObjectColor("#6ed7ff");
-    setBackgroundColor("#071e38");
+    setBackgroundColor("daylight");
     setSpace("Workspace");
     setSection(100);
     setExploring(false);
@@ -244,6 +247,120 @@ export function RealityViewer({
     const grid = new THREE.GridHelper(100, 100, 0x5797c4, 0x163454);
     grid.visible = false;
     scene.add(grid);
+    const disposeRoom = () => {
+      roomMeshes.splice(0).forEach((mesh) => {
+        mesh.geometry.dispose();
+        (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((material) =>
+          material.dispose(),
+        );
+      });
+      roomEnvironment.clear();
+    };
+    const roomMesh = (
+      geometry: THREE.BufferGeometry,
+      material: THREE.Material,
+      position: THREE.Vector3,
+    ) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      roomMeshes.push(mesh);
+      roomEnvironment.add(mesh);
+      return mesh;
+    };
+    const buildRoom = (name: string) => {
+      disposeRoom();
+      const y = floor.position.y || -3;
+      const wall = new THREE.MeshStandardMaterial({
+        color: name === "Bathroom" ? 0x8aaeb8 : name === "Living Area" ? 0x9b806b : 0x547889,
+        roughness: 0.7,
+      });
+      const trim = new THREE.MeshStandardMaterial({
+        color: name === "Bathroom" ? 0xd8f4f5 : 0x2b4553,
+        roughness: 0.42,
+        metalness: 0.12,
+      });
+      roomMesh(
+        new THREE.BoxGeometry(24, 0.18, 18),
+        new THREE.MeshStandardMaterial({
+          color: name === "Bathroom" ? 0x596d73 : name === "Living Area" ? 0x5e4737 : 0x304d58,
+          roughness: 0.82,
+        }),
+        new THREE.Vector3(0, y, 0),
+      );
+      roomMesh(new THREE.BoxGeometry(24, 9, 0.18), wall, new THREE.Vector3(0, y + 4.5, -9));
+      roomMesh(new THREE.BoxGeometry(0.18, 9, 18), wall, new THREE.Vector3(-12, y + 4.5, 0));
+      roomMesh(new THREE.BoxGeometry(0.18, 9, 18), wall.clone(), new THREE.Vector3(12, y + 4.5, 0));
+      if (name === "Workspace") {
+        roomMesh(new THREE.BoxGeometry(8, 0.35, 3), trim, new THREE.Vector3(-1, y + 2.2, -2));
+        roomMesh(new THREE.BoxGeometry(0.25, 2.2, 0.25), trim, new THREE.Vector3(-4, y + 1.1, -3));
+        roomMesh(new THREE.BoxGeometry(0.25, 2.2, 0.25), trim, new THREE.Vector3(2, y + 1.1, -3));
+        roomMesh(
+          new THREE.BoxGeometry(3.4, 1.8, 0.18),
+          new THREE.MeshStandardMaterial({
+            color: 0x142a37,
+            emissive: 0x164e65,
+            emissiveIntensity: 0.7,
+          }),
+          new THREE.Vector3(-1, y + 3.35, -3.25),
+        );
+        roomMesh(
+          new THREE.CylinderGeometry(0.18, 0.22, 2.4, 20),
+          trim,
+          new THREE.Vector3(5, y + 1.2, -2),
+        );
+        roomMesh(
+          new THREE.SphereGeometry(0.55, 24, 14),
+          new THREE.MeshStandardMaterial({
+            color: 0x9ae8ff,
+            emissive: 0x2d9fbd,
+            emissiveIntensity: 0.7,
+          }),
+          new THREE.Vector3(5, y + 2.55, -2),
+        );
+      } else if (name === "Living Area") {
+        roomMesh(
+          new THREE.BoxGeometry(7, 1.6, 2.4),
+          new THREE.MeshStandardMaterial({ color: 0x6f4737, roughness: 0.88 }),
+          new THREE.Vector3(-1, y + 0.85, -3),
+        );
+        roomMesh(new THREE.BoxGeometry(7, 1.7, 0.35), trim, new THREE.Vector3(-1, y + 2.05, -4));
+        roomMesh(
+          new THREE.CylinderGeometry(1.25, 1.25, 0.2, 32),
+          new THREE.MeshStandardMaterial({ color: 0x997659, roughness: 0.9 }),
+          new THREE.Vector3(3, y + 0.12, 1),
+        );
+        roomMesh(
+          new THREE.CylinderGeometry(0.18, 0.22, 1.4, 20),
+          trim,
+          new THREE.Vector3(3, y + 0.8, 1),
+        );
+        roomMesh(
+          new THREE.SphereGeometry(0.8, 24, 16),
+          new THREE.MeshStandardMaterial({ color: 0x4c7b65, roughness: 0.9 }),
+          new THREE.Vector3(5, y + 2.2, -1),
+        );
+      } else {
+        roomMesh(
+          new THREE.BoxGeometry(7, 1.2, 2.4),
+          new THREE.MeshStandardMaterial({ color: 0xe7f0f0, roughness: 0.42 }),
+          new THREE.Vector3(-2, y + 0.7, -3),
+        );
+        roomMesh(new THREE.BoxGeometry(4, 1.5, 0.8), trim, new THREE.Vector3(4, y + 0.75, -3));
+        roomMesh(
+          new THREE.BoxGeometry(4.2, 3.2, 0.12),
+          new THREE.MeshStandardMaterial({ color: 0xc4e9ed, metalness: 0.6, roughness: 0.18 }),
+          new THREE.Vector3(4, y + 3.8, -4.8),
+        );
+        roomMesh(
+          new THREE.CylinderGeometry(0.6, 0.6, 0.14, 32),
+          new THREE.MeshStandardMaterial({ color: 0xe7f7f8, roughness: 0.18 }),
+          new THREE.Vector3(4, y + 1.55, -3),
+        );
+      }
+    };
+    buildRoom("Workspace");
     const lines = new THREE.Group();
     scene.add(lines);
     const materials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
@@ -277,6 +394,14 @@ export function RealityViewer({
       height = 1;
     const keys = new Set<string>();
     const look = { active: false, x: 0, y: 0 };
+    const roomEnvironment = new THREE.Group();
+    roomEnvironment.visible = false;
+    scene.add(roomEnvironment);
+    const roomMeshes: THREE.Mesh[] = [];
+    let demoObject: THREE.Mesh | null = null;
+    let demoActiveRef = false;
+    let demoElapsed = 0;
+    let demoPhase = "";
     const controller = new AbortController();
     const disposeModel = (object: THREE.Object3D) => {
       const textures = new Set<THREE.Texture>();
@@ -327,6 +452,18 @@ export function RealityViewer({
       camera.lookAt(center);
       orbit.update();
     };
+    const applyBackground = (preset: string) => {
+      const presets: Record<string, { color: number; light: number }> = {
+        daylight: { color: 0x8fb9c8, light: 3.4 },
+        dusk: { color: 0x3a3f66, light: 2.1 },
+        night: { color: 0x0b1426, light: 1.1 },
+        blueprint: { color: 0x071e38, light: 2.7 },
+      };
+      const selected = presets[preset] ?? presets["daylight"]!;
+      scene.background = new THREE.Color(selected.color);
+      key.intensity = selected.light;
+      fill.intensity = selected.light * 0.45;
+    };
     const setReactMode = setMode;
     const applyMode = (next: RealityMode) => {
       activeMode = next;
@@ -340,10 +477,11 @@ export function RealityViewer({
       configureOrbit();
       floor.visible = next === "environment";
       floor.receiveShadow = next === "environment";
+      roomEnvironment.visible = next === "environment";
       grid.visible = next === "blueprint";
       lines.visible = next === "blueprint";
       transform.getHelper().visible = next !== "environment" || selected !== null;
-      scene.background = new THREE.Color(backgroundColor);
+      applyBackground(backgroundColor);
       scene.fog = next === "environment" ? new THREE.Fog(0xbdced7, 45, 150) : null;
       for (const [mesh, original] of materials)
         mesh.material =
@@ -395,6 +533,7 @@ export function RealityViewer({
         orbit.enabled = !enabled;
         if (enabled) {
           camera = perspective;
+          transform.camera = perspective;
           camera.position.set(0, center.y - bounds.y * 0.18, bounds.z * 0.75);
           camera.lookAt(center.x, camera.position.y, center.z);
           renderer.domElement.focus();
@@ -416,7 +555,7 @@ export function RealityViewer({
       color: applyObjectColor,
       background(value) {
         setBackgroundColor(value);
-        scene.background = new THREE.Color(value);
+        applyBackground(value);
       },
       space(value) {
         setSpace(value);
@@ -426,6 +565,7 @@ export function RealityViewer({
           Bathroom: { background: 0x8faeba, floor: 0x3f5963 },
         };
         const palette = palettes[value] ?? palettes["Workspace"]!;
+        buildRoom(value);
         scene.background = new THREE.Color(palette.background);
         (floor.material as THREE.MeshStandardMaterial).color.setHex(palette.floor);
         camera.position
@@ -438,14 +578,56 @@ export function RealityViewer({
         camera.lookAt(center);
         orbit.target.copy(center);
       },
+      demo(enabled) {
+        demoActiveRef = enabled;
+        setDemoActive(enabled);
+        if (enabled) {
+          applyMode("environment");
+          setReactMode("environment");
+          buildRoom(space);
+          if (!demoObject) {
+            demoObject = new THREE.Mesh(
+              new THREE.IcosahedronGeometry(0.7, 2),
+              new THREE.MeshStandardMaterial({
+                color: 0xffc65b,
+                emissive: 0x5f2d04,
+                emissiveIntensity: 0.8,
+                roughness: 0.28,
+                metalness: 0.35,
+              }),
+            );
+            demoObject.userData["ascensionName"] = "Live demo object";
+            demoObject.position.set(0, (floor.position.y || -3) + 1.15, 1);
+            demoObject.castShadow = true;
+            scene.add(demoObject);
+          }
+          demoElapsed = 0;
+          demoPhase = "";
+        } else if (demoObject) {
+          scene.remove(demoObject);
+          demoObject.geometry.dispose();
+          (demoObject.material as THREE.Material).dispose();
+          demoObject = null;
+          setDemoEvent("Live demonstration stopped");
+        }
+      },
       reset() {
+        demoActiveRef = false;
+        if (demoObject) {
+          scene.remove(demoObject);
+          demoObject.geometry.dispose();
+          (demoObject.material as THREE.Material).dispose();
+          demoObject = null;
+        }
+        setDemoActive(false);
+        setDemoEvent("Ready for a live demonstration");
         setArrived(false);
         setReactMode(initialMode === "cutaway" ? "blueprint" : initialMode);
         setSelectedObject("Nothing selected");
         setTransformMode("translate");
         setAddKind("box");
         setObjectColor("#6ed7ff");
-        setBackgroundColor("#071e38");
+        setBackgroundColor("daylight");
         setSpace("Workspace");
         setSection(100);
         setExploring(false);
@@ -532,6 +714,29 @@ export function RealityViewer({
         if (keys.has("e")) camera.position.y += speed;
         if (keys.has("q")) camera.position.y -= speed;
       } else orbit.update();
+      if (demoActiveRef && demoObject) {
+        demoElapsed += dt;
+        const phase =
+          demoElapsed < 2.2
+            ? "Selecting an object"
+            : demoElapsed < 4.4
+              ? "Moving it into the room"
+              : demoElapsed < 6.6
+                ? "Changing its color"
+                : "Saving the live arrangement";
+        if (phase !== demoPhase) {
+          demoPhase = phase;
+          setDemoEvent(phase);
+        }
+        const t = demoElapsed % 8;
+        demoObject.position.x = Math.sin((t * Math.PI) / 4) * 3.2;
+        demoObject.position.z = Math.cos((t * Math.PI) / 4) * 1.8;
+        demoObject.rotation.x += dt * 0.7;
+        demoObject.rotation.y += dt * 1.1;
+        const mat = demoObject.material as THREE.MeshStandardMaterial;
+        mat.color.set(new THREE.Color().setHSL((t / 8 + 0.08) % 1, 0.72, 0.58));
+        if (t > 7.8) setDemoEvent("Selecting an object");
+      }
       renderer.render(scene, camera);
     });
     if (!pathway.model_url) {
@@ -594,6 +799,11 @@ export function RealityViewer({
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
       if (model) disposeModel(model);
+      disposeRoom();
+      if (demoObject) {
+        demoObject.geometry.dispose();
+        (demoObject.material as THREE.Material).dispose();
+      }
       lines.children.forEach((node) => {
         if (node instanceof THREE.LineSegments) node.geometry.dispose();
       });
@@ -736,16 +946,38 @@ export function RealityViewer({
             </label>
           </div>
           <div className="reality-background">
-            <span>LIVE BACKGROUND</span>
-            {["#071e38", "#121b26", "#243d48", "#5d4639"].map((value) => (
+            <span>SCENE ENVIRONMENT</span>
+            {(
+              [
+                ["daylight", "DAYLIGHT"],
+                ["dusk", "DUSK"],
+                ["night", "NIGHT"],
+                ["blueprint", "BLUEPRINT"],
+              ] as const
+            ).map(([value, label]) => (
               <button
                 key={value}
-                aria-label={`Background ${value}`}
-                style={{ background: value }}
+                className={`environment-preset ${value}`}
+                aria-pressed={backgroundColor === value}
                 onClick={() => api.current?.background(value)}
-              />
+              >
+                {label}
+              </button>
             ))}
           </div>
+        </div>
+        <div className="reality-live-demo" aria-live="polite">
+          <div>
+            <span className="live-dot" /> <strong>REAL-TIME DEMO</strong>
+            <span>{demoEvent}</span>
+          </div>
+          <button
+            disabled={!ready}
+            aria-pressed={demoActive}
+            onClick={() => api.current?.demo(!demoActive)}
+          >
+            {demoActive ? "STOP LIVE DEMO" : "RUN LIVE DEMO"}
+          </button>
         </div>
         <div className="reality-mode-controls">
           {mode === "blueprint" &&

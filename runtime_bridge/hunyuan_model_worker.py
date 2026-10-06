@@ -1,9 +1,9 @@
 """ASCENSION local Hunyuan3D model worker.
 
-Polls the secured web model queue, rasterizes each pathway's SVG reference
-visual locally, sends the PNG to the already-running Hunyuan3D API, uploads
-the returned GLB through a short-lived signed upload URL, and reports
-completion. No cloud service can call localhost; this process is the bridge.
+Polls the secured web model queue, downloads each pathway's hidden generated
+reference image, sends it to the local Hunyuan3D API, uploads the returned GLB
+through a short-lived signed upload URL, and reports completion. No cloud
+service can call localhost; this process is the bridge.
 """
 
 from __future__ import annotations

@@ -288,7 +288,15 @@ function splitResultBody(value: string) {
 function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: ObjectiveDelivery }) {
   const planning = planningFor(run.result);
   const result = record(run.result);
-  const pathCount = delivery.pathways.length + (delivery.blend ? 1 : 0) || planning.branches.length;
+  // A BLEND is synthesis, not another Spiral pathway. Never inflate the
+  // pathway count by counting BLEND as a path.
+  const deliveredPathCount = delivery.pathways.length;
+  const pathCount = deliveredPathCount || planning.branches.length;
+  const spiralSignal = pathCount
+    ? `${pathCount} PATH${pathCount === 1 ? "" : "S"}${delivery.blend ? " + BLEND" : ""}`
+    : delivery.blend
+      ? "BLEND"
+      : "ACTIVE";
   const guardian = run.guardian_verdict ?? "—";
   const autosync = String(result["autosync_verdict"] ?? "—");
   const delta = governedPersisted(run)
@@ -298,7 +306,7 @@ function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: Objec
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {[
-        ["SPIRAL", pathCount ? `${pathCount} PATHS` : "ACTIVE"],
+        ["SPIRAL", spiralSignal],
         ["GUARDIAN", guardian],
         ["AUTOSYNC", autosync],
         ["VERIFIED Δ", delta],

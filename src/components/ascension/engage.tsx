@@ -599,6 +599,73 @@ export function ResultContent({
         )}
       </div>
 
+      {(delivery.pathways.length > 0 || delivery.blend) && (
+        <section className="space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.025] p-4 sm:p-5">
+          <div>
+            <p className="label-eyebrow text-primary">SPIRAL PATHWAYS</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {delivery.pathways.length} distinct path{delivery.pathways.length === 1 ? "" : "s"}
+              {delivery.blend ? " + BLEND" : ""}
+            </p>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            {delivery.pathways.map((pathway, index) => (
+              <article
+                key={pathway.id}
+                className="rounded-xl border border-primary/25 bg-background/25 p-4"
+              >
+                <p className="text-[0.65rem] tracking-[0.16em] text-primary uppercase">
+                  PATH {index + 1}{pathway.spiral_form ? ` · ${cleanDisplayText(pathway.spiral_form)}` : ""}
+                </p>
+                <h3 className="mt-1 font-display text-xl text-foreground">
+                  {cleanDisplayText(pathway.label)}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-foreground/90">
+                  {cleanDisplayText(pathway.summary)}
+                </p>
+                {pathway.steps.length > 0 && (
+                  <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-foreground/85">
+                    {pathway.steps.map((step, stepIndex) => (
+                      <li key={stepIndex}>{cleanDisplayText(step)}</li>
+                    ))}
+                  </ol>
+                )}
+                {pathway.tradeoffs.length > 0 && (
+                  <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                    Tradeoffs: {pathway.tradeoffs.map(cleanDisplayText).join(" · ")}
+                  </p>
+                )}
+              </article>
+            ))}
+
+            {delivery.blend && (
+              <article className="rounded-xl border border-gold/40 bg-gold/[0.04] p-4">
+                <p className="text-[0.65rem] tracking-[0.16em] text-gold uppercase">BLEND</p>
+                <h3 className="mt-1 font-display text-xl text-foreground">
+                  {cleanDisplayText(delivery.blend.label)}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-foreground/90">
+                  {cleanDisplayText(delivery.blend.summary)}
+                </p>
+                {delivery.blend.steps.length > 0 && (
+                  <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-foreground/85">
+                    {delivery.blend.steps.map((step, stepIndex) => (
+                      <li key={stepIndex}>{cleanDisplayText(step)}</li>
+                    ))}
+                  </ol>
+                )}
+                {delivery.blend.blend_reason && (
+                  <p className="mt-3 text-xs leading-5 text-gold/85">
+                    Why blended: {cleanDisplayText(delivery.blend.blend_reason)}
+                  </p>
+                )}
+              </article>
+            )}
+          </div>
+        </section>
+      )}
+
       {otherFiles.map((file) => (
         <div
           key={file.name}

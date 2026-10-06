@@ -17,10 +17,7 @@ export async function enqueueDeliveryModels(
   const choices = delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways;
   const rows = choices
     .filter(
-      (pathway) =>
-        Boolean(pathway.model_spec) &&
-        Boolean(pathway.generated_image_url) &&
-        !pathway.model_url,
+      (pathway) => Boolean(pathway.generated_image_url) && !pathway.model_url,
     )
     .map((pathway) => ({
       request_id: requestId,

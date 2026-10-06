@@ -339,21 +339,9 @@ function TreeKnowledgeEruption({
   const visualKind = requestedKind(objectiveText);
   if (visualKind !== "drawing" && visualKind !== "design") return null;
 
-  const choices = delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways;
-  const hasRealVisual = choices.some(
-    (pathway) => Boolean(pathway.generated_image_url) || Boolean(pathway.model_url),
-  );
-  if (!hasRealVisual) {
-    return (
-      <section className="rounded-2xl border border-gold/35 bg-background/35 p-5 text-center">
-        <p className="label-eyebrow text-gold">VISUAL GENERATION UNAVAILABLE</p>
-        <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          The image engine did not return a real visual asset. ASCENSION will not substitute
-          primitive boxes, cylinders, or a fake 3D model for this request.
-        </p>
-      </section>
-    );
-  }
+  // Reference images are server-only Hunyuan inputs. The client enters
+  // ENVISION from visual intent and waits for the completed GLB; it never
+  // treats the internal reference image as a user-facing visual asset.
 
   return (
     <Envision3DScene

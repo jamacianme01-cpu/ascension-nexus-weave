@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
 import "./reality-viewer.css";
 
@@ -16,6 +17,12 @@ type ViewerControls = {
   section: (value: number) => void;
   explore: (enabled: boolean) => void;
   move: (direction: string, down: boolean) => void;
+  transform: (mode: "translate" | "rotate" | "scale") => void;
+  add: (kind: "box" | "sphere" | "cylinder") => void;
+  remove: () => void;
+  color: (value: string) => void;
+  background: (value: string) => void;
+  space: (value: string) => void;
 };
 
 /** Dedicated inspection screen. Every displayed object comes from the selected GLB. */
@@ -42,7 +49,15 @@ export function RealityViewer({
   const [arrived, setArrived] = useState(false);
   const dive = useRef(onDive);
   dive.current = onDive;
-  const [mode, setMode] = useState<RealityMode>(initialMode);
+  const [mode, setMode] = useState<RealityMode>(
+    initialMode === "cutaway" ? "blueprint" : initialMode,
+  );
+  const [selectedObject, setSelectedObject] = useState("Nothing selected");
+  const [transformMode, setTransformMode] = useState<"translate" | "rotate" | "scale">("translate");
+  const [addKind, setAddKind] = useState<"box" | "sphere" | "cylinder">("box");
+  const [objectColor, setObjectColor] = useState("#6ed7ff");
+  const [backgroundColor, setBackgroundColor] = useState("#071e38");
+  const [space, setSpace] = useState("Workspace");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState(100);
@@ -74,7 +89,7 @@ export function RealityViewer({
 
   useEffect(() => {
     const target = host.current;
-    if (!target || !pathway.model_url) return;
+    if (!target) return;
     let disposed = false;
     let model: THREE.Group | null = null;
     let renderer: THREE.WebGLRenderer;
@@ -90,6 +105,8 @@ export function RealityViewer({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.localClippingEnabled = true;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.tabIndex = 0;
     renderer.domElement.setAttribute("aria-label", "Reality model: drag to rotate, scroll to zoom");
     target.appendChild(renderer.domElement);
@@ -99,6 +116,89 @@ export function RealityViewer({
     let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = perspective;
     let orbit: OrbitControls<THREE.PerspectiveCamera | THREE.OrthographicCamera> =
       new OrbitControls(camera, renderer.domElement);
+    const transform = new TransformControls(camera, renderer.domElement);
+    transform.setSize(0.85);
+    transform.setMode("translate");
+    transform.addEventListener("dragging-changed", (event) => {
+      orbit.enabled = !(event.value as boolean);
+    });
+    scene.add(transform.getHelper());
+    const setSelected = (object: THREE.Object3D | null) => {
+      selected = object;
+      transform.detach();
+      if (selectedHelper) {
+        scene.remove(selectedHelper);
+        selectedHelper = null;
+      }
+      if (!object) {
+        setSelectedObject("Nothing selected");
+        return;
+      }
+      transform.attach(object);
+      selectedHelper = new THREE.BoxHelper(object, 0x8feaff);
+      scene.add(selectedHelper);
+      setSelectedObject(String(object.userData["ascensionName"] ?? object.name ?? "Object"));
+    };
+    const applyObjectColor = (value: string) => {
+      if (!selected) return;
+      selected.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        const source = Array.isArray(node.material) ? node.material : [node.material];
+        const next = source.map((material) => {
+          const clone = material.clone();
+          if ("color" in clone && clone.color instanceof THREE.Color) clone.color.set(value);
+          return clone;
+        });
+        node.material = Array.isArray(node.material) ? next : next[0];
+        materials.set(node, node.material);
+        const blue = next.map((material) => {
+          const clone = material.clone();
+          if ("color" in clone && clone.color instanceof THREE.Color) clone.color.set("#6bbbd7");
+          if ("roughness" in clone) clone.roughness = 0.4;
+          if ("metalness" in clone) clone.metalness = 0.18;
+          return clone;
+        });
+        blueprintMaterials.set(node, Array.isArray(node.material) ? blue : blue[0]);
+      });
+      setObjectColor(value);
+    };
+    const addObject = (kind: "box" | "sphere" | "cylinder") => {
+      const geometry =
+        kind === "sphere"
+          ? new THREE.SphereGeometry(0.65, 32, 20)
+          : kind === "cylinder"
+            ? new THREE.CylinderGeometry(0.55, 0.55, 1.1, 32)
+            : new THREE.BoxGeometry(1.1, 1.1, 1.1);
+      const material = new THREE.MeshStandardMaterial({
+        color: objectColor,
+        roughness: 0.34,
+        metalness: 0.18,
+      });
+      const object = new THREE.Mesh(geometry, material);
+      object.position.copy(center).add(new THREE.Vector3(0, 0.8, 0));
+      object.userData["ascensionName"] = `Added ${kind}`;
+      editable.add(object);
+      const blue = material.clone();
+      blue.color.set("#6bbbd7");
+      blueprintMaterials.set(object, blue);
+      materials.set(object, material);
+      scene.add(object);
+      setSelected(object);
+    };
+    const removeObject = () => {
+      if (!selected) return;
+      editable.delete(selected);
+      selected.traverse((node) => {
+        if (node instanceof THREE.Mesh) {
+          node.geometry.dispose();
+          (Array.isArray(node.material) ? node.material : [node.material]).forEach((m) =>
+            m.dispose(),
+          );
+        }
+      });
+      selected.parent?.remove(selected);
+      setSelected(null);
+    };
     const configureOrbit = () => {
       orbit.enableDamping = true;
       orbit.dampingFactor = 0.12;
@@ -113,10 +213,14 @@ export function RealityViewer({
     scene.add(new THREE.HemisphereLight(0xe9f5ff, 0x45515b, 2.5));
     const key = new THREE.DirectionalLight(0xffffff, 3.0);
     key.position.set(8, 12, 10);
+    key.castShadow = true;
     scene.add(key);
     const fill = new THREE.DirectionalLight(0x85b9ff, 1.4);
     fill.position.set(-8, 3, -6);
     scene.add(fill);
+    const rim = new THREE.PointLight(0x6cdcff, 3.2, 30, 1.6);
+    rim.position.set(-5, 4, 7);
+    scene.add(rim);
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(250, 250),
       new THREE.MeshStandardMaterial({ color: 0x899b98, roughness: 0.95 }),
@@ -130,18 +234,31 @@ export function RealityViewer({
     const lines = new THREE.Group();
     scene.add(lines);
     const materials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
-    const blueprintMaterial = new THREE.MeshBasicMaterial({
-      color: 0x153f6d,
+    const blueprintMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+    const blueprintMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2f8fbe,
+      roughness: 0.38,
+      metalness: 0.22,
       polygonOffset: true,
       polygonOffsetFactor: 1,
       polygonOffsetUnits: 1,
       side: THREE.DoubleSide,
     });
-    const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xb8e6ff });
+    const edgeMaterial = new THREE.LineBasicMaterial({
+      color: 0xc6f2ff,
+      transparent: true,
+      opacity: 0.86,
+    });
     const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 100);
     const bounds = new THREE.Vector3(10, 6, 6);
     const center = new THREE.Vector3();
     let activeMode: RealityMode = modeRef.current;
+    let selected: THREE.Object3D | null = null;
+    let selectedHelper: THREE.BoxHelper | null = null;
+    const editable = new Set<THREE.Object3D>();
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerStart = { x: 0, y: 0 };
     let fly = false;
     let width = 1,
       height = 1;
@@ -202,18 +319,21 @@ export function RealityViewer({
       fly = false;
       keys.clear();
       orbit.dispose();
+      transform.detach();
       camera = next === "blueprint" ? orthographic : perspective;
+      transform.camera = camera;
       orbit = new OrbitControls(camera, renderer.domElement);
       configureOrbit();
       floor.visible = next === "environment";
+      floor.receiveShadow = next === "environment";
       grid.visible = next === "blueprint";
       lines.visible = next === "blueprint";
-      scene.background = new THREE.Color(
-        next === "blueprint" ? 0x071e38 : next === "environment" ? 0xbdced7 : 0x10181f,
-      );
+      transform.getHelper().visible = next !== "environment" || selected !== null;
+      scene.background = new THREE.Color(backgroundColor);
       scene.fog = next === "environment" ? new THREE.Fog(0xbdced7, 45, 150) : null;
       for (const [mesh, original] of materials)
-        mesh.material = next === "blueprint" ? blueprintMaterial : original;
+        mesh.material =
+          next === "blueprint" ? (blueprintMaterials.get(mesh) ?? blueprintMaterial) : original;
       plane.constant = 100;
       renderer.clippingPlanes = [];
       fit();
@@ -273,6 +393,37 @@ export function RealityViewer({
         if (down) keys.add(direction);
         else keys.delete(direction);
       },
+      transform(next) {
+        transform.setMode(next);
+        setTransformMode(next);
+      },
+      add: addObject,
+      remove: removeObject,
+      color: applyObjectColor,
+      background(value) {
+        setBackgroundColor(value);
+        scene.background = new THREE.Color(value);
+      },
+      space(value) {
+        setSpace(value);
+        const palettes: Record<string, { background: number; floor: number }> = {
+          Workspace: { background: 0x7da7b8, floor: 0x465b62 },
+          "Living Area": { background: 0xb9a187, floor: 0x665443 },
+          Bathroom: { background: 0x8faeba, floor: 0x3f5963 },
+        };
+        const palette = palettes[value] ?? palettes["Workspace"]!;
+        scene.background = new THREE.Color(palette.background);
+        (floor.material as THREE.MeshStandardMaterial).color.setHex(palette.floor);
+        camera.position
+          .copy(center)
+          .add(
+            new THREE.Vector3(value === "Bathroom" ? -1 : value === "Living Area" ? 1 : 0.8, 0.5, 1)
+              .normalize()
+              .multiplyScalar(Math.max(8, camera.position.distanceTo(center))),
+          );
+        camera.lookAt(center);
+        orbit.target.copy(center);
+      },
     };
     api.current = controls;
     resize();
@@ -302,6 +453,7 @@ export function RealityViewer({
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
     const pointerDown = (event: PointerEvent) => {
+      pointerStart = { x: event.clientX, y: event.clientY };
       if (!fly) return;
       look.active = true;
       look.x = event.clientX;
@@ -317,7 +469,17 @@ export function RealityViewer({
       look.x = event.clientX;
       look.y = event.clientY;
     };
-    const pointerUp = () => {
+    const pointerUp = (event: PointerEvent) => {
+      if (!fly && Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) < 7) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.set(
+          ((event.clientX - rect.left) / rect.width) * 2 - 1,
+          -((event.clientY - rect.top) / rect.height) * 2 + 1,
+        );
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects([...editable], true);
+        setSelected(hits[0]?.object ?? null);
+      }
       look.active = false;
     };
     renderer.domElement.addEventListener("pointerdown", pointerDown);
@@ -328,6 +490,7 @@ export function RealityViewer({
     renderer.setAnimationLoop((now) => {
       const dt = Math.min((now - previous) / 1000, 0.05);
       previous = now;
+      if (selectedHelper) selectedHelper.update();
       if (fly) {
         const speed = dt * 2.5;
         const forward = new THREE.Vector3();
@@ -343,49 +506,54 @@ export function RealityViewer({
       } else orbit.update();
       renderer.render(scene, camera);
     });
-    void (async () => {
-      try {
-        const response = await fetch(pathway.model_url!, { signal: controller.signal });
-        if (!response.ok) throw new Error(`Model download returned HTTP ${response.status}`);
-        const gltf = await new GLTFLoader().parseAsync(
-          await response.arrayBuffer(),
-          new URL(".", pathway.model_url!).href,
-        );
-        if (disposed) {
-          disposeModel(gltf.scene);
-          return;
-        }
-        model = gltf.scene;
-        const box = new THREE.Box3().setFromObject(model);
-        if (box.isEmpty()) throw new Error("This model contains no visible geometry.");
-        const rawSize = box.getSize(new THREE.Vector3());
-        const scale = 10 / Math.max(rawSize.x, rawSize.y, rawSize.z);
-        model.scale.multiplyScalar(scale);
-        model.position.sub(box.getCenter(new THREE.Vector3()).multiplyScalar(scale));
-        model.updateMatrixWorld(true);
-        const normalized = new THREE.Box3().setFromObject(model);
-        normalized.getSize(bounds);
-        normalized.getCenter(center);
-        model.traverse((node) => {
-          if (!(node instanceof THREE.Mesh)) return;
-          for (const material of [node.material].flat()) material.side = THREE.DoubleSide;
-          materials.set(node, node.material);
-          const edge = new THREE.LineSegments(
-            new THREE.EdgesGeometry(node.geometry, 24),
-            edgeMaterial,
+    if (!pathway.model_url) {
+      setMode(modeRef.current);
+      setReady(true);
+    } else
+      void (async () => {
+        try {
+          const response = await fetch(pathway.model_url!, { signal: controller.signal });
+          if (!response.ok) throw new Error(`Model download returned HTTP ${response.status}`);
+          const gltf = await new GLTFLoader().parseAsync(
+            await response.arrayBuffer(),
+            new URL(".", pathway.model_url!).href,
           );
-          edge.applyMatrix4(node.matrixWorld);
-          lines.add(edge);
-        });
-        floor.position.y = normalized.min.y - 0.03;
-        grid.position.y = normalized.min.y - 0.04;
-        scene.add(model);
-        setMode(modeRef.current);
-        setReady(true);
-      } catch (cause) {
-        if (!disposed) setError(cause instanceof Error ? cause.message : String(cause));
-      }
-    })();
+          if (disposed) {
+            disposeModel(gltf.scene);
+            return;
+          }
+          model = gltf.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          if (box.isEmpty()) throw new Error("This model contains no visible geometry.");
+          const rawSize = box.getSize(new THREE.Vector3());
+          const scale = 10 / Math.max(rawSize.x, rawSize.y, rawSize.z);
+          model.scale.multiplyScalar(scale);
+          model.position.sub(box.getCenter(new THREE.Vector3()).multiplyScalar(scale));
+          model.updateMatrixWorld(true);
+          const normalized = new THREE.Box3().setFromObject(model);
+          normalized.getSize(bounds);
+          normalized.getCenter(center);
+          model.traverse((node) => {
+            if (!(node instanceof THREE.Mesh)) return;
+            for (const material of [node.material].flat()) material.side = THREE.DoubleSide;
+            materials.set(node, node.material);
+            editable.add(node);
+            const edge = new THREE.LineSegments(
+              new THREE.EdgesGeometry(node.geometry, 12),
+              edgeMaterial,
+            );
+            edge.applyMatrix4(node.matrixWorld);
+            lines.add(edge);
+          });
+          floor.position.y = normalized.min.y - 0.03;
+          grid.position.y = normalized.min.y - 0.04;
+          scene.add(model);
+          setMode(modeRef.current);
+          setReady(true);
+        } catch (cause) {
+          if (!disposed) setError(cause instanceof Error ? cause.message : String(cause));
+        }
+      })();
     return () => {
       disposed = true;
       controller.abort();
@@ -393,12 +561,16 @@ export function RealityViewer({
       renderer.setAnimationLoop(null);
       observer.disconnect();
       orbit.dispose();
+      transform.dispose();
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
       if (model) disposeModel(model);
       lines.children.forEach((node) => {
         if (node instanceof THREE.LineSegments) node.geometry.dispose();
+      });
+      blueprintMaterials.forEach((material) => {
+        for (const item of [material].flat()) item.dispose();
       });
       blueprintMaterial.dispose();
       edgeMaterial.dispose();
@@ -488,6 +660,62 @@ export function RealityViewer({
         </button>
       </aside>
       <footer className="reality-footer">
+        <div className="reality-edit-panel" aria-label="Reality manipulation tools">
+          <span className="reality-selection">{selectedObject}</span>
+          <div className="reality-edit-buttons">
+            {(["translate", "rotate", "scale"] as const).map((value) => (
+              <button
+                key={value}
+                disabled={!ready || selectedObject === "Nothing selected"}
+                aria-pressed={transformMode === value}
+                onClick={() => api.current?.transform(value)}
+              >
+                {value === "translate" ? "MOVE" : value.toUpperCase()}
+              </button>
+            ))}
+            <select
+              aria-label="Add object"
+              value={addKind}
+              onChange={(event) => setAddKind(event.target.value as typeof addKind)}
+            >
+              <option value="box">BOX</option>
+              <option value="sphere">SPHERE</option>
+              <option value="cylinder">CYLINDER</option>
+            </select>
+            <button disabled={!ready} onClick={() => api.current?.add(addKind)}>
+              ADD
+            </button>
+            <button
+              disabled={!ready || selectedObject === "Nothing selected"}
+              onClick={() => api.current?.remove()}
+            >
+              DELETE
+            </button>
+            <label className="reality-color">
+              <span>COLOR</span>
+              <input
+                disabled={!ready || selectedObject === "Nothing selected"}
+                type="color"
+                value={objectColor}
+                onChange={(event) => {
+                  setObjectColor(event.target.value);
+                  api.current?.color(event.target.value);
+                }}
+              />
+            </label>
+          </div>
+          <div className="reality-background">
+            <span>LIVE BACKGROUND</span>
+            {["#071e38", "#121b26", "#243d48", "#5d4639"].map((value) => (
+              <button
+                key={value}
+                aria-label={`Background ${value}`}
+                style={{ background: value }}
+                onClick={() => api.current?.background(value)}
+              />
+            ))}
+          </div>
+        </div>
         <div className="reality-mode-controls">
           {mode === "blueprint" &&
             (["top", "front", "side", "perspective"] as const).map((view) => (
@@ -515,16 +743,33 @@ export function RealityViewer({
             </label>
           )}
           {mode === "environment" && (
-            <button
-              disabled={!ready}
-              aria-pressed={exploring}
-              onClick={() => {
-                setExploring(!exploring);
-                api.current?.explore(!exploring);
-              }}
-            >
-              {exploring ? "RETURN TO ORBIT" : "EXPLORE INSIDE"}
-            </button>
+            <div className="reality-spaces" aria-label="Living spaces">
+              {(["Workspace", "Living Area", "Bathroom"] as const).map((value) => (
+                <button
+                  key={value}
+                  aria-pressed={space === value}
+                  disabled={!ready}
+                  onClick={() => {
+                    setSpace(value);
+                    setExploring(true);
+                    api.current?.space(value);
+                    api.current?.explore(true);
+                  }}
+                >
+                  {value}
+                </button>
+              ))}
+              <button
+                disabled={!ready}
+                aria-pressed={exploring}
+                onClick={() => {
+                  setExploring(!exploring);
+                  api.current?.explore(!exploring);
+                }}
+              >
+                {exploring ? "RETURN TO ORBIT" : "EXPLORE INSIDE"}
+              </button>
+            </div>
           )}
           {exploring && (
             <div className="reality-movement" aria-label="Move through environment">

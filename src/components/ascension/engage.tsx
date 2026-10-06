@@ -28,7 +28,6 @@ import {
   planningFor,
   receiptFiles,
   record,
-  supportsEnvisionObjective,
   strings,
   type ObjectiveDelivery,
 } from "@/lib/ascension/result-model";
@@ -1023,12 +1022,9 @@ export function Engage() {
     atmosphere.current = null;
     setReality(null);
   };
-  const immersiveChoices = Boolean(
-    delivery &&
-    run &&
-    supportsEnvisionObjective(run.objective) &&
-    (delivery.pathways.length || delivery.blend),
-  );
+  // Reality editing belongs to the pathway layer itself. Every delivered
+  // reality gets the same editor, regardless of the wording of the objective.
+  const immersiveChoices = Boolean(delivery && run && (delivery.pathways.length || delivery.blend));
   const realityPathway =
     reality && delivery
       ? [...delivery.pathways, ...(delivery.blend ? [delivery.blend] : [])].find(

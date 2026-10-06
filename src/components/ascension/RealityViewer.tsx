@@ -834,6 +834,10 @@ export function RealityViewer({
       plane.constant = 100;
       renderer.clippingPlanes = [];
       fit();
+      if (next === "environment") {
+        camera.position.sub(orbit.target).multiplyScalar(1.28).add(orbit.target);
+        orbit.update();
+      }
     };
     const controls: ViewerControls = {
       mode: applyMode,

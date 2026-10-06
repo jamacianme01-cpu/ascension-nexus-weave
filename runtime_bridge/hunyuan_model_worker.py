@@ -187,7 +187,7 @@ def _report(
 def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
     separator = "&" if "?" in queue_url else "?"
     claim_url = queue_url + separator + urllib.parse.urlencode({"runner": runner})
-    payload = _json_request(claim_url, token, "GET", None, 60)
+    payload = _json_request(claim_url, token, "GET", None, 180)
     item = payload.get("item")
     if not item:
         return False
@@ -271,3 +271,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

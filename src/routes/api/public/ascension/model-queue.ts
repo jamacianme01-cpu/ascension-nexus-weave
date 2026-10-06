@@ -10,7 +10,10 @@ type ReportStatus = (typeof STATUSES)[number];
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    },
   });
 }
 
@@ -94,7 +97,9 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         }
 
         const { data: pending, error: readError } = await table
-          .select("id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at")
+          .select(
+            "id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at",
+          )
           .eq("status", "queued")
           .order("created_at", { ascending: true })
           .limit(1);
@@ -114,10 +119,53 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
           })
           .eq("id", next.id)
           .eq("status", "queued")
-          .select("id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at")
+          .select(
+            "id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at",
+          )
           .maybeSingle();
         if (claimError) return json({ error: "model_claim_failed" }, 500);
         if (!claimed) return json({ item: null });
+
+        // Generate the reference only after a worker claims this model job.
+        // ENGAGE has already persisted and returned the answer by this point.
+        if (!claimed.source_image_url) {
+          try {
+            const { data: run, error: runError } = await supabaseAdmin
+              .from("ascension_execution_requests")
+              .select("objective")
+              .eq("id", claimed.request_id)
+              .single();
+            if (runError || !run) throw new Error(runError?.message ?? "Model objective missing.");
+            const { generateConceptImage, conceptImagePrompt } =
+              await import("@/lib/ascension/engine/image.server");
+            const sourceUrl = await generateConceptImage(
+              conceptImagePrompt(run.objective, claimed),
+              `references/${claimed.request_id}/${claimed.id}.png`,
+            );
+            const { error: saveError } = await table
+              .update({
+                source_image_url: sourceUrl,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", claimed.id)
+              .eq("status", "claimed");
+            if (saveError) throw new Error(saveError.message);
+            claimed.source_image_url = sourceUrl;
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : String(cause);
+            const { error: failureError } = await table
+              .update({
+                status: "failed",
+                error: `Reference image failed: ${message}`.slice(0, 4000),
+                updated_at: new Date().toISOString(),
+                completed_at: new Date().toISOString(),
+              })
+              .eq("id", claimed.id)
+              .eq("status", "claimed");
+            if (failureError) return json({ error: "model_reference_failure_update_failed" }, 500);
+            return json({ item: null, error: `Reference image failed: ${message}` }, 502);
+          }
+        }
 
         const objectPath = claimed.request_id + "/" + claimed.id + ".glb";
         const signed = await supabaseAdmin.storage
@@ -185,9 +233,7 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
             .update({ status: "running", updated_at: now, error: null })
             .eq("id", jobId)
             .in("status", ["claimed", "running"]);
-          return error
-            ? json({ error: "model_running_update_failed" }, 500)
-            : json({ ok: true });
+          return error ? json({ error: "model_running_update_failed" }, 500) : json({ ok: true });
         }
 
         if (status === "failed") {
@@ -199,9 +245,7 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
               completed_at: now,
             })
             .eq("id", jobId);
-          return error
-            ? json({ error: "model_failed_update_failed" }, 500)
-            : json({ ok: true });
+          return error ? json({ error: "model_failed_update_failed" }, 500) : json({ ok: true });
         }
 
         const objectPath = job.request_id + "/" + job.id + ".glb";
@@ -209,13 +253,11 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
           limit: 100,
           search: job.id + ".glb",
         });
-        if (
-          folder.error ||
-          !(folder.data ?? []).some((item) => item.name === job.id + ".glb")
-        ) {
+        if (folder.error || !(folder.data ?? []).some((item) => item.name === job.id + ".glb")) {
           return json({ error: "model_upload_missing" }, 409);
         }
-        const publicUrl = supabaseAdmin.storage.from(BUCKET).getPublicUrl(objectPath).data.publicUrl;
+        const publicUrl = supabaseAdmin.storage.from(BUCKET).getPublicUrl(objectPath)
+          .data.publicUrl;
         const { error } = await table
           .update({
             status: "completed",

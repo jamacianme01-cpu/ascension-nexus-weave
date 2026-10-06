@@ -17,7 +17,9 @@ export interface ImageProviderInfo {
 }
 
 export function imageProvider(): ImageProviderInfo | null {
-  return process.env["LOVABLE_API_KEY"]?.trim() ? { provider: "lovable", model: IMAGE_MODEL } : null;
+  return process.env["LOVABLE_API_KEY"]?.trim()
+    ? { provider: "lovable", model: IMAGE_MODEL }
+    : null;
 }
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -30,9 +32,10 @@ function base64ToBytes(b64: string): Uint8Array {
 async function persist(path: string, bytes: Uint8Array): Promise<string> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   // The bucket accepts GLB and octet-stream; the Hunyuan worker validates PNG bytes.
-  const { error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .upload(path, bytes, { contentType: "application/octet-stream", upsert: true });
+  const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, bytes, {
+    contentType: "application/octet-stream",
+    upsert: true,
+  });
   if (error) throw new Error(`reference image storage failed: ${error.message}`);
   return supabaseAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
@@ -40,13 +43,17 @@ async function persist(path: string, bytes: Uint8Array): Promise<string> {
 /** Generate and persist one reference image. Throws the real provider/storage error. */
 export async function generateConceptImage(prompt: string, storagePath: string): Promise<string> {
   const key = process.env["LOVABLE_API_KEY"]?.trim();
-  if (!key) throw new Error("Lovable AI is not available to this deployment (LOVABLE_API_KEY missing).");
+  if (!key)
+    throw new Error("Lovable AI is not available to this deployment (LOVABLE_API_KEY missing).");
   const response = await fetch(`${GATEWAY}/images/generations`, {
     method: "POST",
-    // Internal reference generation must never strand ENGAGE in a permanent
-    // running state. A failed/slow reference is reported and 3D remains pending.
-    signal: AbortSignal.timeout(20_000),
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    // This runs in the worker claim request, after the answer has been delivered.
+    // Bound the provider wait; report failures through the model job.
+    signal: AbortSignal.timeout(120_000),
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       model: IMAGE_MODEL,
       prompt: prompt.replace(/\s+/g, " ").trim().slice(0, 3800),
@@ -56,7 +63,9 @@ export async function generateConceptImage(prompt: string, storagePath: string):
   });
   if (!response.ok) {
     const detail = (await response.text().catch(() => "")).slice(0, 800);
-    throw new Error(`Lovable AI image generation returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+    throw new Error(
+      `Lovable AI image generation returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
+    );
   }
   const payload = (await response.json().catch(() => null)) as {
     data?: Array<{ b64_json?: unknown }>;
@@ -73,7 +82,12 @@ export async function generateConceptImage(prompt: string, storagePath: string):
  */
 export async function generatePathwayImages(
   objective: string,
-  pathways: Array<{ id: string; label: string; summary: string; spiral_form?: string | null }>,
+  pathways: Array<{
+    id: string;
+    label: string;
+    summary: string;
+    spiral_form?: string | null;
+  }>,
   requestId = "unscoped",
 ): Promise<{ urls: Map<string, string>; errors: string[] }> {
   const urls = new Map<string, string>();
@@ -117,8 +131,12 @@ export function conceptImagePrompt(
     .join(" — ")
     .slice(0, 900);
   const spatialConversion =
-    /\b(camper|rv|motorhome|trailer|van|room|office|workspace|living space|interior|house|home|building|shop|workshop|shed|garage|cabin)\b/i.test(objective) &&
-    /\b(convert|conversion|transform|remodel|renovate|reconfigure|redesign|layout|fit[- ]?out|modify|retrofit)\b/i.test(objective);
+    /\b(camper|rv|motorhome|trailer|van|room|office|workspace|living space|interior|house|home|building|shop|workshop|shed|garage|cabin)\b/i.test(
+      objective,
+    ) &&
+    /\b(convert|conversion|transform|remodel|renovate|reconfigure|redesign|layout|fit[- ]?out|modify|retrofit)\b/i.test(
+      objective,
+    );
 
   return [
     `Reference image for 3D reconstruction of the objective: "${objective.replace(/\s+/g, " ").trim().slice(0, 300)}".`,

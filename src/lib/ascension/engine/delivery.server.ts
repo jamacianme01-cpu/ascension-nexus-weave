@@ -429,42 +429,22 @@ export async function externalProductDraft(
   // never trigger a second AI call or become the visual authority. Real visual
   // delivery is the hidden reference -> Hunyuan3D -> GLB pipeline below.
 
-  // VISUAL objectives: generate an INTERNAL reference image for every pathway
-  // and blend. These references feed Hunyuan image-to-3D and are never the
-  // user-facing ENVISION result. No procedural geometry is a fallback.
-  if (supportsEnvisionObjective(run.objective)) {
-    const { generatePathwayImages } = await import("./image.server");
-    const visualChoices = parsed.blend ? [...parsed.pathways, parsed.blend] : parsed.pathways;
-    const { urls: imageUrls, errors: imageErrors } = await generatePathwayImages(
-      run.objective,
-      visualChoices,
-      run.id,
-    );
-    if (imageUrls.size) {
-      const withImage = <T extends { id: string; generated_image_url: string | null }>(
-        pathway: T,
-      ): T => {
-        const url = imageUrls.get(pathway.id);
-        return url ? { ...pathway, generated_image_url: url } : pathway;
-      };
-      parsed = {
-        ...parsed,
-        pathways: parsed.pathways.map(withImage),
-        blend: parsed.blend ? withImage(parsed.blend) : null,
-      };
-    }
-    // Pathways are still delivered; 3D is queued only where a durable
-    // reference exists. No primitive geometry is substituted.
-    if (imageErrors.length) {
-      parsed = {
-        ...parsed,
-        limitations: [
-          ...parsed.limitations,
-          `3D generation could not start for ${imageErrors.length} pathway(s) because the internal reference image failed: ${imageErrors.slice(0, 3).join(" | ").slice(0, 900)}`,
-        ],
-      };
-    }
-  }
+  // Generated asset URLs must come from the image/model pipeline, never from
+  // language-model text. Reference generation runs after answer persistence.
+  const withoutUnproducedAssets = <T extends ObjectiveDelivery["pathways"][number]>(pathway: T): T => ({
+    ...pathway,
+    generated_image_url: null,
+    generated_blueprint_url: null,
+    generated_environment_url: null,
+    model_url: null,
+    model_status: null,
+    model_error: null,
+  });
+  parsed = {
+    ...parsed,
+    pathways: parsed.pathways.map(withoutUnproducedAssets),
+    blend: parsed.blend ? withoutUnproducedAssets(parsed.blend) : null,
+  };
 
   const visualSvgs = [
     ...parsed.pathways
@@ -789,3 +769,4 @@ export async function adminDraftStore(runId: string): Promise<DraftStore> {
     },
   };
 }
+

@@ -1,9 +1,10 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import type { ObjectiveDelivery } from "./result-model";
+import { supportsEnvisionObjective, type ObjectiveDelivery } from "./result-model";
 
 /**
  * Queue real Hunyuan3D generation for every physical pathway that has a
- * reference visual but does not yet have a generated GLB.
+ * design objective but does not yet have a generated GLB.
+ * Reference images are generated on claim, independently of answer delivery.
  *
  * The queue is service-role only. The Windows model worker is the only writer
  * allowed to claim and complete these jobs through the secured model-queue route.
@@ -11,14 +12,13 @@ import type { ObjectiveDelivery } from "./result-model";
 export async function enqueueDeliveryModels(
   requestId: string,
   delivery: ObjectiveDelivery | null,
+  objective: string,
 ): Promise<void> {
-  if (!delivery) return;
+  if (!delivery || !supportsEnvisionObjective(objective)) return;
 
   const choices = delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways;
   const rows = choices
-    .filter(
-      (pathway) => Boolean(pathway.generated_image_url) && !pathway.model_url,
-    )
+    .filter((pathway) => !pathway.model_url)
     .map((pathway) => ({
       request_id: requestId,
       pathway_id: pathway.id,
@@ -56,23 +56,27 @@ export async function attachCompletedModels(
 
   const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
   const { data, error } = await table
-    .select("pathway_id, model_url, status")
-    .eq("request_id", requestId)
-    .eq("status", "completed")
-    .not("model_url", "is", null);
+    .select("pathway_id, model_url, status, error")
+    .eq("request_id", requestId);
   if (error) throw new Error(error.message);
 
-  const urls = new Map<string, string>();
+  const jobs = new Map<string, Record<string, unknown>>();
   for (const row of (data ?? []) as Array<Record<string, unknown>>) {
-    const id = typeof row["pathway_id"] === "string" ? row["pathway_id"] : "";
-    const url = typeof row["model_url"] === "string" ? row["model_url"] : "";
-    if (id && /^https:\/\//i.test(url)) urls.set(id, url);
+    if (typeof row["pathway_id"] === "string") jobs.set(row["pathway_id"], row);
   }
-  if (!urls.size) return delivery;
-
   const withUrl = <T extends ObjectiveDelivery["pathways"][number]>(pathway: T): T => {
-    const url = urls.get(pathway.id);
-    return url ? ({ ...pathway, model_url: url } as T) : pathway;
+    const job = jobs.get(pathway.id);
+    if (!job) return pathway;
+    const url = job["model_url"];
+    return {
+      ...pathway,
+      model_url:
+        job["status"] === "completed" && typeof url === "string" && /^https:\/\//i.test(url)
+          ? url
+          : null,
+      model_status: job["status"] as T["model_status"],
+      model_error: typeof job["error"] === "string" ? job["error"] : null,
+    };
   };
 
   return {

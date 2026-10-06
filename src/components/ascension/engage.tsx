@@ -910,15 +910,9 @@ export function Engage() {
           : delivery.response_payload.pathways
         : [];
       const waitingForHunyuan = modelChoices.some(
-        (pathway) => Boolean(pathway.model_spec) && Boolean(pathway.visual_svg) && !pathway.model_url,
+        (pathway) => ["queued", "claimed", "running"].includes(pathway.model_status ?? ""),
       );
-      const deliveryAt = Date.parse(delivery.created_at ?? "");
-      if (
-        waitingForHunyuan &&
-        (!Number.isFinite(deliveryAt) || Date.now() - deliveryAt < 15 * 60_000)
-      ) {
-        return 3000;
-      }
+      if (waitingForHunyuan) return 3000;
 
       if (delivery.source !== "external_draft") return false;
       const finishedAt = Date.parse(runQuery.data?.completed_at ?? "");
@@ -1497,3 +1491,4 @@ export function Engage() {
     </div>
   );
 }
+

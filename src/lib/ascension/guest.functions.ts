@@ -21,7 +21,8 @@ async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T | 
 
 function validateRequest(input: { requestId: string; guestToken: string; retry?: boolean }) {
   if (!/^[a-f0-9-]{36}$/i.test(input.requestId)) throw new Error("A valid request id is required.");
-  if (!/^[a-f0-9-]{36}$/i.test(input.guestToken)) throw new Error("A valid guest token is required.");
+  if (!/^[a-f0-9-]{36}$/i.test(input.guestToken))
+    throw new Error("A valid guest token is required.");
   return {
     requestId: input.requestId,
     guestToken: input.guestToken,
@@ -165,11 +166,21 @@ async function projectGuestDelivery(
   if (state.status === "completed" && state.response_payload) {
     const modelJobs = await import("./model-jobs.server");
     try {
+      await modelJobs.enqueueDeliveryModels(
+        requestId,
+        state.response_payload,
+        bundle.run.objective,
+      );
       const hydrated = await modelJobs.attachCompletedModels(requestId, state.response_payload);
-      await modelJobs.enqueueDeliveryModels(requestId, hydrated);
-      return { ...state, response_payload: hydrated } as unknown as GuestDeliveryState;
-    } catch {
-      // Model generation is asynchronous and must not break guest answer delivery.
+      return {
+        ...state,
+        response_payload: hydrated,
+      } as unknown as GuestDeliveryState;
+    } catch (cause) {
+      return {
+        ...state,
+        error: `3D queue unavailable: ${cause instanceof Error ? cause.message : String(cause)}`,
+      } as GuestDeliveryState;
     }
   }
   return state as unknown as GuestDeliveryState;

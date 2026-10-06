@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:interface": "node tests/interface.test.mjs"
+    "test:interface": "node tests/interface.test.mjs && node tests/model-jobs.test.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -92,3 +92,4 @@
     "vite": "8.1.5"
   }
 }
+

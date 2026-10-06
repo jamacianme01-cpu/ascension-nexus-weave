@@ -130,6 +130,8 @@ export interface ObjectivePathway {
   generated_environment_url: string | null;
   /** Real generated GLB for this pathway when Hunyuan3D has completed it. */
   model_url: string | null;
+  model_status?: "queued" | "claimed" | "running" | "completed" | "failed" | null;
+  model_error?: string | null;
   outcome_score: number | null;
   outcome_reason: string | null;
 }
@@ -308,6 +310,12 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       generated_blueprint_url: generatedBlueprintUrl,
       generated_environment_url: generatedEnvironmentUrl,
       model_url: modelUrl,
+      model_status: ["queued", "claimed", "running", "completed", "failed"].includes(
+        String(p["model_status"]),
+      )
+        ? (p["model_status"] as NonNullable<ObjectivePathway["model_status"]>)
+        : null,
+      model_error: typeof p["model_error"] === "string" ? p["model_error"].slice(0, 4000) : null,
       outcome_score: outcomeScore,
       outcome_reason: outcomeReason,
     };
@@ -376,9 +384,13 @@ export function supportsEnvisionObjective(objective: string): boolean {
   // Physical/spatial transformations are still inspectable realities even when
   // the user phrases them as a how-to. Keep abstract/software/recipe answers out.
   const physicalSubject =
-    /\b(camper|rv|motorhome|trailer|van|vehicle|car|truck|room|office|workspace|living space|interior|house|home|building|shop|workshop|shed|garage|cabin|furniture|machine|device|engine|robot|drone|wearable|shoe|box|enclosure)\b/.test(o);
+    /\b(camper|rv|motorhome|trailer|van|vehicle|car|truck|room|office|workspace|living space|interior|house|home|building|shop|workshop|shed|garage|cabin|furniture|machine|device|engine|robot|drone|wearable|shoe|box|enclosure)\b/.test(
+      o,
+    );
   const transformation =
-    /\b(convert|conversion|transform|remodel|renovate|reconfigure|redesign|layout|fit[- ]?out|modify|retrofit|build|make|design|create|prototype|engineer)\b/.test(o);
+    /\b(convert|conversion|transform|remodel|renovate|reconfigure|redesign|layout|fit[- ]?out|modify|retrofit|build|make|design|create|prototype|engineer)\b/.test(
+      o,
+    );
 
   return physicalSubject && transformation;
 }
@@ -527,7 +539,12 @@ export function assessResult(
     };
   }
   if (bodyOk || realFiles.length) return { produced: true, kind, reason: null, files: realFiles };
-  return { produced: false, kind, reason: scaffoldReason(body, objective), files: [] };
+  return {
+    produced: false,
+    kind,
+    reason: scaffoldReason(body, objective),
+    files: [],
+  };
 }
 
 export function notProducedMessage(kind: RequestedKind) {

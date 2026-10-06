@@ -37,8 +37,18 @@ type Mesh = { buffer: WebGLBuffer; count: number };
 const PATH_SLOTS = [
   { left: "22%", top: "24%", labelTop: "38%", pos: [-2.55, 1.3, 0.1] as Vec3 },
   { left: "78%", top: "24%", labelTop: "38%", pos: [2.55, 1.3, 0.1] as Vec3 },
-  { left: "24%", top: "62%", labelTop: "76%", pos: [-2.35, -1.18, 0.14] as Vec3 },
-  { left: "76%", top: "62%", labelTop: "76%", pos: [2.35, -1.18, 0.14] as Vec3 },
+  {
+    left: "24%",
+    top: "62%",
+    labelTop: "76%",
+    pos: [-2.35, -1.18, 0.14] as Vec3,
+  },
+  {
+    left: "76%",
+    top: "62%",
+    labelTop: "76%",
+    pos: [2.35, -1.18, 0.14] as Vec3,
+  },
 ];
 const FOCUS_BASE: Vec3 = [0, 0.38, 0];
 const BLEND_POS: Vec3 = [0, -0.12, 0.78];
@@ -318,7 +328,10 @@ function orbitVertices(seg = 64, tube = 8) {
       sw = Math.sin(w),
       R = 1,
       r = 0.035;
-    return { p: [(R + r * cw) * cu, (R + r * cw) * su, r * sw], n: [cw * cu, cw * su, sw] };
+    return {
+      p: [(R + r * cw) * cu, (R + r * cw) * su, r * sw],
+      n: [cw * cu, cw * su, sw],
+    };
   };
   const q = (x: { p: Vec3; n: Vec3 }) => d.push(...x.p, ...x.n);
   for (let i = 0; i < seg; i++) {
@@ -348,7 +361,10 @@ function orbitVertices(seg = 64, tube = 8) {
  * plus creases sharper than ~30°. Output is line-vertex pairs (pos + t=0) so
  * the drawing stays steady instead of flowing like energy filaments.
  */
-function wireEdges(src: Float32Array): { feature: Float32Array; all: Float32Array } {
+function wireEdges(src: Float32Array): {
+  feature: Float32Array;
+  all: Float32Array;
+} {
   const key = (v: number) => Math.round(v * 2000) / 2000;
   type EdgeAcc = { a: Vec3; b: Vec3; n: Vec3; count: number; creased: boolean };
   const seen = new Map<string, EdgeAcc>();
@@ -592,7 +608,12 @@ export function Envision3DScene({
   selectedRef.current = selectedId;
   const rotationRef = useRef({ x: -0.22, y: 0.55 });
   const zoomRef = useRef(1);
-  const dragRef = useRef<{ x: number; y: number; active: boolean; moved: boolean }>({
+  const dragRef = useRef<{
+    x: number;
+    y: number;
+    active: boolean;
+    moved: boolean;
+  }>({
     x: 0,
     y: 0,
     active: false,
@@ -610,7 +631,11 @@ export function Envision3DScene({
   const [phase, setPhase] = useState<ManifestationPhase>("possibility");
   // The render loop runs inside a RAF closure, so it reads the ref; the
   // state copy only drives the HUD.
-  const generatedRef = useRef<{ id: string; mesh: Float32Array; url: string } | null>(null);
+  const generatedRef = useRef<{
+    id: string;
+    mesh: Float32Array;
+    url: string;
+  } | null>(null);
   const [generated, setGenerated] = useState<{
     id: string;
     mesh: Float32Array;
@@ -640,6 +665,7 @@ export function Envision3DScene({
   );
   const selected = choices.find((x) => x.id === selectedId) ?? null;
   const isBlend = Boolean(selected && delivery.blend?.id === selected.id);
+  const selectedModelUrl = selected?.model_url ?? null;
 
   const linearSpecs = useMemo(() => {
     const map = new Map<string, LinearSpec | null>();
@@ -677,40 +703,39 @@ export function Envision3DScene({
     setModelViewState("hidden");
   }, [selectedId]);
 
-  // Prefer the completed GLB attached by the local Hunyuan worker. The older
-  // direct provider seam remains only as a secondary compatibility path.
+  // Polling changes delivery objects. Reload only when the selected model's
+  // identity or URL changes, so a slow GLB download survives status refreshes.
   useEffect(() => {
-    if (!selectedId) return;
+    publishGenerated(null);
+    if (!selectedId || !selectedModelUrl) return;
     let cancelled = false;
     const controller = new AbortController();
-    const request = choices.find((x) => x.id === selectedId);
-    if (!request) return;
+    setModelViewState("loading");
     void (async () => {
-      // The only model ENVISION may load is the completed GLB attached by
-      // ASCENSION's Hunyuan model-job pipeline. Internal reference images and
-      // browser-configured direct endpoints are not presentation sources.
-      const model: PathwayModel | null = request.model_url
-        ? { kind: "gltf", url: request.model_url }
-        : null;
-      if (!model || cancelled) return;
       try {
-        const response = await fetch(model.url, { signal: controller.signal });
-        if (!response.ok) return;
+        const response = await fetch(selectedModelUrl, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`Model download returned HTTP ${response.status}`);
         const parsed = parseGlbVertices(await response.arrayBuffer());
-        if (parsed && !cancelled)
-          publishGenerated({ id: request.id, mesh: parsed, url: model.url });
+        if (!parsed) throw new Error("Model contains no readable mesh");
+        if (!cancelled) {
+          publishGenerated({
+            id: selectedId,
+            mesh: parsed,
+            url: selectedModelUrl,
+          });
+          setModelViewState("active");
+        }
       } catch {
-        /* keep the objective-specific scene graph until a real GLB is readable */
+        if (!cancelled) setModelViewState("unavailable");
       }
     })();
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [selectedId, choices]);
-  useEffect(() => {
-    publishGenerated(null);
-  }, [sceneSignature]);
+  }, [selectedId, selectedModelUrl]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1645,7 +1670,7 @@ export function Envision3DScene({
           if (!generatedBuf) generatedBuf = dynamicBuffer(gl);
           const min: Vec3 = [1e9, 1e9, 1e9],
             max: Vec3 = [-1e9, -1e9, -1e9];
-          for (let i = 0; i < generated.mesh.length; i += 3) {
+          for (let i = 0; i < generated.mesh.length; i += 6) {
             for (let a = 0; a < 3; a++) {
               const v = generated.mesh[i + a] ?? 0;
               min[a] = Math.min(min[a] ?? 0, v);
@@ -1784,7 +1809,9 @@ export function Envision3DScene({
       if (primaryPhase !== lastPhaseRef.current) {
         lastPhaseRef.current = primaryPhase;
         if (primaryPhase !== "idle")
-          onPhaseChangeRef.current?.(primaryPhase, { blend: Boolean(focusBlend) });
+          onPhaseChangeRef.current?.(primaryPhase, {
+            blend: Boolean(focusBlend),
+          });
         setPhase(primaryPhase);
       }
 
@@ -1862,7 +1889,12 @@ export function Envision3DScene({
   const pointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
     pinchRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (!selectedId) return;
-    dragRef.current = { x: e.clientX, y: e.clientY, active: true, moved: false };
+    dragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      active: true,
+      moved: false,
+    };
     setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -1952,14 +1984,27 @@ export function Envision3DScene({
   };
   const phaseLabel = MANIFESTATION_PHASE_LABEL[phase];
   const hasReal3D = Boolean(selected && generated?.id === selected.id);
-  const modeHint =
-    !hasReal3D
-      ? "HUNYUAN3D · GENERATING REALITY"
-      : visualMode === "blueprint"
-        ? "BLUEPRINT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
-        : visualMode === "environment"
-          ? "ENVIRONMENT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
-          : "CUTAWAY · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM";
+  const modelStatusLabel =
+    selected?.model_status === "failed"
+      ? "3D FAILED"
+      : selectedModelUrl
+        ? modelViewState === "unavailable"
+          ? "3D COULD NOT LOAD"
+          : "3D LOADING"
+        : selected?.model_status === "running"
+          ? "3D GENERATING"
+          : selected?.model_status === "claimed"
+            ? "3D PREPARING"
+            : selected?.model_status === "queued"
+              ? "3D QUEUED"
+              : "3D NOT AVAILABLE";
+  const modeHint = !hasReal3D
+    ? modelStatusLabel
+    : visualMode === "blueprint"
+      ? "BLUEPRINT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
+      : visualMode === "environment"
+        ? "ENVIRONMENT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
+        : "CUTAWAY · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM";
 
   return (
     <div
@@ -2065,6 +2110,7 @@ export function Envision3DScene({
             </p>
             <h3>{selected.label}</h3>
             <span>{selected.summary}</span>
+            {selected.model_error && <p role="alert">{selected.model_error}</p>}
           </div>
           <div className="ascension-holo-actions">
             <button
@@ -2079,7 +2125,15 @@ export function Envision3DScene({
             {generated?.id === selected.id ? (
               <button onClick={enterModelView}>3D READY</button>
             ) : (
-              <button type="button" disabled>3D GENERATING…</button>
+              <button
+                type="button"
+                disabled={modelViewState !== "unavailable"}
+                onClick={enterModelView}
+              >
+                {modelViewState === "unavailable" && selectedModelUrl
+                  ? "RETRY MODEL LOAD"
+                  : modelStatusLabel}
+              </button>
             )}
             {generated && generated.id === selected.id && (
               <a

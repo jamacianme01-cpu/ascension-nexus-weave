@@ -28,7 +28,9 @@ async function resolveForOwner(
 ): Promise<DeliveryState | null> {
   const { data: run, error } = await supabase
     .from("ascension_execution_requests")
-    .select("id, objective, evidence, constraints, status, result, completed_at, updated_at, created_at")
+    .select(
+      "id, objective, evidence, constraints, status, result, completed_at, updated_at, created_at",
+    )
     .eq("id", requestId)
     .eq("submitted_by", userId)
     .maybeSingle();
@@ -45,7 +47,10 @@ async function resolveForOwner(
   const engine = await import("./engine/delivery.server");
   const state = await engine.resolveDelivery({
     run,
-    artifactStage: byOrdinal(101) as { status: string; response_payload: unknown } | null,
+    artifactStage: byOrdinal(101) as {
+      status: string;
+      response_payload: unknown;
+    } | null,
     draft: engine.draftFromStage(byOrdinal(102)),
     store: await engine.adminDraftStore(requestId),
     retry,
@@ -53,11 +58,14 @@ async function resolveForOwner(
   if (state.status === "completed" && state.response_payload) {
     const modelJobs = await import("./model-jobs.server");
     try {
+      await modelJobs.enqueueDeliveryModels(requestId, state.response_payload, run.objective);
       const hydrated = await modelJobs.attachCompletedModels(requestId, state.response_payload);
-      await modelJobs.enqueueDeliveryModels(requestId, hydrated);
       return { ...state, response_payload: hydrated };
-    } catch {
-      // Hunyuan model generation is asynchronous; answer delivery must not fail if queueing does.
+    } catch (cause) {
+      return {
+        ...state,
+        error: `3D queue unavailable: ${cause instanceof Error ? cause.message : String(cause)}`,
+      };
     }
   }
   return state;
@@ -76,7 +84,12 @@ export const prepareObjectiveDelivery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
-    const state = await resolveForOwner(context.supabase, context.userId, data.requestId, data.retry);
+    const state = await resolveForOwner(
+      context.supabase,
+      context.userId,
+      data.requestId,
+      data.retry,
+    );
     if (!state) throw new Error("This objective is unavailable to your account.");
     return state;
   });

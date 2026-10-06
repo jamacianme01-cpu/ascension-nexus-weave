@@ -15,8 +15,17 @@ function Test-Hunyuan {
   return [bool](Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue)
 }
 
+function Test-HunyuanProcess {
+  return [bool](Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.Name -like 'python*.exe' -and
+      $_.CommandLine -like '*api_server.py*' -and
+      $_.CommandLine -like '*--port*8081*'
+    })
+}
+
 function Start-Hunyuan {
-  if (Test-Hunyuan) { return }
+  if ((Test-Hunyuan) -or (Test-HunyuanProcess)) { return }
   $env:HF_HUB_CACHE = Join-Path $HunyuanRoot 'HuggingFaceHub'
   $env:HY3DGEN_MODELS = Join-Path $HunyuanRoot 'HuggingFaceHub'
   $env:PYTORCH_CUDA_ALLOC_CONF = 'expandable_segments:True'

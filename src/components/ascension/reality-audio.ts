@@ -26,15 +26,17 @@ function atmosphereGraph(ctx: AudioContext) {
   filter.type = "lowpass";
   filter.frequency.value = 650;
   filter.Q.value = 0.4;
-  wind.connect(filter).connect(output);
+  const windLevel = ctx.createGain();
+  windLevel.gain.value = 0.16;
+  wind.connect(filter).connect(windLevel).connect(output);
   sources.push(wind);
-  nodes.push(filter);
+  nodes.push(filter, windLevel);
   // Soft, sustained fifths, spread across the room; no arpeggio or alert tones.
   [55, 82.41, 110.12].forEach((frequency, i) => {
     const tone = ctx.createOscillator();
     tone.frequency.value = frequency;
     const level = ctx.createGain();
-    level.gain.value = i === 0 ? 0.12 : 0.035;
+    level.gain.value = i === 0 ? 0.055 : 0.018;
     const pan = ctx.createStereoPanner();
     pan.pan.value = (i - 1) * 0.65;
     tone.connect(level).connect(pan).connect(output);
@@ -48,12 +50,23 @@ function atmosphereGraph(ctx: AudioContext) {
   });
   sources.forEach((source) => source.start());
   let stopped = false;
+  let dimTimer: number | undefined;
   return {
     output,
     filter,
+    dim(level = 0.035, after = 4) {
+      if (stopped) return;
+      const now = ctx.currentTime;
+      output.gain.cancelAndHoldAtTime(now);
+      output.gain.linearRampToValueAtTime(level, now + after);
+    },
+    scheduleDim(afterMs: number, level = 0.035, after = 6) {
+      dimTimer = window.setTimeout(() => this.dim(level, after), afterMs);
+    },
     stop(after = 0.5) {
       if (stopped) return;
       stopped = true;
+      if (dimTimer !== undefined) window.clearTimeout(dimTimer);
       const now = ctx.currentTime;
       output.gain.cancelAndHoldAtTime(now);
       output.gain.linearRampToValueAtTime(0, now + after);
@@ -77,7 +90,8 @@ function atmosphereGraph(ctx: AudioContext) {
 
 export function createRealityAtmosphere(ctx: AudioContext) {
   const graph = atmosphereGraph(ctx);
-  graph.output.gain.linearRampToValueAtTime(0.42, ctx.currentTime + 2.5);
+  graph.output.gain.linearRampToValueAtTime(0.17, ctx.currentTime + 2.5);
+  graph.scheduleDim(12_000);
   return { stop: () => graph.stop(0.65) };
 }
 

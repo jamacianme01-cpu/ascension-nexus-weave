@@ -395,11 +395,13 @@ export function RealityViewer({
         node.userData["ascensionRoot"] = group;
       });
       editable.add(group);
+      addedObjects.add(group);
       const blue = finish.clone();
       blue.color.set("#6bbbd7");
       group.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) return;
         materials.set(node, node.material);
+        sourceMaterials.set(node, node.material);
         const nodeBlue = (Array.isArray(node.material) ? node.material : [node.material]).map(
           (material) => {
             const clone = material.clone();
@@ -408,6 +410,7 @@ export function RealityViewer({
           },
         );
         blueprintMaterials.set(node, Array.isArray(node.material) ? nodeBlue : nodeBlue[0]);
+        sourceBlueprintMaterials.set(node, Array.isArray(node.material) ? nodeBlue : nodeBlue[0]);
       });
       scene.add(group);
       setSelected(group);
@@ -415,10 +418,13 @@ export function RealityViewer({
     const removeObject = () => {
       if (!selected) return;
       editable.delete(selected);
+      addedObjects.delete(selected);
       selected.traverse((node) => {
         if (node instanceof THREE.Mesh) {
           materials.delete(node);
+          sourceMaterials.delete(node);
           blueprintMaterials.delete(node);
+          sourceBlueprintMaterials.delete(node);
           node.geometry.dispose();
           (Array.isArray(node.material) ? node.material : [node.material]).forEach((m) =>
             m.dispose(),
@@ -576,7 +582,9 @@ export function RealityViewer({
     const lines = new THREE.Group();
     scene.add(lines);
     const materials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+    const sourceMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const blueprintMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+    const sourceBlueprintMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const blueprintMaterial = new THREE.MeshStandardMaterial({
       color: 0x2f8fbe,
       roughness: 0.38,
@@ -598,6 +606,16 @@ export function RealityViewer({
     let selected: THREE.Object3D | null = null;
     let selectedHelper: THREE.BoxHelper | null = null;
     const editable = new Set<THREE.Object3D>();
+    const addedObjects = new Set<THREE.Object3D>();
+    const originalTransforms = new Map<
+      THREE.Object3D,
+      { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: THREE.Vector3 }
+    >();
+    let originalModelTransform: {
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
+      scale: THREE.Vector3;
+    } | null = null;
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let pointerStart = { x: 0, y: 0 };
@@ -838,6 +856,7 @@ export function RealityViewer({
         }
       },
       reset() {
+        const startingMode = initialMode === "cutaway" ? "blueprint" : initialMode;
         demoActiveRef = false;
         if (demoObject) {
           scene.remove(demoObject);
@@ -845,11 +864,53 @@ export function RealityViewer({
           (demoObject.material as THREE.Material).dispose();
           demoObject = null;
         }
+        setSelected(null);
+        for (const object of [...addedObjects]) {
+          object.traverse((node) => {
+            if (!(node instanceof THREE.Mesh)) return;
+            node.geometry.dispose();
+            (Array.isArray(node.material) ? node.material : [node.material]).forEach((material) =>
+              material.dispose(),
+            );
+            materials.delete(node);
+            sourceMaterials.delete(node);
+            blueprintMaterials.delete(node);
+            sourceBlueprintMaterials.delete(node);
+          });
+          object.parent?.remove(object);
+          editable.delete(object);
+        }
+        addedObjects.clear();
+        for (const [object, snapshot] of originalTransforms) {
+          object.position.copy(snapshot.position);
+          object.quaternion.copy(snapshot.quaternion);
+          object.scale.copy(snapshot.scale);
+        }
+        if (model && originalModelTransform) {
+          model.position.copy(originalModelTransform.position);
+          model.quaternion.copy(originalModelTransform.quaternion);
+          model.scale.copy(originalModelTransform.scale);
+          model.updateMatrixWorld(true);
+        }
+        for (const [mesh, source] of sourceMaterials) {
+          mesh.material = source;
+          materials.set(mesh, source);
+          const blueprint = sourceBlueprintMaterials.get(mesh);
+          if (blueprint) blueprintMaterials.set(mesh, blueprint);
+        }
+        renderer.clippingPlanes = [];
+        if (model) floor.position.y = new THREE.Box3().setFromObject(model).min.y - 0.03;
+        grid.position.y = floor.position.y - 0.01;
+        buildRoom("Workspace");
+        applyMode(startingMode);
+        applyBackground("daylight");
+        fly = false;
+        keys.clear();
+        orbit.enabled = true;
         setDemoActive(false);
         setDemoEvent("Ready for a live demonstration");
-        setArrived(false);
-        setReactMode(initialMode === "cutaway" ? "blueprint" : initialMode);
-        setSelectedObject("Nothing selected");
+        setArrived(true);
+        setReactMode(startingMode);
         setTransformMode("translate");
         setAddKind("box");
         setObjectColor("#6ed7ff");
@@ -858,7 +919,6 @@ export function RealityViewer({
         setSection(100);
         setExploring(false);
         setError(null);
-        setAttempt((value) => value + 1);
       },
     };
     api.current = controls;
@@ -994,10 +1054,36 @@ export function RealityViewer({
           const normalized = new THREE.Box3().setFromObject(model);
           normalized.getSize(bounds);
           normalized.getCenter(center);
+          originalModelTransform = {
+            position: model.position.clone(),
+            quaternion: model.quaternion.clone(),
+            scale: model.scale.clone(),
+          };
           model.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) return;
             for (const material of [node.material].flat()) material.side = THREE.DoubleSide;
             materials.set(node, node.material);
+            sourceMaterials.set(node, node.material);
+            originalTransforms.set(node, {
+              position: node.position.clone(),
+              quaternion: node.quaternion.clone(),
+              scale: node.scale.clone(),
+            });
+            const nodeBlue = (Array.isArray(node.material) ? node.material : [node.material]).map(
+              (material) => {
+                const clone = material.clone();
+                if ("color" in clone && clone.color instanceof THREE.Color)
+                  clone.color.set("#6bbbd7");
+                if ("roughness" in clone) clone.roughness = 0.4;
+                if ("metalness" in clone) clone.metalness = 0.18;
+                return clone;
+              },
+            );
+            blueprintMaterials.set(node, Array.isArray(node.material) ? nodeBlue : nodeBlue[0]);
+            sourceBlueprintMaterials.set(
+              node,
+              Array.isArray(node.material) ? nodeBlue : nodeBlue[0],
+            );
             editable.add(node);
             const edge = new THREE.LineSegments(
               new THREE.EdgesGeometry(node.geometry, 12),

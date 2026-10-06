@@ -780,6 +780,7 @@ export function RealityViewer({
           });
           floor.position.y = normalized.min.y - 0.03;
           grid.position.y = normalized.min.y - 0.04;
+          buildRoom(space);
           scene.add(model);
           setMode(modeRef.current);
           setReady(true);

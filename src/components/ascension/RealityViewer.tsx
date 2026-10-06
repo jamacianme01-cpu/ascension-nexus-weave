@@ -13,6 +13,9 @@ type CatalogKind =
   | "box"
   | "sphere"
   | "cylinder"
+  | "panel"
+  | "beam"
+  | "column"
   | "desk"
   | "chair"
   | "sofa"
@@ -23,7 +26,16 @@ type CatalogKind =
   | "window"
   | "tub"
   | "sink"
-  | "light";
+  | "light"
+  | "wheel"
+  | "gear"
+  | "pipe"
+  | "coil"
+  | "motor"
+  | "battery"
+  | "prism"
+  | "rail"
+  | "sensor";
 type ViewerControls = {
   mode: (mode: RealityMode) => void;
   fit: () => void;
@@ -217,7 +229,82 @@ export function RealityViewer({
       else if (kind === "cylinder")
         part(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 32), new THREE.Vector3());
       else if (kind === "box") part(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.Vector3());
-      else if (kind === "desk") {
+      else if (kind === "panel") part(new THREE.BoxGeometry(3.2, 0.16, 2.2), new THREE.Vector3());
+      else if (kind === "beam") part(new THREE.BoxGeometry(5.5, 0.35, 0.35), new THREE.Vector3());
+      else if (kind === "column")
+        part(new THREE.CylinderGeometry(0.42, 0.48, 4.2, 24), new THREE.Vector3(0, 2.1, 0));
+      else if (kind === "wheel")
+        part(new THREE.TorusGeometry(0.85, 0.2, 18, 36), new THREE.Vector3(), accent);
+      else if (kind === "gear") {
+        part(new THREE.CylinderGeometry(0.82, 0.82, 0.24, 16), new THREE.Vector3(), accent);
+        for (let tooth = 0; tooth < 8; tooth++) {
+          const a = (tooth * Math.PI) / 4;
+          part(
+            new THREE.BoxGeometry(0.34, 0.28, 0.22),
+            new THREE.Vector3(Math.cos(a) * 0.94, 0, Math.sin(a) * 0.94),
+            finish,
+          ).rotation.y = -a;
+        }
+      } else if (kind === "pipe") {
+        const pipe = part(
+          new THREE.CylinderGeometry(0.18, 0.18, 3.2, 24),
+          new THREE.Vector3(),
+          accent,
+        );
+        pipe.rotation.z = Math.PI / 2;
+      } else if (kind === "coil") {
+        part(new THREE.TorusGeometry(0.68, 0.12, 16, 36), new THREE.Vector3(), accent);
+        part(new THREE.TorusGeometry(0.68, 0.12, 16, 36), new THREE.Vector3(0, 0.34, 0), accent);
+        part(new THREE.TorusGeometry(0.68, 0.12, 16, 36), new THREE.Vector3(0, -0.34, 0), accent);
+      } else if (kind === "motor") {
+        const body = part(
+          new THREE.CylinderGeometry(0.62, 0.62, 1.8, 32),
+          new THREE.Vector3(),
+          accent,
+        );
+        body.rotation.z = Math.PI / 2;
+        const shaft = part(
+          new THREE.CylinderGeometry(0.16, 0.16, 2.5, 20),
+          new THREE.Vector3(),
+          finish,
+        );
+        shaft.rotation.z = Math.PI / 2;
+      } else if (kind === "battery") {
+        part(new THREE.BoxGeometry(1.5, 2.2, 1.1), new THREE.Vector3(0, 1.1, 0));
+        part(
+          new THREE.CylinderGeometry(0.14, 0.14, 0.2, 16),
+          new THREE.Vector3(-0.35, 2.3, 0),
+          accent,
+        );
+        part(
+          new THREE.CylinderGeometry(0.14, 0.14, 0.2, 16),
+          new THREE.Vector3(0.35, 2.3, 0),
+          accent,
+        );
+      } else if (kind === "prism") {
+        const prism = part(
+          new THREE.CylinderGeometry(0.72, 0.72, 1.8, 10),
+          new THREE.Vector3(0, 0.9, 0),
+          accent,
+        );
+        prism.rotation.y = Math.PI / 10;
+      } else if (kind === "rail") {
+        part(new THREE.BoxGeometry(6, 0.18, 0.22), new THREE.Vector3(0, 0.2, -0.65));
+        part(new THREE.BoxGeometry(6, 0.18, 0.22), new THREE.Vector3(0, 0.2, 0.65), accent);
+        for (let i = -2; i <= 2; i++)
+          part(new THREE.BoxGeometry(0.18, 0.2, 1.6), new THREE.Vector3(i, 0.2, 0), finish);
+      } else if (kind === "sensor") {
+        part(new THREE.CylinderGeometry(0.3, 0.42, 0.7, 24), new THREE.Vector3(0, 0.35, 0), accent);
+        part(
+          new THREE.SphereGeometry(0.5, 24, 16),
+          new THREE.Vector3(0, 1.05, 0),
+          new THREE.MeshStandardMaterial({
+            color: 0x9ae8ff,
+            emissive: 0x2d9fbd,
+            emissiveIntensity: 0.9,
+          }),
+        );
+      } else if (kind === "desk") {
         part(new THREE.BoxGeometry(4.5, 0.28, 2), new THREE.Vector3(0, 1.45, 0));
         [-1.9, 1.9].forEach((x) =>
           [-0.7, 0.7].forEach((z) =>
@@ -1061,10 +1148,13 @@ export function RealityViewer({
               value={addKind}
               onChange={(event) => setAddKind(event.target.value as typeof addKind)}
             >
-              <optgroup label="BASIC SHAPES">
+              <optgroup label="CORE CAD">
                 <option value="box">Box</option>
                 <option value="sphere">Sphere</option>
                 <option value="cylinder">Cylinder</option>
+                <option value="panel">Panel</option>
+                <option value="beam">Beam</option>
+                <option value="column">Column</option>
               </optgroup>
               <optgroup label="FURNITURE">
                 <option value="desk">Desk</option>
@@ -1073,16 +1163,27 @@ export function RealityViewer({
                 <option value="table">Table</option>
                 <option value="cabinet">Cabinet</option>
               </optgroup>
-              <optgroup label="STRUCTURE">
+              <optgroup label="ARCHITECTURE">
                 <option value="wall">Wall</option>
                 <option value="door">Door</option>
                 <option value="window">Window</option>
-              </optgroup>
-              <optgroup label="ROOM FIXTURES">
                 <option value="tub">Tub</option>
                 <option value="sink">Sink</option>
                 <option value="light">Light</option>
               </optgroup>
+              <optgroup label="MECHANICAL">
+                <option value="wheel">Wheel</option>
+                <option value="gear">Gear</option>
+                <option value="pipe">Pipe</option>
+                <option value="coil">Coil</option>
+                <option value="motor">Motor</option>
+              </optgroup>
+              <optgroup label="ELECTRICAL & INVENTION">
+                <option value="battery">Battery</option>
+                <option value="prism">Prism</option>
+                <option value="rail">Rail Assembly</option>
+                <option value="sensor">Sensor</option>
+              </optgroup>{" "}
             </select>
             <button disabled={!ready} onClick={() => api.current?.add(addKind)}>
               ADD

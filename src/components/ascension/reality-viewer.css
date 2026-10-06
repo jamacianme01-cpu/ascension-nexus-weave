@@ -74,7 +74,7 @@
 }
 .reality-viewport {
   position: absolute;
-  inset: 90px 0 168px;
+  inset: 90px 0 240px;
 }
 .reality-viewport canvas {
   display: block;
@@ -399,7 +399,7 @@
 }
 @media (max-width: 760px) {
   .reality-viewport {
-    bottom: 285px;
+    bottom: 360px;
   }
   .reality-footer {
     grid-template-columns: 1fr;

@@ -29,6 +29,7 @@ import {
   receiptFiles,
   record,
   requestedKind,
+  supportsEnvisionObjective,
   strings,
   type ObjectiveDelivery,
 } from "@/lib/ascension/result-model";
@@ -344,8 +345,7 @@ function TreeKnowledgeEruption({
   // Only creation/design objectives enter ENVISION. Ordinary answers can still
   // have Spiral pathways, but they must not be turned into arbitrary 3D objects
   // (for example, "how to make apple pie" must remain an answer, not a pie mesh).
-  const visualKind = requestedKind(objectiveText);
-  if (visualKind !== "drawing" && visualKind !== "design") return null;
+  if (!supportsEnvisionObjective(objectiveText)) return null;
 
   // Reference images are server-only Hunyuan inputs. The client enters
   // ENVISION from visual intent and waits for the completed GLB; it never
@@ -504,9 +504,13 @@ function statusText(run: ObjectiveRun, produced: boolean | null) {
 export function ResultContent({
   delivery,
   source,
+  onInspect,
+  canInspect = false,
 }: {
   delivery: ObjectiveDelivery;
   source?: "governed" | "external_draft" | null;
+  onInspect?: (pathway: ObjectiveDelivery["pathways"][number]) => void;
+  canInspect?: boolean;
 }) {
   const hasVisualChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
   // ENVISION's interactive 3D scene is the primary visual whenever pathways exist.
@@ -621,7 +625,20 @@ export function ResultContent({
             {delivery.pathways.map((pathway, index) => (
               <article
                 key={pathway.id}
-                className="rounded-xl border border-primary/25 bg-background/25 p-4"
+                role={canInspect ? "button" : undefined}
+                tabIndex={canInspect ? 0 : undefined}
+                onClick={canInspect && onInspect ? () => onInspect(pathway) : undefined}
+                onKeyDown={
+                  canInspect && onInspect
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onInspect(pathway);
+                        }
+                      }
+                    : undefined
+                }
+                className={`rounded-xl border border-primary/25 bg-background/25 p-4 ${canInspect ? "cursor-pointer transition hover:border-primary/60 hover:bg-primary/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/45" : ""}`}
               >
                 <p className="text-[0.65rem] tracking-[0.16em] text-primary uppercase">
                   PATH {index + 1}{pathway.spiral_form ? ` · ${cleanDisplayText(pathway.spiral_form)}` : ""}
@@ -644,11 +661,31 @@ export function ResultContent({
                     Tradeoffs: {pathway.tradeoffs.map(cleanDisplayText).join(" · ")}
                   </p>
                 )}
+                {canInspect && (
+                  <p className="mt-4 text-xs font-medium tracking-[0.14em] text-primary uppercase">
+                    OPEN REALITY · INSPECT 3D
+                  </p>
+                )}
               </article>
             ))}
 
             {delivery.blend && (
-              <article className="rounded-xl border border-gold/40 bg-gold/[0.04] p-4">
+              <article
+                role={canInspect ? "button" : undefined}
+                tabIndex={canInspect ? 0 : undefined}
+                onClick={canInspect && onInspect ? () => onInspect(delivery.blend!) : undefined}
+                onKeyDown={
+                  canInspect && onInspect
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onInspect(delivery.blend!);
+                        }
+                      }
+                    : undefined
+                }
+                className={`rounded-xl border border-gold/40 bg-gold/[0.04] p-4 ${canInspect ? "cursor-pointer transition hover:border-gold/70 hover:bg-gold/[0.08] focus:outline-none focus:ring-2 focus:ring-gold/45" : ""}`}
+              >
                 <p className="text-[0.65rem] tracking-[0.16em] text-gold uppercase">BLEND</p>
                 <h3 className="mt-1 font-display text-xl text-foreground">
                   {cleanDisplayText(delivery.blend.label)}
@@ -666,6 +703,11 @@ export function ResultContent({
                 {delivery.blend.blend_reason && (
                   <p className="mt-3 text-xs leading-5 text-gold/85">
                     Why blended: {cleanDisplayText(delivery.blend.blend_reason)}
+                  </p>
+                )}
+                {canInspect && (
+                  <p className="mt-4 text-xs font-medium tracking-[0.14em] text-gold uppercase">
+                    OPEN BLENDED REALITY · INSPECT 3D
                   </p>
                 )}
               </article>
@@ -1127,6 +1169,14 @@ export function Engage() {
     sound(delivery?.blend?.id === id ? "blend" : "select");
   };
 
+  const inspectPathwayReality = (pathway: ObjectiveDelivery["pathways"][number]) => {
+    sound(delivery?.blend?.id === pathway.id ? "blend" : "open");
+    setTreeChoiceId(pathway.id);
+    setDetailsOpen(true);
+    setBookSequence("eruption");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const openTreeReality = (pathway: ObjectiveDelivery["pathways"][number]) => {
     sound("open");
     setTreeChoiceId(pathway.id);
@@ -1381,7 +1431,12 @@ export function Engage() {
                   onUse={choosePathway}
                 />
               )}
-              <ResultContent delivery={delivery} source={deliveryQuery.data?.source ?? null} />
+              <ResultContent
+                delivery={delivery}
+                source={deliveryQuery.data?.source ?? null}
+                canInspect={supportsEnvisionObjective(run.objective)}
+                onInspect={inspectPathwayReality}
+              />
             </>
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">

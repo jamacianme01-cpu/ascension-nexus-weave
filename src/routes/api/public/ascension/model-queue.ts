@@ -74,6 +74,25 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         }
 
         const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
+
+        // A worker can successfully claim a job and then lose connectivity before
+        // reporting "running". Recover only stale "claimed" jobs; never recycle an
+        // actively running generation.
+        const staleClaimCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { error: recoveryError } = await table
+          .update({
+            status: "queued",
+            claimed_at: null,
+            claimed_by: null,
+            updated_at: new Date().toISOString(),
+            error: null,
+          })
+          .eq("status", "claimed")
+          .lt("claimed_at", staleClaimCutoff);
+        if (recoveryError) {
+          return json({ error: "model_stale_claim_recovery_failed" }, 500);
+        }
+
         const { data: pending, error: readError } = await table
           .select("id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at")
           .eq("status", "queued")

@@ -43,6 +43,9 @@ export async function generateConceptImage(prompt: string, storagePath: string):
   if (!key) throw new Error("Lovable AI is not available to this deployment (LOVABLE_API_KEY missing).");
   const response = await fetch(`${GATEWAY}/images/generations`, {
     method: "POST",
+    // Internal reference generation must never strand ENGAGE in a permanent
+    // running state. A failed/slow reference is reported and 3D remains pending.
+    signal: AbortSignal.timeout(20_000),
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: IMAGE_MODEL,

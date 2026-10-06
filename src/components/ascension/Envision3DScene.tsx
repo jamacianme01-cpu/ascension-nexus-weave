@@ -24,7 +24,7 @@ type Props = {
   delivery: ObjectiveDelivery;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onUse: (pathway: Pathway) => void;
+  onUse: (pathway: Pathway, mode?: VisualMode) => void;
   /** The user's objective text. Only used to detect THEIR declared specs (e.g. 48 V · 9 coils). */
   objectiveText?: string | undefined;
   /** Fired when the primary manifestation clock crosses a phase boundary. */
@@ -1218,6 +1218,7 @@ export function Envision3DScene({
       let stationRot = translate(base[0], base[1], base[2]);
       stationRot = matMul(stationRot, rotY(spin));
       stationRot = matMul(stationRot, rotX(pitch));
+      if (modelViewActive) stationRot = matMul(stationRot, compose([0, 0, 0], [0, 0, 0], [zoom, zoom, zoom]));
       if (focus && stationPhase === "stabilized" && semanticModel) {
         stationRot = matMul(stationRot, rotZ(semanticHeroZ));
       }
@@ -1683,7 +1684,7 @@ export function Envision3DScene({
             (min[2] + max[2]) / 2,
           ];
           const extent = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]) || 1;
-          const s = 1.5 / extent;
+          const s = 4.6 / extent;
           const src = generated.mesh;
           const normalized = new Float32Array(src.length);
           for (let i = 0; i < src.length; i += 6) {
@@ -2094,7 +2095,7 @@ export function Envision3DScene({
                 role="tab"
                 aria-selected={visualMode === m}
                 data-active={visualMode === m ? "true" : undefined}
-                onClick={() => setVisualMode(m)}
+                onClick={() => onUse(selected, m)}
               >
                 {m.toUpperCase()}
               </button>
@@ -2145,8 +2146,8 @@ export function Envision3DScene({
                 MODEL
               </a>
             )}
-            <button onClick={() => onUse(selected)}>
-              {isBlend ? "OPEN BLEND" : "OPEN REALITY"}
+            <button onClick={() => onUse(selected, visualMode)}>
+              {isBlend ? "ENTER BLEND" : "ENTER REALITY"}
             </button>
           </div>
         </div>

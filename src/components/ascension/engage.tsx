@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
 import { Envision3DScene } from "@/components/ascension/Envision3DScene";
 import type { ManifestationPhase } from "@/lib/ascension/manifestation";
 import {
@@ -335,7 +336,7 @@ function TreeKnowledgeEruption({
   delivery: ObjectiveDelivery;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onUse: (pathway: ObjectiveDelivery["pathways"][number]) => void;
+  onUse: (pathway: ObjectiveDelivery["pathways"][number], mode?: RealityMode) => void;
   objectiveText: string;
   onPhaseChange: (phase: ManifestationPhase, info: { blend: boolean }) => void;
 }) {
@@ -797,6 +798,7 @@ export function Engage() {
   const [revealed, setRevealed] = useState(false);
   const [treeChoiceId, setTreeChoiceId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [reality, setReality] = useState<{ id: string; mode: RealityMode } | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sequenceTimers = useRef<number[]>([]);
@@ -1163,23 +1165,14 @@ export function Engage() {
     sound(delivery?.blend?.id === id ? "blend" : "select");
   };
 
-  const inspectPathwayReality = (pathway: ObjectiveDelivery["pathways"][number]) => {
-    sound(delivery?.blend?.id === pathway.id ? "blend" : "open");
-    setTreeChoiceId(pathway.id);
-    setDetailsOpen(true);
-    setBookSequence("eruption");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const openTreeReality = (pathway: ObjectiveDelivery["pathways"][number]) => {
+  const openTreeReality = (pathway: ObjectiveDelivery["pathways"][number], mode: RealityMode = "cutaway") => {
     sound("open");
     setTreeChoiceId(pathway.id);
-    setDetailsOpen(true);
-    setBookSequence("eruption");
-    window.setTimeout(
-      () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      120,
-    );
+    setReality({ id: pathway.id, mode });
+  };
+
+  const inspectPathwayReality = (pathway: ObjectiveDelivery["pathways"][number]) => {
+    openTreeReality(pathway);
   };
 
   const error = engage.error ?? runQuery.error ?? deliveryQuery.error ?? prepare.error;
@@ -1222,6 +1215,9 @@ export function Engage() {
     engage.mutate();
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
+  const realityPathway = reality && delivery
+    ? [...delivery.pathways, ...(delivery.blend ? [delivery.blend] : [])].find((pathway) => pathway.id === reality.id)
+    : null;
 
   return (
     <div
@@ -1230,6 +1226,7 @@ export function Engage() {
       data-book-open={bookOpen ? "true" : undefined}
       data-has-run={run && revealed ? "true" : undefined}
     >
+      {reality && realityPathway && <RealityViewer pathway={realityPathway} initialMode={reality.mode} onClose={() => setReality(null)} />}
       <section aria-label="Engage ASCENSION" className="ascension-command">
         <div className="ascension-stage">
           <div className="ascension-scene-hero" aria-hidden="true">

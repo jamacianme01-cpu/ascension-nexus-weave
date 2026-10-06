@@ -1,0 +1,227 @@
+.reality-screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: #10181f;
+  color: #e7f2f8;
+  font-family: inherit;
+}
+.reality-screen::backdrop {
+  background: #10181f;
+}
+.reality-screen button {
+  border: 1px solid #5c819b70;
+  background: #152431e8;
+  color: #e7f2f8;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  min-height: 42px;
+  transition: background 0.18s;
+}
+.reality-screen button:hover {
+  background: #28485e;
+}
+.reality-screen button:focus-visible {
+  outline: 2px solid #82e9ff;
+  outline-offset: 3px;
+}
+.reality-screen button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.reality-screen button[aria-pressed="true"] {
+  background: #bcf1ff;
+  color: #0b2534;
+  border-color: #bcf1ff;
+}
+.reality-header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 24px;
+  background: linear-gradient(#09131ff5, #09131fba, transparent);
+}
+.reality-title {
+  flex: 1;
+  min-width: 0;
+}
+.reality-title span {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: #8dbacb;
+}
+.reality-title h1 {
+  margin: 4px 0 0;
+  font-size: clamp(16px, 2vw, 23px);
+  font-weight: 500;
+}
+.reality-tabs {
+  display: flex;
+  gap: 6px;
+}
+.reality-viewport {
+  position: absolute;
+  inset: 90px 0 115px;
+}
+.reality-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+  outline: none;
+}
+.reality-viewport canvas:active {
+  cursor: grabbing;
+}
+.reality-tools {
+  position: absolute;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.reality-tools button:first-child,
+.reality-tools button:nth-child(2) {
+  font-size: 24px;
+}
+.reality-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  padding: 16px 24px 20px;
+  background: linear-gradient(transparent, #09131fed);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.reality-footer p {
+  margin: 0;
+  font-size: 12px;
+  color: #c5d9e5;
+  text-align: center;
+}
+.reality-mode-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+.reality-mode-controls label {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 12px 18px;
+  background: #152431e8;
+  border-radius: 10px;
+}
+.reality-mode-controls input {
+  width: min(30vw, 280px);
+  accent-color: #9ceaff;
+}
+.reality-mode-controls label span {
+  width: 85px;
+}
+.reality-movement {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.reality-movement button {
+  touch-action: none;
+  padding: 9px;
+}
+.reality-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 80%;
+  padding: 24px;
+  background: #0d1d2bf0;
+  border: 1px solid #6798b755;
+  border-radius: 12px;
+  text-align: center;
+}
+.reality-screen[data-mode="blueprint"] {
+  background: #071e38;
+}
+.reality-screen[data-mode="environment"] {
+  background: #bdced7;
+}
+@media (max-width: 760px) {
+  .reality-header {
+    padding: 12px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .reality-header .reality-back {
+    padding: 8px;
+    font-size: 9px;
+  }
+  .reality-title h1 {
+    font-size: 15px;
+  }
+  .reality-tabs {
+    width: 100%;
+    justify-content: center;
+  }
+  .reality-tabs button {
+    flex: 1;
+    padding: 10px 7px;
+    font-size: 10px;
+  }
+  .reality-viewport {
+    top: 130px;
+    bottom: 150px;
+  }
+  .reality-tools {
+    right: 8px;
+  }
+  .reality-tools button {
+    padding: 9px;
+    font-size: 9px;
+  }
+  .reality-footer {
+    padding: 10px 8px 16px;
+  }
+  .reality-footer p {
+    font-size: 10px;
+    max-width: 90%;
+  }
+  .reality-mode-controls {
+    gap: 4px;
+  }
+  .reality-mode-controls label {
+    gap: 8px;
+    padding: 10px;
+  }
+  .reality-movement {
+    justify-content: center;
+  }
+  .reality-movement button {
+    font-size: 9px;
+    min-height: 38px;
+  }
+}

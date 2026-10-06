@@ -98,6 +98,68 @@ export type Database = {
         }
         Relationships: []
       }
+      ascension_model_jobs: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          label: string
+          model_url: string | null
+          pathway_id: string
+          request_id: string
+          source_image_url: string | null
+          status: string
+          summary: string
+          updated_at: string
+          visual_svg: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          label: string
+          model_url?: string | null
+          pathway_id: string
+          request_id: string
+          source_image_url?: string | null
+          status?: string
+          summary?: string
+          updated_at?: string
+          visual_svg: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          label?: string
+          model_url?: string | null
+          pathway_id?: string
+          request_id?: string
+          source_image_url?: string | null
+          status?: string
+          summary?: string
+          updated_at?: string
+          visual_svg?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ascension_model_jobs_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "ascension_execution_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ascension_publications: {
         Row: {
           content_hash: string | null

@@ -475,7 +475,11 @@ export async function externalProductDraft(
   if (requested === "drawing" || requested === "design") {
     const { generatePathwayImages } = await import("./image.server");
     const visualChoices = parsed.blend ? [...parsed.pathways, parsed.blend] : parsed.pathways;
-    const imageUrls = await generatePathwayImages(run.objective, visualChoices);
+    const { urls: imageUrls, errors: imageErrors } = await generatePathwayImages(
+      run.objective,
+      visualChoices,
+      run.id,
+    );
     if (imageUrls.size) {
       const withImage = <T extends { id: string; generated_image_url: string | null }>(
         pathway: T,
@@ -489,10 +493,16 @@ export async function externalProductDraft(
         blend: parsed.blend ? withImage(parsed.blend) : null,
       };
     }
-    if (requested === "drawing" && imageUrls.size === 0) {
-      throw new Error(
-        "The image-generation engine did not return a real image. ASCENSION will not replace the requested drawing with primitive SVG or 3D geometry.",
-      );
+    // Pathways are still delivered; 3D is queued only where a durable
+    // reference exists. No primitive geometry is substituted.
+    if (imageErrors.length) {
+      parsed = {
+        ...parsed,
+        limitations: [
+          ...parsed.limitations,
+          `3D generation could not start for ${imageErrors.length} pathway(s) because the internal reference image failed: ${imageErrors.slice(0, 3).join(" | ").slice(0, 900)}`,
+        ],
+      };
     }
   }
 

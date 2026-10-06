@@ -116,10 +116,16 @@ export function conceptImagePrompt(
     .filter(Boolean)
     .join(" — ")
     .slice(0, 900);
+  const spatialConversion =
+    /\b(camper|rv|motorhome|trailer|van|room|office|workspace|living space|interior|house|home|building|shop|workshop|shed|garage|cabin)\b/i.test(objective) &&
+    /\b(convert|conversion|transform|remodel|renovate|reconfigure|redesign|layout|fit[- ]?out|modify|retrofit)\b/i.test(objective);
+
   return [
     `Reference image for 3D reconstruction of the objective: "${objective.replace(/\s+/g, " ").trim().slice(0, 300)}".`,
     `Subject: ${subject}.`,
-    "Show the single complete object with credible engineering detail, correct materials and components, three-quarter view, entire object in frame.",
-    "Plain uniform light-grey background, soft even studio lighting, no text, no labels, no watermark, no other objects.",
+    spatialConversion
+      ? "Show the complete converted space as one coherent cutaway/isometric 3D reality. Keep the shell and the pathway-specific office, living, sleeping, storage and circulation layout visible together so the user can inspect the arrangement."
+      : "Show the single complete object with credible engineering detail, correct materials and components, three-quarter view, entire object in frame.",
+    "Plain uniform light-grey background, soft even studio lighting, no text, no labels, no watermark, no unrelated objects.",
   ].join(" ");
 }

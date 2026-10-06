@@ -23,6 +23,7 @@ type ViewerControls = {
   color: (value: string) => void;
   background: (value: string) => void;
   space: (value: string) => void;
+  reset: () => void;
 };
 
 /** Dedicated inspection screen. Every displayed object comes from the selected GLB. */
@@ -65,6 +66,18 @@ export function RealityViewer({
   const [attempt, setAttempt] = useState(0);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  useEffect(() => {
+    setArrived(false);
+    setMode(initialMode === "cutaway" ? "blueprint" : initialMode);
+    setSelectedObject("Nothing selected");
+    setTransformMode("translate");
+    setObjectColor("#6ed7ff");
+    setBackgroundColor("#071e38");
+    setSpace("Workspace");
+    setSection(100);
+    setExploring(false);
+    setError(null);
+  }, [pathway.id, initialMode]);
 
   useEffect(() => {
     if (!ready) return;
@@ -314,7 +327,8 @@ export function RealityViewer({
       camera.lookAt(center);
       orbit.update();
     };
-    const setMode = (next: RealityMode) => {
+    const setReactMode = setMode;
+    const applyMode = (next: RealityMode) => {
       activeMode = next;
       fly = false;
       keys.clear();
@@ -339,7 +353,7 @@ export function RealityViewer({
       fit();
     };
     const controls: ViewerControls = {
-      mode: setMode,
+      mode: applyMode,
       fit,
       zoom(factor) {
         if (camera instanceof THREE.OrthographicCamera) {
@@ -424,10 +438,24 @@ export function RealityViewer({
         camera.lookAt(center);
         orbit.target.copy(center);
       },
+      reset() {
+        setArrived(false);
+        setReactMode(initialMode === "cutaway" ? "blueprint" : initialMode);
+        setSelectedObject("Nothing selected");
+        setTransformMode("translate");
+        setAddKind("box");
+        setObjectColor("#6ed7ff");
+        setBackgroundColor("#071e38");
+        setSpace("Workspace");
+        setSection(100);
+        setExploring(false);
+        setError(null);
+        setAttempt((value) => value + 1);
+      },
     };
     api.current = controls;
     resize();
-    setMode(activeMode);
+    applyMode(activeMode);
     const observer = new ResizeObserver(resize);
     observer.observe(target);
     const down = (event: KeyboardEvent) => {
@@ -581,7 +609,7 @@ export function RealityViewer({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [pathway.model_url, attempt]);
+  }, [pathway.id, pathway.model_url, attempt]);
 
   useEffect(() => {
     api.current?.mode(mode);
@@ -657,6 +685,9 @@ export function RealityViewer({
           }}
         >
           FIT MODEL
+        </button>
+        <button disabled={!ready} onClick={() => api.current?.reset()}>
+          RESET REALITY
         </button>
       </aside>
       <footer className="reality-footer">

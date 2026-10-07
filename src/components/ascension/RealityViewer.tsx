@@ -89,7 +89,7 @@ export function RealityViewer({
   const dive = useRef(onDive);
   dive.current = onDive;
   const [mode, setMode] = useState<RealityMode>(
-    initialMode === "cutaway" ? "blueprint" : initialMode,
+    "cutaway",
   );
   const [selectedObject, setSelectedObject] = useState("Nothing selected");
   const [transformMode, setTransformMode] = useState<"translate" | "rotate" | "scale">("translate");
@@ -986,6 +986,7 @@ export function RealityViewer({
       orthographic.top = half;
       orthographic.bottom = -half;
       orthographic.updateProjectionMatrix();
+      if (model) fit();
     };
     const fit = () => {
       const radius = bounds.length() / 2;
@@ -1472,22 +1473,7 @@ export function RealityViewer({
         <button className="reality-sound" aria-pressed={soundEnabled} onClick={onToggleSound}>
           {soundEnabled ? "SOUND ON" : "SOUND OFF"}
         </button>
-        <nav aria-label="Reality view" className="reality-tabs">
-          {(["cutaway", "blueprint", "environment"] as const).map((value) => (
-            <button
-              key={value}
-              disabled={!ready}
-              aria-pressed={mode === value}
-              onClick={() => {
-                setMode(value);
-                api.current?.mode(value);
-                if (value === "environment") api.current?.space(space);
-              }}
-            >
-              {value.toUpperCase()}
-            </button>
-          ))}
-        </nav>
+
       </header>
       <div ref={host} className="reality-viewport" data-ready={ready} />
       {!ready && (
@@ -1535,172 +1521,7 @@ export function RealityViewer({
       )}
       {ready && (
       <footer className="reality-footer">
-        <div className="reality-edit-panel" aria-label="Reality manipulation tools">
-          <span className="reality-selection">{selectedObject}</span>
-          <div className="reality-edit-buttons">
-            {(["translate", "rotate", "scale"] as const).map((value) => (
-              <button
-                key={value}
-                disabled={!ready || selectedObject === "Nothing selected"}
-                aria-pressed={transformMode === value}
-                onClick={() => api.current?.transform(value)}
-              >
-                {value === "translate" ? "MOVE" : value.toUpperCase()}
-              </button>
-            ))}
-            <select
-              aria-label="Add object"
-              value={addKind}
-              onChange={(event) => setAddKind(event.target.value as typeof addKind)}
-            >
-              <optgroup label="CORE CAD">
-                <option value="box">Box</option>
-                <option value="sphere">Sphere</option>
-                <option value="cylinder">Cylinder</option>
-                <option value="panel">Panel</option>
-                <option value="beam">Beam</option>
-                <option value="column">Column</option>
-              </optgroup>
-              <optgroup label="FURNITURE">
-                <option value="desk">Desk</option>
-                <option value="chair">Chair</option>
-                <option value="sofa">Sofa</option>
-                <option value="table">Table</option>
-                <option value="cabinet">Cabinet</option>
-              </optgroup>
-              <optgroup label="ARCHITECTURE">
-                <option value="wall">Wall</option>
-                <option value="door">Door</option>
-                <option value="window">Window</option>
-                <option value="tub">Tub</option>
-                <option value="sink">Sink</option>
-                <option value="light">Light</option>
-              </optgroup>
-              <optgroup label="MECHANICAL">
-                <option value="wheel">Wheel</option>
-                <option value="gear">Gear</option>
-                <option value="pipe">Pipe</option>
-                <option value="coil">Coil</option>
-                <option value="motor">Motor</option>
-              </optgroup>
-              <optgroup label="ELECTRICAL & INVENTION">
-                <option value="battery">Battery</option>
-                <option value="prism">Prism</option>
-                <option value="rail">Rail Assembly</option>
-                <option value="sensor">Sensor</option>
-              </optgroup>{" "}
-            </select>
-            <button disabled={!ready} onClick={() => api.current?.add(addKind)}>
-              ADD
-            </button>
-            <button
-              disabled={!ready || selectedObject === "Nothing selected"}
-              onClick={() => api.current?.remove()}
-            >
-              DELETE
-            </button>
-            <label className="reality-color">
-              <span>COLOR</span>
-              <input
-                disabled={!ready || selectedObject === "Nothing selected"}
-                type="color"
-                value={objectColor}
-                onChange={(event) => {
-                  setObjectColor(event.target.value);
-                  api.current?.color(event.target.value);
-                }}
-              />
-            </label>
-          </div>
-        </div>
-        <div className="reality-mode-controls">
-          {mode === "blueprint" &&
-            (["top", "front", "side", "perspective"] as const).map((view) => (
-              <button disabled={!ready} key={view} onClick={() => api.current?.view(view)}>
-                {view === "perspective" ? "3D" : view.toUpperCase()}
-              </button>
-            ))}
-          {mode === "cutaway" && (
-            <label>
-              SECTION{" "}
-              <input
-                disabled={!ready}
-                aria-label="Cutaway section"
-                type="range"
-                min="0"
-                max="100"
-                value={section}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  setSection(value);
-                  api.current?.section(value);
-                }}
-              />
-              <span>{section === 100 ? "FULL MODEL" : `${section}%`}</span>
-            </label>
-          )}
-          {mode === "environment" && (
-            <div className="reality-spaces" aria-label="Living spaces">
-              <span className="reality-space-label">ROOM ENVIRONMENTS</span>
-              {ROOM_OPTIONS.map((value) => (
-                <button
-                  key={value}
-                  aria-pressed={space === value}
-                  disabled={!ready}
-                  onClick={() => {
-                    setSpace(value);
-                    setExploring(true);
-                    api.current?.space(value);
-                    api.current?.explore(true);
-                  }}
-                >
-                  {value}
-                </button>
-              ))}
-              <button
-                disabled={!ready}
-                aria-pressed={exploring}
-                onClick={() => {
-                  setExploring(!exploring);
-                  api.current?.explore(!exploring);
-                }}
-              >
-                {exploring ? "RETURN TO ORBIT" : "EXPLORE INSIDE"}
-              </button>
-            </div>
-          )}
-          {exploring && (
-            <div className="reality-movement" aria-label="Move through environment">
-              {[
-                ["w", "FORWARD"],
-                ["s", "BACK"],
-                ["a", "LEFT"],
-                ["d", "RIGHT"],
-                ["e", "UP"],
-                ["q", "DOWN"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  onPointerDown={(event) => {
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    api.current?.move(key!, true);
-                  }}
-                  onPointerUp={() => api.current?.move(key!, false)}
-                  onPointerCancel={() => api.current?.move(key!, false)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <p>
-          {exploring
-            ? "Drag to look · WASD to move · Q / E down / up"
-            : mode === "blueprint"
-              ? "Orthographic drawing · Drag to rotate · Right-drag to pan · Scroll / pinch to zoom"
-              : "Drag to rotate · Right-drag to pan · Scroll / pinch to zoom"}
-        </p>
+        <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>
       </footer>
       )}
     </dialog>,

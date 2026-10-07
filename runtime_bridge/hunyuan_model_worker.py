@@ -13,6 +13,7 @@ import base64
 import json
 import os
 import socket
+import ssl
 import subprocess
 import tempfile
 import time
@@ -32,6 +33,22 @@ def _token() -> str:
     return value
 
 
+def _open_with_retry(request, timeout):
+    """Retry interrupted TLS transfers while keeping certificate verification."""
+    for attempt in range(3):
+        try:
+            response = urllib.request.urlopen(request, timeout=timeout)
+            try:
+                data = response.read()
+                return data, response.headers
+            finally:
+                response.close()
+        except (urllib.error.URLError, ssl.SSLError, ConnectionError, TimeoutError) as exc:
+            if isinstance(exc, urllib.error.HTTPError) or attempt == 2:
+                raise
+            time.sleep(attempt + 1)
+
+
 def _json_request(url: str, token: str, method: str = "GET", payload=None, timeout: int = 60):
     body = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
     headers = {
@@ -46,9 +63,8 @@ def _json_request(url: str, token: str, method: str = "GET", payload=None, timeo
         headers["content-type"] = "application/json"
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            raw = response.read()
-            return json.loads(raw.decode("utf-8")) if raw else {}
+        raw, _ = _open_with_retry(req, timeout)
+        return json.loads(raw.decode("utf-8")) if raw else {}
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")
         raise RuntimeError(
@@ -82,9 +98,8 @@ def _download_source_image(url: str, work: Path) -> Path:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=180) as response:
-            data = response.read()
-            content_type = (response.headers.get("content-type") or "").lower()
+        data, headers = _open_with_retry(req, 180)
+        content_type = (headers.get("content-type") or "").lower()
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")
         raise RuntimeError(
@@ -159,11 +174,7 @@ def _upload_glb(signed_url: str, glb: bytes) -> None:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=600) as response:
-            if response.status < 200 or response.status >= 300:
-                raise RuntimeError(
-                    "signed upload returned HTTP " + str(response.status)
-                )
+        _open_with_retry(req, 600)
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")
         raise RuntimeError(
@@ -271,4 +282,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
 

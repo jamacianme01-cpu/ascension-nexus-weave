@@ -81,3 +81,22 @@ await assert.rejects(
   /not available/,
 );
 console.log("PASS missing engines and missing models stop launch with a specific error");
+
+// Regression: the Windows config uses an untagged name while /models reports
+// its canonical :latest ID. Pass the canonical ID into the Vite child process.
+const available = ["qwen3-ascension:latest", "qwen3:4b", "qwen2.5-coder:3b", "qwen2.5-coder:14b"];
+for (const configuredUrl of ["http://127.0.0.1:11434/v1", undefined]) {
+  const config = { LOCAL_LLM_MODEL: "qwen3-ascension", ...(configuredUrl ? { LOCAL_LLM_BASE_URL: configuredUrl } : {}) };
+  const result = await connectAnswerEngine(config, {
+    request: async () => Response.json(configuredUrl
+      ? { data: available.map((id) => ({ id })) }
+      : { models: available.map((name) => ({ name })) }),
+    start: noNetwork,
+  });
+  assert.equal(config.LOCAL_LLM_MODEL, "qwen3-ascension:latest");
+  assert.equal(result, "local model qwen3-ascension:latest");
+}
+await assert.rejects(connectAnswerEngine({ LOCAL_LLM_BASE_URL: "http://localhost:11434/v1", LOCAL_LLM_MODEL: "qwen3-ascension:v2" }, {
+  request: async () => Response.json({ data: available.map((id) => ({ id })) }),
+}), /not available/);
+console.log("PASS untagged ASCENSION model resolves to installed :latest; missing explicit versions still fail");

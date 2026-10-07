@@ -48,6 +48,19 @@ async function startOllama() {
   });
 }
 
+function installedModelName(requested, names) {
+  const name = requested?.trim();
+  if (!name) return undefined;
+  if (names.includes(name)) return name;
+  // An untagged Ollama model refers to its :latest tag. Keep explicit tags
+  // exact so a missing version never silently selects a different model.
+  if (!name.split("/").at(-1).includes(":")) {
+    const tagged = `${name}:latest`;
+    if (names.includes(tagged)) return tagged;
+  }
+  return undefined;
+}
+
 export async function connectAnswerEngine(
   env,
   {
@@ -87,12 +100,14 @@ export async function connectAnswerEngine(
     if (!response.ok)
       throw new Error(`Configured local answer engine returned HTTP ${response.status}.`);
     const installed = (await response.json()).data;
-    if (
-      !Array.isArray(installed) ||
-      !installed.some((model) => model.id === (env.LOCAL_LLM_MODEL || "qwen3:4b"))
-    )
+    const chosen = installedModelName(
+      env.LOCAL_LLM_MODEL || "qwen3:4b",
+      Array.isArray(installed) ? installed.map((model) => model.id) : [],
+    );
+    if (!chosen)
       throw new Error("The configured answer model is not available from the local engine.");
-    return `local model ${env.LOCAL_LLM_MODEL || "qwen3:4b"}`;
+    env.LOCAL_LLM_MODEL = chosen;
+    return `local model ${chosen}`;
   }
 
   let models;
@@ -116,7 +131,7 @@ export async function connectAnswerEngine(
       "No local answer engine is reachable. Open https://ascensionweave.app to use the hosted engine, or start your installed Ollama engine and run this command again.",
     );
   const names = models.map((model) => model.name);
-  const chosen =
+  const requested =
     env.LOCAL_LLM_MODEL ||
     ["qwen3-ascension:latest", "qwen3-ascension", "qwen3:4b"].find((name) =>
       names.includes(name),
@@ -124,7 +139,8 @@ export async function connectAnswerEngine(
     names.find(
       (name) => /^(qwen|llama|gemma|mistral|phi|deepseek)/i.test(name) && !/embed/i.test(name),
     );
-  if (!chosen || !names.includes(chosen))
+  const chosen = installedModelName(requested, names);
+  if (!chosen)
     throw new Error(
       "Ollama is running, but the required answer model is not installed. No model was downloaded. Use https://ascensionweave.app for the hosted engine.",
     );

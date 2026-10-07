@@ -23,6 +23,7 @@ import {
 import {
   assessResult,
   hasEnvisionPreparation,
+  requestedKind,
   governedPersisted,
   notProducedMessage,
   parseDelivery,
@@ -608,6 +609,7 @@ export function Engage() {
   const [treeChoiceId, setTreeChoiceId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [reality, setReality] = useState<{ id: string; mode: RealityMode } | null>(null);
+  const autoDrawingRun = useRef<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioContextRef = useRef<AudioContext | null>(null);
   const atmosphere = useRef<ReturnType<typeof createRealityAtmosphere> | null>(null);
@@ -977,6 +979,23 @@ export function Engage() {
   const inspectPathwayReality = (pathway: ObjectiveDelivery["pathways"][number]) => {
     openTreeReality(pathway);
   };
+
+  // A drawing request opens its real generated output as soon as it arrives.
+  // Closing or choosing a pathway remains the user's decision; never reopen it.
+  useEffect(() => {
+    if (!run || !delivery || requestedKind(run.objective) !== "drawing" ||
+      autoDrawingRun.current === run.id) return;
+    if (reality) {
+      autoDrawingRun.current = run.id;
+      return;
+    }
+    const generated = [...delivery.pathways, ...(delivery.blend ? [delivery.blend] : [])]
+      .find((pathway) => Boolean(pathway.model_url));
+    if (!generated) return;
+    autoDrawingRun.current = run.id;
+    setTreeChoiceId(generated.id);
+    setReality({ id: generated.id, mode: "blueprint" });
+  }, [run?.id, run?.objective, delivery, reality]);
 
   const error = engage.error ?? runQuery.error ?? deliveryQuery.error ?? prepare.error;
   const canEngage = Boolean(objective.trim()) && !engage.isPending;

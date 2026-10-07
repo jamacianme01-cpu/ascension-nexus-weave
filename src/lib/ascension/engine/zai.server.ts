@@ -160,6 +160,7 @@ export async function callZai(input: {
   user: string;
   /** Short search phrase (normally the objective). Never the full stage prompt. */
   knowledgeQuery?: string;
+  imageDataUrl?: string;
   temperature?: number;
 }): Promise<ZaiCallResult> {
   const lovableKey = process.env["LOVABLE_API_KEY"]?.trim();
@@ -235,7 +236,9 @@ export async function callZai(input: {
             }),
         messages: [
           { role: "system", content: system },
-          { role: "user", content: user },
+          { role: "user", content: input.imageDataUrl
+            ? [{ type: "text", text: user }, { type: "image_url", image_url: { url: input.imageDataUrl } }]
+            : user },
         ],
       }),
     });
@@ -281,3 +284,4 @@ export async function callZai(input: {
     knowledge: knowledgeResult,
   };
 }
+

@@ -5,6 +5,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
+import { getDesignParts } from "@/lib/ascension/parts.functions";
+import type { DesignPart } from "@/lib/ascension/parts-model";
 import "./reality-viewer.css";
 
 export type RealityMode = "cutaway" | "blueprint" | "environment";
@@ -60,6 +62,8 @@ type ViewerControls = {
   background: (value: string) => void;
   space: (value: string) => void;
   reset: () => void;
+  picture: () => string;
+  anchorParts: (parts: DesignPart[]) => DesignPart[];
 };
 
 /** Dedicated inspection screen. Every displayed object comes from the selected GLB. */
@@ -86,6 +90,32 @@ export function RealityViewer({
   const close = useRef(onClose);
   close.current = onClose;
   const [arrived, setArrived] = useState(false);
+  const [ready, setReady] = useState(false);
+  const labelsHost = useRef<HTMLDivElement>(null);
+  const [showParts, setShowParts] = useState(false);
+  const [parts, setParts] = useState<DesignPart[]>([]);
+  const [partIndex, setPartIndex] = useState<number | null>(null);
+  const [partsLoading, setPartsLoading] = useState(false);
+  const [partsError, setPartsError] = useState<string | null>(null);
+  const [partsAttempt, setPartsAttempt] = useState(0);
+  useEffect(() => {
+    setParts([]);
+    setPartIndex(null);
+    setPartsError(null);
+  }, [pathway.id, pathway.summary]);
+  const partsStepsKey = JSON.stringify(pathway.steps);
+  useEffect(() => {
+    if (!showParts || !ready || !api.current) return;
+    let active = true;
+    setPartsLoading(true);
+    setPartsError(null);
+    getDesignParts({ data: { objective, label: pathway.label, summary: pathway.summary, steps: JSON.parse(partsStepsKey) as string[], image: api.current.picture() } })
+      .then(result => { if (active) { const anchored = api.current?.anchorParts(result) ?? []; if (!anchored.length) throw new Error("No visible parts could be labeled in this view. Rotate the model and retry."); setParts(anchored); setPartIndex(null); } })
+      .catch(cause => { if (active) setPartsError(cause instanceof Error ? cause.message : "Part labels could not be loaded."); })
+      .finally(() => { if (active) setPartsLoading(false); });
+    return () => { active = false; };
+  }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
+  const selectedPart = partIndex === null ? null : parts[partIndex];
   const dive = useRef(onDive);
   dive.current = onDive;
   const [mode, setMode] = useState<RealityMode>(
@@ -97,7 +127,6 @@ export function RealityViewer({
   const [objectColor, setObjectColor] = useState("#6ed7ff");
   const [backgroundColor, setBackgroundColor] = useState("daylight");
   const [space, setSpace] = useState<RoomName>("Workspace");
-  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState(100);
   const [exploring, setExploring] = useState(false);
@@ -106,7 +135,7 @@ export function RealityViewer({
   modeRef.current = mode;
   useEffect(() => {
     setArrived(false);
-    setMode(initialMode === "cutaway" ? "blueprint" : initialMode);
+    setMode("cutaway");
     setSelectedObject("Nothing selected");
     setTransformMode("translate");
     setObjectColor("#6ed7ff");
@@ -1056,7 +1085,32 @@ export function RealityViewer({
         orbit.update();
       }
     };
+    const partAnchors: THREE.Vector3[] = [];
+    let annotationCamera: THREE.PerspectiveCamera | THREE.OrthographicCamera = camera.clone();
     const controls: ViewerControls = {
+      picture() {
+        renderer.render(scene, camera);
+        annotationCamera = camera.clone();
+        const image = document.createElement("canvas");
+        image.width = Math.min(1024, renderer.domElement.width);
+        image.height = Math.round(image.width * renderer.domElement.height / renderer.domElement.width);
+        image.getContext("2d")!.drawImage(renderer.domElement, 0, 0, image.width, image.height);
+        return image.toDataURL("image/jpeg", 0.85);
+      },
+      anchorParts(parts) {
+        partAnchors.length = 0;
+        if (!model) return [];
+        const visible: DesignPart[] = [];
+        for (const part of parts) {
+          const ray = new THREE.Raycaster();
+          ray.setFromCamera(new THREE.Vector2(part.x * 2 - 1, 1 - part.y * 2), annotationCamera);
+          const hit = ray.intersectObject(model, true)[0];
+          if (!hit) continue;
+          partAnchors.push(model.worldToLocal(hit.point.clone()));
+          visible.push(part);
+        }
+        return visible;
+      },
       mode: applyMode,
       fit,
       zoom(factor) {
@@ -1164,7 +1218,7 @@ export function RealityViewer({
       },
       reset() {
         const startingMode =
-          initialMode === "cutaway" ? "blueprint" : initialMode;
+          "cutaway";
         setSelected(null);
         for (const object of [...addedObjects]) {
           object.traverse((node) => {
@@ -1325,6 +1379,14 @@ export function RealityViewer({
         if (keys.has("q")) camera.position.y -= speed;
       } else orbit.update();
       renderer.render(scene, camera);
+      labelsHost.current?.querySelectorAll<HTMLButtonElement>("button").forEach((button, index) => {
+        const anchor = partAnchors[index];
+        if (!anchor || !model) { button.hidden = true; return; }
+        const projected = model.localToWorld(anchor.clone()).project(camera);
+        button.hidden = projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
+        button.style.left = `${(projected.x + 1) * 50}%`;
+        button.style.top = `${(1 - projected.y) * 50}%`;
+      });
     });
       void (async () => {
         try {
@@ -1470,12 +1532,20 @@ export function RealityViewer({
           <h1>{objective}</h1>
           <p className="reality-pathway-label">{pathway.label}</p>
         </div>
+        <button className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
+          PARTS
+        </button>
         <button className="reality-sound" aria-pressed={soundEnabled} onClick={onToggleSound}>
           {soundEnabled ? "SOUND ON" : "SOUND OFF"}
         </button>
 
       </header>
-      <div ref={host} className="reality-viewport" data-ready={ready} />
+      <div className="reality-model-stage">
+        <div ref={host} className="reality-viewport" data-ready={ready} />
+        {showParts && !partsLoading && !partsError && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
+          {parts.map((part, index) => <button key={part.name + index} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => setPartIndex(index)}>{part.name}</button>)}
+        </div>}
+      </div>
       {!ready && (
         <div className="reality-status" role={error ? "alert" : "status"}>
           <p>
@@ -1519,9 +1589,26 @@ export function RealityViewer({
         </button>
       </aside>
       )}
-      {ready && (
+      {(ready || showParts) && (
       <footer className="reality-footer">
-        <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>
+        {showParts && (
+          <section id="reality-parts" className="reality-parts" aria-label="Design parts">
+            <p className="reality-parts-hint">Select a label on the model to explore how it works.</p>
+            {partsLoading && <p role="status">Loading part labels…</p>}
+            {partsError && <div role="alert"><p>{partsError}</p><button onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</button></div>}
+            {selectedPart && !partsLoading && !partsError && <article id="reality-part-detail" className="reality-part-detail" aria-live="polite">
+              <h2>{selectedPart.name}</h2>
+              <dl>{([
+                ["Purpose", selectedPart.purpose],
+                ["Location in the design", selectedPart.location],
+                ["How it works", selectedPart.operation],
+                ["Connections", selectedPart.connections],
+                ["Design limits", selectedPart.limitations],
+              ] as const).map(([label, text]) => <div key={label}><dt>{label}</dt><dd>{text}</dd></div>)}</dl>
+            </article>}
+          </section>
+        )}
+        {ready && <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>}
       </footer>
       )}
     </dialog>,

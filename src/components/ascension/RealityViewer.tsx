@@ -5,7 +5,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
-import { getDesignParts } from "@/lib/ascension/parts.functions";
+import { getDesignParts, getDissectedDesign } from "@/lib/ascension/parts.functions";
 import type { DesignPart } from "@/lib/ascension/parts-model";
 import "./reality-viewer.css";
 
@@ -92,6 +92,22 @@ export function RealityViewer({
   const [arrived, setArrived] = useState(false);
   const [ready, setReady] = useState(false);
   const labelsHost = useRef<HTMLDivElement>(null);
+  const [dissected, setDissected] = useState(false);
+  const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
+  const [dissectionLoading, setDissectionLoading] = useState(false);
+  const [dissectionError, setDissectionError] = useState<string | null>(null);
+  const [dissectionAttempt, setDissectionAttempt] = useState(0);
+  useEffect(() => { setDissection(null); setDissected(false); setDissectionError(null); }, [pathway.id, pathway.model_url]);
+  useEffect(() => {
+    if (!dissected || !ready || !api.current || dissection) return;
+    let active = true;
+    setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
+    getDissectedDesign({data:{objective,label:pathway.label,summary:pathway.summary,image:api.current.picture()}})
+      .then(result => { if(active) setDissection(result); })
+      .catch(cause => { if(active) setDissectionError(cause instanceof Error ? cause.message : "Dissected view could not be generated."); })
+      .finally(()=>{if(active)setDissectionLoading(false);});
+    return ()=>{active=false;};
+  }, [dissected, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(false);
   const [parts, setParts] = useState<DesignPart[]>([]);
   const [partIndex, setPartIndex] = useState<number | null>(null);
@@ -115,7 +131,8 @@ export function RealityViewer({
       .finally(() => { if (active) setPartsLoading(false); });
     return () => { active = false; };
   }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
-  const selectedPart = partIndex === null ? null : parts[partIndex];
+  const activeParts = dissected ? dissection?.parts ?? [] : parts;
+  const selectedPart = partIndex === null ? null : activeParts[partIndex];
   const dive = useRef(onDive);
   dive.current = onDive;
   const [mode, setMode] = useState<RealityMode>(
@@ -1532,6 +1549,9 @@ export function RealityViewer({
           <h1>{objective}</h1>
           <p className="reality-pathway-label">{pathway.label}</p>
         </div>
+        <button disabled={!ready} aria-pressed={dissected} onClick={() => {setDissected(value=>!value);setPartIndex(null);}}>
+          {dissected ? "ASSEMBLED" : "DISSECTED"}
+        </button>
         <button className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
           PARTS
         </button>
@@ -1541,8 +1561,21 @@ export function RealityViewer({
 
       </header>
       <div className="reality-model-stage">
-        <div ref={host} className="reality-viewport" data-ready={ready} />
-        {showParts && !partsLoading && !partsError && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
+        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:dissected ? "hidden" : "visible"}} />
+        {dissected && dissection && <div className="reality-dissection">
+          <div className="reality-dissection-picture">
+            <img src={dissection.imageUrl} alt={`Exploded concept illustration of ${pathway.label}`} />
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              {dissection.parts.map((part,index)=>{const right=index%2===1;const row=Math.floor(index/2);const total=Math.ceil(dissection.parts.length/2);const y=(row+0.5)*100/total;return <polyline key={index} points={`${part.x*100},${part.y*100} ${right?80:20},${y} ${right?98:2},${y}`} />;})}
+            </svg>
+            {dissection.parts.map((part,index)=>{const right=index%2===1;const row=Math.floor(index/2);const total=Math.ceil(dissection.parts.length/2);return <button className="reality-dissection-label" key={part.name+index} style={{left:right?"80%":"0%",top:`${(row+0.5)*100/total}%`}} aria-pressed={partIndex===index} onClick={()=>setPartIndex(index)}>{part.name}</button>;})}
+          </div>
+        </div>}
+        {dissected && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>
+          <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
+          {dissectionError && <button onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</button>}
+        </div>}
+        {!dissected && showParts && !partsLoading && !partsError && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
           {parts.map((part, index) => <button key={part.name + index} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => setPartIndex(index)}>{part.name}</button>)}
         </div>}
       </div>
@@ -1566,7 +1599,7 @@ export function RealityViewer({
           )}
         </div>
       )}
-      {ready && (
+      {ready && !dissected && (
       <aside className="reality-tools" aria-label="Model controls">
         <button disabled={!ready} aria-label="Zoom in" onClick={() => api.current?.zoom(1.3)}>
           ＋
@@ -1589,14 +1622,15 @@ export function RealityViewer({
         </button>
       </aside>
       )}
-      {(ready || showParts) && (
+      {(ready || showParts || dissected) && (
       <footer className="reality-footer">
-        {showParts && (
+        {(showParts || dissected) && (
           <section id="reality-parts" className="reality-parts" aria-label="Design parts">
             <p className="reality-parts-hint">Select a label on the model to explore how it works.</p>
-            {partsLoading && <p role="status">Loading part labels…</p>}
-            {partsError && <div role="alert"><p>{partsError}</p><button onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</button></div>}
-            {selectedPart && !partsLoading && !partsError && <article id="reality-part-detail" className="reality-part-detail" aria-live="polite">
+            {dissected && <p className="reality-parts-hint">Exploded concept illustration · Internal construction is illustrative.</p>}
+            {!dissected && partsLoading && <p role="status">Loading part labels…</p>}
+            {!dissected && partsError && <div role="alert"><p>{partsError}</p><button onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</button></div>}
+            {selectedPart && (dissected || (!partsLoading && !partsError)) && <article id="reality-part-detail" className="reality-part-detail" aria-live="polite">
               <h2>{selectedPart.name}</h2>
               <dl>{([
                 ["Purpose", selectedPart.purpose],
@@ -1608,7 +1642,7 @@ export function RealityViewer({
             </article>}
           </section>
         )}
-        {ready && <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>}
+        {ready && !dissected && <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>}
       </footer>
       )}
     </dialog>,

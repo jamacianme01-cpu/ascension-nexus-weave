@@ -579,6 +579,55 @@ try {
       assert.equal(model.hasEnvisionPreparation("draw programmable cubits", { ...prepared, pathways: [{ ...prepared.pathways[0], summary: "cube", steps: ["draw"] }] }), false);
       assert.match(prepared.limitations.join(" "), /not a completed drawing/);
     });
+    let drawingCalls = 0;
+    globalThis.fetch = async () => {
+      const response = ++drawingCalls === 1
+        ? { ...visualDraft, kind: "answer", pathways: [] }
+        : { ...visualDraft, kind: "answer" };
+      return new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(response) } }] }) + '\n');
+    };
+    const repairedDrawing = await deliveryEngine.externalProductDraft({
+      id: "repair-drawing-request", objective: "draw programmable cubits", result: null,
+    }, []);
+    check("prose-only drawing response gets one bounded geometry repair", () => {
+      assert.equal(drawingCalls, 2);
+      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", repairedDrawing), true);
+      assert.equal(repairedDrawing.pathways[0].model_url, null);
+    });
+    const oldFailedDrawing = {
+      status: "failed", created_at: "2026-10-07T20:00:00Z", response_payload: null,
+      error: "the external engine did not return a substantive result (no visual drawing was returned)",
+      engine_model: "external", source_key: deliveryEngine.artifactSourceKey("old-drawing", []),
+    };
+    const drawingRun = { ...runShoe, id: "old-drawing", objective: "draw programmable cubits", result: null };
+    let recoveryClaims = 0;
+    let persistedFailure = "";
+    const recoveryStore = {
+      claim: async () => { recoveryClaims++; return true; },
+      complete: async () => {},
+      fail: async (_key, message) => { persistedFailure = message; },
+    };
+    const recovered = await deliveryEngine.resolveDelivery({
+      run: drawingRun, draft: oldFailedDrawing, artifactStage: null, store: recoveryStore,
+      retry: false, generate: async () => repairedDrawing,
+    });
+    check("old drawing-contract failure recovers without manual retry", () => {
+      assert.equal(recovered.source, "external_draft");
+      assert.equal(recoveryClaims, 1);
+    });
+    await deliveryEngine.resolveDelivery({
+      run: drawingRun, draft: oldFailedDrawing, artifactStage: null, store: recoveryStore,
+      retry: false, generate: async () => { throw new Error("no visual drawing"); },
+    });
+    const failedAgain = await deliveryEngine.resolveDelivery({
+      run: drawingRun, draft: { ...oldFailedDrawing, error: persistedFailure }, artifactStage: null,
+      store: noStore, retry: false, generate: async () => { throw new Error("must not regenerate"); },
+    });
+    check("drawing recovery failure stays bounded across polling", () => {
+      assert.match(persistedFailure, /^Drawing handoff repair:/);
+      assert.match(failedAgain.error, /Drawing handoff repair:/);
+      assert.equal(recoveryClaims, 2);
+    });
     globalThis.fetch = async () => new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ ...visualDraft, kind: "answer", pathways: [] }) } }] }) + '\n');
     await assert.rejects(() => deliveryEngine.externalProductDraft({
       id: "empty-drawing-request", objective: "draw programmable cubits", result: null,
@@ -861,3 +910,4 @@ try {
 } finally {
   await server.close();
 }
+

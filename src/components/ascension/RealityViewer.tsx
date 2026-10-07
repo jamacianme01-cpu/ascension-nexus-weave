@@ -60,12 +60,12 @@ type ViewerControls = {
   background: (value: string) => void;
   space: (value: string) => void;
   reset: () => void;
-  demo: (enabled: boolean) => void;
 };
 
 /** Dedicated inspection screen. Every displayed object comes from the selected GLB. */
 export function RealityViewer({
   pathway,
+  objective,
   initialMode,
   onClose,
   soundEnabled,
@@ -73,6 +73,7 @@ export function RealityViewer({
   onDive,
 }: {
   pathway: ObjectivePathway;
+  objective: string;
   initialMode: RealityMode;
   onClose: () => void;
   soundEnabled: boolean;
@@ -95,8 +96,6 @@ export function RealityViewer({
   const [addKind, setAddKind] = useState<CatalogKind>("box");
   const [objectColor, setObjectColor] = useState("#6ed7ff");
   const [backgroundColor, setBackgroundColor] = useState("daylight");
-  const [demoActive, setDemoActive] = useState(false);
-  const [demoEvent, setDemoEvent] = useState("Ready for a live demonstration");
   const [space, setSpace] = useState<RoomName>("Workspace");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +141,14 @@ export function RealityViewer({
   useEffect(() => {
     const target = host.current;
     if (!target) return;
+    // A design specification is not a generated model. Keep the actual request
+    // visible while Hunyuan is pending instead of opening a fabricated room.
+    if (!pathway.model_url) {
+      setReady(false);
+      setError(null);
+      setArrived(true);
+      return;
+    }
     let disposed = false;
     let model: THREE.Group | null = null;
     let renderer: THREE.WebGLRenderer;
@@ -160,7 +167,10 @@ export function RealityViewer({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.tabIndex = 0;
-    renderer.domElement.setAttribute("aria-label", "Reality model: drag to rotate, scroll to zoom");
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Reality model: drag to rotate, scroll to zoom",
+    );
     target.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     const perspective = new THREE.PerspectiveCamera(45, 1, 0.01, 300);
@@ -189,7 +199,9 @@ export function RealityViewer({
       transform.attach(object);
       selectedHelper = new THREE.BoxHelper(object, 0x8feaff);
       scene.add(selectedHelper);
-      setSelectedObject(String(object.userData["ascensionName"] ?? object.name ?? "Object"));
+      setSelectedObject(
+        String(object.userData["ascensionName"] ?? object.name ?? "Object"),
+      );
     };
     const applyObjectColor = (value: string) => {
       if (!selected) return;
@@ -210,7 +222,10 @@ export function RealityViewer({
           if ("metalness" in clone) clone.metalness = 0.18;
           return clone;
         });
-        blueprintMaterials.set(node, Array.isArray(node.material) ? blue : blue[0]);
+        blueprintMaterials.set(
+          node,
+          Array.isArray(node.material) ? blue : blue[0],
+        );
       });
       setObjectColor(value);
     };
@@ -226,7 +241,11 @@ export function RealityViewer({
         roughness: 0.28,
         metalness: 0.28,
       });
-      const part = (geometry: THREE.BufferGeometry, position: THREE.Vector3, material = finish) => {
+      const part = (
+        geometry: THREE.BufferGeometry,
+        position: THREE.Vector3,
+        material = finish,
+      ) => {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.copy(position);
         mesh.castShadow = true;
@@ -236,16 +255,33 @@ export function RealityViewer({
       };
       if (kind === "sphere") part(new THREE.SphereGeometry(0.65, 32, 20), new THREE.Vector3());
       else if (kind === "cylinder")
-        part(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 32), new THREE.Vector3());
-      else if (kind === "box") part(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.Vector3());
-      else if (kind === "panel") part(new THREE.BoxGeometry(3.2, 0.16, 2.2), new THREE.Vector3());
-      else if (kind === "beam") part(new THREE.BoxGeometry(5.5, 0.35, 0.35), new THREE.Vector3());
+        part(
+          new THREE.CylinderGeometry(0.55, 0.55, 1.1, 32),
+          new THREE.Vector3(),
+        );
+      else if (kind === "box")
+        part(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.Vector3());
+      else if (kind === "panel")
+        part(new THREE.BoxGeometry(3.2, 0.16, 2.2), new THREE.Vector3());
+      else if (kind === "beam")
+        part(new THREE.BoxGeometry(5.5, 0.35, 0.35), new THREE.Vector3());
       else if (kind === "column")
-        part(new THREE.CylinderGeometry(0.42, 0.48, 4.2, 24), new THREE.Vector3(0, 2.1, 0));
+        part(
+          new THREE.CylinderGeometry(0.42, 0.48, 4.2, 24),
+          new THREE.Vector3(0, 2.1, 0),
+        );
       else if (kind === "wheel")
-        part(new THREE.TorusGeometry(0.85, 0.2, 18, 36), new THREE.Vector3(), accent);
+        part(
+          new THREE.TorusGeometry(0.85, 0.2, 18, 36),
+          new THREE.Vector3(),
+          accent,
+        );
       else if (kind === "gear") {
-        part(new THREE.CylinderGeometry(0.82, 0.82, 0.24, 16), new THREE.Vector3(), accent);
+        part(
+          new THREE.CylinderGeometry(0.82, 0.82, 0.24, 16),
+          new THREE.Vector3(),
+          accent,
+        );
         for (let tooth = 0; tooth < 8; tooth++) {
           const a = (tooth * Math.PI) / 4;
           part(
@@ -262,9 +298,21 @@ export function RealityViewer({
         );
         pipe.rotation.z = Math.PI / 2;
       } else if (kind === "coil") {
-        part(new THREE.TorusGeometry(0.68, 0.12, 16, 36), new THREE.Vector3(), accent);
-        part(new THREE.TorusGeometry(0.68, 0.12, 16, 36), new THREE.Vector3(0, 0.34, 0), accent);
-        part(new THREE.TorusGeometry(0.68, 0.12, 16, 36), new THREE.Vector3(0, -0.34, 0), accent);
+        part(
+          new THREE.TorusGeometry(0.68, 0.12, 16, 36),
+          new THREE.Vector3(),
+          accent,
+        );
+        part(
+          new THREE.TorusGeometry(0.68, 0.12, 16, 36),
+          new THREE.Vector3(0, 0.34, 0),
+          accent,
+        );
+        part(
+          new THREE.TorusGeometry(0.68, 0.12, 16, 36),
+          new THREE.Vector3(0, -0.34, 0),
+          accent,
+        );
       } else if (kind === "motor") {
         const body = part(
           new THREE.CylinderGeometry(0.62, 0.62, 1.8, 32),
@@ -279,7 +327,10 @@ export function RealityViewer({
         );
         shaft.rotation.z = Math.PI / 2;
       } else if (kind === "battery") {
-        part(new THREE.BoxGeometry(1.5, 2.2, 1.1), new THREE.Vector3(0, 1.1, 0));
+        part(
+          new THREE.BoxGeometry(1.5, 2.2, 1.1),
+          new THREE.Vector3(0, 1.1, 0),
+        );
         part(
           new THREE.CylinderGeometry(0.14, 0.14, 0.2, 16),
           new THREE.Vector3(-0.35, 2.3, 0),
@@ -298,12 +349,27 @@ export function RealityViewer({
         );
         prism.rotation.y = Math.PI / 10;
       } else if (kind === "rail") {
-        part(new THREE.BoxGeometry(6, 0.18, 0.22), new THREE.Vector3(0, 0.2, -0.65));
-        part(new THREE.BoxGeometry(6, 0.18, 0.22), new THREE.Vector3(0, 0.2, 0.65), accent);
+        part(
+          new THREE.BoxGeometry(6, 0.18, 0.22),
+          new THREE.Vector3(0, 0.2, -0.65),
+        );
+        part(
+          new THREE.BoxGeometry(6, 0.18, 0.22),
+          new THREE.Vector3(0, 0.2, 0.65),
+          accent,
+        );
         for (let i = -2; i <= 2; i++)
-          part(new THREE.BoxGeometry(0.18, 0.2, 1.6), new THREE.Vector3(i, 0.2, 0), finish);
+          part(
+            new THREE.BoxGeometry(0.18, 0.2, 1.6),
+            new THREE.Vector3(i, 0.2, 0),
+            finish,
+          );
       } else if (kind === "sensor") {
-        part(new THREE.CylinderGeometry(0.3, 0.42, 0.7, 24), new THREE.Vector3(0, 0.35, 0), accent);
+        part(
+          new THREE.CylinderGeometry(0.3, 0.42, 0.7, 24),
+          new THREE.Vector3(0, 0.35, 0),
+          accent,
+        );
         part(
           new THREE.SphereGeometry(0.5, 24, 16),
           new THREE.Vector3(0, 1.05, 0),
@@ -314,46 +380,98 @@ export function RealityViewer({
           }),
         );
       } else if (kind === "desk") {
-        part(new THREE.BoxGeometry(4.5, 0.28, 2), new THREE.Vector3(0, 1.45, 0));
+        part(
+          new THREE.BoxGeometry(4.5, 0.28, 2),
+          new THREE.Vector3(0, 1.45, 0),
+        );
         [-1.9, 1.9].forEach((x) =>
           [-0.7, 0.7].forEach((z) =>
-            part(new THREE.BoxGeometry(0.22, 1.45, 0.22), new THREE.Vector3(x, 0.7, z)),
+            part(
+              new THREE.BoxGeometry(0.22, 1.45, 0.22),
+              new THREE.Vector3(x, 0.7, z),
+            ),
           ),
         );
-        part(new THREE.BoxGeometry(1.7, 1.05, 0.12), new THREE.Vector3(0, 2.08, -0.55), accent);
+        part(
+          new THREE.BoxGeometry(1.7, 1.05, 0.12),
+          new THREE.Vector3(0, 2.08, -0.55),
+          accent,
+        );
       } else if (kind === "chair") {
-        part(new THREE.BoxGeometry(1.6, 0.22, 1.5), new THREE.Vector3(0, 0.85, 0));
-        part(new THREE.BoxGeometry(1.6, 1.8, 0.2), new THREE.Vector3(0, 1.7, -0.62), accent);
+        part(
+          new THREE.BoxGeometry(1.6, 0.22, 1.5),
+          new THREE.Vector3(0, 0.85, 0),
+        );
+        part(
+          new THREE.BoxGeometry(1.6, 1.8, 0.2),
+          new THREE.Vector3(0, 1.7, -0.62),
+          accent,
+        );
         [-0.55, 0.55].forEach((x) =>
           [-0.5, 0.5].forEach((z) =>
-            part(new THREE.BoxGeometry(0.14, 0.85, 0.14), new THREE.Vector3(x, 0.4, z)),
+            part(
+              new THREE.BoxGeometry(0.14, 0.85, 0.14),
+              new THREE.Vector3(x, 0.4, z),
+            ),
           ),
         );
       } else if (kind === "sofa") {
-        part(new THREE.BoxGeometry(4.5, 1.1, 1.8), new THREE.Vector3(0, 0.65, 0));
-        part(new THREE.BoxGeometry(4.5, 1.45, 0.28), new THREE.Vector3(0, 1.65, -0.75), accent);
+        part(
+          new THREE.BoxGeometry(4.5, 1.1, 1.8),
+          new THREE.Vector3(0, 0.65, 0),
+        );
+        part(
+          new THREE.BoxGeometry(4.5, 1.45, 0.28),
+          new THREE.Vector3(0, 1.65, -0.75),
+          accent,
+        );
         [-2.1, 2.1].forEach((x) =>
-          part(new THREE.BoxGeometry(0.3, 1.4, 1.8), new THREE.Vector3(x, 1.1, 0), accent),
+          part(
+            new THREE.BoxGeometry(0.3, 1.4, 1.8),
+            new THREE.Vector3(x, 1.1, 0),
+            accent,
+          ),
         );
       } else if (kind === "table") {
-        part(new THREE.CylinderGeometry(1.5, 1.5, 0.22, 40), new THREE.Vector3(0, 1.35, 0));
+        part(
+          new THREE.CylinderGeometry(1.5, 1.5, 0.22, 40),
+          new THREE.Vector3(0, 1.35, 0),
+        );
         part(
           new THREE.CylinderGeometry(0.18, 0.28, 1.35, 24),
           new THREE.Vector3(0, 0.65, 0),
           accent,
         );
       } else if (kind === "cabinet") {
-        part(new THREE.BoxGeometry(2.8, 3.2, 0.55), new THREE.Vector3(0, 1.6, 0));
+        part(
+          new THREE.BoxGeometry(2.8, 3.2, 0.55),
+          new THREE.Vector3(0, 1.6, 0),
+        );
         [-0.68, 0.68].forEach((x) =>
-          part(new THREE.BoxGeometry(1.28, 2.8, 0.08), new THREE.Vector3(x, 1.6, -0.32), accent),
+          part(
+            new THREE.BoxGeometry(1.28, 2.8, 0.08),
+            new THREE.Vector3(x, 1.6, -0.32),
+            accent,
+          ),
         );
       } else if (kind === "wall") {
         part(new THREE.BoxGeometry(6, 4, 0.22), new THREE.Vector3(0, 2, 0));
       } else if (kind === "door") {
-        part(new THREE.BoxGeometry(2.2, 4.6, 0.18), new THREE.Vector3(0, 2.3, 0));
-        part(new THREE.SphereGeometry(0.12, 18, 12), new THREE.Vector3(0.72, 2.2, -0.18), accent);
+        part(
+          new THREE.BoxGeometry(2.2, 4.6, 0.18),
+          new THREE.Vector3(0, 2.3, 0),
+        );
+        part(
+          new THREE.SphereGeometry(0.12, 18, 12),
+          new THREE.Vector3(0.72, 2.2, -0.18),
+          accent,
+        );
       } else if (kind === "window") {
-        part(new THREE.BoxGeometry(4.2, 2.6, 0.12), new THREE.Vector3(0, 2.2, 0), accent);
+        part(
+          new THREE.BoxGeometry(4.2, 2.6, 0.12),
+          new THREE.Vector3(0, 2.2, 0),
+          accent,
+        );
         part(
           new THREE.BoxGeometry(3.8, 2.2, 0.08),
           new THREE.Vector3(0, 2.2, -0.1),
@@ -365,17 +483,36 @@ export function RealityViewer({
             metalness: 0.35,
           }),
         );
-        part(new THREE.BoxGeometry(0.12, 2.4, 0.16), new THREE.Vector3(0, 2.2, -0.18), finish);
-        part(new THREE.BoxGeometry(4, 0.12, 0.16), new THREE.Vector3(0, 2.2, -0.18), finish);
+        part(
+          new THREE.BoxGeometry(0.12, 2.4, 0.16),
+          new THREE.Vector3(0, 2.2, -0.18),
+          finish,
+        );
+        part(
+          new THREE.BoxGeometry(4, 0.12, 0.16),
+          new THREE.Vector3(0, 2.2, -0.18),
+          finish,
+        );
       } else if (kind === "tub") {
-        part(new THREE.BoxGeometry(4.2, 0.9, 2.2), new THREE.Vector3(0, 0.5, 0), accent);
+        part(
+          new THREE.BoxGeometry(4.2, 0.9, 2.2),
+          new THREE.Vector3(0, 0.5, 0),
+          accent,
+        );
         part(
           new THREE.BoxGeometry(3.4, 0.12, 1.5),
           new THREE.Vector3(0, 0.98, 0),
-          new THREE.MeshStandardMaterial({ color: 0xbdebed, roughness: 0.16, metalness: 0.22 }),
+          new THREE.MeshStandardMaterial({
+            color: 0xbdebed,
+            roughness: 0.16,
+            metalness: 0.22,
+          }),
         );
       } else if (kind === "sink") {
-        part(new THREE.BoxGeometry(2.3, 1.5, 1.2), new THREE.Vector3(0, 0.75, 0));
+        part(
+          new THREE.BoxGeometry(2.3, 1.5, 1.2),
+          new THREE.Vector3(0, 0.75, 0),
+        );
         part(
           new THREE.CylinderGeometry(0.55, 0.55, 0.12, 30),
           new THREE.Vector3(0, 1.52, 0),
@@ -387,7 +524,11 @@ export function RealityViewer({
           accent,
         );
       } else if (kind === "light") {
-        part(new THREE.CylinderGeometry(0.7, 0.35, 0.3, 32), new THREE.Vector3(0, 2.8, 0), accent);
+        part(
+          new THREE.CylinderGeometry(0.7, 0.35, 0.3, 32),
+          new THREE.Vector3(0, 2.8, 0),
+          accent,
+        );
         part(
           new THREE.SphereGeometry(0.42, 24, 16),
           new THREE.Vector3(0, 2.4, 0),
@@ -416,10 +557,15 @@ export function RealityViewer({
             const clone = material.clone();
             if ("color" in clone && clone.color instanceof THREE.Color) clone.color.set("#6bbbd7");
             return clone;
-          },
+        });
+        blueprintMaterials.set(
+          node,
+          Array.isArray(node.material) ? nodeBlue : nodeBlue[0],
         );
-        blueprintMaterials.set(node, Array.isArray(node.material) ? nodeBlue : nodeBlue[0]);
-        sourceBlueprintMaterials.set(node, Array.isArray(node.material) ? nodeBlue : nodeBlue[0]);
+        sourceBlueprintMaterials.set(
+          node,
+          Array.isArray(node.material) ? nodeBlue : nodeBlue[0],
+        );
       });
       scene.add(group);
       setSelected(group);
@@ -435,9 +581,10 @@ export function RealityViewer({
           blueprintMaterials.delete(node);
           sourceBlueprintMaterials.delete(node);
           node.geometry.dispose();
-          (Array.isArray(node.material) ? node.material : [node.material]).forEach((m) =>
-            m.dispose(),
-          );
+          (Array.isArray(node.material)
+            ? node.material
+            : [node.material]
+          ).forEach((m) => m.dispose());
         }
       });
       selected.parent?.remove(selected);
@@ -478,9 +625,10 @@ export function RealityViewer({
     const disposeRoom = () => {
       roomMeshes.splice(0).forEach((mesh) => {
         mesh.geometry.dispose();
-        (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((material) =>
-          material.dispose(),
-        );
+        (Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material]
+        ).forEach((material) => material.dispose());
       });
       roomEnvironment.clear();
     };
@@ -548,18 +696,42 @@ export function RealityViewer({
         }),
         new THREE.Vector3(0, y, 0),
       );
-      roomMesh(new THREE.BoxGeometry(24, 9, 0.18), wall, new THREE.Vector3(0, y + 4.5, -9));
-      roomMesh(new THREE.BoxGeometry(0.18, 9, 18), wall, new THREE.Vector3(-12, y + 4.5, 0));
-      roomMesh(new THREE.BoxGeometry(0.18, 9, 18), wall.clone(), new THREE.Vector3(12, y + 4.5, 0));
+      roomMesh(
+        new THREE.BoxGeometry(24, 9, 0.18),
+        wall,
+        new THREE.Vector3(0, y + 4.5, -9),
+      );
+      roomMesh(
+        new THREE.BoxGeometry(0.18, 9, 18),
+        wall,
+        new THREE.Vector3(-12, y + 4.5, 0),
+      );
+      roomMesh(
+        new THREE.BoxGeometry(0.18, 9, 18),
+        wall.clone(),
+        new THREE.Vector3(12, y + 4.5, 0),
+      );
       roomMesh(
         new THREE.BoxGeometry(24, 0.18, 18),
         new THREE.MeshStandardMaterial({ color: 0x24333c, roughness: 0.9 }),
         new THREE.Vector3(0, y + 9, 0),
       );
       if (name === "Workspace") {
-        roomMesh(new THREE.BoxGeometry(8, 0.35, 3), trim, new THREE.Vector3(-1, y + 2.2, -2));
-        roomMesh(new THREE.BoxGeometry(0.25, 2.2, 0.25), trim, new THREE.Vector3(-4, y + 1.1, -3));
-        roomMesh(new THREE.BoxGeometry(0.25, 2.2, 0.25), trim, new THREE.Vector3(2, y + 1.1, -3));
+        roomMesh(
+          new THREE.BoxGeometry(8, 0.35, 3),
+          trim,
+          new THREE.Vector3(-1, y + 2.2, -2),
+        );
+        roomMesh(
+          new THREE.BoxGeometry(0.25, 2.2, 0.25),
+          trim,
+          new THREE.Vector3(-4, y + 1.1, -3),
+        );
+        roomMesh(
+          new THREE.BoxGeometry(0.25, 2.2, 0.25),
+          trim,
+          new THREE.Vector3(2, y + 1.1, -3),
+        );
         roomMesh(
           new THREE.BoxGeometry(3.4, 1.8, 0.18),
           new THREE.MeshStandardMaterial({
@@ -589,7 +761,11 @@ export function RealityViewer({
           new THREE.MeshStandardMaterial({ color: 0x6f4737, roughness: 0.88 }),
           new THREE.Vector3(-1, y + 0.85, -3),
         );
-        roomMesh(new THREE.BoxGeometry(7, 1.7, 0.35), trim, new THREE.Vector3(-1, y + 2.05, -4));
+        roomMesh(
+          new THREE.BoxGeometry(7, 1.7, 0.35),
+          trim,
+          new THREE.Vector3(-1, y + 2.05, -4),
+        );
         roomMesh(
           new THREE.CylinderGeometry(1.25, 1.25, 0.2, 32),
           new THREE.MeshStandardMaterial({ color: 0x997659, roughness: 0.9 }),
@@ -611,8 +787,16 @@ export function RealityViewer({
           new THREE.MeshStandardMaterial({ color: 0x6f5d78, roughness: 0.86 }),
           new THREE.Vector3(-1, y + 0.55, -3),
         );
-        roomMesh(new THREE.BoxGeometry(7, 1.35, 0.35), trim, new THREE.Vector3(-1, y + 1.5, -5.5));
-        roomMesh(new THREE.BoxGeometry(2.3, 2.6, 0.55), trim, new THREE.Vector3(5, y + 1.3, -4));
+        roomMesh(
+          new THREE.BoxGeometry(7, 1.35, 0.35),
+          trim,
+          new THREE.Vector3(-1, y + 1.5, -5.5),
+        );
+        roomMesh(
+          new THREE.BoxGeometry(2.3, 2.6, 0.55),
+          trim,
+          new THREE.Vector3(5, y + 1.3, -4),
+        );
         roomMesh(
           new THREE.CylinderGeometry(0.45, 0.32, 1.6, 20),
           trim,
@@ -628,7 +812,11 @@ export function RealityViewer({
           new THREE.Vector3(-1, y + 4.4, -8.85),
         );
       } else if (name === "Kitchen") {
-        roomMesh(new THREE.BoxGeometry(9, 1.6, 1.3), trim, new THREE.Vector3(-2, y + 0.8, -5.5));
+        roomMesh(
+          new THREE.BoxGeometry(9, 1.6, 1.3),
+          trim,
+          new THREE.Vector3(-2, y + 0.8, -5.5),
+        );
         roomMesh(
           new THREE.BoxGeometry(3.8, 1.1, 2.4),
           new THREE.MeshStandardMaterial({ color: 0x7e8c86, roughness: 0.48 }),
@@ -641,7 +829,11 @@ export function RealityViewer({
         );
         roomMesh(
           new THREE.CylinderGeometry(0.42, 0.42, 0.14, 28),
-          new THREE.MeshStandardMaterial({ color: 0xb9d8d4, metalness: 0.6, roughness: 0.18 }),
+          new THREE.MeshStandardMaterial({
+            color: 0xb9d8d4,
+            metalness: 0.6,
+            roughness: 0.18,
+          }),
           new THREE.Vector3(-2, y + 1.65, -5.5),
         );
         roomMesh(
@@ -654,10 +846,18 @@ export function RealityViewer({
           new THREE.Vector3(4, y + 4.3, -8.85),
         );
       } else if (name === "Garage") {
-        roomMesh(new THREE.BoxGeometry(8, 1.4, 1.5), trim, new THREE.Vector3(-2, y + 0.7, -5.5));
+        roomMesh(
+          new THREE.BoxGeometry(8, 1.4, 1.5),
+          trim,
+          new THREE.Vector3(-2, y + 0.7, -5.5),
+        );
         roomMesh(
           new THREE.BoxGeometry(6.2, 0.35, 3.4),
-          new THREE.MeshStandardMaterial({ color: 0x6a7075, roughness: 0.7, metalness: 0.2 }),
+          new THREE.MeshStandardMaterial({
+            color: 0x6a7075,
+            roughness: 0.7,
+            metalness: 0.2,
+          }),
           new THREE.Vector3(1, y + 1.5, -1),
         );
         roomMesh(
@@ -680,10 +880,18 @@ export function RealityViewer({
           new THREE.MeshStandardMaterial({ color: 0xe7f0f0, roughness: 0.42 }),
           new THREE.Vector3(-2, y + 0.7, -3),
         );
-        roomMesh(new THREE.BoxGeometry(4, 1.5, 0.8), trim, new THREE.Vector3(4, y + 0.75, -3));
+        roomMesh(
+          new THREE.BoxGeometry(4, 1.5, 0.8),
+          trim,
+          new THREE.Vector3(4, y + 0.75, -3),
+        );
         roomMesh(
           new THREE.BoxGeometry(4.2, 3.2, 0.12),
-          new THREE.MeshStandardMaterial({ color: 0xc4e9ed, metalness: 0.6, roughness: 0.18 }),
+          new THREE.MeshStandardMaterial({
+            color: 0xc4e9ed,
+            metalness: 0.6,
+            roughness: 0.18,
+          }),
           new THREE.Vector3(4, y + 3.8, -4.8),
         );
         roomMesh(
@@ -723,7 +931,11 @@ export function RealityViewer({
     const addedObjects = new Set<THREE.Object3D>();
     const originalTransforms = new Map<
       THREE.Object3D,
-      { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: THREE.Vector3 }
+      {
+        position: THREE.Vector3;
+        quaternion: THREE.Quaternion;
+        scale: THREE.Vector3;
+      }
     >();
     let originalModelTransform: {
       position: THREE.Vector3;
@@ -743,10 +955,6 @@ export function RealityViewer({
     scene.add(roomEnvironment);
     const roomMeshes: THREE.Mesh[] = [];
     buildRoom("Workspace");
-    let demoObject: THREE.Mesh | null = null;
-    let demoActiveRef = false;
-    let demoElapsed = 0;
-    let demoPhase = "";
     const controller = new AbortController();
     const disposeModel = (object: THREE.Object3D) => {
       const textures = new Set<THREE.Texture>();
@@ -783,15 +991,23 @@ export function RealityViewer({
       const radius = bounds.length() / 2;
       const angle = Math.min(
         THREE.MathUtils.degToRad(perspective.fov / 2),
-        Math.atan((Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2)) * width) / height),
+        Math.atan(
+          (Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2)) * width) /
+            height,
+        ),
       );
       const distance = (radius / Math.sin(angle)) * 1.07;
       camera.position
         .copy(center)
-        .add(new THREE.Vector3(0.8, 0.5, 1).normalize().multiplyScalar(distance));
+        .add(
+          new THREE.Vector3(0.8, 0.5, 1).normalize().multiplyScalar(distance),
+        );
       camera.up.set(0, 1, 0);
       orthographic.zoom =
-        Math.min(14 / Math.max(bounds.y, bounds.z), (14 * width) / height / bounds.x) * 0.75;
+        Math.min(
+          14 / Math.max(bounds.y, bounds.z),
+          (14 * width) / height / bounds.x,
+        ) * 0.75;
       orthographic.updateProjectionMatrix();
       orbit.target.copy(center);
       camera.lookAt(center);
@@ -880,7 +1096,11 @@ export function RealityViewer({
         }
         const distance = Math.max(bounds.length() * 1.35, 8);
         camera.position.copy(center).addScaledVector(direction, distance);
-        camera.up.copy(view === "top" ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0));
+        camera.up.copy(
+          view === "top"
+            ? new THREE.Vector3(0, 0, -1)
+            : new THREE.Vector3(0, 1, 0),
+        );
         orbit.target.copy(center);
         camera.lookAt(center);
         orbit.update();
@@ -941,56 +1161,18 @@ export function RealityViewer({
         camera.lookAt(center);
         orbit.target.copy(center);
       },
-      demo(enabled) {
-        demoActiveRef = enabled;
-        setDemoActive(enabled);
-        if (enabled) {
-          applyMode("environment");
-          setReactMode("environment");
-          buildRoom(space);
-          if (!demoObject) {
-            demoObject = new THREE.Mesh(
-              new THREE.IcosahedronGeometry(0.7, 2),
-              new THREE.MeshStandardMaterial({
-                color: 0xffc65b,
-                emissive: 0x5f2d04,
-                emissiveIntensity: 0.8,
-                roughness: 0.28,
-                metalness: 0.35,
-              }),
-            );
-            demoObject.userData["ascensionName"] = "Live demo object";
-            demoObject.position.set(0, (floor.position.y || -3) + 1.15, 1);
-            demoObject.castShadow = true;
-            scene.add(demoObject);
-          }
-          demoElapsed = 0;
-          demoPhase = "";
-        } else if (demoObject) {
-          scene.remove(demoObject);
-          demoObject.geometry.dispose();
-          (demoObject.material as THREE.Material).dispose();
-          demoObject = null;
-          setDemoEvent("Live demonstration stopped");
-        }
-      },
       reset() {
-        const startingMode = initialMode === "cutaway" ? "blueprint" : initialMode;
-        demoActiveRef = false;
-        if (demoObject) {
-          scene.remove(demoObject);
-          demoObject.geometry.dispose();
-          (demoObject.material as THREE.Material).dispose();
-          demoObject = null;
-        }
+        const startingMode =
+          initialMode === "cutaway" ? "blueprint" : initialMode;
         setSelected(null);
         for (const object of [...addedObjects]) {
           object.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) return;
             node.geometry.dispose();
-            (Array.isArray(node.material) ? node.material : [node.material]).forEach((material) =>
-              material.dispose(),
-            );
+            (Array.isArray(node.material)
+              ? node.material
+              : [node.material]
+            ).forEach((material) => material.dispose());
             materials.delete(node);
             sourceMaterials.delete(node);
             blueprintMaterials.delete(node);
@@ -1026,8 +1208,6 @@ export function RealityViewer({
         fly = false;
         keys.clear();
         orbit.enabled = true;
-        setDemoActive(false);
-        setDemoEvent("Ready for a live demonstration");
         setArrived(true);
         setReactMode(startingMode);
         setTransformMode("translate");
@@ -1049,9 +1229,18 @@ export function RealityViewer({
       if (
         !fly ||
         event.target instanceof HTMLInputElement ||
-        !["w", "a", "s", "d", "q", "e", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
-          event.key,
-        )
+        ![
+          "w",
+          "a",
+          "s",
+          "d",
+          "q",
+          "e",
+          "ArrowUp",
+          "ArrowDown",
+          "ArrowLeft",
+          "ArrowRight",
+        ].includes(event.key)
       )
         return;
       event.preventDefault();
@@ -1077,15 +1266,28 @@ export function RealityViewer({
     };
     const pointerMove = (event: PointerEvent) => {
       if (!fly || !look.active) return;
-      const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
+      const euler = new THREE.Euler().setFromQuaternion(
+        camera.quaternion,
+        "YXZ",
+      );
       euler.y -= (event.clientX - look.x) * 0.004;
-      euler.x = THREE.MathUtils.clamp(euler.x - (event.clientY - look.y) * 0.004, -1.5, 1.5);
+      euler.x = THREE.MathUtils.clamp(
+        euler.x - (event.clientY - look.y) * 0.004,
+        -1.5,
+        1.5,
+      );
       camera.quaternion.setFromEuler(euler);
       look.x = event.clientX;
       look.y = event.clientY;
     };
     const pointerUp = (event: PointerEvent) => {
-      if (!fly && Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) < 7) {
+      if (
+        !fly &&
+        Math.hypot(
+          event.clientX - pointerStart.x,
+          event.clientY - pointerStart.y,
+        ) < 7
+      ) {
         const rect = renderer.domElement.getBoundingClientRect();
         pointer.set(
           ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -1121,39 +1323,15 @@ export function RealityViewer({
         if (keys.has("e")) camera.position.y += speed;
         if (keys.has("q")) camera.position.y -= speed;
       } else orbit.update();
-      if (demoActiveRef && demoObject) {
-        demoElapsed += dt;
-        const phase =
-          demoElapsed < 2.2
-            ? "Reading request · selecting the workspace"
-            : demoElapsed < 4.4
-              ? "Generating layout · placing objects in the room"
-              : demoElapsed < 6.6
-                ? "Applying materials, color, and lighting"
-                : "Saving the live environment arrangement";
-        if (phase !== demoPhase) {
-          demoPhase = phase;
-          setDemoEvent(phase);
-        }
-        const t = demoElapsed % 8;
-        demoObject.position.x = Math.sin((t * Math.PI) / 4) * 3.2;
-        demoObject.position.z = Math.cos((t * Math.PI) / 4) * 1.8;
-        demoObject.rotation.x += dt * 0.7;
-        demoObject.rotation.y += dt * 1.1;
-        const mat = demoObject.material as THREE.MeshStandardMaterial;
-        mat.color.set(new THREE.Color().setHSL((t / 8 + 0.08) % 1, 0.72, 0.58));
-        if (t > 7.8) setDemoEvent("Selecting an object");
-      }
       renderer.render(scene, camera);
     });
-    if (!pathway.model_url) {
-      setMode(modeRef.current);
-      setReady(true);
-    } else
       void (async () => {
         try {
-          const response = await fetch(pathway.model_url!, { signal: controller.signal });
-          if (!response.ok) throw new Error(`Model download returned HTTP ${response.status}`);
+        const response = await fetch(pathway.model_url!, {
+          signal: controller.signal,
+        });
+        if (!response.ok)
+          throw new Error(`Model download returned HTTP ${response.status}`);
           const gltf = await new GLTFLoader().parseAsync(
             await response.arrayBuffer(),
             new URL(".", pathway.model_url!).href,
@@ -1168,7 +1346,9 @@ export function RealityViewer({
           const rawSize = box.getSize(new THREE.Vector3());
           const scale = 10 / Math.max(rawSize.x, rawSize.y, rawSize.z);
           model.scale.multiplyScalar(scale);
-          model.position.sub(box.getCenter(new THREE.Vector3()).multiplyScalar(scale));
+        model.position.sub(
+          box.getCenter(new THREE.Vector3()).multiplyScalar(scale),
+        );
           model.updateMatrixWorld(true);
           const normalized = new THREE.Box3().setFromObject(model);
           normalized.getSize(bounds);
@@ -1196,9 +1376,11 @@ export function RealityViewer({
                 if ("roughness" in clone) clone.roughness = 0.4;
                 if ("metalness" in clone) clone.metalness = 0.18;
                 return clone;
-              },
+          });
+          blueprintMaterials.set(
+            node,
+            Array.isArray(node.material) ? nodeBlue : nodeBlue[0],
             );
-            blueprintMaterials.set(node, Array.isArray(node.material) ? nodeBlue : nodeBlue[0]);
             sourceBlueprintMaterials.set(
               node,
               Array.isArray(node.material) ? nodeBlue : nodeBlue[0],
@@ -1234,10 +1416,6 @@ export function RealityViewer({
       window.removeEventListener("blur", blur);
       if (model) disposeModel(model);
       disposeRoom();
-      if (demoObject) {
-        demoObject.geometry.dispose();
-        (demoObject.material as THREE.Material).dispose();
-      }
       lines.children.forEach((node) => {
         if (node instanceof THREE.LineSegments) node.geometry.dispose();
       });
@@ -1288,7 +1466,8 @@ export function RealityViewer({
         </button>
         <div className="reality-title">
           <span>ASCENSION / ENVISION</span>
-          <h1>{pathway.label}</h1>
+          <h1>{objective}</h1>
+          <p className="reality-pathway-label">{pathway.label}</p>
         </div>
         <button className="reality-sound" aria-pressed={soundEnabled} onClick={onToggleSound}>
           {soundEnabled ? "SOUND ON" : "SOUND OFF"}
@@ -1297,6 +1476,7 @@ export function RealityViewer({
           {(["cutaway", "blueprint", "environment"] as const).map((value) => (
             <button
               key={value}
+              disabled={!ready}
               aria-pressed={mode === value}
               onClick={() => {
                 setMode(value);
@@ -1315,12 +1495,22 @@ export function RealityViewer({
           <p>
             {error ??
               (!pathway.model_url
-                ? (pathway.model_error ?? `3D ${pathway.model_status ?? "not available"}`)
+                ? (pathway.model_error ??
+                  (pathway.model_status === "failed"
+                    ? "The requested 3D drawing failed to generate."
+                    : pathway.model_status
+                      ? `Your requested 3D drawing is ${pathway.model_status}.`
+                      : "Your requested 3D drawing has not been generated yet."))
                 : "Loading your model…")}
           </p>
-          {error && <button onClick={() => setAttempt((value) => value + 1)}>RETRY LOAD</button>}
+          {error && (
+            <button onClick={() => setAttempt((value) => value + 1)}>
+              RETRY LOAD
+            </button>
+          )}
         </div>
       )}
+      {ready && (
       <aside className="reality-tools" aria-label="Model controls">
         <button disabled={!ready} aria-label="Zoom in" onClick={() => api.current?.zoom(1.3)}>
           ＋
@@ -1342,6 +1532,8 @@ export function RealityViewer({
           RESET REALITY
         </button>
       </aside>
+      )}
+      {ready && (
       <footer className="reality-footer">
         <div className="reality-edit-panel" aria-label="Reality manipulation tools">
           <span className="reality-selection">{selectedObject}</span>
@@ -1420,24 +1612,6 @@ export function RealityViewer({
               />
             </label>
           </div>
-        </div>
-        <div className="reality-live-demo" aria-live="polite">
-          <div className="reality-demo-copy">
-            <div className="reality-demo-heading">
-              <span className="live-dot" /> <strong>REAL-TIME DEMO</strong>
-            </div>
-            <span className="reality-demo-request">
-              REQUEST: “Create a working invention workspace with a desk, power rail, and sensor.”
-            </span>
-            <span className="reality-demo-event">{demoEvent}</span>
-          </div>
-          <button
-            disabled={!ready}
-            aria-pressed={demoActive}
-            onClick={() => api.current?.demo(!demoActive)}
-          >
-            {demoActive ? "STOP LIVE DEMO" : "RUN LIVE DEMO"}
-          </button>
         </div>
         <div className="reality-mode-controls">
           {mode === "blueprint" &&
@@ -1528,6 +1702,7 @@ export function RealityViewer({
               : "Drag to rotate · Right-drag to pan · Scroll / pinch to zoom"}
         </p>
       </footer>
+      )}
     </dialog>,
     document.body,
   );

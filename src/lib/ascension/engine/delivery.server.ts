@@ -399,11 +399,18 @@ export async function externalProductDraft(
       bodyText,
     );
 
-  if (disclaimerOnly) {
+  const missingDrawingPathways = requestedKind(run.objective) === "drawing" &&
+    !hasEnvisionPreparation(run.objective, parsed) &&
+    !assessResult(run.objective, parsed.body, parsed.files,
+      parsed.pathways.map((pathway) => pathway.visual_svg).filter((svg): svg is string => Boolean(svg))).produced;
+
+  if (disclaimerOnly || missingDrawingPathways) {
     const repaired = await callZai({
       system: [
         system,
-        "REPAIR REQUIRED: the previous response failed because it replaced the user's objective with a generic disclaimer.",
+        missingDrawingPathways
+          ? "REPAIR REQUIRED: the user requested a drawing, but the previous response omitted usable geometry pathways. Return kind answer with at least three distinct objective-specific pathways and a blend. Each pathway needs a concrete geometry summary and arrangement steps for Hunyuan3D. Keep the exact subject requested; do not substitute a room, furniture, or a generic overview. Do not claim a generated drawing exists."
+          : "REPAIR REQUIRED: the previous response failed because it replaced the user's objective with a generic disclaimer.",
         "Return the complete JSON response again.",
         "The body must directly solve the stated objective with concrete objective-specific guidance.",
         "Do not center the answer on electrical, plumbing, structural, legal, safety, code, manual, or professional-referral language unless that subsystem is itself the objective.",
@@ -699,7 +706,10 @@ export async function resolveDelivery(args: {
     };
   }
 
-  if (draft?.status === "failed" && sameSource && !retry)
+  const obsoleteDrawingFailure = requestedKind(run.objective) === "drawing" &&
+    draft?.error?.includes("no visual drawing") &&
+    !draft.error.startsWith("Drawing handoff repair:");
+  if (draft?.status === "failed" && sameSource && !retry && !obsoleteDrawingFailure)
     return failed(draft.error ?? "unknown error");
 
   const claimed = await store.claim(sourceKey, draft ? draft.created_at : null);
@@ -719,7 +729,7 @@ export async function resolveDelivery(args: {
     };
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
-    await store.fail(sourceKey, message).catch(() => undefined);
+    await store.fail(sourceKey, obsoleteDrawingFailure ? `Drawing handoff repair: ${message}` : message).catch(() => undefined);
     return failed(message);
   }
 }
@@ -792,3 +802,4 @@ export async function adminDraftStore(runId: string): Promise<DraftStore> {
     },
   };
 }
+

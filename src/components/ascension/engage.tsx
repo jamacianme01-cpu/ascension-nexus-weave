@@ -473,7 +473,7 @@ export function ResultContent({
                 )}
                 {canInspect && (
                   <p className="mt-4 text-xs font-medium tracking-[0.14em] text-primary uppercase">
-                    DIVE INTO REALITY
+                    {pathway.model_url ? "DIVE INTO REALITY" : pathway.model_status === "failed" ? "3D GENERATION FAILED · VIEW STATUS" : "3D DRAWING PENDING · VIEW STATUS"}
                   </p>
                 )}
               </article>
@@ -517,7 +517,7 @@ export function ResultContent({
                 )}
                 {canInspect && (
                   <p className="mt-4 text-xs font-medium tracking-[0.14em] text-gold uppercase">
-                    DIVE INTO BLENDED REALITY
+                    {delivery.blend.model_url ? "DIVE INTO BLENDED REALITY" : delivery.blend.model_status === "failed" ? "3D GENERATION FAILED · VIEW STATUS" : "3D DRAWING PENDING · VIEW STATUS"}
                   </p>
                 )}
               </article>
@@ -1044,6 +1044,7 @@ export function Engage() {
       {reality && realityPathway && (
         <RealityViewer
           pathway={realityPathway}
+          objective={run?.objective ?? objective}
           initialMode={reality.mode}
           soundEnabled={soundEnabled}
           onToggleSound={toggleSound}
@@ -1307,3 +1308,4 @@ export function Engage() {
     </div>
   );
 }
+

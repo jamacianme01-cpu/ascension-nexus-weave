@@ -825,7 +825,7 @@ export function Engage() {
       setConstraints("");
       setFollow(null);
       setTreeChoiceId(null);
-      setDetailsOpen(false);
+      setDetailsOpen(true);
       prepare.reset();
       void client.invalidateQueries({ queryKey: ["ascension", "my-objectives"] });
       window.history.replaceState(null, "", `/?run=${encodeURIComponent(request.id)}`);
@@ -1206,7 +1206,7 @@ export function Engage() {
         </div>
       </section>
 
-      {run && revealed && detailsOpen && (
+      {run && revealed && (detailsOpen || !delivery) && (
         <section
           ref={answerRef}
           aria-label="Your answer"
@@ -1217,11 +1217,13 @@ export function Engage() {
               <p className="label-eyebrow text-primary">ASCENSION RESPONSE</p>
               <p className="mt-2 text-sm text-muted-foreground">{run.objective}</p>
               <p role="status" className="mt-3 text-sm text-foreground/90">
-                {delivery && deliveryQuery.data?.source === "external_draft"
-                  ? "Your result is below."
-                  : deliveryQuery.data?.note && produced === null
-                    ? deliveryQuery.data.note
-                    : statusText(run, produced)}
+                {deliveryError
+                  ? "Answer generation needs attention."
+                  : delivery && deliveryQuery.data?.source === "external_draft"
+                    ? "Your result is below."
+                    : deliveryQuery.data?.note && produced === null
+                      ? deliveryQuery.data.note
+                      : statusText(run, produced)}
               </p>
             </div>
           )}

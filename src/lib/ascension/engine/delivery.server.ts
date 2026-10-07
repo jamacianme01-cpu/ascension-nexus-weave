@@ -3,7 +3,8 @@ import {
   assessResult,
   notProducedMessage,
   parseDelivery,
-  requestedKind, supportsEnvisionObjective,
+  requestedKind,
+  supportsEnvisionObjective,
   type ObjectiveDelivery,
 } from "../result-model";
 
@@ -384,7 +385,9 @@ export async function externalProductDraft(
   const bodyText = parsed.body.trim();
   const disclaimerOnly =
     bodyText.length < 1200 &&
-    /(?:qualified personnel|consult (?:a )?professional|local (?:safety )?codes|manufacturer(?:'s)? manual|owner(?:'s)? manual)/i.test(bodyText);
+    /(?:qualified personnel|consult (?:a )?professional|local (?:safety )?codes|manufacturer(?:'s)? manual|owner(?:'s)? manual)/i.test(
+      bodyText,
+    );
 
   if (disclaimerOnly) {
     const repaired = await callZai({
@@ -431,7 +434,9 @@ export async function externalProductDraft(
 
   // Generated asset URLs must come from the image/model pipeline, never from
   // language-model text. Reference generation runs after answer persistence.
-  const withoutUnproducedAssets = <T extends ObjectiveDelivery["pathways"][number]>(pathway: T): T => ({
+  const withoutUnproducedAssets = <T extends ObjectiveDelivery["pathways"][number]>(
+    pathway: T,
+  ): T => ({
     ...pathway,
     generated_image_url: null,
     generated_blueprint_url: null,
@@ -654,9 +659,15 @@ export async function resolveDelivery(args: {
   // used when LOCAL_LLM_BASE_URL is explicitly configured.
   if (!args.generate && !hasLovableAi && !hasExplicitLocal && !hasOptInZai) {
     if (!TERMINAL_STATUSES.has(run.status))
-      return pending("ASCENSION is preparing your answer.", {
-        engine_label: DRAFT_LABEL,
-      });
+      return {
+        ...draftBase,
+        status: "completed",
+        response_payload: null,
+        error:
+          "The request was saved, but this server has no answer engine connected. For the local app, restart with npm run dev:local. The hosted app uses its own engine configuration.",
+        note: null,
+        source: null,
+      };
     return {
       ...base,
       status: "completed",
@@ -769,4 +780,3 @@ export async function adminDraftStore(runId: string): Promise<DraftStore> {
     },
   };
 }
-

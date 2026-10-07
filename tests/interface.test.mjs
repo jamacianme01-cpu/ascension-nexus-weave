@@ -422,9 +422,11 @@ try {
       store: noStore,
       retry: false,
     });
-    check("without the local worker, queued work does not call a paid API", () => {
-      assert.equal(waitingLocal.status, "running");
+    check("missing engine reports a blocker instead of claiming an answer is being prepared", () => {
+      assert.equal(waitingLocal.status, "completed");
       assert.equal(waitingLocal.source, null);
+      assert.equal(waitingLocal.response_payload, null);
+      assert.match(waitingLocal.error, /no answer engine connected/);
     });
   } finally {
     if (priorPaidDrafts === undefined) delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;

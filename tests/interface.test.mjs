@@ -624,6 +624,47 @@ try {
       assert.equal(localResult.text, "Visible answer text.");
       assert.equal(localResult.model, "test-local-model");
     });
+
+    process.env.LOCAL_LLM_BASE_URL = "http://127.0.0.1:11434/v1";
+    process.env.LOCAL_LLM_MODEL = "qwen3-ascension:latest";
+    globalThis.fetch = async (url, init) => {
+      sentUrl = String(url);
+      sentBody = JSON.parse(String(init.body));
+      assert.equal(init.headers.Authorization, undefined);
+      assert.equal(init.headers.Accept, "application/x-ndjson");
+      const bytes = new TextEncoder().encode([
+        JSON.stringify({ message: { thinking: "private reasoning", content: "" }, done: false }),
+        JSON.stringify({ message: { content: "Visible café " }, done: false }),
+        JSON.stringify({ message: { content: "answer." }, done: true, done_reason: "stop" }),
+      ].join("\n"));
+      return new Response(new ReadableStream({ start(controller) {
+        // Split inside UTF-8 and JSON frames; the final frame has no newline.
+        for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+        controller.close();
+      } }));
+    };
+    const native = await callZai({ system: "test", user: "draw programmable cubits" });
+    check("installed Qwen3 uses native Ollama with thinking disabled and preserves answer chunks", () => {
+      assert.equal(sentUrl, "http://127.0.0.1:11434/api/chat");
+      assert.equal(sentBody.model, "qwen3-ascension:latest");
+      assert.equal(sentBody.think, false);
+      assert.equal(sentBody.options.num_predict, 4096);
+      assert.equal(native.text, "Visible café answer.");
+    });
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      message: { content: "", thinking: "unfinished reasoning" }, done: true, done_reason: "length",
+    }));
+    await assert.rejects(() => callZai({ system: "test", user: "test" }), /output limit before producing an answer/);
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      message: { content: "<think>unfinished reasoning" }, done: true,
+    }));
+    await assert.rejects(() => callZai({ system: "test", user: "test" }), /thinking without a final answer/);
+    globalThis.fetch = async () => new Response('{"error":"Ollama model failed"}\n');
+    await assert.rejects(() => callZai({ system: "test", user: "test" }), /Ollama model failed/);
+    globalThis.fetch = async () => new Response('{"message":{"content":""},"done":true}\n');
+    await assert.rejects(() => callZai({ system: "test", user: "test" }), /empty response/);
+    passed++;
+    process.stdout.write("PASS native engine failures and thinking-only responses remain errors\n");
   } finally {
     globalThis.fetch = original;
     if (priorLocalBase === undefined) delete process.env.LOCAL_LLM_BASE_URL;

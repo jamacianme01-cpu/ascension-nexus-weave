@@ -33,7 +33,16 @@ function localLlmConfig() {
 
 /** Strip a local model's inline reasoning block if it leaks into content. */
 function stripInlineReasoning(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
+}
+
+/** The launcher's standard Ollama endpoint supports native thinking controls. */
+function ollamaChatUrl(baseUrl: string): string | null {
+  const url = new URL(baseUrl);
+  return ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
+    url.port === "11434" && url.pathname === "/v1"
+    ? `${url.origin}/api/chat`
+    : null;
 }
 
 export interface ZaiCallResult {
@@ -87,18 +96,20 @@ function extractJson(text: string): Record<string, unknown> | null {
   return null;
 }
 
-async function readStream(response: Response): Promise<string> {
+async function readStream(response: Response, nativeOllama = false) {
   const body = response.body;
   if (!body) throw new ZaiEngineError("Z.AI returned no response body", response.status);
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let text = "";
+  let finishReason: string | null = null;
+  let sawThinking = false;
 
   function consume(raw: string) {
     const line = raw.trim();
-    if (!line.startsWith("data:")) return;
-    const payload = line.slice(5).trim();
+    if (!nativeOllama && !line.startsWith("data:")) return;
+    const payload = nativeOllama ? line : line.slice(5).trim();
     if (!payload || payload === "[DONE]") return;
     let parsed;
     try {
@@ -108,12 +119,20 @@ async function readStream(response: Response): Promise<string> {
     }
     if (parsed.error)
       throw new ZaiEngineError(
-        String(parsed.error.message ?? "Z.AI stream failed"),
+        String(typeof parsed.error === "string" ? parsed.error : parsed.error.message ?? "Answer engine stream failed"),
         response.status,
       );
+    if (nativeOllama) {
+      if (typeof parsed.message?.content === "string") text += parsed.message.content;
+      if (parsed.message?.thinking) sawThinking = true;
+      if (parsed.done_reason) finishReason = parsed.done_reason;
+      return;
+    }
     for (const choice of parsed.choices ?? []) {
       const fragment = choice.delta?.content ?? choice.message?.content;
       if (typeof fragment === "string") text += fragment;
+      if (choice.delta?.reasoning || choice.delta?.reasoning_content) sawThinking = true;
+      if (choice.finish_reason) finishReason = choice.finish_reason;
     }
   }
 
@@ -130,7 +149,7 @@ async function readStream(response: Response): Promise<string> {
   } finally {
     reader.releaseLock();
   }
-  return text;
+  return { text, finishReason, sawThinking };
 }
 
 /** One streamed engine call. Production prefers Lovable's built-in AI gateway;
@@ -182,16 +201,17 @@ export async function callZai(input: {
   const baseUrl =
     provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai" ? zaiBaseUrl() : local!.baseUrl;
   const apiKey = provider === "lovable" ? lovableKey : provider === "zai" ? zaiKey : null;
+  const nativeUrl = provider === "local" ? ollamaChatUrl(baseUrl) : null;
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}/chat/completions`, {
+    response = await fetch(nativeUrl ?? `${baseUrl}/chat/completions`, {
       method: "POST",
       signal: AbortSignal.timeout(provider === "local" ? 180000 : 90000),
       headers:
         provider === "local"
           ? {
               "Content-Type": "application/json",
-              Accept: "text/event-stream",
+              Accept: nativeUrl ? "application/x-ndjson" : "text/event-stream",
             }
           : {
               "Content-Type": "application/json",
@@ -202,10 +222,17 @@ export async function callZai(input: {
       body: JSON.stringify({
         model,
         stream: true,
-        temperature: input.temperature ?? 0.2,
-        // Local reasoning models budget their thinking inside max_tokens;
-        // without headroom the visible answer can come back empty.
-        ...(provider === "local" ? { max_tokens: LOCAL_MAX_TOKENS } : {}),
+        ...(nativeUrl
+          ? {
+              // Qwen3 otherwise defaults to thinking, which can consume the
+              // entire output budget before emitting any visible answer.
+              ...(/(?:^|\/)qwen3(?:[:.-]|$)/i.test(model) ? { think: false } : {}),
+              options: { temperature: input.temperature ?? 0.2, num_predict: LOCAL_MAX_TOKENS },
+            }
+          : {
+              temperature: input.temperature ?? 0.2,
+              ...(provider === "local" ? { max_tokens: LOCAL_MAX_TOKENS } : {}),
+            }),
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -232,10 +259,16 @@ export async function callZai(input: {
     );
   }
 
-  const text = stripInlineReasoning(await readStream(response));
+  const result = await readStream(response, Boolean(nativeUrl));
+  const text = stripInlineReasoning(result.text);
   if (!text.trim()) {
+    const detail = result.finishReason === "length"
+      ? " exhausted its output limit before producing an answer"
+      : result.sawThinking || /<think>/i.test(result.text)
+        ? " returned thinking without a final answer"
+        : " returned an empty response";
     throw new ZaiEngineError(
-      `${provider === "local" ? "The local answer engine" : provider === "lovable" ? "Lovable AI" : "Z.AI"} returned an empty response`,
+      `${provider === "local" ? "The local answer engine" : provider === "lovable" ? "Lovable AI" : "Z.AI"}${detail}`,
       response.status,
     );
   }

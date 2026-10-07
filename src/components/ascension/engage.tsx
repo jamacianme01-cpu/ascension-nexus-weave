@@ -22,6 +22,7 @@ import {
 } from "@/lib/ascension/guest.functions";
 import {
   assessResult,
+  hasEnvisionPreparation,
   governedPersisted,
   notProducedMessage,
   parseDelivery,
@@ -878,7 +879,7 @@ export function Engage() {
           ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
         ];
         const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
-        if (parsed.kind === "not_produced" || !check.produced) {
+        if (parsed.kind === "not_produced" || (!check.produced && !hasEnvisionPreparation(run.objective, parsed))) {
           unproduced =
             parsed.kind === "not_produced"
               ? parsed.body
@@ -1220,7 +1221,9 @@ export function Engage() {
                 {deliveryError
                   ? "Answer generation needs attention."
                   : delivery && deliveryQuery.data?.source === "external_draft"
-                    ? "Your result is below."
+                    ? hasEnvisionPreparation(run!.objective, delivery) && !delivery.pathways.some((pathway) => pathway.model_url)
+                      ? "Your design is ready. The 3D visual is still pending."
+                      : "Your result is below."
                     : deliveryQuery.data?.note && produced === null
                       ? deliveryQuery.data.note
                       : statusText(run, produced)}

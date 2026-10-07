@@ -70,9 +70,15 @@ try {
   assert.equal(rows[0].source_image_url, null);
   assert.equal(rows[0].status, "queued");
   console.log("PASS design queues without waiting for a reference image");
+  await enqueueDeliveryModels("drawing-request", { ...delivery, pathways: [{ ...delivery.pathways[0], id: "drawing-path" }] }, "draw a folding workbench");
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].request_id, "drawing-request");
+  assert.equal(rows[1].status, "queued");
+  assert.equal(rows[1].source_image_url, null);
+  console.log("PASS drawing request queues Hunyuan before a visual artifact exists");
   rows[0].status = "running";
   await enqueueDeliveryModels("request", delivery, "Design a folding workbench");
-  assert.equal(rows.length, 1);
+  assert.equal(rows.length, 2);
   assert.equal(rows[0].status, "running");
   console.log("PASS repeated answer reads preserve the existing model job");
   const before = writes;

@@ -1,6 +1,7 @@
 import type { Json } from "@/integrations/supabase/types";
 import {
   assessResult,
+  hasEnvisionPreparation,
   notProducedMessage,
   parseDelivery,
   requestedKind,
@@ -293,6 +294,7 @@ export async function externalProductDraft(
     "Do not infer the user's skill level. Keep generic compliance notes out of the main answer; the main answer must solve the stated objective.",
     "For app/code requests, include complete runnable source files.",
     "For visual requests keep body concise: briefly explain what was created and the key design logic; do not bury the visual under a long essay.",
+    "For drawing and visualization requests, return kind 'answer' with substantive design pathways describing the actual geometry, components, materials, and arrangement. These specifications feed the separate Hunyuan3D generator. Leave files empty and visual_svg/model_spec null; do not claim that a drawing or 3D model has already been generated.",
     "For product/invention creation requests, create a substantive design/specification rather than a receipt, token list, or plan to make one.",
     "files must be an array of objects with name and content. Use [] when no download is needed.",
     "limitations must truthfully state what remains unverified or conceptual.",
@@ -377,6 +379,14 @@ export async function externalProductDraft(
     );
   }
 
+  // A visual specification is an answer draft, not an already-created artifact.
+  // Models sometimes choose 'artifact' solely because the objective says draw.
+  if (requestedKind(run.objective) === "drawing" && candidate["kind"] === "artifact" &&
+    Array.isArray(candidate["files"]) && !candidate["files"].length &&
+    Array.isArray(candidate["pathways"]) && candidate["pathways"].length &&
+    !candidate["pathways"].some((pathway) => record(pathway)["visual_svg"])) {
+    candidate["kind"] = "answer";
+  }
   let parsed = parseDelivery(candidate);
 
   // Reject the exact failure mode where an ordinary objective is replaced by
@@ -458,7 +468,8 @@ export async function externalProductDraft(
     ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
   ];
   const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
-  if (!check.produced || parsed.kind === "not_produced")
+  const preparingVisual = hasEnvisionPreparation(run.objective, parsed);
+  if ((!check.produced && !preparingVisual) || parsed.kind === "not_produced")
     throw new Error(
       `the external engine did not return a substantive result${check.reason ? ` (${check.reason})` : ""}`,
     );
@@ -468,6 +479,7 @@ export async function externalProductDraft(
     files: check.kind === "answer" || check.kind === "design" ? [] : check.files,
     limitations: [
       ...parsed.limitations,
+      ...(preparingVisual ? ["The 3D visual is pending Hunyuan3D generation; this design draft is not a completed drawing."] : []),
       "Governed ASCENSION verification and persistence continue separately.",
     ],
   };

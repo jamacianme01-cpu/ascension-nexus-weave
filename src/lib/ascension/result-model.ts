@@ -483,6 +483,18 @@ export interface ResultAssessment {
   files: { name: string; content: string }[];
 }
 
+/** A usable design can enter Hunyuan before a visual artifact exists.
+ * This never counts the specification itself as a produced drawing. */
+export function hasEnvisionPreparation(objective: string, delivery: ObjectiveDelivery): boolean {
+  if (requestedKind(objective) !== "drawing" || delivery.kind === "not_produced") return false;
+  if (scaffoldReason(delivery.body, objective) !== null || !delivery.pathways.length) return false;
+  const choices = delivery.blend ? [...delivery.pathways, delivery.blend] : delivery.pathways;
+  return choices.every((pathway) =>
+    pathway.steps.length > 0 &&
+    scaffoldReason([pathway.summary, ...pathway.steps].join("\n"), objective) === null,
+  );
+}
+
 const CODE_FILE = /\.(html?|js|jsx|ts|tsx|py|java|kt|swift|go|rs|rb|php|c|cpp|cs|sh|vue|svelte)$/i;
 const INTERNAL_FILE =
   /^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|acceptance_result\.json|metadata\.json|lineage\.json|knowledgeform_.*\.md)$/i;

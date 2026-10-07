@@ -542,6 +542,49 @@ try {
     await assert.rejects(() => callZai({ system: "test", user: "test" }), /engine failed/);
     passed++;
     process.stdout.write("PASS upstream stream errors reach the user\n");
+
+    const visualDraft = {
+      kind: "artifact",
+      title: "Programmable modular cubes",
+      body: "A modular cube has six docking faces, a central controller, and replaceable sensor panels. Power and data contacts run through the face connectors so connected units can exchange signals.",
+      files: [],
+      limitations: ["Conceptual design; hardware operation has not been tested."],
+      pathways: [{
+        id: "modular-cube",
+        label: "Docking cube",
+        summary: "Six square panels surround a central controller, with recessed edge contacts and a replaceable sensor panel on the front face.",
+        steps: ["Arrange the controller in the center and leave clearance between the board and each face.", "Place recessed data and power contacts along the edges of each docking face."],
+        tradeoffs: ["Detachable panels require robust connectors."],
+        visual_svg: null,
+        model_spec: null,
+        model_url: "https://example.invalid/model-invented-by-text.glb",
+      }],
+      blend: null,
+    };
+    globalThis.fetch = async () => new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(visualDraft) } }] }) + '\n');
+    const prepared = await deliveryEngine.externalProductDraft({
+      id: "drawing-request", objective: "draw programmable cubits", result: null, status: "running",
+    }, []);
+    check("drawing specifications reach the Hunyuan handoff without a fake completed drawing", () => {
+      assert.equal(prepared.kind, "answer");
+      assert.equal(prepared.pathways[0].model_url, null);
+      assert.equal(prepared.files.length, 0);
+      assert.equal(model.assessResult("draw programmable cubits", prepared.body, prepared.files).produced, false);
+      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", prepared), true);
+      assert.equal(model.hasEnvisionPreparation("draw a folding workbench", prepared), true);
+      assert.equal(model.hasEnvisionPreparation("draw a gel support shoe", prepared), true);
+      assert.equal(model.hasEnvisionPreparation("make a web app", prepared), false);
+      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", { ...prepared, pathways: [] }), false);
+      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", { ...prepared, body: "draw programmable cubits" }), false);
+      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", { ...prepared, pathways: [{ ...prepared.pathways[0], summary: "cube", steps: ["draw"] }] }), false);
+      assert.match(prepared.limitations.join(" "), /not a completed drawing/);
+    });
+    globalThis.fetch = async () => new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ ...visualDraft, kind: "answer", pathways: [] }) } }] }) + '\n');
+    await assert.rejects(() => deliveryEngine.externalProductDraft({
+      id: "empty-drawing-request", objective: "draw programmable cubits", result: null,
+    }, []), /no visual drawing/);
+    passed++;
+    process.stdout.write("PASS drawing text without a generation pathway remains rejected\n");
   } finally {
     globalThis.fetch = original;
     if (priorKey === undefined) delete process.env.ZAI_API_KEY;

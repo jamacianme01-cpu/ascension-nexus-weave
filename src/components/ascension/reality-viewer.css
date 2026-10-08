@@ -560,3 +560,9 @@
 .reality-component-list { max-height:120px; overflow:auto; }
 .reality-component-actions select { max-width:100%; border:1px solid #5c819b70; background:#152431; color:#e7f2f8; border-radius:8px; padding:8px; }
 .reality-component-workbench p { text-align:left; margin:8px 0; }
+
+.reality-named-parts { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr)); gap:8px; margin:8px 0 12px; }
+.reality-named-parts button { display:flex; flex-direction:column; gap:5px; text-align:left; letter-spacing:0; }
+.reality-named-parts strong { font-size:13px; }
+.reality-named-parts span { font-size:12px; line-height:1.4; opacity:0.9; }
+.reality-geometry-details summary { cursor:pointer; color:#abc2ce; padding:8px 0; }

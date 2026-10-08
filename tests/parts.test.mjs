@@ -7,6 +7,8 @@ try {
   const part = { name: 'Housing', x: 0.5, y: 0.5, purpose: 'Supports the assembly.', location: 'Outer body.', operation: 'Encloses the assembly.', connections: 'Supports internal components.', limitations: 'Material not specified.' };
   assert.equal(parseDesignParts({parts:[part]})[0].name,'Housing');
   assert.throws(()=>parseDesignParts({parts:[{...part,x:2}]}));
+  assert.throws(()=>parseDesignParts({parts:[{...part,name:'Diagram A'}]}));
+  assert.throws(()=>parseDesignParts({parts:[{...part,name:'B'}]}));
   assert.throws(()=>parseDesignParts({parts:[{...part,operation:''}]}));
   const camera = new THREE.PerspectiveCamera(45,1,0.1,100); camera.position.set(0,0,5); camera.lookAt(0,0,0); camera.updateMatrixWorld();
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial()); mesh.updateMatrixWorld();

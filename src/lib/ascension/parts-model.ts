@@ -17,6 +17,7 @@ export function parseDesignParts(value: unknown): DesignPart[] {
     if (!item || typeof item !== 'object') return [];
     const part = item as Record<string, unknown>;
     if (typeof part['x'] !== 'number' || typeof part['y'] !== 'number' || !Number.isFinite(part['x']) || !Number.isFinite(part['y']) || part['x'] < 0 || part['x'] > 1 || part['y'] < 0 || part['y'] > 1) return [];
+    if (typeof part['name'] === 'string' && /^(?:(?:part|component|diagram|label|marker)\s*)?(?:[a-z]|\d+)$/i.test(part['name'].trim())) return [];
     if (!fields.every(field => typeof part[field] === 'string' && (part[field] as string).trim())) return [];
     return [{ x: part['x'], y: part['y'], ...Object.fromEntries(fields.map(field => [field, (part[field] as string).trim().slice(0, field === 'name' ? 120 : 2400)])) } as unknown as DesignPart];
   });

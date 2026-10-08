@@ -66,6 +66,7 @@ type ViewerControls = {
   reset: () => void;
   picture: () => string;
   anchorParts: (parts: DesignPart[]) => DesignPart[];
+  locatePart: (index:number) => void;
   selectComponent: (id: string) => void;
   combine: (source: string, target: string, blend: boolean) => void;
   undo: () => void;
@@ -144,7 +145,7 @@ export function RealityViewer({
   }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
   const activeParts = dissected ? dissection?.parts ?? [] : parts;
   const selectedComponent = components.find(component=>component.id===componentId);
-  const selectedPart = !dissected && selectedComponent?.detail ? selectedComponent.detail : partIndex === null ? null : activeParts[partIndex];
+  const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected ? selectedComponent?.detail ?? null : null;
   const dive = useRef(onDive);
   dive.current = onDive;
   const [mode, setMode] = useState<RealityMode>(
@@ -965,6 +966,7 @@ export function RealityViewer({
     };
     const lines = new THREE.Group();
     scene.add(lines);
+    const displayEdges: THREE.LineSegments[] = [];
     const materials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const sourceMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const blueprintMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
@@ -983,6 +985,8 @@ export function RealityViewer({
       transparent: true,
       opacity: 0.86,
     });
+    const solidEdgeMaterial = new THREE.LineBasicMaterial({color:0x344654,transparent:true,opacity:0.45});
+    const locationMarker=new THREE.Mesh(new THREE.SphereGeometry(0.09,12,8),new THREE.MeshBasicMaterial({color:0xffc96b,depthTest:false}));locationMarker.renderOrder=10;locationMarker.visible=false;scene.add(locationMarker);
     const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 100);
     const bounds = new THREE.Vector3(10, 6, 6);
     const center = new THREE.Vector3();
@@ -1083,10 +1087,10 @@ export function RealityViewer({
     };
     const applyBackground = (preset: string) => {
       const presets: Record<string, { color: number; light: number }> = {
-        daylight: { color: 0x8fb9c8, light: 3.4 },
+        daylight: { color: 0x171b22, light: 2.5 },
         dusk: { color: 0x3a3f66, light: 2.1 },
         night: { color: 0x0b1426, light: 1.1 },
-        blueprint: { color: 0x071e38, light: 2.7 },
+        blueprint: { color: 0x101923, light: 2.4 },
       };
       const selected = presets[preset] ?? presets["daylight"]!;
       scene.background = new THREE.Color(selected.color);
@@ -1108,9 +1112,10 @@ export function RealityViewer({
       floor.receiveShadow = next === "environment";
       roomEnvironment.visible = next === "environment";
       grid.visible = next === "blueprint";
-      lines.visible = next === "blueprint";
+      lines.visible = false;
+      displayEdges.forEach(edge=>{edge.visible=true;edge.material=next==="blueprint"?edgeMaterial:solidEdgeMaterial;});
       transform.getHelper().visible = next !== "environment" || selected !== null;
-      applyBackground(backgroundColor);
+      applyBackground(next === "blueprint" ? "blueprint" : backgroundColor);
       scene.fog = next === "environment" ? new THREE.Fog(0xbdced7, 45, 150) : null;
       for (const [mesh, original] of materials)
         mesh.material =
@@ -1134,8 +1139,16 @@ export function RealityViewer({
     };
     transform.addEventListener("mouseDown",()=>{if(selected)remember(snapshot(selected));});
     const partAnchors: THREE.Vector3[] = [];
+    const partObjects: THREE.Object3D[] = [];
+    const partNames:string[]=[];
+    let locatedPart:number|null=null;
     let annotationCamera: THREE.PerspectiveCamera | THREE.OrthographicCamera = camera.clone();
     const controls: ViewerControls = {
+      locatePart(index){
+        const anchor=partAnchors[index],object=partObjects[index];if(!model||!anchor||!object)return;
+        locatedPart=index;locationMarker.visible=true;locationMarker.position.copy(object.localToWorld(anchor.clone()));
+        setSelected(componentDetails.get(object.uuid)?.name===partNames[index]?object:null);orbit.target.copy(locationMarker.position);orbit.update();
+      },
       selectComponent(id) {
         const object=componentObjects.get(id);if(!object?.parent)return;
         setSelected(object);
@@ -1157,7 +1170,7 @@ export function RealityViewer({
       async exportAssembly(){
         const exportRoot=new THREE.Group();
         for(const object of componentObjects.values())if(object.parent && ![...componentObjects.values()].some(other=>other!==object && isAncestor(other,object))) {
-          const cleanClone=(node:THREE.Object3D):THREE.Object3D=>{const copy=node instanceof THREE.Mesh ? new THREE.Mesh(node.geometry,node.material) : new THREE.Group();copy.name=node.userData["ascensionName"]??node.name;copy.position.copy(node.position);copy.quaternion.copy(node.quaternion);copy.scale.copy(node.scale);copy.matrixAutoUpdate=node.matrixAutoUpdate;if(!node.matrixAutoUpdate)copy.matrix.copy(node.matrix);copy.userData={componentName:copy.name};node.children.forEach(child=>copy.add(cleanClone(child)));return copy;};
+          const cleanClone=(node:THREE.Object3D):THREE.Object3D=>{const copy=node instanceof THREE.Mesh ? new THREE.Mesh(node.geometry,node.material) : new THREE.Group();copy.name=node.userData["ascensionName"]??node.name;copy.position.copy(node.position);copy.quaternion.copy(node.quaternion);copy.scale.copy(node.scale);copy.matrixAutoUpdate=node.matrixAutoUpdate;if(!node.matrixAutoUpdate)copy.matrix.copy(node.matrix);copy.userData={componentName:copy.name};node.children.filter(child=>!child.userData["ascensionDisplayEdge"]).forEach(child=>copy.add(cleanClone(child)));return copy;};
           const clone=cleanClone(object);object.updateWorldMatrix(true,true);object.matrixWorld.decompose(clone.position,clone.quaternion,clone.scale);exportRoot.add(clone);
         }
         const output=await new GLTFExporter().parseAsync(exportRoot,{binary:true});
@@ -1174,20 +1187,21 @@ export function RealityViewer({
         return image.toDataURL("image/jpeg", 0.85);
       },
       anchorParts(parts) {
-        partAnchors.length = 0;
+        partAnchors.length = 0;partObjects.length=0;partNames.length=0;
         if (!model) return [];
         const visible: DesignPart[] = [];
         for (const part of parts) {
           const ray = new THREE.Raycaster();
           ray.setFromCamera(new THREE.Vector2(part.x * 2 - 1, 1 - part.y * 2), annotationCamera);
-          const hit = ray.intersectObject(model, true)[0];
+          const hit = ray.intersectObject(model, true).find(hit=>hit.object instanceof THREE.Mesh);
           if (!hit) continue;
           const hitObject=hit.object;
+          partObjects.push(hitObject);partNames.push(part.name);
           if(componentObjects.size>1 && componentObjects.has(hitObject.uuid) && !componentDetails.has(hitObject.uuid)) {
             componentDetails.set(hitObject.uuid,part);
             hitObject.userData["ascensionName"]=part.name;
           }
-          partAnchors.push(model.worldToLocal(hit.point.clone()));
+          partAnchors.push(hitObject.worldToLocal(hit.point.clone()));
           visible.push(part);
         }
         refreshComponents();
@@ -1435,7 +1449,7 @@ export function RealityViewer({
         );
         raycaster.setFromCamera(pointer, camera);
         const hits = raycaster.intersectObjects([...editable], true);
-        const hit = hits[0]?.object ?? null;
+        const hit = hits.find(hit=>hit.object instanceof THREE.Mesh)?.object ?? null;
         const root = hit?.userData["ascensionRoot"] as THREE.Object3D | undefined;
         setSelected(root ?? hit);
       }
@@ -1463,11 +1477,12 @@ export function RealityViewer({
         if (keys.has("e")) camera.position.y += speed;
         if (keys.has("q")) camera.position.y -= speed;
       } else orbit.update();
+      if(locatedPart!==null && model && partAnchors[locatedPart])locationMarker.position.copy(partObjects[locatedPart]!.localToWorld(partAnchors[locatedPart]!.clone()));
       renderer.render(scene, camera);
       labelsHost.current?.querySelectorAll<HTMLButtonElement>("button").forEach((button, index) => {
         const anchor = partAnchors[index];
         if (!anchor || !model) { button.hidden = true; return; }
-        const projected = model.localToWorld(anchor.clone()).project(camera);
+        const projected = partObjects[index]!.localToWorld(anchor.clone()).project(camera);
         button.hidden = projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
         button.style.left = `${(projected.x + 1) * 50}%`;
         button.style.top = `${(1 - projected.y) * 50}%`;
@@ -1513,7 +1528,18 @@ export function RealityViewer({
           };
           model.traverse((node) => {
             if (!(node instanceof THREE.Mesh)) return;
-            for (const material of [node.material].flat()) material.side = THREE.DoubleSide;
+                        const palette=[0x8da9b8,0xb59a75,0x739ba2,0x9b92b7,0x87a395,0xb0a08c];
+            const displayMaterials=[node.material].flat().map(material=>{
+              const copy=material.clone();copy.side=THREE.DoubleSide;
+              if("color" in copy && copy.color instanceof THREE.Color && !((copy as THREE.MeshStandardMaterial).map)) {
+                const color=copy.color;
+                if(Math.max(color.r,color.g,color.b)-Math.min(color.r,color.g,color.b)<0.1 && color.r>0.7)color.setHex(palette[componentObjects.size%palette.length]!);
+              }
+              if("roughness" in copy)copy.roughness=0.65;
+              if("metalness" in copy)copy.metalness=0.15;
+              return copy;
+            });
+            node.material=Array.isArray(node.material)?displayMaterials:displayMaterials[0]!;
             materials.set(node, node.material);
             sourceMaterials.set(node, node.material);
             originalTransforms.set(node, {
@@ -1525,8 +1551,8 @@ export function RealityViewer({
               (material) => {
                 const clone = material.clone();
                 if ("color" in clone && clone.color instanceof THREE.Color)
-                  clone.color.set("#6bbbd7");
-                if ("roughness" in clone) clone.roughness = 0.4;
+                  clone.color.set("#315366");
+                if ("roughness" in clone) clone.roughness = 0.7;
                 if ("metalness" in clone) clone.metalness = 0.18;
                 return clone;
           });
@@ -1539,14 +1565,14 @@ export function RealityViewer({
               Array.isArray(node.material) ? nodeBlue : nodeBlue[0],
             );
             editable.add(node);
-            if(!node.name || node.name.toLowerCase().includes("mesh"))node.name=`Component ${componentObjects.size+1}`;
+            if(!node.name || /^(?:mesh|component|part|diagram|label)(?:[ _.-]*[a-z0-9]+)?$/i.test(node.name))node.name=`Unidentified geometry ${componentObjects.size+1}`;
             componentObjects.set(node.uuid,node);
             const edge = new THREE.LineSegments(
               new THREE.EdgesGeometry(node.geometry, 12),
               edgeMaterial,
             );
-            edge.applyMatrix4(node.matrixWorld);
-            lines.add(edge);
+            edge.userData["ascensionDisplayEdge"]=true;edge.material=modeRef.current==="blueprint"?edgeMaterial:solidEdgeMaterial;
+            node.add(edge);displayEdges.push(edge);
           });
           floor.position.y = normalized.min.y - 0.03;
           grid.position.y = normalized.min.y - 0.04;
@@ -1579,7 +1605,9 @@ export function RealityViewer({
         for (const item of [material].flat()) item.dispose();
       });
       blueprintMaterial.dispose();
+      displayEdges.forEach(edge=>edge.geometry.dispose());
       edgeMaterial.dispose();
+      solidEdgeMaterial.dispose();locationMarker.geometry.dispose();locationMarker.material.dispose();
       floor.geometry.dispose();
       floor.material.dispose();
       grid.geometry.dispose();
@@ -1625,6 +1653,9 @@ export function RealityViewer({
           <h1>{objective}</h1>
           <p className="reality-pathway-label">{pathway.label}</p>
         </div>
+        <button disabled={!ready} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode(value=>value==="blueprint"?"cutaway":"blueprint");}}>
+          BLUEPRINT
+        </button>
         <button disabled={!ready} aria-pressed={dissected} onClick={() => {setDissected(value=>!value);setPartIndex(null);}}>
           {dissected ? "ASSEMBLED" : "DISSECTED"}
         </button>
@@ -1703,6 +1734,10 @@ export function RealityViewer({
         {(showParts || dissected) && (
           <section id="reality-parts" className="reality-parts" aria-label="Design parts">
             {!dissected && <div className="reality-component-workbench">
+              {!partsLoading && !partsError && <div className="reality-named-parts" aria-label="Named parts and functions">
+                {parts.map((part,index)=><button key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);api.current?.locatePart(index);}}><strong>{part.name}</strong><span>{part.purpose}</span></button>)}
+              </div>}
+              <details className="reality-geometry-details"><summary>Editable model components</summary>
               <div className="reality-component-list" aria-label="Editable components">
                 {components.map(component=><button key={component.id} aria-pressed={componentId===component.id} onClick={()=>{setPartIndex(null);api.current?.selectComponent(component.id);}}>{component.name}</button>)}
               </div>
@@ -1715,6 +1750,7 @@ export function RealityViewer({
                 <button disabled={!undoCount} onClick={()=>api.current?.undo()}>UNDO</button>
                 <button onClick={()=>{void api.current?.exportAssembly().catch(cause=>setWorkbenchError(String(cause)));}}>SAVE GLB</button>
               </div>
+              </details>
               <p className="reality-parts-hint">Select a component to highlight it. Drag its handles to edit. Blend combines components into an editable assembly.</p>
               {selectedComponent && !selectedComponent.detail && <p>{selectedComponent.name}: extracted model geometry. Its technical role has not been identified.</p>}
               {workbenchError && <p role="alert">{workbenchError}</p>}
@@ -1725,6 +1761,7 @@ export function RealityViewer({
             {!dissected && partsError && <div role="alert"><p>{partsError}</p><button onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</button></div>}
             {selectedPart && (dissected || (!partsLoading && !partsError)) && <article id="reality-part-detail" className="reality-part-detail" aria-live="polite">
               <h2>{selectedPart.name}</h2>
+              {!dissected && !componentId && <p>This feature is located on shared geometry. It is not yet a separate editable component.</p>}
               <dl>{([
                 ["Purpose", selectedPart.purpose],
                 ["Location in the design", selectedPart.location],
@@ -1735,6 +1772,7 @@ export function RealityViewer({
             </article>}
           </section>
         )}
+        {ready && !dissected && mode==="blueprint" && <div className="reality-mode-controls" aria-label="Blueprint camera views">{(["top","front","side","perspective"] as const).map(view=><button key={view} onClick={()=>api.current?.view(view)}>{view==="perspective"?"3D":view.toUpperCase()}</button>)}</div>}
         {ready && !dissected && <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>}
       </footer>
       )}

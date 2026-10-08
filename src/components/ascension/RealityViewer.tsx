@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+import { splitMeshIslands, attachComponent, isAncestor } from "@/lib/ascension/component-workbench";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
 import { getDesignParts, getDissectedDesign } from "@/lib/ascension/parts.functions";
@@ -64,6 +66,10 @@ type ViewerControls = {
   reset: () => void;
   picture: () => string;
   anchorParts: (parts: DesignPart[]) => DesignPart[];
+  selectComponent: (id: string) => void;
+  combine: (source: string, target: string, blend: boolean) => void;
+  undo: () => void;
+  exportAssembly: () => Promise<void>;
 };
 
 /** Dedicated inspection screen. Every displayed object comes from the selected GLB. */
@@ -89,6 +95,11 @@ export function RealityViewer({
   const api = useRef<ViewerControls | null>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  const [components, setComponents] = useState<Array<{id:string;name:string;detail:DesignPart|null}>>([]);
+  const [componentId, setComponentId] = useState<string | null>(null);
+  const [targetId, setTargetId] = useState("");
+  const [workbenchError, setWorkbenchError] = useState<string | null>(null);
+  const [undoCount, setUndoCount] = useState(0);
   const [arrived, setArrived] = useState(false);
   const [ready, setReady] = useState(false);
   const labelsHost = useRef<HTMLDivElement>(null);
@@ -132,7 +143,8 @@ export function RealityViewer({
     return () => { active = false; };
   }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
   const activeParts = dissected ? dissection?.parts ?? [] : parts;
-  const selectedPart = partIndex === null ? null : activeParts[partIndex];
+  const selectedComponent = components.find(component=>component.id===componentId);
+  const selectedPart = !dissected && selectedComponent?.detail ? selectedComponent.detail : partIndex === null ? null : activeParts[partIndex];
   const dive = useRef(onDive);
   dive.current = onDive;
   const [mode, setMode] = useState<RealityMode>(
@@ -233,6 +245,7 @@ export function RealityViewer({
     scene.add(transform.getHelper());
     const setSelected = (object: THREE.Object3D | null) => {
       selected = object;
+      setComponentId(object?.uuid ?? null);
       transform.detach();
       if (selectedHelper) {
         scene.remove(selectedHelper);
@@ -591,7 +604,9 @@ export function RealityViewer({
         node.userData["ascensionRoot"] = group;
       });
       editable.add(group);
+      componentObjects.set(group.uuid,group);
       addedObjects.add(group);
+      remember(()=>{group.removeFromParent();componentObjects.delete(group.uuid);addedObjects.delete(group);editable.delete(group);});
       const blue = finish.clone();
       blue.color.set("#6bbbd7");
       group.traverse((node) => {
@@ -615,6 +630,7 @@ export function RealityViewer({
       });
       scene.add(group);
       setSelected(group);
+      refreshComponents();
     };
     const removeObject = () => {
       if (!selected) return;
@@ -1102,9 +1118,47 @@ export function RealityViewer({
         orbit.update();
       }
     };
+    const componentObjects = new Map<string, THREE.Object3D>();
+    const componentDetails = new Map<string, DesignPart>();
+    const history: Array<() => void> = [];
+    const refreshComponents = () => setComponents([...componentObjects.values()].filter(object=>object.parent).map(object=>({id:object.uuid,name:object.userData["ascensionName"] ?? object.name ?? "Component",detail:componentDetails.get(object.uuid)??null})));
+    const remember = (undo:()=>void) => {history.push(undo);if(history.length>30)history.shift();setUndoCount(history.length);};
+    const snapshot = (object:THREE.Object3D) => {
+      const parent=object.parent;const position=object.position.clone();const rotation=object.quaternion.clone();const scale=object.scale.clone();
+      return ()=>{if(parent)parent.add(object);else object.removeFromParent();object.position.copy(position);object.quaternion.copy(rotation);object.scale.copy(scale);object.updateWorldMatrix(true,true);};
+    };
+    transform.addEventListener("mouseDown",()=>{if(selected)remember(snapshot(selected));});
     const partAnchors: THREE.Vector3[] = [];
     let annotationCamera: THREE.PerspectiveCamera | THREE.OrthographicCamera = camera.clone();
     const controls: ViewerControls = {
+      selectComponent(id) {
+        const object=componentObjects.get(id);if(!object?.parent)return;
+        setSelected(object);
+        const box=new THREE.Box3().setFromObject(object);orbit.target.copy(box.getCenter(new THREE.Vector3()));orbit.update();
+      },
+      combine(sourceId,targetId,blend) {
+        const source=componentObjects.get(sourceId),target=componentObjects.get(targetId);
+        if(!source?.parent||!target?.parent||source===target||isAncestor(source,target)||isAncestor(target,source))throw new Error("Choose two independent components.");
+        const undo=snapshot(source);
+        attachComponent(source,target);
+        if(blend){
+          const group=new THREE.Group();group.name=`Blend: ${source.name} + ${target.name}`;
+          const parent=target.parent!;const undoTarget=snapshot(target);parent.add(group);group.attach(target);componentObjects.set(group.uuid,group);
+          remember(()=>{undo();undoTarget();group.removeFromParent();componentObjects.delete(group.uuid);});setSelected(group);
+        }else{remember(undo);setSelected(source);}
+        refreshComponents();
+      },
+      undo(){history.pop()?.();setUndoCount(history.length);setSelected(null);refreshComponents();},
+      async exportAssembly(){
+        const exportRoot=new THREE.Group();
+        for(const object of componentObjects.values())if(object.parent && ![...componentObjects.values()].some(other=>other!==object && isAncestor(other,object))) {
+          const cleanClone=(node:THREE.Object3D):THREE.Object3D=>{const copy=node instanceof THREE.Mesh ? new THREE.Mesh(node.geometry,node.material) : new THREE.Group();copy.name=node.userData["ascensionName"]??node.name;copy.position.copy(node.position);copy.quaternion.copy(node.quaternion);copy.scale.copy(node.scale);copy.matrixAutoUpdate=node.matrixAutoUpdate;if(!node.matrixAutoUpdate)copy.matrix.copy(node.matrix);copy.userData={componentName:copy.name};node.children.forEach(child=>copy.add(cleanClone(child)));return copy;};
+          const clone=cleanClone(object);object.updateWorldMatrix(true,true);object.matrixWorld.decompose(clone.position,clone.quaternion,clone.scale);exportRoot.add(clone);
+        }
+        const output=await new GLTFExporter().parseAsync(exportRoot,{binary:true});
+        if(!(output instanceof ArrayBuffer))throw new Error("Assembly export failed.");
+        const url=URL.createObjectURL(new Blob([output],{type:"model/gltf-binary"}));const link=document.createElement("a");link.href=url;link.download="ASCENSION_assembly.glb";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      },
       picture() {
         renderer.render(scene, camera);
         annotationCamera = camera.clone();
@@ -1123,9 +1177,15 @@ export function RealityViewer({
           ray.setFromCamera(new THREE.Vector2(part.x * 2 - 1, 1 - part.y * 2), annotationCamera);
           const hit = ray.intersectObject(model, true)[0];
           if (!hit) continue;
+          const hitObject=hit.object;
+          if(componentObjects.size>1 && componentObjects.has(hitObject.uuid) && !componentDetails.has(hitObject.uuid)) {
+            componentDetails.set(hitObject.uuid,part);
+            hitObject.userData["ascensionName"]=part.name;
+          }
           partAnchors.push(model.worldToLocal(hit.point.clone()));
           visible.push(part);
         }
+        refreshComponents();
         return visible;
       },
       mode: applyMode,
@@ -1236,6 +1296,8 @@ export function RealityViewer({
       reset() {
         const startingMode =
           "cutaway";
+        while(history.length)history.pop()!();
+        setUndoCount(0);
         setSelected(null);
         for (const object of [...addedObjects]) {
           object.traverse((node) => {
@@ -1254,6 +1316,7 @@ export function RealityViewer({
           editable.delete(object);
         }
         addedObjects.clear();
+        refreshComponents();
         for (const [object, snapshot] of originalTransforms) {
           object.position.copy(snapshot.position);
           object.quaternion.copy(snapshot.quaternion);
@@ -1421,6 +1484,11 @@ export function RealityViewer({
             return;
           }
           model = gltf.scene;
+          const meshes:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node);});
+          for(const mesh of meshes){
+            const pieces=splitMeshIslands(mesh);
+            if(pieces.length>1){const holder=new THREE.Group();holder.position.copy(mesh.position);holder.quaternion.copy(mesh.quaternion);holder.scale.copy(mesh.scale);mesh.parent!.add(holder);pieces.forEach(piece=>holder.add(piece));mesh.removeFromParent();mesh.geometry.dispose();}
+          }
           const box = new THREE.Box3().setFromObject(model);
           if (box.isEmpty()) throw new Error("This model contains no visible geometry.");
           const rawSize = box.getSize(new THREE.Vector3());
@@ -1466,6 +1534,8 @@ export function RealityViewer({
               Array.isArray(node.material) ? nodeBlue : nodeBlue[0],
             );
             editable.add(node);
+            if(!node.name || node.name.toLowerCase().includes("mesh"))node.name=`Component ${componentObjects.size+1}`;
+            componentObjects.set(node.uuid,node);
             const edge = new THREE.LineSegments(
               new THREE.EdgesGeometry(node.geometry, 12),
               edgeMaterial,
@@ -1478,6 +1548,7 @@ export function RealityViewer({
           buildRoom(space);
           scene.add(model);
           setMode(modeRef.current);
+          refreshComponents();
           setReady(true);
         } catch (cause) {
           if (!disposed) setError(cause instanceof Error ? cause.message : String(cause));
@@ -1575,7 +1646,7 @@ export function RealityViewer({
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
           {dissectionError && <button onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</button>}
         </div>}
-        {!dissected && showParts && !partsLoading && !partsError && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
+        {false && !dissected && showParts && !partsLoading && !partsError && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
           {parts.map((part, index) => <button key={part.name + index} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => setPartIndex(index)}>{part.name}</button>)}
         </div>}
       </div>
@@ -1626,7 +1697,24 @@ export function RealityViewer({
       <footer className="reality-footer">
         {(showParts || dissected) && (
           <section id="reality-parts" className="reality-parts" aria-label="Design parts">
-            <p className="reality-parts-hint">Select a label on the model to explore how it works.</p>
+            {!dissected && <div className="reality-component-workbench">
+              <div className="reality-component-list" aria-label="Editable components">
+                {components.map(component=><button key={component.id} aria-pressed={componentId===component.id} onClick={()=>{setPartIndex(null);api.current?.selectComponent(component.id);}}>{component.name}</button>)}
+              </div>
+              <div className="reality-component-actions">
+                {(["translate","rotate","scale"] as const).map(action=><button key={action} disabled={!componentId} aria-pressed={transformMode===action} onClick={()=>api.current?.transform(action)}>{action==="translate"?"MOVE":action.toUpperCase()}</button>)}
+                <select aria-label="Target component B" value={targetId} onChange={event=>setTargetId(event.target.value)}><option value="">Choose component B</option>{components.filter(component=>component.id!==componentId).map(component=><option key={component.id} value={component.id}>{component.name}</option>)}</select>
+                {[false,true].map(blend=><button key={String(blend)} disabled={!componentId||!targetId} onClick={()=>{try{setWorkbenchError(null);api.current?.combine(componentId!,targetId,blend);}catch(cause){setWorkbenchError(cause instanceof Error?cause.message:"Assembly change failed.");}}}>{blend?"BLEND ASSEMBLY":"ADD A TO B"}</button>)}
+                <select aria-label="New component shape" value={addKind} onChange={event=>setAddKind(event.target.value as CatalogKind)}>{(["box","sphere","cylinder","panel","beam","coil","motor","battery"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}</select>
+                <button onClick={()=>api.current?.add(addKind)}>ADD COMPONENT</button>
+                <button disabled={!undoCount} onClick={()=>api.current?.undo()}>UNDO</button>
+                <button onClick={()=>{void api.current?.exportAssembly().catch(cause=>setWorkbenchError(String(cause)));}}>SAVE GLB</button>
+              </div>
+              <p className="reality-parts-hint">Select a component to highlight it. Drag its handles to edit. Blend combines components into an editable assembly.</p>
+              {selectedComponent && !selectedComponent.detail && <p>{selectedComponent.name}: extracted model geometry. Its technical role has not been identified.</p>}
+              {workbenchError && <p role="alert">{workbenchError}</p>}
+            </div>}
+            <p className="reality-parts-hint">Select a component to explore how it works.</p>
             {dissected && <p className="reality-parts-hint">Exploded concept illustration · Internal construction is illustrative.</p>}
             {!dissected && partsLoading && <p role="status">Loading part labels…</p>}
             {!dissected && partsError && <div role="alert"><p>{partsError}</p><button onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</button></div>}

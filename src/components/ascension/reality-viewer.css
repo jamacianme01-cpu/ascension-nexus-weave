@@ -555,3 +555,8 @@
 .reality-dissection-picture svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .reality-dissection-picture polyline { fill: none; stroke: #23566e; stroke-width: 0.3; }
 .reality-dissection-label { position: absolute; width: 20%; transform: translateY(-50%); min-height: 32px !important; padding: 5px !important; font-size: clamp(9px, 1vw, 12px) !important; letter-spacing: 0 !important; overflow-wrap: anywhere; }
+
+.reality-component-list,.reality-component-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.reality-component-list { max-height:120px; overflow:auto; }
+.reality-component-actions select { max-width:100%; border:1px solid #5c819b70; background:#152431; color:#e7f2f8; border-radius:8px; padding:8px; }
+.reality-component-workbench p { text-align:left; margin:8px 0; }

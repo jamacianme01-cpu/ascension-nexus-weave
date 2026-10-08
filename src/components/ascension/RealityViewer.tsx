@@ -1051,6 +1051,11 @@ export function RealityViewer({
       if (model) fit();
     };
     const fit = () => {
+      if (model) {
+        const assemblyBox = new THREE.Box3().setFromObject(model);
+        for(const object of addedObjects)if(object.parent)assemblyBox.union(new THREE.Box3().setFromObject(object));
+        if(!assemblyBox.isEmpty()){assemblyBox.getSize(bounds);assemblyBox.getCenter(center);}
+      }
       const radius = bounds.length() / 2;
       const angle = Math.min(
         THREE.MathUtils.degToRad(perspective.fov / 2),

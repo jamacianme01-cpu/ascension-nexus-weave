@@ -79,6 +79,8 @@ export function RealityViewer({
   objective,
   initialMode,
   onClose,
+  onNewObjective,
+  newObjectiveDisabled,
   soundEnabled,
   onToggleSound,
   onDive,
@@ -87,6 +89,8 @@ export function RealityViewer({
   objective: string;
   initialMode: RealityMode;
   onClose: () => void;
+  onNewObjective: () => void;
+  newObjectiveDisabled: boolean;
   soundEnabled: boolean;
   onToggleSound: () => void;
   onDive: () => void;
@@ -1647,6 +1651,9 @@ export function RealityViewer({
       <header className="reality-header">
         <button className="reality-back" onClick={onClose}>
           ← BACK TO PATHWAYS
+        </button>
+        <button onClick={onNewObjective} disabled={newObjectiveDisabled}>
+          NEW OBJECTIVE
         </button>
         <div className="reality-title">
           <span>ASCENSION / ENVISION</span>

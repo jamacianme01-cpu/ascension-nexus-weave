@@ -703,7 +703,10 @@ export function Engage() {
 
   const deliveryQuery = useQuery<DeliveryState | null>({
     queryKey: ["ascension", "delivery", active, access, runQuery.data?.status ?? null],
-    placeholderData: (prev) => prev,
+    placeholderData: (prev, previousQuery) =>
+      previousQuery?.queryKey[2] === active && previousQuery?.queryKey[3] === access
+        ? prev
+        : undefined,
     enabled: Boolean(active) && (access === "auth" || Boolean(guestToken)),
     queryFn: () =>
       access === "guest"
@@ -1000,7 +1003,10 @@ export function Engage() {
   const error = engage.error ?? runQuery.error ?? deliveryQuery.error ?? prepare.error;
   const canEngage = Boolean(objective.trim()) && !engage.isPending;
   const startBookSequence = () => {
-    if (!canEngage || bookSequence !== "idle") return;
+    if (!canEngage) return;
+    setActive(null);
+    setReality(null);
+    setTreeChoiceId(null);
     sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
     sequenceTimers.current = [];
     setBookOpen(true);
@@ -1042,6 +1048,31 @@ export function Engage() {
     atmosphere.current = null;
     setReality(null);
   };
+  const newObjective = () => {
+    if (engage.isPending) return;
+    closeReality();
+    sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    sequenceTimers.current = [];
+    setActive(null);
+    setObjective("");
+    setEvidence("");
+    setConstraints("");
+    setFollow(null);
+    setTreeChoiceId(null);
+    setDetailsOpen(false);
+    setBookSequence("idle");
+    setBookOpen(false);
+    setRevealed(false);
+    engage.reset();
+    prepare.reset();
+    save(ACTIVE, "");
+    save(DRAFT, "");
+    window.history.replaceState(null, "", "/");
+    window.requestAnimationFrame(() => {
+      inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      inputRef.current?.focus({ preventScroll: true });
+    });
+  };
   // Reality editing belongs to the pathway layer itself. Every delivered
   // reality gets the same editor, regardless of the wording of the objective.
   const immersiveChoices = Boolean(delivery && run && (delivery.pathways.length || delivery.blend));
@@ -1069,6 +1100,8 @@ export function Engage() {
           onToggleSound={toggleSound}
           onDive={() => sound("open")}
           onClose={closeReality}
+          onNewObjective={newObjective}
+          newObjectiveDisabled={engage.isPending}
         />
       )}
       <section aria-label="Engage ASCENSION" className="ascension-command">
@@ -1155,6 +1188,12 @@ export function Engage() {
           </details>
 
           <div className="relative z-[30] flex flex-wrap items-center justify-between gap-3">
+            {active && (
+              <button type="button" onClick={newObjective} disabled={engage.isPending}
+                className="min-h-11 text-sm text-gold disabled:opacity-40">
+                NEW OBJECTIVE
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setHistoryOpen((v) => !v)}
@@ -1164,11 +1203,11 @@ export function Engage() {
             </button>
             <button
               type="button"
-              disabled={!canEngage || bookSequence !== "idle"}
+              disabled={!canEngage}
               onClick={startBookSequence}
               className="min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-[0.14em] text-gold disabled:opacity-40"
             >
-              {bookSequence !== "idle" || engage.isPending
+              {engage.isPending
                 ? "ENGAGING ASCENSION…"
                 : "ENGAGE ASCENSION"}
             </button>

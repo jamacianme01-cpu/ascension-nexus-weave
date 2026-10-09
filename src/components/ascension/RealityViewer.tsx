@@ -1649,6 +1649,7 @@ export function RealityViewer({
         </div>
       )}
       <header className="reality-header">
+        <div className="reality-navigation">
         <button className="reality-back" onClick={onClose}>
           ← BACK TO PATHWAYS
         </button>
@@ -1660,6 +1661,8 @@ export function RealityViewer({
           <h1>{objective}</h1>
           <p className="reality-pathway-label">{pathway.label}</p>
         </div>
+        </div>
+        <div className="reality-view-controls" role="group" aria-label="Drawing views and parts">
         <button disabled={!ready} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode(value=>value==="blueprint"?"cutaway":"blueprint");}}>
           BLUEPRINT
         </button>
@@ -1672,7 +1675,7 @@ export function RealityViewer({
         <button className="reality-sound" aria-pressed={soundEnabled} onClick={onToggleSound}>
           {soundEnabled ? "SOUND ON" : "SOUND OFF"}
         </button>
-
+        </div>
       </header>
       <div className="reality-model-stage">
         <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:dissected ? "hidden" : "visible"}} />

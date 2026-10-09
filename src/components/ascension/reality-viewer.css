@@ -566,3 +566,52 @@
 .reality-named-parts strong { font-size:13px; }
 .reality-named-parts span { font-size:12px; line-height:1.4; opacity:0.9; }
 .reality-geometry-details summary { cursor:pointer; color:#abc2ce; padding:8px 0; }
+
+/* Keep the drawing controls visible independently of navigation and long titles. */
+.reality-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  max-height: none;
+  overflow: visible;
+}
+.reality-navigation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.reality-navigation .reality-title { order: -1; }
+.reality-view-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.reality-view-controls button {
+  min-width: 0;
+  padding: 10px 6px;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .reality-header { padding: 8px 10px; gap: 8px; }
+  .reality-navigation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
+  }
+  .reality-navigation .reality-title {
+    order: 0;
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .reality-navigation button { padding: 8px; font-size: 10px; }
+  .reality-title h1,
+  .reality-pathway-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .reality-view-controls .reality-parts-tab { grid-row: auto; grid-column: auto; }
+  .reality-view-controls button { font-size: 10px; letter-spacing: 0; }
+}

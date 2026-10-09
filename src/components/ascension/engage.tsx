@@ -1307,7 +1307,7 @@ export function Engage() {
             </div>
           </details>
 
-          <div className="relative z-[30] flex flex-wrap items-center justify-between gap-3">
+          <nav className="ascension-question-tools" aria-label="Question history and new objectives">
             {active && (
               <button type="button" onClick={newObjective} disabled={engage.isPending}
                 className="min-h-11 text-sm text-gold disabled:opacity-40">
@@ -1321,6 +1321,8 @@ export function Engage() {
             >
               {historyOpen ? "Close past results" : "Past results"}
             </button>
+          </nav>
+          <div className="relative z-[30] flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
               disabled={!canEngage}
@@ -1334,7 +1336,7 @@ export function Engage() {
           </div>
 
           {historyOpen && (
-            <div className="rounded-xl border border-border p-4">
+            <section className="ascension-history rounded-xl border border-border p-4" aria-label="Saved questions">
               {pastQuestions.length ? (
                 pastQuestions.map((item) => (
                   <button
@@ -1356,7 +1358,7 @@ export function Engage() {
                 <p className="text-sm text-muted-foreground">No saved results yet.</p>
               )}
               {history.error && <p className="mt-3 text-sm text-gold">Account history could not be loaded. Saved questions from this browser are shown.</p>}
-            </div>
+            </section>
           )}
 
           {error && (

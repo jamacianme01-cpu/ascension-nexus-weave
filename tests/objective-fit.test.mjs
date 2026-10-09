@@ -86,6 +86,22 @@ try {
   gateway([omitted]); await assert.rejects(() => fit.reviewObjectiveFit(request, correct), /incomplete/);
   pass("omitted or duplicate target checks cannot authorize a result");
 
+  const iteration = await server.ssrLoadModule("/src/lib/ascension/iteration-model.ts");
+  const revisedRequest = { ...request, evidence: [...iteration.revisionEvidence("new_answers"),
+    iteration.priorResultContext({ id: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa", objective: request.objective }, correct, "refine")] };
+  gateway([verdict(correct)]);
+  const exactRepeat = await fit.reviewObjectiveFit(revisedRequest, correct);
+  assert.equal(exactRepeat.matches, false);
+  assert.match(exactRepeat.issues[0], /repeats an earlier answer/);
+  const novel = model.parseDelivery({ ...correct, pathways: [{ ...correct.pathways[0],
+    summary: "A separate modular end-region design uses individually adjustable annotation nodes.",
+    steps: ["Arrange each named end region as an independent module.", "Show the connections between modules."] }] });
+  calls = gateway([correct, verdict(correct), novel, verdict(novel)]);
+  const freshResult = await engine.externalProductDraft(revisedRequest, []);
+  assert.equal(calls.length, 4);
+  assert.equal(freshResult.pathways[0].summary, novel.pathways[0].summary);
+  pass("new answers repair exact repeats even when the model's own review accepts them");
+
   calls = gateway([wrong, verdict(wrong, ["result"]), wrong, verdict(wrong, ["result"])]);
   await assert.rejects(() => engine.externalProductDraft(request, []), /still does not match/);
   assert.equal(calls.length, 4);
@@ -144,3 +160,4 @@ try {
   if (priorKey === undefined) delete process.env.LOVABLE_API_KEY; else process.env.LOVABLE_API_KEY = priorKey;
   await server.close();
 }
+

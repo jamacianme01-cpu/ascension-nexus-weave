@@ -69,6 +69,20 @@ export function pathwayBlendInput(requestId: string, objective: string, pathway:
     pathwayId: pathway.id, pathwayLabel: pathway.label, kind: "pathway", name: pathway.label,
     description: [pathway.summary, ...pathway.steps, ...pathway.tradeoffs].join("\n").slice(0, 6000) };
 }
+export type PathwayVariable = { field: "summary" | "step" | "tradeoff"; index: number; name: string; description: string };
+/** Select the actual delivered detail, without requiring a generated mesh or inferred part labels. */
+export function pathwayVariables(pathway: ObjectivePathway): PathwayVariable[] {
+  return [
+    { field: "summary" as const, index: 0, name: "Design approach", description: pathway.summary },
+    ...pathway.steps.map((description, index) => ({ field: "step" as const, index, name: `Step ${index + 1}`, description })),
+    ...pathway.tradeoffs.map((description, index) => ({ field: "tradeoff" as const, index, name: `Tradeoff ${index + 1}`, description })),
+  ].filter(variable => variable.description.trim());
+}
+export function variableBlendInput(requestId: string, objective: string, pathway: ObjectivePathway, variable: PathwayVariable): BlendInput {
+  return { key: `${requestId}:${pathway.id}:variable:${variable.field}:${variable.index}`,
+    requestId, objective, pathwayId: pathway.id, pathwayLabel: pathway.label, kind: "variable",
+    name: `${pathway.label} · ${variable.name}`, description: variable.description };
+}
 export function partBlendInput(
   requestId: string, objective: string, pathway: ObjectivePathway, part: DesignPart,
   field?: "purpose" | "location" | "operation" | "connections" | "limitations",
@@ -122,10 +136,11 @@ export function revisionEvidence(kind: "new_answers" | "blend", inputs: BlendInp
     instruction: kind === "blend"
       ? "Create a NEW combined design from exactly the selected inputs. Explain what combines, what changes, and any conflicts. Do not substitute the old automatic blend or include unselected alternatives. Preserve the current objective and the supplied changes."
       : "Produce materially different answers and pathways to the same objective. Use the previous result for comparison, not as a response to repeat. Keep the user's sources and requirements.",
-    changes: changes.trim().slice(0, 900), input_count: inputs.length });
+    changes: kind === "blend" ? changes.trim().slice(0, 900) : "", input_count: inputs.length });
   const records = inputs.flatMap((input, index) => {
     const meta = { source: "ASCENSION_BLEND", input: index + 1,
       request_id: input.requestId, pathway_id: input.pathwayId.slice(0, 150),
+      original_objective: input.objective.slice(0, 300),
       pathway: input.pathwayLabel.slice(0, 200), kind: input.kind, name: input.name.slice(0, 200),
     };
     const width = Math.max(50, Math.floor((1900 - JSON.stringify(meta).length - 90) / 2));
@@ -138,3 +153,32 @@ export function revisionEvidence(kind: "new_answers" | "blend", inputs: BlendInp
   if (records.length > 29) throw new Error("This blend has too much detail. Choose fewer inputs.");
   return [header, ...records];
 }
+
+/** Exact repeats cannot qualify as new answers even if a model review accepts them. */
+export function repeatedRevisionTargets(evidence: unknown, delivery: {
+  body: string; pathways: { summary: string; steps: string[] }[];
+  blend: { summary: string; steps: string[] } | null;
+}): string[] {
+  if (!Array.isArray(evidence)) return [];
+  const records = evidence.map(contextRecord).filter((value): value is Record<string, unknown> => Boolean(value));
+  if (!records.some(value => value["source"] === "ASCENSION_REVISION" && value["action"] === "new_answers")) return [];
+  const parent = [...records].reverse().find(value => value["source"] === "ASCENSION_PARENT_CONTEXT");
+  const prior = contextRecord(parent?.["prior_result"]);
+  if (!prior) return [];
+  const normalize = (value: unknown) => typeof value === "string" ? value.toLowerCase().replace(/\s+/g, " ").trim() : "";
+  const signature = (value: unknown) => {
+    const path = contextRecord(value);
+    if (!path) return "";
+    const summary = normalize(path["summary"]);
+    const steps = Array.isArray(path["steps"]) ? path["steps"].map(normalize).filter(Boolean) : [];
+    return summary || steps.length ? JSON.stringify([summary, steps]) : "";
+  };
+  const previous = Array.isArray(prior["pathways"]) ? prior["pathways"] : [];
+  const signatures = new Set([...previous, prior["blend"]].map(signature).filter(Boolean));
+  const repeats = delivery.pathways.flatMap((path, index) => signatures.has(signature(path)) ? [`pathway_${index + 1}`] : []);
+  if (delivery.blend && signatures.has(signature(delivery.blend))) repeats.push("blend");
+  if (!delivery.pathways.length && !delivery.blend && normalize(delivery.body) && normalize(delivery.body) === normalize(prior["body"]))
+    repeats.push("result");
+  return repeats;
+}
+

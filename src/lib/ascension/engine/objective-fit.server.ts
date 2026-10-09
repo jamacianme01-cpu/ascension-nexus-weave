@@ -1,6 +1,7 @@
 import type { Json } from "@/integrations/supabase/types";
 import type { ObjectiveDelivery } from "../result-model";
 import { callZai } from "./zai.server";
+import { repeatedRevisionTargets } from "../iteration-model";
 
 type ObjectiveInput = { objective: string; evidence?: Json | null; constraints?: Json | null };
 export type ObjectiveFitReview = {
@@ -61,6 +62,9 @@ export async function reviewObjectiveFit(
     if (!check["matches"]) issues.push(`${check["target"]}: ${check["reason"].slice(0, 1000)}`);
   }
   if (expected.size) throw new Error("The objective meaning check omitted a result.");
+  for (const target of repeatedRevisionTargets(run.evidence, delivery)) {
+    issues.push(`${target}: This repeats an earlier answer; new answers require a different approach.`);
+  }
   const question = typeof value["question"] === "string" ? value["question"].trim() : null;
   return { interpretation: value["interpretation"].trim(), question,
     matches: !question && !issues.length, issues };
@@ -106,3 +110,4 @@ export async function stampObjectiveFit(
   }
   return { ...delivery, objective_fit: { objective, interpretation, content_key: await meaningKey(delivery) } };
 }
+

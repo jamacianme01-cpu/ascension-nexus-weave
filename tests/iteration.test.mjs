@@ -89,6 +89,20 @@ try {
   assert.throws(() => iteration.revisionEvidence("blend", [path]), /at least two/);
   pass("a new blend carries only explicitly selected pathways, parts or variables, including cross-result inputs");
 
+  const detailedPath = { ...priorResult.pathways[0], tradeoffs: ["Needs a sealed mount."] };
+  const variables = iteration.pathwayVariables(detailedPath);
+  const approach = iteration.variableBlendInput(idA, parent.objective, detailedPath, variables[0]);
+  const step = iteration.variableBlendInput(idA, parent.objective, detailedPath, variables[1]);
+  const detailEvidence = iteration.revisionEvidence("blend", [approach, step]).map(JSON.parse);
+  assert.notEqual(approach.key, step.key);
+  assert.equal(approach.kind, "variable");
+  assert.equal(detailEvidence.find(item => item.input === 1).description, detailedPath.summary);
+  assert.equal(detailEvidence.find(item => item.input === 2).description, detailedPath.steps[0]);
+  assert.equal(detailEvidence.find(item => item.input === 2).original_objective, parent.objective);
+  assert.ok(detailEvidence.every(item => !String(item.description).includes(detailedPath.tradeoffs[0])));
+  assert.equal(JSON.parse(iteration.revisionEvidence("new_answers", [], "Unsubmitted blend edits")[0]).changes, "");
+  pass("delivered variables can blend before a mesh exists and unrelated blend edits cannot affect new answers");
+
   const long = { ...path, description: '"\n\\'.repeat(1600) };
   const packed = iteration.revisionEvidence("blend", [long, variable]);
   assert.ok(packed.every(item => item.length <= 2000));
@@ -103,6 +117,16 @@ try {
   assert.equal(JSON.parse(revised[0]).action, "new_answers");
   assert.deepEqual(iteration.editableEvidence(["User source", context, { parent_request_id: idA }, ...revised]), ["User source"]);
   pass("new answers compare with the prior result without recursively copying generated context into the editor");
+
+  const repeated = { ...priorResult, pathways: [{ ...priorResult.pathways[0], id: "new-id", label: "Renamed pathway" }] };
+  assert.deepEqual(iteration.repeatedRevisionTargets([...revised, context], repeated), ["pathway_1"]);
+  assert.deepEqual(iteration.repeatedRevisionTargets([context], repeated), []);
+  assert.deepEqual(iteration.repeatedRevisionTargets([...revised, context], { ...repeated,
+    pathways: [{ summary: "A fixed bench mounts the sensor on a stationary post.", steps: ["Anchor a stationary post."] }] }), []);
+  assert.deepEqual(iteration.repeatedRevisionTargets([...revised,
+    iteration.priorResultContext(parent, { ...priorResult, pathways: [] }, "refine")],
+    { ...priorResult, pathways: [], body: `  ${priorResult.body.toUpperCase()}  ` }), ["result"]);
+  pass("new ids and labels cannot disguise repeated pathways while ordinary continuation can reuse them");
 
   await guest.submitGuestObjective({ data: { objective: parent.objective, evidence: revised,
     parentRequestId: idA, parentGuestToken: tokenA, followUp: "refine" } });
@@ -121,3 +145,4 @@ try {
   pass("signed-in revisions read the generated answer as well as the older delivery stage");
   console.log(`${passed} iteration workflow checks passed`);
 } finally { await server.close(); delete globalThis.__iterationDatabase; delete globalThis.__iterationAuthContext; }
+

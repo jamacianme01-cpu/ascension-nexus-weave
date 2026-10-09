@@ -36,7 +36,7 @@ import {
 import {
   editableEvidence, parentQuestionId, pathwayBlendInput, partBlendInput,
   readSavedQuestions, rememberQuestion, readBlendSelection, saveBlendSelection,
-  toggleBlendInput, revisionEvidence, type SavedQuestion, type BlendInput,
+  toggleBlendInput, revisionEvidence, pathwayVariables, variableBlendInput, type SavedQuestion, type BlendInput,
 } from "@/lib/ascension/iteration-model";
 
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
@@ -352,6 +352,9 @@ export function ResultContent({
   canInspect = false,
   selectedBlendIds = [],
   onToggleBlend,
+  selectedVariableKeys = [],
+  onToggleVariable,
+  variableKey,
 }: {
   delivery: ObjectiveDelivery;
   source?: "governed" | "external_draft" | null;
@@ -359,6 +362,9 @@ export function ResultContent({
   canInspect?: boolean;
   selectedBlendIds?: string[];
   onToggleBlend?: (pathway: ObjectiveDelivery["pathways"][number]) => void;
+  selectedVariableKeys?: string[];
+  onToggleVariable?: (pathway: ObjectiveDelivery["pathways"][number], variable: ReturnType<typeof pathwayVariables>[number]) => void;
+  variableKey?: (pathway: ObjectiveDelivery["pathways"][number], variable: ReturnType<typeof pathwayVariables>[number]) => string;
 }) {
   const hasVisualChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
   // ENVISION's interactive 3D scene is the primary visual whenever pathways exist.
@@ -370,6 +376,24 @@ export function ResultContent({
   const body = splitResultBody(delivery.body);
   const otherFiles = delivery.files.filter(
     (file) => file !== drawing && !(/\.svg$/i.test(file.name) && hasVisualChoices),
+  );
+  const variablesFor = (pathway: ObjectiveDelivery["pathways"][number]) => onToggleVariable && variableKey && (
+    <details className="ascension-variable-picker mt-3" onClick={event => event.stopPropagation()}
+      onKeyDown={event => event.stopPropagation()}>
+      <summary className="min-h-11 cursor-pointer py-3 text-sm text-gold">Choose variables to blend</summary>
+      <div className="space-y-2" role="group" aria-label={`Variables from ${pathway.label}`}>
+        {pathwayVariables(pathway).map(variable => {
+          const key = variableKey(pathway, variable);
+          return <label key={key} className="flex min-h-11 items-start gap-3 rounded-lg border border-gold/20 p-3 text-sm">
+            <input type="checkbox" className="mt-1 shrink-0" checked={selectedVariableKeys.includes(key)}
+              onChange={() => onToggleVariable(pathway, variable)}
+              aria-label={`Use ${variable.name} from ${pathway.label} in a new blend`} />
+            <span className="min-w-0 break-words"><strong className="block text-gold">{variable.name}</strong>
+              {cleanDisplayText(variable.description)}</span>
+          </label>;
+        })}
+      </div>
+    </details>
   );
 
   return (
@@ -506,6 +530,7 @@ export function ResultContent({
                     Tradeoffs: {pathway.tradeoffs.map(cleanDisplayText).join(" · ")}
                   </p>
                 )}
+                {variablesFor(pathway)}
                 {canInspect && (
                   <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(pathway); }}
                     className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-primary uppercase">
@@ -545,6 +570,7 @@ export function ResultContent({
                     Why blended: {cleanDisplayText(delivery.blend.blend_reason)}
                   </p>
                 )}
+                {variablesFor(delivery.blend)}
                 {canInspect && (
                   <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(delivery.blend!); }}
                     className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-gold uppercase">
@@ -1115,7 +1141,7 @@ export function Engage() {
   const newRevision = (kind: "new_answers" | "blend") => {
     if (!run || !delivery || engage.isPending) return;
     try {
-      const revision = revisionEvidence(kind, kind === "blend" ? blendInputs : [], blendChanges);
+      const revision = revisionEvidence(kind, kind === "blend" ? blendInputs : [], kind === "blend" ? blendChanges : "");
       const sources = editableEvidence(run.evidence);
       if (revision.length + sources.length > 32)
         throw new Error("This revision has too many selected details or source entries. Choose fewer inputs.");
@@ -1424,6 +1450,9 @@ export function Engage() {
                 onInspect={inspectPathwayReality}
                 selectedBlendIds={blendInputs.filter(item => item.requestId === run.id && item.kind === "pathway").map(item => item.pathwayId)}
                 onToggleBlend={pathway => updateBlend(pathwayBlendInput(run.id, run.objective, pathway))}
+                selectedVariableKeys={blendInputs.filter(item => item.requestId === run.id && item.kind === "variable").map(item => item.key)}
+                variableKey={(pathway, variable) => variableBlendInput(run.id, run.objective, pathway, variable).key}
+                onToggleVariable={(pathway, variable) => updateBlend(variableBlendInput(run.id, run.objective, pathway, variable))}
               />
               {blendControls}
             </>
@@ -1486,4 +1515,5 @@ export function Engage() {
     </div>
   );
 }
+
 

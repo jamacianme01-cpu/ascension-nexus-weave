@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -84,6 +84,11 @@ export function RealityViewer({
   soundEnabled,
   onToggleSound,
   onDive,
+  onBuildOn,
+  onNewAnswers,
+  isPartSelected,
+  onTogglePart,
+  blendControls,
 }: {
   pathway: ObjectivePathway;
   objective: string;
@@ -94,6 +99,11 @@ export function RealityViewer({
   soundEnabled: boolean;
   onToggleSound: () => void;
   onDive: () => void;
+  onBuildOn: () => void;
+  onNewAnswers: () => void;
+  isPartSelected: (part: DesignPart, field?: "purpose" | "location" | "operation" | "connections" | "limitations") => boolean;
+  onTogglePart: (part: DesignPart, field?: "purpose" | "location" | "operation" | "connections" | "limitations") => void;
+  blendControls: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -1771,19 +1781,34 @@ export function RealityViewer({
             {!dissected && partsError && <div role="alert"><p>{partsError}</p><button onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</button></div>}
             {selectedPart && (dissected || (!partsLoading && !partsError)) && <article id="reality-part-detail" className="reality-part-detail" aria-live="polite">
               <h2>{selectedPart.name}</h2>
+              <label className="reality-blend-choice">
+                <input type="checkbox" checked={isPartSelected(selectedPart)} onChange={() => onTogglePart(selectedPart)} />
+                Use {selectedPart.name} in a new blend
+              </label>
               {!dissected && !componentId && <p>This feature is located on shared geometry. It is not yet a separate editable component.</p>}
               <dl>{([
-                ["Purpose", selectedPart.purpose],
-                ["Location in the design", selectedPart.location],
-                ["How it works", selectedPart.operation],
-                ["Connections", selectedPart.connections],
-                ["Design limits", selectedPart.limitations],
-              ] as const).map(([label, text]) => <div key={label}><dt>{label}</dt><dd>{text}</dd></div>)}</dl>
+                ["Purpose", selectedPart.purpose, "purpose"],
+                ["Location in the design", selectedPart.location, "location"],
+                ["How it works", selectedPart.operation, "operation"],
+                ["Connections", selectedPart.connections, "connections"],
+                ["Design limits", selectedPart.limitations, "limitations"],
+              ] as const).map(([label, text, field]) => <div key={label}><dt>
+                <label className="reality-blend-choice">
+                  <input type="checkbox" checked={isPartSelected(selectedPart, field)}
+                    onChange={() => onTogglePart(selectedPart, field)} aria-label={`Use ${selectedPart.name} ${label} in a new blend`} />
+                  {label}
+                </label>
+              </dt><dd>{text}</dd></div>)}</dl>
             </article>}
           </section>
         )}
         {ready && !dissected && mode==="blueprint" && <div className="reality-mode-controls" aria-label="Blueprint camera views">{(["top","front","side","perspective"] as const).map(view=><button key={view} onClick={()=>api.current?.view(view)}>{view==="perspective"?"3D":view.toUpperCase()}</button>)}</div>}
         {ready && !dissected && <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>}
+        <div className="reality-revision-actions" aria-label="Work from this result">
+          <button disabled={newObjectiveDisabled} onClick={onBuildOn}>BUILD ON RESULT</button>
+          <button disabled={newObjectiveDisabled} onClick={onNewAnswers}>NEW ANSWERS</button>
+        </div>
+        {blendControls}
       </footer>
       )}
     </dialog>,

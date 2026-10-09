@@ -561,7 +561,17 @@ try {
       }],
       blend: null,
     };
-    globalThis.fetch = async () => new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(visualDraft) } }] }) + '\n');
+    const matchingReview = (init) => {
+      try {
+        const body = JSON.parse(init.body);
+        const input = JSON.parse(body.messages[1].content);
+        if (!input.proposed_targets) return null;
+        return { interpretation: input.original_objective, question: null,
+          checks: input.proposed_targets.map(target => ({ target: target.target, matches: true, reason: "Matches this test's submitted objective." })) };
+      } catch { return null; }
+    };
+    const streamed = value => new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(value) } }] }) + '\n');
+    globalThis.fetch = async (_url, init) => streamed(matchingReview(init) ?? visualDraft);
     const prepared = await deliveryEngine.externalProductDraft({
       id: "drawing-request", objective: "draw programmable cubits", result: null, status: "running",
     }, []);
@@ -580,11 +590,13 @@ try {
       assert.match(prepared.limitations.join(" "), /not a completed drawing/);
     });
     let drawingCalls = 0;
-    globalThis.fetch = async () => {
+    globalThis.fetch = async (_url, init) => {
+      const reviewed = matchingReview(init);
+      if (reviewed) return streamed(reviewed);
       const response = ++drawingCalls === 1
         ? { ...visualDraft, kind: "answer", pathways: [] }
         : { ...visualDraft, kind: "answer" };
-      return new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(response) } }] }) + '\n');
+      return streamed(response);
     };
     const repairedDrawing = await deliveryEngine.externalProductDraft({
       id: "repair-drawing-request", objective: "draw programmable cubits", result: null,

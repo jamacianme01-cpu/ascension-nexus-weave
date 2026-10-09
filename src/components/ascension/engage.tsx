@@ -33,6 +33,11 @@ import {
   strings,
   type ObjectiveDelivery,
 } from "@/lib/ascension/result-model";
+import {
+  editableEvidence, parentQuestionId, pathwayBlendInput, partBlendInput,
+  readSavedQuestions, rememberQuestion, readBlendSelection, saveBlendSelection,
+  toggleBlendInput, revisionEvidence, type SavedQuestion, type BlendInput,
+} from "@/lib/ascension/iteration-model";
 
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
 const ACTIVE = "ascension.active-objective";
@@ -42,7 +47,38 @@ const GUEST_TOKEN = "ascension.active-guest-token";
 const SOUND_PREF = "ascension.sound.enabled";
 const BOOK_TREE_SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 type FollowUp = "continue" | "refine";
-type FollowState = { id: string; kind: FollowUp; pathwayLabel?: string };
+type FollowState = { id: string; kind: FollowUp; pathwayLabel?: string; access: "guest" | "auth"; guestToken?: string | undefined };
+type SubmissionInput = {
+  objective: string; evidence: string[]; constraints: string[];
+  parentRequestId?: string; followUp?: FollowUp; parentGuestToken?: string | undefined;
+  parentAccess?: "guest" | "auth";
+};
+
+function BlendControls({ inputs, changes, onChanges, onRemove, onCreate, disabled, error }: {
+  inputs: BlendInput[]; changes: string; onChanges: (value: string) => void;
+  onRemove: (key: string) => void; onCreate: () => void; disabled: boolean;
+  error?: string | null;
+}) {
+  if (!inputs.length) return null;
+  return <div className="space-y-3 rounded-xl border border-gold/35 bg-gold/5 p-3" aria-label="Selected blend inputs">
+    <p className="text-sm text-gold">{inputs.length} selected for a new blend</p>
+    <div className="flex flex-wrap gap-2">{inputs.map(input => <button type="button" key={input.key}
+      onClick={() => onRemove(input.key)} aria-label={`Remove ${input.name} from blend`}
+      className="rounded-lg border border-gold/35 px-3 py-2 text-left text-sm text-foreground">
+      {input.name} <span aria-hidden="true">×</span>
+    </button>)}</div>
+    <label className="block text-sm text-foreground">Changes for this blend
+      <textarea value={changes} onChange={event => onChanges(event.target.value)} maxLength={900} rows={2}
+        placeholder="Change a variable, describe how the parts should connect, or leave as selected."
+        className="mt-2 w-full rounded-lg border border-gold/30 bg-void/60 p-3" />
+    </label>
+    <button type="button" disabled={disabled || inputs.length < 2} onClick={onCreate}
+      className="min-h-11 rounded-full border border-gold/50 px-5 text-sm text-gold disabled:opacity-40">
+      CREATE NEW BLEND
+    </button>
+    {error && <p role="alert" className="text-sm text-gold">{error}</p>}
+  </div>;
+}
 
 function save(key: string, value: string) {
   try {
@@ -314,11 +350,15 @@ export function ResultContent({
   source,
   onInspect,
   canInspect = false,
+  selectedBlendIds = [],
+  onToggleBlend,
 }: {
   delivery: ObjectiveDelivery;
   source?: "governed" | "external_draft" | null;
   onInspect?: (pathway: ObjectiveDelivery["pathways"][number]) => void;
   canInspect?: boolean;
+  selectedBlendIds?: string[];
+  onToggleBlend?: (pathway: ObjectiveDelivery["pathways"][number]) => void;
 }) {
   const hasVisualChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
   // ENVISION's interactive 3D scene is the primary visual whenever pathways exist.
@@ -435,21 +475,15 @@ export function ResultContent({
             {delivery.pathways.map((pathway, index) => (
               <article
                 key={pathway.id}
-                role={canInspect ? "button" : undefined}
-                tabIndex={canInspect ? 0 : undefined}
                 onClick={canInspect && onInspect ? () => onInspect(pathway) : undefined}
-                onKeyDown={
-                  canInspect && onInspect
-                    ? (event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          onInspect(pathway);
-                        }
-                      }
-                    : undefined
-                }
                 className={`rounded-xl border border-primary/25 bg-background/25 p-4 ${canInspect ? "cursor-pointer transition hover:border-primary/60 hover:bg-primary/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/45" : ""}`}
               >
+                {onToggleBlend && <label className="mb-3 flex min-h-11 items-center gap-2 text-sm text-gold"
+                  onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+                  <input type="checkbox" checked={selectedBlendIds.includes(pathway.id)}
+                    onChange={() => onToggleBlend(pathway)} aria-label={`Use ${pathway.label} in a new blend`} />
+                  Choose for blending
+                </label>}
                 <p className="text-[0.65rem] tracking-[0.16em] text-primary uppercase">
                   PATH {index + 1}
                   {pathway.spiral_form ? ` · ${cleanDisplayText(pathway.spiral_form)}` : ""}
@@ -473,30 +507,25 @@ export function ResultContent({
                   </p>
                 )}
                 {canInspect && (
-                  <p className="mt-4 text-xs font-medium tracking-[0.14em] text-primary uppercase">
+                  <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(pathway); }}
+                    className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-primary uppercase">
                     {pathway.model_url ? "DIVE INTO REALITY" : pathway.model_status === "failed" ? "3D GENERATION FAILED · VIEW STATUS" : "3D DRAWING PENDING · VIEW STATUS"}
-                  </p>
+                  </button>
                 )}
               </article>
             ))}
 
             {delivery.blend && (
               <article
-                role={canInspect ? "button" : undefined}
-                tabIndex={canInspect ? 0 : undefined}
                 onClick={canInspect && onInspect ? () => onInspect(delivery.blend!) : undefined}
-                onKeyDown={
-                  canInspect && onInspect
-                    ? (event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          onInspect(delivery.blend!);
-                        }
-                      }
-                    : undefined
-                }
                 className={`rounded-xl border border-gold/40 bg-gold/[0.04] p-4 ${canInspect ? "cursor-pointer transition hover:border-gold/70 hover:bg-gold/[0.08] focus:outline-none focus:ring-2 focus:ring-gold/45" : ""}`}
               >
+                {onToggleBlend && <label className="mb-3 flex min-h-11 items-center gap-2 text-sm text-gold"
+                  onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+                  <input type="checkbox" checked={selectedBlendIds.includes(delivery.blend.id)}
+                    onChange={() => onToggleBlend(delivery.blend!)} aria-label={`Use ${delivery.blend.label} in a new blend`} />
+                  Choose for blending
+                </label>}
                 <p className="text-[0.65rem] tracking-[0.16em] text-gold uppercase">BLEND</p>
                 <h3 className="mt-1 font-display text-xl text-foreground">
                   {cleanDisplayText(delivery.blend.label)}
@@ -517,9 +546,10 @@ export function ResultContent({
                   </p>
                 )}
                 {canInspect && (
-                  <p className="mt-4 text-xs font-medium tracking-[0.14em] text-gold uppercase">
+                  <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(delivery.blend!); }}
+                    className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-gold uppercase">
                     {delivery.blend.model_url ? "DIVE INTO BLENDED REALITY" : delivery.blend.model_status === "failed" ? "3D GENERATION FAILED · VIEW STATUS" : "3D DRAWING PENDING · VIEW STATUS"}
-                  </p>
+                  </button>
                 )}
               </article>
             )}
@@ -601,6 +631,11 @@ export function Engage() {
   const [guestToken, setGuestToken] = useState<string | null>(null);
   const [follow, setFollow] = useState<FollowState | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [savedQuestions, setSavedQuestions] = useState<SavedQuestion[]>([]);
+  const [blendInputs, setBlendInputs] = useState<BlendInput[]>([]);
+  const [blendChanges, setBlendChanges] = useState("");
+  const [iterationError, setIterationError] = useState<string | null>(null);
+  const reopenedQuestion = useRef<string | null>(null);
   const [bookSequence, setBookSequence] = useState<
     "idle" | "roots" | "trunk" | "nodes" | "canopy" | "eruption" | "processing"
   >("idle");
@@ -619,18 +654,25 @@ export function Engage() {
   const answerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    const saved = readSavedQuestions();
+    setSavedQuestions(saved);
+    setBlendInputs(readBlendSelection());
     // A normal visit must always open on a fresh command surface.
     // Resume a previous run only when the URL explicitly names that run
     // (for example, after the user selects Past results or follows a saved run link).
     const id = new URL(window.location.href).searchParams.get("run");
     if (id && /^[a-f0-9-]{36}$/i.test(id)) {
       setActive(id);
-      const storedAccess = read(ACCESS) === "auth" ? "auth" : "guest";
+      reopenedQuestion.current = id;
+      const entry = saved.find(item => item.id === id);
+      const storedAccess = entry?.access ?? (read(ACCESS) === "auth" ? "auth" : "guest");
       setAccess(storedAccess);
       if (storedAccess === "guest") {
-        const token = read(GUEST_TOKEN);
+        const token = entry?.guestToken ?? (read(ACTIVE) === id ? read(GUEST_TOKEN) : null);
         if (token && /^[a-f0-9-]{36}$/i.test(token)) setGuestToken(token);
       }
+      setFollow({ id, kind: "refine", access: storedAccess,
+        guestToken: entry?.guestToken ?? (read(ACTIVE) === id ? read(GUEST_TOKEN) ?? undefined : undefined) });
       setBookOpen(true);
       setRevealed(true);
     } else {
@@ -745,7 +787,10 @@ export function Engage() {
   const history = useQuery({
     queryKey: ["ascension", "my-objectives"],
     enabled: historyOpen,
-    queryFn: listMyObjectives,
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user ? listMyObjectives() : { items: [] };
+    },
     retry: false,
   });
 
@@ -762,29 +807,31 @@ export function Engage() {
   });
 
   const run = runQuery.data;
+  useEffect(() => {
+    if (!run || (access === "guest" && !guestToken)) return;
+    setSavedQuestions(rememberQuestion({ id: run.id, objective: run.objective, created_at: run.created_at,
+      access, ...(guestToken ? { guestToken } : {}), parentId: parentQuestionId(run.evidence) }));
+    if (reopenedQuestion.current === run.id) {
+      reopenedQuestion.current = null;
+      setObjective(run.objective);
+      setEvidence(editableEvidence(run.evidence).join("\n"));
+      setConstraints(strings(run.constraints).join("\n"));
+    }
+  }, [run?.id, run?.objective, access, guestToken]);
+  const pastQuestions = useMemo(() => {
+    const items = new Map<string, SavedQuestion>();
+    for (const item of history.data?.items ?? []) items.set(item.id, { id: item.id, objective: item.objective,
+      created_at: item.created_at, access: "auth", parentId: parentQuestionId(item.evidence) });
+    for (const item of savedQuestions) items.set(item.id, item);
+    return [...items.values()].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  }, [history.data, savedQuestions]);
 
   const engage = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        objective: objective.trim(),
-        evidence: evidence
-          .split("\n")
-          .map((v) => v.trim())
-          .filter(Boolean),
-        constraints: constraints
-          .split("\n")
-          .map((v) => v.trim())
-          .filter(Boolean),
-        ...(follow
-          ? {
-              parentRequestId: follow.id,
-              followUp: follow.kind,
-            }
-          : {}),
-      };
+    mutationFn: async (input: SubmissionInput) => {
+      const { parentAccess, parentGuestToken, ...payload } = input;
 
       const { data } = await supabase.auth.getUser();
-      if (data.user) {
+      if (parentAccess === "auth" || (data.user && !parentGuestToken)) {
         return {
           request: (await submitObjective({ data: payload })).request,
           access: "auth" as const,
@@ -795,7 +842,7 @@ export function Engage() {
       const guest = await submitGuestObjective({
         data: {
           ...payload,
-          ...(follow && guestToken ? { parentGuestToken: guestToken } : {}),
+          ...(parentGuestToken ? { parentGuestToken } : {}),
         },
       });
       return {
@@ -804,15 +851,24 @@ export function Engage() {
         guestToken: guest.guestToken,
       };
     },
-    onError: () => {
+    onError: (_error, input) => {
       // Return the Book to a usable state so the objective can be sent again.
       sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
       sequenceTimers.current = [];
       setBookSequence("idle");
-      setBookOpen(Boolean(run));
-      setRevealed(Boolean(run));
+      setObjective(input.objective);
+      setEvidence(editableEvidence(input.evidence).join("\n"));
+      setConstraints(input.constraints.join("\n"));
+      if (input.parentRequestId) {
+        setActive(input.parentRequestId);
+        autoDrawingRun.current = input.parentRequestId;
+        setFollow({ id: input.parentRequestId, kind: input.followUp ?? "refine",
+          access: input.parentAccess ?? "guest", guestToken: input.parentGuestToken });
+      }
+      setBookOpen(Boolean(input.parentRequestId));
+      setRevealed(Boolean(input.parentRequestId));
     },
-    onSuccess: async ({ request, access: nextAccess, guestToken: nextGuestToken }) => {
+    onSuccess: async ({ request, access: nextAccess, guestToken: nextGuestToken }, input) => {
       setAccess(nextAccess);
       save(ACCESS, nextAccess);
       if (nextAccess === "guest" && nextGuestToken) {
@@ -823,6 +879,8 @@ export function Engage() {
         save(GUEST_TOKEN, "");
       }
       client.setQueryData(["ascension", "run", request.id, nextAccess], request);
+      setSavedQuestions(rememberQuestion({ id: request.id, objective: request.objective, created_at: request.created_at,
+        access: nextAccess, ...(nextGuestToken ? { guestToken: nextGuestToken } : {}), parentId: input.parentRequestId }));
       setActive(request.id);
       save(ACTIVE, request.id);
       save(DRAFT, "");
@@ -858,6 +916,8 @@ export function Engage() {
           ["ascension", "delivery", request.id, nextAccess, request.status],
           immediateDelivery,
         );
+      } catch (cause) {
+        setIterationError(cause instanceof Error ? cause.message : String(cause));
       } finally {
         void client.invalidateQueries({
           queryKey: ["ascension", "delivery", request.id],
@@ -933,9 +993,10 @@ export function Engage() {
 
   const followUp = (kind: FollowUp) => {
     if (!run) return;
-    setFollow({ id: run.id, kind });
+    closeReality();
+    setFollow({ id: run.id, kind, access, ...(guestToken ? { guestToken } : {}) });
     setObjective(run.objective);
-    setEvidence(strings(run.evidence).join("\n"));
+    setEvidence(editableEvidence(run.evidence).join("\n"));
     setConstraints(strings(run.constraints).join("\n"));
     window.scrollTo({ top: 0, behavior: "smooth" });
     window.setTimeout(() => inputRef.current?.focus(), 250);
@@ -957,9 +1018,9 @@ export function Engage() {
       instruction:
         "Use this selected Spiral pathway as the direction for the next governed objective.",
     });
-    setFollow({ id: run.id, kind: "refine", pathwayLabel: pathway.label });
+    setFollow({ id: run.id, kind: "refine", pathwayLabel: pathway.label, access, ...(guestToken ? { guestToken } : {}) });
     setObjective(run.objective);
-    setEvidence([...strings(run.evidence), selection].join("\n"));
+    setEvidence([...editableEvidence(run.evidence), selection].join("\n"));
     setConstraints(strings(run.constraints).join("\n"));
     window.scrollTo({ top: 0, behavior: "smooth" });
     window.setTimeout(() => inputRef.current?.focus(), 250);
@@ -1000,12 +1061,13 @@ export function Engage() {
     setReality({ id: generated.id, mode: "blueprint" });
   }, [run?.id, run?.objective, delivery, reality]);
 
-  const error = engage.error ?? runQuery.error ?? deliveryQuery.error ?? prepare.error;
+  const error = iterationError ?? engage.error ?? runQuery.error ?? deliveryQuery.error ?? prepare.error;
   const canEngage = Boolean(objective.trim()) && !engage.isPending;
-  const startBookSequence = () => {
-    if (!canEngage) return;
+  const sendSubmission = (payload: SubmissionInput) => {
+    if (!payload.objective.trim() || engage.isPending) return;
+    setIterationError(null);
+    closeReality();
     setActive(null);
-    setReality(null);
     setTreeChoiceId(null);
     sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
     sequenceTimers.current = [];
@@ -1040,7 +1102,53 @@ export function Engage() {
     phase(1800, "nodes");
     phase(2800, "canopy");
     phase(3900, "processing");
-    engage.mutate();
+    engage.mutate(payload);
+  };
+  const startBookSequence = () => {
+    if (!canEngage) return;
+    sendSubmission({ objective: objective.trim(),
+      evidence: evidence.split("\n").map(value => value.trim()).filter(Boolean),
+      constraints: constraints.split("\n").map(value => value.trim()).filter(Boolean),
+      ...(follow ? { parentRequestId: follow.id, followUp: follow.kind,
+        parentAccess: follow.access, parentGuestToken: follow.guestToken } : {}) });
+  };
+  const newRevision = (kind: "new_answers" | "blend") => {
+    if (!run || !delivery || engage.isPending) return;
+    try {
+      const revision = revisionEvidence(kind, kind === "blend" ? blendInputs : [], blendChanges);
+      const sources = editableEvidence(run.evidence);
+      if (revision.length + sources.length > 32)
+        throw new Error("This revision has too many selected details or source entries. Choose fewer inputs.");
+      sendSubmission({ objective: run.objective, evidence: [...revision, ...sources],
+        constraints: strings(run.constraints), parentRequestId: run.id, followUp: "refine",
+        parentAccess: access, ...(guestToken ? { parentGuestToken: guestToken } : {}) });
+    } catch (cause) { setIterationError(cause instanceof Error ? cause.message : String(cause)); }
+  };
+  const updateBlend = (input: BlendInput) => {
+    setBlendInputs(prior => { const next = toggleBlendInput(prior, input); saveBlendSelection(next); return next; });
+  };
+  const removeBlend = (key: string) => {
+    setBlendInputs(prior => { const next = prior.filter(item => item.key !== key); saveBlendSelection(next); return next; });
+  };
+  const openQuestion = (item: SavedQuestion) => {
+    if (engage.isPending) return;
+    closeReality();
+    sequenceTimers.current.forEach(timer => window.clearTimeout(timer));
+    sequenceTimers.current = [];
+    const loaded = client.getQueryData<ObjectiveRun>(["ascension", "run", item.id, item.access]);
+    reopenedQuestion.current = loaded ? null : item.id;
+    autoDrawingRun.current = item.id;
+    setAccess(item.access); save(ACCESS, item.access);
+    setGuestToken(item.guestToken ?? null); save(GUEST_TOKEN, item.guestToken ?? "");
+    setActive(item.id); save(ACTIVE, item.id);
+    setObjective(item.objective);
+    setEvidence(loaded ? editableEvidence(loaded.evidence).join("\n") : "");
+    setConstraints(loaded ? strings(loaded.constraints).join("\n") : "");
+    setFollow({ id: item.id, kind: "refine", access: item.access, guestToken: item.guestToken });
+    setBookOpen(true); setRevealed(true); setDetailsOpen(true); setBookSequence("idle");
+    setTreeChoiceId(null); setHistoryOpen(false); setIterationError(null); engage.reset(); prepare.reset();
+    window.history.replaceState(null, "", `/?run=${encodeURIComponent(item.id)}`);
+    window.requestAnimationFrame(() => inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
   const closeReality = () => {
@@ -1058,6 +1166,7 @@ export function Engage() {
     setEvidence("");
     setConstraints("");
     setFollow(null);
+    setIterationError(null);
     setTreeChoiceId(null);
     setDetailsOpen(false);
     setBookSequence("idle");
@@ -1082,6 +1191,9 @@ export function Engage() {
           (pathway) => pathway.id === reality.id,
         )
       : null;
+  const blendControls = <BlendControls inputs={blendInputs} changes={blendChanges} onChanges={setBlendChanges}
+    onRemove={removeBlend} onCreate={() => newRevision("blend")} disabled={engage.isPending || !delivery}
+    error={iterationError} />;
 
   return (
     <div
@@ -1102,6 +1214,14 @@ export function Engage() {
           onClose={closeReality}
           onNewObjective={newObjective}
           newObjectiveDisabled={engage.isPending}
+          onBuildOn={() => followUp("refine")}
+          onNewAnswers={() => newRevision("new_answers")}
+          isPartSelected={(part, field) => Boolean(run && blendInputs.some(item => item.key ===
+            partBlendInput(run.id, run.objective, realityPathway, part, field).key))}
+          onTogglePart={(part, field) => {
+            if (run) updateBlend(partBlendInput(run.id, run.objective, realityPathway, part, field));
+          }}
+          blendControls={blendControls}
         />
       )}
       <section aria-label="Engage ASCENSION" className="ascension-command">
@@ -1144,7 +1264,7 @@ export function Engage() {
             ref={inputRef}
             value={objective}
             placeholder="Tell ASCENSION what you want to accomplish…"
-            onChange={(event) => setObjective(event.target.value)}
+            onChange={(event) => { reopenedQuestion.current = null; setObjective(event.target.value); }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey && canEngage) {
                 event.preventDefault();
@@ -1215,43 +1335,27 @@ export function Engage() {
 
           {historyOpen && (
             <div className="rounded-xl border border-border p-4">
-              {history.isPending ? (
-                <p className="text-sm text-muted-foreground">Loading past results…</p>
-              ) : history.error ? (
-                <p className="text-sm text-gold">Sign in to read saved results.</p>
-              ) : history.data?.items.length ? (
-                history.data.items.map((item) => (
+              {pastQuestions.length ? (
+                pastQuestions.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => {
-                      setAccess("auth");
-                      save(ACCESS, "auth");
-                      setGuestToken(null);
-                      save(GUEST_TOKEN, "");
-                      setActive(item.id);
-                      setBookOpen(true);
-                      setRevealed(true);
-                      save(ACTIVE, item.id);
-                      setHistoryOpen(false);
-                      window.history.replaceState(null, "", `/?run=${encodeURIComponent(item.id)}`);
-                      window.setTimeout(
-                        () =>
-                          answerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-                        100,
-                      );
-                    }}
+                    disabled={engage.isPending}
+                    onClick={() => openQuestion(item)}
                     className="block w-full border-b border-border/50 py-3 text-left text-sm text-foreground"
                   >
                     {item.objective.slice(0, 180)}
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      {new Date(item.created_at).toLocaleString()}
+                      {new Date(item.created_at).toLocaleString()} · {item.parentId ? "REVISION" : "ORIGINAL"} · OPEN QUESTION & RESULT
                     </span>
                   </button>
                 ))
+              ) : history.isPending ? (
+                <p className="text-sm text-muted-foreground">Loading past results…</p>
               ) : (
                 <p className="text-sm text-muted-foreground">No saved results yet.</p>
               )}
+              {history.error && <p className="mt-3 text-sm text-gold">Account history could not be loaded. Saved questions from this browser are shown.</p>}
             </div>
           )}
 
@@ -1272,6 +1376,17 @@ export function Engage() {
           aria-label="Your answer"
           className="ascension-result-reveal mx-auto max-w-6xl scroll-mt-20 space-y-4 rounded-2xl border border-primary/30 bg-void/85 p-4 shadow-2xl sm:p-6"
         >
+          {delivery && <div className="flex flex-wrap items-center gap-2" aria-label="Work from this result">
+            <p className="w-full text-sm text-muted-foreground">{run.objective}</p>
+            <button type="button" disabled={engage.isPending} onClick={() => followUp("refine")}
+              className="min-h-11 rounded-full border border-gold/40 px-5 text-sm text-gold">BUILD ON RESULT</button>
+            <button type="button" disabled={engage.isPending} onClick={() => newRevision("new_answers")}
+              className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary">NEW ANSWERS</button>
+            {parentQuestionId(run.evidence) && pastQuestions.find(item => item.id === parentQuestionId(run.evidence)) &&
+              <button type="button" disabled={engage.isPending}
+                onClick={() => openQuestion(pastQuestions.find(item => item.id === parentQuestionId(run.evidence))!)}
+                className="min-h-11 px-3 text-sm text-muted-foreground">EARLIER RESULT</button>}
+          </div>}
           {!immersiveChoices && (
             <div>
               <p className="label-eyebrow text-primary">ASCENSION RESPONSE</p>
@@ -1305,7 +1420,10 @@ export function Engage() {
                 source={deliveryQuery.data?.source ?? null}
                 canInspect={immersiveChoices}
                 onInspect={inspectPathwayReality}
+                selectedBlendIds={blendInputs.filter(item => item.requestId === run.id && item.kind === "pathway").map(item => item.pathwayId)}
+                onToggleBlend={pathway => updateBlend(pathwayBlendInput(run.id, run.objective, pathway))}
               />
+              {blendControls}
             </>
           ) : notProduced ? (
             <div role="alert" className="rounded-xl border border-gold/35 bg-gold/5 p-5">
@@ -1341,7 +1459,7 @@ export function Engage() {
             </div>
           ) : null}
 
-          {TERMINAL.has(run.status) && (
+          {!delivery && TERMINAL.has(run.status) && (
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"

@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:interface": "node tests/interface.test.mjs && node tests/model-jobs.test.mjs"
+    "test:interface": "node tests/interface.test.mjs && node tests/model-jobs.test.mjs && node tests/objective-fit.test.mjs && node tests/iteration.test.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -95,3 +95,4 @@
     "vite": "8.1.5"
   }
 }
+

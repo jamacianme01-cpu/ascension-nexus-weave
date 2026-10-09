@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
+import { priorResultContext } from "./iteration-model";
 
 /**
  * Authenticated objective intake and run-status reads.
@@ -90,8 +91,10 @@ export const submitObjective = createServerFn({ method: "POST" })
         .from("ascension_run_stages")
         .select("response_payload")
         .eq("request_id", parent.id)
-        .eq("ordinal", 100)
+        .in("ordinal", [100, 102])
         .eq("status", "completed")
+        .order("ordinal", { ascending: false })
+        .limit(1)
         .maybeSingle();
       if (deliveryError) throw new Error(deliveryError.message);
       const parentResult =
@@ -124,7 +127,7 @@ export const submitObjective = createServerFn({ method: "POST" })
         user_selected_pathway: selectedPathway,
         selection_authority: data.selectedPathwayId ? "USER_SELECTED" : "NO_USER_SELECTION",
         prior_objective: parent.objective,
-        prior_result: delivery?.response_payload ?? null,
+        ...JSON.parse(priorResultContext(parent, delivery?.response_payload, data.followUp!)),
         verification: "External draft supplied as context only; not verified evidence.",
       });
       if (contextText.length > 60000)
@@ -207,3 +210,4 @@ export const getObjectiveStatus = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { request: (row as ObjectiveRun | null) ?? null };
   });
+

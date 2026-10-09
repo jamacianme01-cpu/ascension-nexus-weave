@@ -8,6 +8,9 @@ import {
   supportsEnvisionObjective,
   type ObjectiveDelivery,
 } from "../result-model";
+import {
+  reviewObjectiveFit, stampObjectiveFit, type ObjectiveFitReview,
+} from "./objective-fit.server";
 
 const ORDINAL = 100;
 const ARTIFACT_ORDINAL = 101;
@@ -194,6 +197,7 @@ export async function externalProductDraft(
     status?: string;
   },
   transportedFiles: { name: string; content: string }[],
+  priorFit?: ObjectiveFitReview,
 ): Promise<ObjectiveDelivery> {
   const normalizedObjective = run.objective
     .toLowerCase()
@@ -271,6 +275,9 @@ export async function externalProductDraft(
     "Its named architecture includes CLARITY orchestration; Meaning Elements; Knowledgeverse; World Model; DTF pathway planning; Outcome Predictor; Confidence Engine; Contradiction Engine; Guardian; AutoSync; and execution engines for software, documents, images, CAD, simulation, box design, video, music, web, databases, robotics, printers, drones, and other connected tools.",
     "When the user asks what ASCENSION can do, explain ASCENSION specifically. Distinguish what this web response can produce immediately from capabilities that require the governed runtime or a connected execution tool. Do not claim a tool is connected or a physical action occurred unless evidence says so.",
     "Write a useful user-facing result now. ASCENSION governed execution may still be pending; available artifacts can be receipts, plans, Knowledge Forms, or scaffolds.",
+    "Preserve the original objective's subject, action, requested output and constraints. Interpret ordinary spelling errors in context, but never replace an unfamiliar or user-defined concept with a different familiar subject. Do not let retrieved records or Spiral forms redefine what the user asked for.",
+    "For ASCENSION_REVISION action new_answers, use the earlier result to produce materially different approaches, rather than copying its answers. Keep the same objective and user requirements. For ASCENSION_BLEND, combine exactly the USER_SELECTED pathways, parts or variables and the user's requested changes into a new result. Reassemble detail_part records in order. Identify interactions, conflicts, and the new combined behavior; never silently add unselected alternatives. Earlier drafts are context, not proof. Prefer ASCENSION_PARENT_CONTEXT over legacy continuation records when they differ.",
+    "Every pathway and the blend must address that same subject and goal. Use a Spiral form only when it is relevant to the original objective; replace an unrelated form with a genuinely different approach to the same requested outcome.",
     "Do not claim you physically built, tested, verified, persisted, or governed anything.",
     "Return exactly one JSON object with keys: kind, title, body, pathways, blend, files, limitations.",
     "The body must be clean readable plain text. Do not emit Markdown markers, escaped Markdown, or HTML entities.",
@@ -303,9 +310,8 @@ export async function externalProductDraft(
 
   const evidenceContext = Array.isArray(run.evidence)
     ? run.evidence
-        .map((item) => String(item))
+        .map((item) => typeof item === "string" ? item : JSON.stringify(item))
         .filter(Boolean)
-        .slice(0, 32)
         .join("\n")
     : "";
   const constraintContext = Array.isArray(run.constraints)
@@ -318,6 +324,7 @@ export async function externalProductDraft(
 
   const user = [
     `OBJECTIVE:\n${run.objective}`,
+    priorFit ? `MEANING CHECK OF THE PREVIOUS RESULT:\n${JSON.stringify(priorFit)}\nCorrect its subject/task mismatch. The original objective remains authoritative.` : "",
     evidenceContext ? `USER / OBJECTIVE EVIDENCE:\n${evidenceContext}` : "",
     constraintContext ? `OBJECTIVE CONSTRAINTS:\n${constraintContext}` : "",
     `GOVERNED RUNTIME STATUS: ${run.status ?? "unknown"} (do not claim this draft is verified)`,
@@ -443,8 +450,6 @@ export async function externalProductDraft(
     parsed = parseDelivery(repairedCandidate);
   }
 
-  const requested = requestedKind(run.objective);
-
   // Primitive model_spec/SVG output is legacy planning metadata only. It must
   // never trigger a second AI call or become the visual authority. Real visual
   // delivery is the hidden reference -> Hunyuan3D -> GLB pipeline below.
@@ -474,14 +479,49 @@ export async function externalProductDraft(
       .filter((value): value is string => Boolean(value)),
     ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
   ];
-  const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
-  const preparingVisual = hasEnvisionPreparation(run.objective, parsed);
+  let check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
+  let preparingVisual = hasEnvisionPreparation(run.objective, parsed);
   if ((!check.produced && !preparingVisual) || parsed.kind === "not_produced")
     throw new Error(
       `the external engine did not return a substantive result${check.reason ? ` (${check.reason})` : ""}`,
     );
 
-  return {
+  let fit = await reviewObjectiveFit(run, parsed);
+  if (fit.question) throw new Error(`A detail is needed to preserve your meaning: ${fit.question}`);
+  if (!fit.matches) {
+    const repair = await callZai({
+      includeInternalKnowledge: false,
+      temperature: 0.15,
+      system: [system,
+        "MEANING REPAIR REQUIRED: the proposed result answered a different subject or task. Rewrite the complete JSON response so the body, every pathway and the blend answer the ORIGINAL objective. Preserve user-defined concepts and names.",
+        "Use the meaning check to identify the mismatch, not to invent facts or verified performance. Do not reuse unrelated pathways or asset URLs. Give concrete design geometry appropriate to the actual subject, rather than defaulting to hardware.",
+      ].join(" "),
+      user: JSON.stringify({ original_objective: run.objective, evidence: run.evidence ?? null,
+        constraints: run.constraints ?? null, meaning_check: fit, failed_response: parsed }),
+    });
+    if (!repair.json) throw new Error("The result did not match your objective, and its repair returned no structured result.");
+    const replacement = repair.json;
+    if (typeof replacement["limitations"] === "string") replacement["limitations"] = [replacement["limitations"]];
+    else if (!Array.isArray(replacement["limitations"])) replacement["limitations"] = [];
+    if (requestedKind(run.objective) === "drawing" && replacement["kind"] === "artifact" &&
+        Array.isArray(replacement["files"]) && !replacement["files"].length &&
+        Array.isArray(replacement["pathways"]) && replacement["pathways"].length &&
+        !replacement["pathways"].some(pathway => record(pathway)["visual_svg"])) replacement["kind"] = "answer";
+    if (typeof replacement["body"] === "string") replacement["body"] = stripModelProvenanceClaims(cleanGeneratedText(replacement["body"]));
+    const corrected = parseDelivery(replacement);
+    parsed = { ...corrected, pathways: corrected.pathways.map(withoutUnproducedAssets),
+      blend: corrected.blend ? withoutUnproducedAssets(corrected.blend) : null };
+    fit = await reviewObjectiveFit(run, parsed);
+    if (fit.question) throw new Error(`A detail is needed to preserve your meaning: ${fit.question}`);
+    if (!fit.matches) throw new Error(`The generated result still does not match your objective: ${fit.issues.join("; ")}. No unrelated result was released.`);
+    check = assessResult(run.objective, parsed.body, parsed.files,
+      [...parsed.pathways, ...(parsed.blend ? [parsed.blend] : [])].flatMap(pathway => pathway.visual_svg ? [pathway.visual_svg] : []));
+    preparingVisual = hasEnvisionPreparation(run.objective, parsed);
+    if ((!check.produced && !preparingVisual) || parsed.kind === "not_produced")
+      throw new Error(`The repaired result did not produce the requested output${check.reason ? ` (${check.reason})` : ""}.`);
+  }
+
+  return stampObjectiveFit(run.objective, {
     ...parsed,
     files: check.kind === "answer" || check.kind === "design" ? [] : check.files,
     limitations: [
@@ -489,7 +529,7 @@ export async function externalProductDraft(
       ...(preparingVisual ? ["The 3D visual is pending Hunyuan3D generation; this design draft is not a completed drawing."] : []),
       "Governed ASCENSION verification and persistence continue separately.",
     ],
-  };
+  }, fit.interpretation, true);
 }
 
 /* ------------------------------------------------------------------ */
@@ -587,10 +627,17 @@ export async function resolveDelivery(args: {
   retry: boolean;
   now?: number;
   generate?: DraftGenerator;
+  review?: typeof reviewObjectiveFit;
 }): Promise<ResolvedDelivery> {
   const { run, artifactStage, draft, store, retry } = args;
   const now = args.now ?? Date.now();
   const generate = args.generate ?? externalProductDraft;
+  const review = args.review ?? reviewObjectiveFit;
+  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim());
+  const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
+  const hasOptInZai = Boolean(process.env["ZAI_API_KEY"]?.trim()) && process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true";
+  const canReview = hasLovableAi || hasExplicitLocal || hasOptInZai || Boolean(args.review);
+  let rejectedFit: ObjectiveFitReview | undefined;
   const base = {
     created_at: run.completed_at ?? run.updated_at ?? run.created_at,
     error: null,
@@ -606,12 +653,39 @@ export async function resolveDelivery(args: {
     ...extra,
   });
 
+  // A delivered version is a saved result. Reopening it, model completion,
+  // and later runtime transport must not rewrite its answer or drawings.
+  // New answers and user-selected blends submit a linked, separate request.
+  if (draft?.status === "completed" && !retry) {
+    try {
+      const saved = parseDelivery(draft.response_payload);
+      const assessment = assessResult(run.objective, saved.body, saved.files,
+        [...saved.pathways, ...(saved.blend ? [saved.blend] : [])].flatMap(pathway => pathway.visual_svg ? [pathway.visual_svg] : []));
+      if (saved.kind !== "not_produced" && (assessment.produced || hasEnvisionPreparation(run.objective, saved)))
+        return { ...base, created_at: draft.created_at, engine_label: DRAFT_LABEL,
+          engine_model: draft.engine_model, status: "completed", response_payload: saved,
+          note: null, source: "external_draft" };
+    } catch { /* Incomplete historical projections can still be recovered below. */ }
+  }
+
   // The user-facing draft can start as soon as the objective is accepted.
   // The governed runtime continues independently and can supersede this draft
   // if it later transports the actual requested result.
   const files =
     artifactStage?.status === "completed" ? artifactFiles(artifactStage.response_payload) : [];
-  const governed = run.status === "verified" ? governedDelivery(run, files) : null;
+  let governed = run.status === "verified" ? governedDelivery(run, files) : null;
+  if (governed && governed.kind !== "not_produced" && canReview) {
+    try {
+      const fit = await review(run, governed);
+      if (fit.question) return { ...base, status: "completed", response_payload: null, note: null,
+        error: `A detail is needed to preserve your meaning: ${fit.question}`, source: null };
+      if (fit.matches) governed = await stampObjectiveFit(run.objective, governed, fit.interpretation);
+      else { rejectedFit = fit; governed = null; }
+    } catch (cause) {
+      return { ...base, status: "completed", response_payload: null, note: null, source: null,
+        error: `The objective meaning check failed: ${cause instanceof Error ? cause.message : String(cause)}` };
+    }
+  }
   if (governed && governed.kind !== "not_produced") {
     return {
       ...base,
@@ -625,11 +699,6 @@ export async function resolveDelivery(args: {
   // The governed result is not the thing that was asked for. Ask the external
   // engine for a clearly unverified draft — once per artifact set.
   const sourceKey = artifactSourceKey(run.id, files);
-  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim());
-  const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
-  const hasOptInZai =
-    Boolean(process.env["ZAI_API_KEY"]?.trim()) &&
-    process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true";
   const draftBase = {
     ...base,
     engine_label: DRAFT_LABEL,
@@ -639,21 +708,6 @@ export async function resolveDelivery(args: {
   // path is available. Hosted ASCENSION must supersede stale local drafts.
   const localSource = draft?.source_key === `local:${run.id}` && !hasLovableAi;
   const sameSource = localSource || draft?.source_key === sourceKey;
-
-  if (draft?.status === "completed" && sameSource) {
-    try {
-      return {
-        ...draftBase,
-        created_at: draft.created_at,
-        status: "completed",
-        response_payload: parseDelivery(draft.response_payload),
-        note: null,
-        source: "external_draft",
-      };
-    } catch {
-      // A stored draft that no longer validates is regenerated below.
-    }
-  }
   const running = draft?.status === "running";
   const fresh = running && now - Date.parse(draft!.created_at) < DRAFT_STALE_MS;
   if (running && fresh) {
@@ -717,7 +771,7 @@ export async function resolveDelivery(args: {
     return pending("An unverified draft is being prepared…", { engine_label: DRAFT_LABEL });
   }
   try {
-    const produced = await generate(run, files);
+    const produced = await generate(run, files, rejectedFit);
     await store.complete(sourceKey, produced);
     return {
       ...draftBase,

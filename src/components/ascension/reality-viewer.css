@@ -540,6 +540,9 @@
 .reality-part-detail h2 { margin: 0 0 12px; font-size: 18px; color: #bcf1ff; }
 .reality-part-detail dl { margin: 0; display: grid; gap: 12px; }
 .reality-part-detail dt { font-weight: 600; color: #9feaff; }
+.reality-blend-choice { display: flex; align-items: center; gap: 8px; min-height: 44px; color: #e4c88b; cursor: pointer; }
+.reality-blend-choice input { width: 18px; height: 18px; accent-color: #e4c88b; }
+.reality-revision-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .reality-part-detail dd { margin: 4px 0 0; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 760px) { .reality-parts-tab { grid-row: 3; grid-column: 1 / -1; } }
 

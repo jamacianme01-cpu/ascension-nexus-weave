@@ -160,6 +160,8 @@ export async function callZai(input: {
   user: string;
   /** Short search phrase (normally the objective). Never the full stage prompt. */
   knowledgeQuery?: string;
+  /** Meaning checks compare only submitted intent with the proposed output. */
+  includeInternalKnowledge?: boolean;
   imageDataUrl?: string;
   temperature?: number;
 }): Promise<ZaiCallResult> {
@@ -175,7 +177,7 @@ export async function callZai(input: {
 
   let knowledgeText = "ASCENSION internal knowledge retrieval unavailable for this call.";
   let knowledgeResult: KnowledgeRetrievalResult | null = null;
-  try {
+  if (input.includeInternalKnowledge !== false) try {
     const query = (input.knowledgeQuery ?? input.user).replace(/\s+/g, " ").trim().slice(0, 300);
     knowledgeResult = await retrieveKnowledge(query, 6);
     knowledgeText = formatKnowledgeEvidence(knowledgeResult);
@@ -183,19 +185,22 @@ export async function callZai(input: {
     knowledgeText = `ASCENSION internal knowledge retrieval failed: ${cause instanceof Error ? cause.message : String(cause)}`;
   }
 
-  const system = [
+  const system = input.includeInternalKnowledge === false ? input.system : [
     input.system,
     "The ASCENSION INTERNAL KNOWLEDGE section comes from ASCENSION's own published Knowledgeverse, pathways, governance, ledger and chamber state.",
     "Use that internal knowledge as the primary context. Do not invent missing internal state and do not imply external web research occurred.",
     "The application renders ASCENSION provenance separately. Do NOT emit [A#] markers, source-path citations, or phrases such as 'according to ASCENSION internal knowledge', 'ASCENSION internal knowledge confirms', or equivalent provenance claims in your response.",
     "Use relevant internal records only as background context. Do not turn a stored Meaning Element, prior transition, evidence record, or verified Delta into proof of a broader scientific or technical proposition.",
+    "The submitted objective and the user's definitions take priority over retrieved records. Ignore unrelated records; never use them to rename the subject or substitute a different domain, object, or task.",
     "Runtime verification means ASCENSION verified that runtime record or transition. It does not automatically verify every scientific proposition associated with the objective.",
     "When you supply scientific, technical, historical, or other factual material that is not explicitly stated in the internal records, introduce it as general knowledge where useful and do not attribute it to ASCENSION's stored records.",
     "A retrieved internal record is not automatically new VERIFIED Delta merely because it was read; preserve its published provenance and status.",
   ].join(" ");
   // Local engines run smaller context windows; keep retrieved evidence compact.
   const knowledgeForPrompt = provider === "local" ? knowledgeText.slice(0, 2400) : knowledgeText;
-  const user = `${input.user}\n\nASCENSION INTERNAL KNOWLEDGE:\n${knowledgeForPrompt}`;
+  const user = input.includeInternalKnowledge === false
+    ? input.user
+    : `${input.user}\n\nASCENSION INTERNAL KNOWLEDGE:\n${knowledgeForPrompt}`;
 
   const model = zaiModel();
   const started = Date.now();

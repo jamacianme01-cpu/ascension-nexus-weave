@@ -149,6 +149,8 @@ export interface ObjectiveDelivery {
   blend: ObjectiveBlend | null;
   files: { name: string; content: string }[];
   limitations: string[];
+  /** A model-based meaning check, separate from scientific/runtime verification. */
+  objective_fit?: { objective: string; interpretation: string; content_key: string };
 }
 
 /** Validate external output before displaying or offering it for download. */
@@ -359,6 +361,13 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     throw new Error("An unproduced result cannot carry created artifacts.");
   if (v["kind"] === "artifact" && !files.length && !hasVisualPathway)
     throw new Error("The created result did not include a visual or downloadable artifact.");
+  const fit = record(v["objective_fit"]);
+  const objectiveFit =
+    typeof fit["objective"] === "string" && fit["objective"].length <= 4000 &&
+    typeof fit["interpretation"] === "string" && Boolean(fit["interpretation"].trim()) && fit["interpretation"].length <= 4000 &&
+    typeof fit["content_key"] === "string" && /^[a-f0-9]{64}$/.test(fit["content_key"])
+      ? { objective: fit["objective"], interpretation: fit["interpretation"], content_key: fit["content_key"] }
+      : undefined;
   return {
     kind: v["kind"] as ObjectiveDelivery["kind"],
     title: v["title"],
@@ -367,6 +376,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     blend,
     files,
     limitations: v["limitations"] as string[],
+    ...(objectiveFit ? { objective_fit: objectiveFit } : {}),
   };
 }
 
@@ -568,3 +578,4 @@ export function notProducedMessage(kind: RequestedKind) {
         ? "The requested design has not been produced."
         : "The requested answer has not been produced.";
 }
+

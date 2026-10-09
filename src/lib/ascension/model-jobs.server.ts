@@ -23,7 +23,11 @@ export async function enqueueDeliveryModels(
       request_id: requestId,
       pathway_id: pathway.id,
       label: pathway.label.slice(0, 200),
-      summary: pathway.summary.slice(0, 5000),
+      summary: [
+        delivery.objective_fit ? `Requested meaning: ${delivery.objective_fit.interpretation.slice(0, 1000)}` : "",
+        pathway.summary,
+        ...pathway.steps,
+      ].filter(Boolean).join("\n").slice(0, 5000),
       visual_svg: pathway.visual_svg ?? "",
       // Image-to-3D: the real generated concept image is the Hunyuan3D source.
       source_image_url: pathway.generated_image_url,
@@ -91,3 +95,4 @@ export async function attachCompletedModels(
     blend: delivery.blend ? withUrl(delivery.blend) : null,
   };
 }
+

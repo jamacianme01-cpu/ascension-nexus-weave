@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import type { ObjectiveRun } from "./objectives.functions";
 import type { ObjectiveDelivery } from "./result-model";
+import { priorResultContext } from "./iteration-model";
 
 type RpcResult<T> = { data: T | null; error: { message: string } | null };
 
@@ -93,12 +94,30 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }) => {
+    let evidence = data.evidence;
+    if (data.parentRequestId) {
+      if (!/^[a-f0-9-]{36}$/i.test(data.parentRequestId) ||
+          !/^[a-f0-9-]{36}$/i.test(data.parentGuestToken ?? "") ||
+          !["continue", "refine"].includes(data.followUp ?? ""))
+        throw new Error("Invalid guest follow-up reference.");
+      // The token-authorized bundle contains the current generated answer.
+      // The older SQL continuation path only carries stage 100.
+      const parent = await rpc<GuestBundle>("ascension_guest_bundle", {
+        p_request_id: data.parentRequestId, p_guest_token: data.parentGuestToken,
+      });
+      if (!parent?.run) throw new Error("The earlier objective is unavailable.");
+      const stage = parent.draft_stage && typeof parent.draft_stage === "object"
+        ? parent.draft_stage as { status?: string; response_payload?: unknown } : null;
+      const result = stage?.status === "completed" ? stage.response_payload
+        : parent.delivery_stage?.status === "completed" ? parent.delivery_stage.response_payload : null;
+      evidence = [...(evidence ?? []), priorResultContext(parent.run, result, data.followUp!)];
+    }
     const payload = await rpc<{
       request: ObjectiveRun;
       guest_token: string;
     }>("ascension_guest_submit", {
       p_objective: data.objective,
-      p_evidence: data.evidence,
+      p_evidence: evidence,
       p_constraints: data.constraints,
       p_parent_request_id: data.parentRequestId,
       p_parent_guest_token: data.parentGuestToken,
@@ -193,3 +212,4 @@ export const getGuestObjectiveDelivery = createServerFn({ method: "GET" })
 export const prepareGuestObjectiveDelivery = createServerFn({ method: "POST" })
   .inputValidator(validateRequest)
   .handler(async ({ data }) => projectGuestDelivery(data.requestId, data.guestToken, data.retry));
+

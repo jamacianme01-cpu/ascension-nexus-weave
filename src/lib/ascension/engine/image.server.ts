@@ -132,7 +132,7 @@ export function conceptImagePrompt(
     .map((value) => value.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .join(" — ")
-    .slice(0, 900);
+    .slice(0, 2400);
   const spatialConversion =
     /\b(camper|rv|motorhome|trailer|van|room|office|workspace|living space|interior|house|home|building|shop|workshop|shed|garage|cabin)\b/i.test(
       objective,
@@ -146,7 +146,9 @@ export function conceptImagePrompt(
     `Subject: ${subject}.`,
     spatialConversion
       ? "Show the complete converted space as one coherent cutaway/isometric 3D reality. Keep the shell and the pathway-specific office, living, sleeping, storage and circulation layout visible together so the user can inspect the arrangement."
-      : "Show the single complete object with credible engineering detail, correct materials and components, three-quarter view, entire object in frame.",
+      : "Show the complete requested subject and the pathway-specific arrangement, entire subject in frame. Use a visual representation appropriate to its actual domain and scale; schematic or conceptual structures must look schematic rather than like fabricated hardware.",
+    "Preserve the original subject and user-defined terminology. The pathway is an approach to that same objective, never permission to substitute a different object or domain. Do not add unrelated parts simply because the objective says programmable.",
     "Plain uniform light-grey background, soft even studio lighting, no text, no labels, no watermark, no unrelated objects.",
   ].join(" ");
 }
+

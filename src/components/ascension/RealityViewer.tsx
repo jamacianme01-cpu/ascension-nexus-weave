@@ -1523,7 +1523,7 @@ export function RealityViewer({
           model = buildConceptDiagram(conceptPartsRef.current, {
             structure: tokens.getPropertyValue("--concept-structure").trim(),
             energy: tokens.getPropertyValue("--concept-energy").trim(),
-          });
+          }, pathway.model_spec);
         }
           const meshes:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node);});
           for(const mesh of meshes){

@@ -6,6 +6,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { splitMeshIslands, attachComponent, isAncestor } from "@/lib/ascension/component-workbench";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
+import { Button } from "@/components/ui/button";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
 import { getDesignParts, getDissectedDesign } from "@/lib/ascension/parts.functions";
 import type { DesignPart } from "@/lib/ascension/parts-model";
@@ -170,7 +171,7 @@ export function RealityViewer({
   const activeParts = conceptual ? conceptParts : dissected ? dissection?.parts ?? [] : parts;
   useEffect(() => { if (conceptual && ready) api.current?.explode(dissected); }, [conceptual, ready, dissected]);
   const selectedComponent = components.find(component=>component.id===componentId);
-  const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected ? selectedComponent?.detail ?? null : null;
+  const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected || conceptual ? selectedComponent?.detail ?? null : null;
   const dive = useRef(onDive);
   dive.current = onDive;
   const [mode, setMode] = useState<RealityMode>(
@@ -190,7 +191,7 @@ export function RealityViewer({
   modeRef.current = mode;
   useEffect(() => {
     setArrived(false);
-    setMode("cutaway");
+    setMode(initialMode);
     setSelectedObject("Nothing selected");
     setTransformMode("translate");
     setObjectColor("#6ed7ff");
@@ -1518,7 +1519,11 @@ export function RealityViewer({
           if (disposed) { disposeModel(gltf.scene); return; }
           model = gltf.scene;
         } else {
-          model = buildConceptDiagram(conceptPartsRef.current);
+          const tokens = getComputedStyle(document.documentElement);
+          model = buildConceptDiagram(conceptPartsRef.current, {
+            structure: tokens.getPropertyValue("--concept-structure").trim(),
+            energy: tokens.getPropertyValue("--concept-energy").trim(),
+          });
         }
           const meshes:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node);});
           for(const mesh of meshes){
@@ -1680,7 +1685,7 @@ export function RealityViewer({
         <div className="reality-title">
           <span>{conceptual ? "CONCEPT / UNVERIFIED · DERIVED PATHWAY DIAGRAM" : "HUNYUAN3D MESH / UNVERIFIED"}</span>
           {conceptual && <p className="reality-pathway-label">{pathway.model_error ? `GLB: ${pathway.model_error}` : pathway.model_status ? `GLB creation: ${pathway.model_status}` : "Physical model unavailable · Concept available now"}</p>}
-          {pathway.model_url && loadedUrl !== pathway.model_url && <button onClick={() => { edited.current = false; setLoadedUrl(pathway.model_url); }}>REPLACE EDITED CONCEPT WITH HUNYUAN MODEL</button>}
+          {pathway.model_url && loadedUrl !== pathway.model_url && <Button variant="outline" onClick={() => { edited.current = false; setLoadedUrl(pathway.model_url); }}>REPLACE EDITED CONCEPT WITH HUNYUAN MODEL</Button>}
           <h1>{objective}</h1>
           <p className="reality-pathway-label">{pathway.label}</p>
         </div>

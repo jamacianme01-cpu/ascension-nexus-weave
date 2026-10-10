@@ -17,7 +17,7 @@ export function deriveConceptParts(objective: string, pathway: ObjectivePathway)
   }));
 }
 
-export function buildConceptDiagram(parts: DesignPart[]): THREE.Group {
+export function buildConceptDiagram(parts: DesignPart[], palette: { structure: string; energy: string }): THREE.Group {
   const group = new THREE.Group();
   group.name = "Derived pathway concept diagram";
   parts.forEach((part, index) => {
@@ -30,7 +30,7 @@ export function buildConceptDiagram(parts: DesignPart[]): THREE.Group {
     }
     shape.closePath();
     const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.22, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.06, bevelThickness: 0.04 }),
-      new THREE.MeshStandardMaterial({ color: index % 2 ? "#b59a75" : "#739ba2", roughness: 0.45, metalness: 0.25 }));
+      new THREE.MeshStandardMaterial({ color: index % 2 ? palette.structure : palette.energy, roughness: 0.45, metalness: 0.25 }));
     mesh.name = part.name;
     mesh.position.set((index % 2 - 0.5) * 3.4, (Math.ceil(parts.length / 2) / 2 - Math.floor(index / 2)) * 2.1, (index % 3) * 0.32);
     mesh.userData["conceptPart"] = part;

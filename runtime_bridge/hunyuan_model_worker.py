@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import http.client
 import os
 import socket
 import ssl
@@ -33,20 +34,31 @@ def _token() -> str:
     return value
 
 
-def _open_with_retry(request, timeout):
-    """Retry interrupted TLS transfers while keeping certificate verification."""
-    for attempt in range(3):
+def _open_with_retry(request, timeout, operation="secure transfer"):
+    """Retry transient TLS disconnects without bypassing certificate verification.
+
+    A signed GLB upload uses upsert and can be safely retried if the reply was
+    lost after the server accepted the bytes. Permanent HTTP/certificate errors
+    fail immediately. Preserve the operation name in failures for diagnosis.
+    """
+    attempts = 6
+    for attempt in range(attempts):
         try:
-            response = urllib.request.urlopen(request, timeout=timeout)
-            try:
-                data = response.read()
-                return data, response.headers
-            finally:
-                response.close()
-        except (urllib.error.URLError, ssl.SSLError, ConnectionError, TimeoutError) as exc:
-            if isinstance(exc, urllib.error.HTTPError) or attempt == 2:
-                raise
-            time.sleep(attempt + 1)
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return response.read(), response.headers
+        except urllib.error.HTTPError:
+            raise
+        except (urllib.error.URLError, ssl.SSLError, ConnectionError,
+                TimeoutError, http.client.IncompleteRead, OSError) as exc:
+            reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+            if isinstance(reason, ssl.SSLCertVerificationError):
+                raise RuntimeError(operation + " certificate verification failed: " + str(exc)) from exc
+            if attempt == attempts - 1:
+                raise RuntimeError(
+                    operation + " interrupted after " + str(attempts)
+                    + " attempts: " + str(exc)
+                ) from exc
+            time.sleep(min(2 ** attempt, 8))
 
 
 def _json_request(url: str, token: str, method: str = "GET", payload=None, timeout: int = 60):
@@ -63,7 +75,7 @@ def _json_request(url: str, token: str, method: str = "GET", payload=None, timeo
         headers["content-type"] = "application/json"
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
-        raw, _ = _open_with_retry(req, timeout)
+        raw, _ = _open_with_retry(req, timeout, operation="model queue request")
         return json.loads(raw.decode("utf-8")) if raw else {}
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")
@@ -98,7 +110,7 @@ def _download_source_image(url: str, work: Path) -> Path:
         },
     )
     try:
-        data, headers = _open_with_retry(req, 180)
+        data, headers = _open_with_retry(req, 180, operation="reference image download")
         content_type = (headers.get("content-type") or "").lower()
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")
@@ -174,7 +186,7 @@ def _upload_glb(signed_url: str, glb: bytes) -> None:
         },
     )
     try:
-        _open_with_retry(req, 600)
+        _open_with_retry(req, 600, operation="GLB upload")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")
         raise RuntimeError(

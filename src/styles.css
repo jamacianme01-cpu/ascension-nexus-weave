@@ -45,8 +45,6 @@
 }
 
 :root {
-  --concept-structure: #b59a75;
-  --concept-energy: #739ba2;
   --radius: 0.375rem;
   --void: oklch(0.12 0.028 258);
   --background: oklch(0.16 0.032 262);

@@ -9,5 +9,5 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Immediate RealityViewer concepts are bounded reading-order diagrams derived only from the selected pathway's supplied steps/specification, never physical verification or substitute generated objects.
+- Both existing ENVISION and RealityViewer consume canonical-assembly geometry, extracted from the historical ENVISION renderer, so semantic specs and known-subject fallbacks stay consistent without claiming physical verification; unknown subjects use named interpretive diagram points only.
 - Keep the dedicated Three.js workbench; automatically upgrade to a delivered GLB only when the current assembly is unedited, otherwise require an explicit replacement to preserve edits.

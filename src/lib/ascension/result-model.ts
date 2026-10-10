@@ -209,7 +209,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     const title = typeof m["title"] === "string" ? m["title"].trim().slice(0, 160) : "";
     const description =
       typeof m["description"] === "string" ? m["description"].trim().slice(0, 1200) : "";
-    const rawParts = Array.isArray(m["parts"]) ? m["parts"].slice(0, 64) : [];
+    const rawParts = Array.isArray(m["parts"]) ? m["parts"].slice(0, 32) : [];
     const allowedPrimitives = new Set<ObjectiveModelPrimitive>([
       "box",
       "cylinder",

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import { canonicalAssembly, pathwayKind } from "@/lib/ascension/canonical-assembly";
+import { Button } from "@/components/ui/button";
 import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
 import {
   MANIFESTATION_PHASE_LABEL,
@@ -463,18 +465,6 @@ function arcVertices() {
 
 /* ------------------------------ pathway kind ------------------------------ */
 
-type HoloKind = "turbofan" | "rocket" | "ion" | "linear" | "plasma" | "fluid" | "generic";
-function pathwayKind(path: Pathway): HoloKind {
-  const text = `${path.label} ${path.summary} ${path.spiral_form ?? ""}`.toLowerCase();
-  if (/turbofan|turbine|jet engine|compressor|bypass/.test(text)) return "turbofan";
-  if (/rocket|combustion chamber|nozzle/.test(text)) return "rocket";
-  if (/ion thruster|ion propulsion|electrostatic/.test(text)) return "ion";
-  if (/linear|rail|coil|maglev|electromagnetic rail|induction/.test(text)) return "linear";
-  if (/plasma/.test(text)) return "plasma";
-  if (/fluid|hydraulic|pneumatic/.test(text)) return "fluid";
-  return "generic";
-}
-
 /* ------------------------------ shaders ------------------------------ */
 
 function shader(gl: WebGLRenderingContext, type: number, src: string) {
@@ -680,8 +670,8 @@ export function Envision3DScene({
   const selectedSpec = selected ? (linearSpecs.get(selected.id) ?? null) : null;
 
   const sceneSignature = useMemo(
-    () => choices.map((c) => `${c.id}:${c.model_url ?? ""}`).join("|"),
-    [choices],
+    () => choices.map((c) => `${c.id}:${c.model_url ?? ""}:${JSON.stringify(c.model_spec)}`).join("|") + (objectiveText ?? ""),
+    [choices, objectiveText],
   );
 
   // Manifestation clocks: the overview manifests once when realities erupt
@@ -774,6 +764,14 @@ export function Envision3DScene({
       const w = wireEdges(data);
       return { feature: lineMesh(gl, w.feature), all: lineMesh(gl, w.all) };
     };
+    const assemblyCache = new Map(choices.map(path => [path.id, canonicalAssembly(objectiveText ?? "", path)]));
+    const canonicalMeshes = new Map<Float32Array, Mesh>();
+    for (const parts of assemblyCache.values()) for (const part of parts) {
+      if (canonicalMeshes.has(part.vertices)) continue;
+      const m = mesh(gl, part.vertices);
+      canonicalMeshes.set(part.vertices, m);
+      wires.set(m, buildWire(part.vertices));
+    }
     // Generated Hunyuan3D linework, built when the model buffer is built.
     let generatedWire: {
       feature: WebGLBuffer;
@@ -1159,15 +1157,15 @@ export function Envision3DScene({
       const prog = phaseProgress(elapsedMs);
       const fade = stationFadeRef.current[index] ?? 1;
       const zoom = focus ? zoomRef.current : 1;
-      const kind = blend ? "generic" : pathwayKind(path);
+      const kind = pathwayKind(path, objectiveText);
       const spec = blend ? null : (linearSpecs.get(path.id) ?? null);
       const semanticModel = path.model_spec;
 
       // ENVISION is 3D-only. Reference images are internal Hunyuan inputs and
-      // are never rendered to the user. Until the real GLB is loaded, the
-      // pathway remains in an explicit generation state with no fake geometry.
+      // are never rendered to the user. Canonical interpretive assemblies are
+      // explicitly unverified until a delivered GLB supplies the generated mesh.
       const modelViewActive = focus && generatedRef.current?.id === path.id;
-      if (!modelViewActive) return;
+
 
       // Focused realities glide from their overview slot into the inspection field.
       const glide = easeOutCubic(Math.min(1, (focus ? clocks.focus : 0) / 450));
@@ -1259,400 +1257,12 @@ export function Envision3DScene({
       // CUTAWAY renders the solid parts, BLUEPRINT routes the exact same parts
       // through model()'s drafting branch, and ENVIRONMENT stages those same
       // parts in the hall. No question-specific renderer code is needed.
-      if (semanticModel?.parts.length && !modelViewActive) {
-        const materialColor = (
-          material: (typeof semanticModel.parts)[number]["material"],
-        ): Vec3 => {
-          switch (material) {
-            case "gold":
-              return GOLD;
-            case "gold_deep":
-              return GOLD_DEEP;
-            case "copper":
-              return [0.88, 0.34, 0.1];
-            case "blue":
-              return BLUE_GLASS;
-            case "blue_deep":
-              return BLUE_GLASS_DEEP;
-            case "ice":
-              return ICE;
-            case "cyan":
-              return CYAN;
-            case "warm":
-              return WARM_LIGHT;
-            case "steel":
-              return [0.14, 0.2, 0.27];
-            case "dark":
-              return [0.035, 0.055, 0.075];
-          }
-        };
-        const meshFor = (primitive: (typeof semanticModel.parts)[number]["primitive"]): Mesh => {
-          switch (primitive) {
-            case "box":
-              return cube;
-            case "cylinder":
-              return cylinder;
-            case "ring":
-              return torus;
-            case "sphere":
-              return sphere;
-            case "nozzle":
-              return nozzle;
-          }
-        };
-        for (const part of semanticModel.parts) {
-          const p: Vec3 = [part.position[0] * k, part.position[1] * k, part.position[2] * k];
-          const s: Vec3 = [part.scale[0] * k, part.scale[1] * k, part.scale[2] * k];
-          model(
-            meshFor(part.primitive),
-            p,
-            part.rotation,
-            s,
-            materialColor(part.material),
-            0.12,
-            1,
-          );
-        }
-        return;
-      }
-
-      if (blend && !modelViewActive) {
-        // BLEND is shown directly as one solid synthesized assembly; no orbiting source-energy animation.
-        // Combined assembly: rail spine + ion rings + chamber core + exhaust, gold synthesis.
-        model(cube, [0, -0.52, 0], [0, 0, 0], [1.42 * k, 0.045, 0.42 * k], BLUE_GLASS_DEEP, 0.24);
-        for (let q = -1; q <= 1; q += 2)
-          model(cube, [0, q * 0.36, 0], [0, 0, 0], [1.42 * k, 0.034, 0.034], ICE, 0.34);
-        for (let ring = -1; ring <= 1; ring++)
-          model(
-            torus,
-            [ring * 0.48, 0, 0],
-            [Math.PI / 2, 0, 0],
-            [0.3 * k, 0.3 * k, 0.3 * k],
-            GOLD,
-            0.42,
-          );
-        model(nozzle, [0.95, 0, 0], [0, 0, 0], [0.58 * k, 0.42 * k, 0.42 * k], GOLD_DEEP, 0.36);
-        model(
-          sphere,
-          [-0.1, 0, 0],
-          [0, 0, 0],
-          [0.28 * k, 0.28 * k, 0.28 * k],
-          [0.18, 0.72, 0.95],
-          0.32,
-        );
-        return;
-      }
-
       if (!modelViewActive) {
-        if (kind === "turbofan") {
-          model(
-            cylinder,
-            [0, 0, 0],
-            [0, 0, 0],
-            [1.05 * k, 0.52 * k, 0.52 * k],
-            BLUE_GLASS_DEEP,
-            0.18,
-          );
-          model(
-            torus,
-            [-0.92, 0, 0],
-            [0, Math.PI / 2, 0],
-            [0.54 * k, 0.54 * k, 0.54 * k],
-            GOLD,
-            0.32,
-          );
-          model(sphere, [-0.86, 0, 0], [0, 0, 0], [0.19 * k, 0.19 * k, 0.19 * k], WARM_LIGHT, 0.28);
-          for (let s = -2; s <= 2; s++)
-            model(
-              torus,
-              [s * 0.3, 0, 0],
-              [0, Math.PI / 2, 0],
-              [0.34 * k, 0.34 * k, 0.34 * k],
-              s === 0 ? WARM_LIGHT : GOLD,
-              0.26,
-            );
-          for (let blade = 0; blade < 8; blade++) {
-            const a = (blade * Math.PI) / 4;
-            model(
-              cube,
-              [-0.88, Math.cos(a) * 0.25, Math.sin(a) * 0.25],
-              [a, 0, 0],
-              [0.035 * k, 0.24 * k, 0.055 * k],
-              ICE,
-              0.2,
-            );
-          }
-          model(nozzle, [0.93, 0, 0], [0, 0, 0], [0.45 * k, 0.44 * k, 0.44 * k], BLUE_GLASS, 0.26);
-        } else if (kind === "rocket") {
-          model(
-            cylinder,
-            [-0.42, 0, 0],
-            [0, 0, 0],
-            [0.56 * k, 0.34 * k, 0.34 * k],
-            BLUE_GLASS,
-            0.26,
-          );
-          model(
-            torus,
-            [-0.84, 0, 0],
-            [0, Math.PI / 2, 0],
-            [0.34 * k, 0.34 * k, 0.34 * k],
-            GOLD,
-            0.28,
-          );
-          model(sphere, [-0.28, 0, 0], [0, 0, 0], [0.24 * k, 0.24 * k, 0.24 * k], WARM_LIGHT, 0.3);
-          model(
-            nozzle,
-            [0.48, 0, 0],
-            [0, 0, 0],
-            [0.82 * k, 0.62 * k, 0.62 * k],
-            [0.98, 0.45, 0.16],
-            0.34,
-          );
-          model(
-            torus,
-            [0.9, 0, 0],
-            [0, Math.PI / 2, 0],
-            [0.58 * k, 0.58 * k, 0.58 * k],
-            [1, 0.58, 0.18],
-            0.3,
-          );
-          model(cube, [1.42, 0, 0], [0, 0, 0], [0.52 * k, 0.016, 0.016], [1, 0.68, 0.28], 0.22);
-        } else if (kind === "ion") {
-          model(
-            cylinder,
-            [-0.42, 0, 0],
-            [0, 0, 0],
-            [0.48 * k, 0.42 * k, 0.42 * k],
-            BLUE_GLASS_DEEP,
-            0.18,
-          );
-          model(sphere, [-0.48, 0, 0], [0, 0, 0], [0.25 * k, 0.25 * k, 0.25 * k], ICE, 0.26);
-          for (let g = 0; g < 4; g++)
-            model(
-              torus,
-              [0.08 + g * 0.2, 0, 0],
-              [0, Math.PI / 2, 0],
-              [0.4 * k, 0.4 * k, 0.4 * k],
-              g % 2 ? GOLD : ICE,
-              0.3,
-            );
-          for (let q = -1; q <= 1; q += 2)
-            model(cube, [0.34, q * 0.28, 0], [0, 0, 0], [0.82 * k, 0.018, 0.018], ICE, 0.18);
-          model(cube, [1.28, 0, 0], [0, 0, 0], [0.76 * k, 0.012, 0.012], BLUE_GLASS, 0.26);
-        } else if (kind === "linear") {
-          // APPROVED REFERENCE MODEL:
-          // three gilded circular housings + visible copper winding packs +
-          // long blue support rails + dark structural spine + physical base.
-          // CUTAWAY, BLUEPRINT and ENVIRONMENT all render THIS SAME geometry.
-          const copper: Vec3 = [0.88, 0.34, 0.1];
-          const railBlue: Vec3 = [0.025, 0.3, 0.62];
-          const steel: Vec3 = [0.1, 0.14, 0.19];
-          const darkSteel: Vec3 = [0.035, 0.055, 0.075];
-
-          // Exhibition base from the approved cutaway reference.
-          model(cube, [0, -0.72, 0.06], [0, 0, 0], [0.92 * k, 0.085, 0.58 * k], darkSteel, 0.08, 1);
-          model(
-            cube,
-            [0, -0.61, 0.02],
-            [0, 0, 0],
-            [0.78 * k, 0.035, 0.46 * k],
-            railBlue,
-            0.12,
-            0.98,
-          );
-
-          // Dark central load-bearing spine running through the entire machine.
-          model(cylinder, [0, 0, 0], [0, 0, 0], [1.35 * k, 0.11 * k, 0.11 * k], steel, 0.08, 1);
-
-          // Long support rails. Use the user's identified rail count when known;
-          // otherwise the four-beam exhibit arrangement from the approved image.
-          const railCount = spec?.rails ?? 4;
-          const railSlots: Vec3[] =
-            railCount === 3
-              ? [
-                  [0, 0.34, 0],
-                  [0, -0.28, 0.24],
-                  [0, -0.28, -0.24],
-                ]
-              : [
-                  [0, 0.34, 0.22],
-                  [0, 0.34, -0.22],
-                  [0, -0.34, 0.22],
-                  [0, -0.34, -0.22],
-                ];
-          for (const [, y, z] of railSlots) {
-            model(cube, [0, y, z], [0, 0, 0], [1.58 * k, 0.055, 0.055], railBlue, 0.14, 1);
-            // Gold end caps echo the approved exhibit model.
-            for (let q = -1; q <= 1; q += 2)
-              model(
-                cube,
-                [q * 1.54 * k, y, z],
-                [0, 0, 0],
-                [0.06, 0.072, 0.072],
-                GOLD_DEEP,
-                0.12,
-                1,
-              );
-          }
-
-          // Three large ring housings arranged along the propulsion axis.
-          const housingX = [-0.78, 0, 0.78];
-          for (let h = 0; h < housingX.length; h++) {
-            const x = housingX[h] ?? 0;
-            model(
-              torus,
-              [x, 0, 0],
-              [0, Math.PI / 2, 0],
-              [0.5 * k, 0.5 * k, 0.5 * k],
-              h === 1 ? [0.66, 0.56, 0.38] : GOLD,
-              0.18,
-              1,
-            );
-            // Inner structural ring visible through the cutaway.
-            model(
-              torus,
-              [x, 0, 0],
-              [0, Math.PI / 2, 0],
-              [0.38 * k, 0.38 * k, 0.38 * k],
-              steel,
-              0.08,
-              1,
-            );
-
-            // Copper winding pack inside each housing: a stack of tightly spaced
-            // turns around the X-axis, not a single flat symbolic ring.
-            const turns = spec?.coils && spec.coils >= 9 ? 9 : 7;
-            for (let turn = 0; turn < turns; turn++) {
-              const tx = x + (turn - (turns - 1) / 2) * 0.032 * k;
-              model(
-                torus,
-                [tx, 0, 0],
-                [0, Math.PI / 2, 0],
-                [0.235 * k, 0.235 * k, 0.235 * k],
-                copper,
-                0.16,
-                1,
-              );
-            }
-
-            // Central core visible inside the copper pack.
-            model(
-              cylinder,
-              [x, 0, 0],
-              [0, 0, 0],
-              [0.22 * k, 0.105 * k, 0.105 * k],
-              darkSteel,
-              0.06,
-              1,
-            );
-          }
-
-          // Horizontal braces linking the three housings.
-          for (let q = -1; q <= 1; q += 2) {
-            model(
-              cube,
-              [0, q * 0.48, 0],
-              [0, 0, 0],
-              [1.02 * k, 0.035, 0.075],
-              [0.18, 0.22, 0.26],
-              0.08,
-              1,
-            );
-          }
-
-          // Optional user-specific components are additive; they do not alter the
-          // approved base model for unrelated objectives.
-          if (spec?.stasis) {
-            model(
-              torus,
-              [0, 0, 0],
-              [0, Math.PI / 2, 0],
-              [0.61 * k, 0.61 * k, 0.61 * k],
-              [0.3, 0.72, 0.92],
-              0.16,
-              0.72,
-            );
-          }
-          if (spec?.piezo) {
-            for (let q = -1; q <= 1; q += 2)
-              model(cube, [0, q * 0.43, -0.28], [0, 0, 0], [1.42 * k, 0.018, 0.035], ICE, 0.1, 0.9);
-          }
-          if (spec?.lidar) {
-            model(
-              sphere,
-              [-1.2 * k, 0.56, 0],
-              [0, 0, 0],
-              [0.1 * k, 0.1 * k, 0.1 * k],
-              WARM_LIGHT,
-              0.16,
-              1,
-            );
-          }
-        } else if (kind === "plasma") {
-          model(
-            cylinder,
-            [-0.42, 0, 0],
-            [0, 0, 0],
-            [0.54 * k, 0.36 * k, 0.36 * k],
-            BLUE_GLASS_DEEP,
-            0.18,
-          );
-          model(sphere, [-0.22, 0, 0], [0, 0, 0], [0.3 * k, 0.3 * k, 0.3 * k], WARM_LIGHT, 0.36);
-          for (let ring = -1; ring <= 1; ring++)
-            model(
-              torus,
-              [ring * 0.46, 0, 0],
-              [0, Math.PI / 2, 0],
-              [0.38 * k, 0.38 * k, 0.38 * k],
-              ring === 0 ? GOLD : CYAN,
-              0.34,
-            );
-          model(nozzle, [0.78, 0, 0], [0, 0, 0], [0.72 * k, 0.5 * k, 0.5 * k], BLUE_GLASS, 0.28);
-        } else if (kind === "fluid") {
-          model(
-            cylinder,
-            [-0.34, 0, 0],
-            [0, 0, 0],
-            [0.72 * k, 0.34 * k, 0.34 * k],
-            BLUE_GLASS,
-            0.22,
-          );
-          for (let v = -1; v <= 1; v++)
-            model(
-              torus,
-              [v * 0.45, 0, 0],
-              [0, Math.PI / 2, 0],
-              [0.31 * k, 0.31 * k, 0.31 * k],
-              GOLD,
-              0.24,
-            );
-          model(
-            nozzle,
-            [0.82, 0, 0],
-            [0, 0, 0],
-            [0.6 * k, 0.46 * k, 0.46 * k],
-            BLUE_GLASS_DEEP,
-            0.24,
-          );
-        } else {
-          model(cube, [0, 0, 0], [0, 0, 0], [0.72 * k, 0.24 * k, 0.32 * k], color, 0.26);
-          model(
-            torus,
-            [-0.52, 0, 0],
-            [Math.PI / 2, 0, 0],
-            [0.32 * k, 0.32 * k, 0.32 * k],
-            GOLD,
-            0.28,
-          );
-          model(
-            torus,
-            [0.52, 0, 0],
-            [Math.PI / 2, 0, 0],
-            [0.32 * k, 0.32 * k, 0.32 * k],
-            GOLD,
-            0.28,
-          );
+        for (const part of assemblyCache.get(path.id) ?? []) {
+          // Use the original vertex buffers and model() manifestation/drafting pipeline.
+          const m = canonicalMeshes.get(part.vertices);
+          if (!m) continue;
+          model(m, part.position.map(v=>v*k) as Vec3, part.rotation, part.scale.map(v=>v*k) as Vec3, part.color, .12, 1);
         }
       }
 
@@ -1871,6 +1481,7 @@ export function Envision3DScene({
       dead = true;
       cancelAnimationFrame(raf);
       [cube, torus, sphere, cylinder, nozzle].forEach((m) => gl.deleteBuffer(m.buffer));
+      for (const m of canonicalMeshes.values()) gl.deleteBuffer(m.buffer);
       [helixM, arcM, orbitM].forEach((m) => gl.deleteBuffer(m.buffer));
       for (const w of wires.values()) {
         gl.deleteBuffer(w.feature.buffer);
@@ -2000,7 +1611,7 @@ export function Envision3DScene({
               ? "3D QUEUED"
               : "3D NOT AVAILABLE";
   const modeHint = !hasReal3D
-    ? modelStatusLabel
+    ? `CONCEPT / UNVERIFIED · ${selected && pathwayKind(selected, objectiveText) === "generic" && !selected.model_spec ? "INTERPRETIVE DIAGRAM · PHYSICAL GEOMETRY UNAVAILABLE" : "SEMANTIC ASSEMBLY"} · ${modelStatusLabel}`
     : visualMode === "blueprint"
       ? "BLUEPRINT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
       : visualMode === "environment"
@@ -2026,7 +1637,7 @@ export function Envision3DScene({
         aria-label="Interactive 3D holographic ENVISION scene"
       />
       <div className="ascension-envision-heading">
-        <span>ENVISION MODE</span>
+        <span>ENVISION · {hasReal3D ? "GENERATED / UNVERIFIED" : "CONCEPT / UNVERIFIED"}</span>
         <strong data-phase={phase}>
           {selected ? (phase === "stabilized" ? modeHint : phaseLabel) : phaseLabel}
         </strong>
@@ -2054,7 +1665,7 @@ export function Envision3DScene({
       )}
       {!selected &&
         paths.map((path, i) => (
-          <button
+          <Button
             key={path.id}
             className="ascension-holo-hit"
             style={{ left: PATH_SLOTS[i]?.left, top: PATH_SLOTS[i]?.labelTop }}
@@ -2063,20 +1674,20 @@ export function Envision3DScene({
             <span>PATH {String(i + 1).padStart(2, "0")}</span>
             <strong>{path.label}</strong>
             {path.outcome_score !== null && <em>{Math.round(path.outcome_score * 100)}%</em>}
-          </button>
+          </Button>
         ))}
       {!selected && delivery.blend && (
-        <button
+        <Button
           className="ascension-holo-hit ascension-holo-hit--blend"
           style={{ left: "50%", top: "61%" }}
-          onClick={() => onSelect(delivery.blend!.id)}
+          onClick={() => { if (delivery.blend) onSelect(delivery.blend.id); }}
         >
           <span>BLEND REALITIES</span>
           <strong>SPIRAL + OUTCOME</strong>
           {delivery.blend.outcome_score !== null && (
             <em>{Math.round(delivery.blend.outcome_score * 100)}%</em>
           )}
-        </button>
+        </Button>
       )}
       {webglError && (
         <div className="ascension-holo-error">3D acceleration is unavailable in this browser.</div>
@@ -2089,16 +1700,16 @@ export function Envision3DScene({
         >
           <div className="ascension-mode-switch" role="tablist" aria-label="Presentation mode">
             {(["cutaway", "blueprint", "environment"] as const).map((m) => (
-              <button
+              <Button
                 key={m}
                 type="button"
                 role="tab"
                 aria-selected={visualMode === m}
                 data-active={visualMode === m ? "true" : undefined}
-                onClick={() => onUse(selected, m)}
+                onClick={() => setVisualMode(m)}
               >
                 {m.toUpperCase()}
-              </button>
+              </Button>
             ))}
           </div>
           <div>
@@ -2107,26 +1718,26 @@ export function Envision3DScene({
                 ? "BLEND REALITY"
                 : generated && generated.id === selected.id
                   ? "HUNYUAN3D REALITY · GENERATED MODEL"
-                  : "ENVISIONED REALITY"}
+                  : "CONCEPT / UNVERIFIED"}
             </p>
             <h3>{selected.label}</h3>
             <span>{selected.summary}</span>
             {selected.model_error && <p role="alert">{selected.model_error}</p>}
           </div>
           <div className="ascension-holo-actions">
-            <button
+            <Button
               onClick={() => {
                 rotationRef.current = { x: -0.22, y: 0.55 };
                 zoomRef.current = 1;
               }}
             >
               RESET VIEW
-            </button>
-            <button onClick={() => onSelect(null)}>BACK</button>
+            </Button>
+            <Button onClick={() => onSelect(null)}>BACK</Button>
             {generated?.id === selected.id ? (
-              <button onClick={enterModelView}>3D READY</button>
+              <Button onClick={enterModelView}>3D READY</Button>
             ) : (
-              <button
+              <Button
                 type="button"
                 disabled={modelViewState !== "unavailable"}
                 onClick={enterModelView}
@@ -2134,7 +1745,7 @@ export function Envision3DScene({
                 {modelViewState === "unavailable" && selectedModelUrl
                   ? "RETRY MODEL LOAD"
                   : modelStatusLabel}
-              </button>
+              </Button>
             )}
             {generated && generated.id === selected.id && (
               <a
@@ -2146,9 +1757,9 @@ export function Envision3DScene({
                 MODEL
               </a>
             )}
-            <button onClick={() => onUse(selected, visualMode)}>
+            <Button onClick={() => onUse(selected, visualMode)}>
               {isBlend ? "ENTER BLEND" : "ENTER REALITY"}
-            </button>
+            </Button>
           </div>
         </div>
       )}

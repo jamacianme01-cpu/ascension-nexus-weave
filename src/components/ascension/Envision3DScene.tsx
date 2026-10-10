@@ -670,8 +670,8 @@ export function Envision3DScene({
   const selectedSpec = selected ? (linearSpecs.get(selected.id) ?? null) : null;
 
   const sceneSignature = useMemo(
-    () => choices.map((c) => `${c.id}:${c.model_url ?? ""}`).join("|"),
-    [choices],
+    () => choices.map((c) => `${c.id}:${c.model_url ?? ""}:${JSON.stringify(c.model_spec)}`).join("|") + (objectiveText ?? ""),
+    [choices, objectiveText],
   );
 
   // Manifestation clocks: the overview manifests once when realities erupt
@@ -764,6 +764,14 @@ export function Envision3DScene({
       const w = wireEdges(data);
       return { feature: lineMesh(gl, w.feature), all: lineMesh(gl, w.all) };
     };
+    const assemblyCache = new Map(choices.map(path => [path.id, canonicalAssembly(objectiveText ?? "", path)]));
+    const canonicalMeshes = new Map<Float32Array, Mesh>();
+    for (const parts of assemblyCache.values()) for (const part of parts) {
+      if (canonicalMeshes.has(part.vertices)) continue;
+      const m = mesh(gl, part.vertices);
+      canonicalMeshes.set(part.vertices, m);
+      wires.set(m, buildWire(part.vertices));
+    }
     // Generated Hunyuan3D linework, built when the model buffer is built.
     let generatedWire: {
       feature: WebGLBuffer;
@@ -1250,13 +1258,11 @@ export function Envision3DScene({
       // through model()'s drafting branch, and ENVIRONMENT stages those same
       // parts in the hall. No question-specific renderer code is needed.
       if (!modelViewActive) {
-        for (const part of canonicalAssembly(objectiveText ?? "", path)) {
+        for (const part of assemblyCache.get(path.id) ?? []) {
           // Use the original vertex buffers and model() manifestation/drafting pipeline.
-          const m = mesh(gl, part.vertices);
-          const w = buildWire(part.vertices);
-          wires.set(m, w);
+          const m = canonicalMeshes.get(part.vertices);
+          if (!m) continue;
           model(m, part.position.map(v=>v*k) as Vec3, part.rotation, part.scale.map(v=>v*k) as Vec3, part.color, .12, 1);
-          gl.deleteBuffer(m.buffer); gl.deleteBuffer(w.feature); gl.deleteBuffer(w.all); wires.delete(m);
         }
       }
 
@@ -1475,6 +1481,7 @@ export function Envision3DScene({
       dead = true;
       cancelAnimationFrame(raf);
       [cube, torus, sphere, cylinder, nozzle].forEach((m) => gl.deleteBuffer(m.buffer));
+      for (const m of canonicalMeshes.values()) gl.deleteBuffer(m.buffer);
       [helixM, arcM, orbitM].forEach((m) => gl.deleteBuffer(m.buffer));
       for (const w of wires.values()) {
         gl.deleteBuffer(w.feature.buffer);
@@ -1604,7 +1611,7 @@ export function Envision3DScene({
               ? "3D QUEUED"
               : "3D NOT AVAILABLE";
   const modeHint = !hasReal3D
-    ? `CONCEPT / UNVERIFIED · ${pathwayKind(selected ?? paths[0] as Pathway, objectiveText) === "generic" && !selected?.model_spec ? "INTERPRETIVE DIAGRAM" : "SEMANTIC ASSEMBLY"} · ${modelStatusLabel}`
+    ? `CONCEPT / UNVERIFIED · ${selected && pathwayKind(selected, objectiveText) === "generic" && !selected.model_spec ? "INTERPRETIVE DIAGRAM · PHYSICAL GEOMETRY UNAVAILABLE" : "SEMANTIC ASSEMBLY"} · ${modelStatusLabel}`
     : visualMode === "blueprint"
       ? "BLUEPRINT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
       : visualMode === "environment"

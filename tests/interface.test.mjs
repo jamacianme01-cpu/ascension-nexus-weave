@@ -413,7 +413,11 @@ try {
     assert.equal(repeat.response_payload.body, draftAnswer.body);
   });
   const priorPaidDrafts = process.env.ASCENSION_ALLOW_PAID_DRAFTS;
+  const priorLovableAi = process.env.LOVABLE_API_KEY;
+  const priorLocalBase = process.env.LOCAL_LLM_BASE_URL;
   delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
+  delete process.env.LOVABLE_API_KEY;
+  delete process.env.LOCAL_LLM_BASE_URL;
   try {
     const waitingLocal = await deliveryEngine.resolveDelivery({
       run: runShoe,
@@ -428,10 +432,6 @@ try {
       assert.equal(waitingLocal.response_payload, null);
       assert.match(waitingLocal.error, /no answer engine connected/);
     });
-  } finally {
-    if (priorPaidDrafts === undefined) delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
-    else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorPaidDrafts;
-  }
   const localDraft = await deliveryEngine.resolveDelivery({
     run: runShoe,
     artifactStage: null,
@@ -451,6 +451,14 @@ try {
     assert.equal(localDraft.source, "external_draft");
     assert.match(localDraft.response_payload.body, /heel pod/);
   });
+  } finally {
+    if (priorPaidDrafts === undefined) delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
+    else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorPaidDrafts;
+    if (priorLovableAi === undefined) delete process.env.LOVABLE_API_KEY;
+    else process.env.LOVABLE_API_KEY = priorLovableAi;
+    if (priorLocalBase === undefined) delete process.env.LOCAL_LLM_BASE_URL;
+    else process.env.LOCAL_LLM_BASE_URL = priorLocalBase;
+  }
   const verifiedShoe = { ...runShoe, status: "verified", completed_at: "2026-09-28T13:06:48Z" };
   const noFilesYet = await deliveryEngine.resolveDelivery({
     run: verifiedShoe,

@@ -35,8 +35,6 @@ export const Route = createFileRoute("/console/knowledgeverse")({
           "Meaning Elements, Knowledge Forms, relationships, emergence candidates, ID/SID and lineage read from published ASCENSION state.",
       },
       { property: "og:title", content: "Inspect · Knowledgeverse Console — ASCENSION" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
         content:

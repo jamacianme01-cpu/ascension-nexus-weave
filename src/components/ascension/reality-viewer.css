@@ -592,7 +592,7 @@
 .reality-navigation .reality-title { order: -1; }
 .reality-view-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
 }
 .reality-view-controls button {
@@ -619,6 +619,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .reality-view-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .reality-view-controls .reality-parts-tab { grid-row: auto; grid-column: auto; }
-  .reality-view-controls button { font-size: 10px; letter-spacing: 0; }
+  .reality-view-controls button { font-size: 10px; letter-spacing: 0; overflow-wrap: anywhere; }
 }

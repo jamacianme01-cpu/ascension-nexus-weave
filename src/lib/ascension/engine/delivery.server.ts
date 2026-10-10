@@ -480,6 +480,13 @@ export async function externalProductDraft(
     } else if (!Array.isArray(repairedCandidate["limitations"])) {
       repairedCandidate["limitations"] = [];
     }
+    // A repaired drawing specification is still an answer, not a generated
+    // image or 3D artifact. Apply the same rule as the initial draft.
+    if (requestedKind(run.objective) === "drawing" && repairedCandidate["kind"] === "artifact" &&
+      Array.isArray(repairedCandidate["files"]) && !repairedCandidate["files"].length &&
+      Array.isArray(repairedCandidate["pathways"]) && repairedCandidate["pathways"].length &&
+      !repairedCandidate["pathways"].some((pathway) => record(pathway)["visual_svg"]))
+      repairedCandidate["kind"] = "answer";
     parsed = parseDelivery(repairedCandidate);
     if (missingSpiralExpansion && needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
       // Keep the substantive answer visible, but do not pretend the missing

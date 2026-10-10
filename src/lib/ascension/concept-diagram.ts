@@ -17,22 +17,53 @@ export function deriveConceptParts(objective: string, pathway: ObjectivePathway)
   }));
 }
 
-export function buildConceptDiagram(parts: DesignPart[], palette: { structure: string; energy: string }): THREE.Group {
+/** Render named, subject-dependent assembly geometry, not identical hex tiles. */
+export function buildConceptDiagram(
+  parts: DesignPart[],
+  palette: { structure: string; energy: string },
+  modelSpec?: import("./result-model").ObjectiveModelSpec | null,
+): THREE.Group {
   const group = new THREE.Group();
-  group.name = "Derived pathway concept diagram";
-  parts.forEach((part, index) => {
-    // Deliberately diagrammatic hexagonal plates, not a pretend shoe/engine/room.
-    const shape = new THREE.Shape();
-    for (let corner = 0; corner < 6; corner++) {
-      const angle = corner * Math.PI / 3;
-      const x = Math.cos(angle) * 1.35, y = Math.sin(angle) * 0.8;
-      if (corner === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+  group.name = modelSpec?.title ?? "Unverified pathway assembly";
+  const primitive = (kind: string): THREE.BufferGeometry => {
+    switch (kind) {
+      case "cylinder": return new THREE.CylinderGeometry(0.46, 0.46, 1.5, 36);
+      case "ring": return new THREE.TorusGeometry(0.62, 0.16, 20, 48);
+      case "sphere": return new THREE.SphereGeometry(0.65, 28, 20);
+      case "nozzle": return new THREE.ConeGeometry(0.6, 1.6, 36);
+      default: return new THREE.BoxGeometry(1.5, 0.46, 0.8);
     }
-    shape.closePath();
-    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.22, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.06, bevelThickness: 0.04 }),
-      new THREE.MeshStandardMaterial({ color: index % 2 ? palette.structure : palette.energy, roughness: 0.45, metalness: 0.25 }));
+  };
+  const inferredPrimitive = (label: string) => {
+    if (/\\b(?:coil|winding|solenoid|toroid|loop|ring|wheel)\\b/i.test(label)) return "ring";
+    if (/\\b(?:magnet|motor|engine|shaft|rod|rotor|piston|tube|cylinder|hub)\\b/i.test(label)) return "cylinder";
+    if (/\\b(?:nozzle|cone|jet|exhaust)\\b/i.test(label)) return "nozzle";
+    if (/\\b(?:sensor|sphere|ball|bearing)\\b/i.test(label)) return "sphere";
+    return "box";
+  };
+  parts.forEach((part, index) => {
+    const specification = modelSpec?.parts[index];
+    const shape = primitive(specification?.primitive ?? inferredPrimitive(part.name));
+    const mesh = new THREE.Mesh(
+      shape,
+      new THREE.MeshStandardMaterial({
+        color: index % 2 ? palette.structure : palette.energy,
+        roughness: 0.4,
+        metalness: 0.26,
+      }),
+    );
     mesh.name = part.name;
-    mesh.position.set((index % 2 - 0.5) * 3.4, (Math.ceil(parts.length / 2) / 2 - Math.floor(index / 2)) * 2.1, (index % 3) * 0.32);
+    if (specification) {
+      mesh.position.set(...specification.position);
+      mesh.rotation.set(...specification.rotation);
+      mesh.scale.set(...specification.scale);
+    } else {
+      mesh.position.set(
+        (index % 3 - 1) * 1.95,
+        (Math.ceil(parts.length / 3) / 2 - Math.floor(index / 3)) * 1.5,
+        (index % 2) * 0.32,
+      );
+    }
     mesh.userData["conceptPart"] = part;
     group.add(mesh);
   });

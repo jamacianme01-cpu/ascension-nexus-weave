@@ -188,6 +188,34 @@ export function governedDelivery(
   });
 }
 
+/**
+ * Detect a collapsed Spiral response without inventing artificial pathways.
+ * Selected user blends are synthesis requests, not requests for three new paths.
+ * An ordinary factual question does not need three redundant alternatives.
+ */
+export function needsSpiralExpansionRepair(
+  objective: string,
+  evidence: unknown,
+  spiralForms: readonly string[],
+  result: Pick<ObjectiveDelivery, "pathways" | "blend">,
+): boolean {
+  const records = Array.isArray(evidence) ? evidence : [];
+  const userBlend = records.some((value) => typeof value === "string" &&
+    value.includes('"source":"ASCENSION_BLEND"') && value.includes('"action":"blend"'));
+  if (userBlend) return false;
+  const newAnswers = records.some((value) => typeof value === "string" &&
+    value.includes('"source":"ASCENSION_REVISION"') && value.includes('"action":"new_answers"'));
+  const kind = requestedKind(objective);
+  const practicalHowTo = /^\s*how\s+(?:to|can|would)\b/i.test(objective) &&
+    /\b(?:make|build|create|design|convert|construct|fix|repair|generate|produce|improve)\b/i.test(objective);
+  const needsMultiple = newAnswers || spiralForms.length >= 2 ||
+    kind === "drawing" || kind === "design" || kind === "app" || practicalHowTo;
+  if (!needsMultiple) return false;
+  const signatures = new Set(result.pathways.map((pathway) =>
+    [pathway.label, pathway.summary].join("|").replace(/\s+/g, " ").trim().toLowerCase()));
+  return result.pathways.length < 3 || signatures.size < 3 || !result.blend;
+}
+
 export async function externalProductDraft(
   run: {
     objective: string;
@@ -411,13 +439,18 @@ export async function externalProductDraft(
     !assessResult(run.objective, parsed.body, parsed.files,
       parsed.pathways.map((pathway) => pathway.visual_svg).filter((svg): svg is string => Boolean(svg))).produced;
 
-  if (disclaimerOnly || missingDrawingPathways) {
+  const missingSpiralExpansion = needsSpiralExpansionRepair(
+    run.objective, run.evidence, spiralForms, parsed,
+  );
+  if (disclaimerOnly || missingDrawingPathways || missingSpiralExpansion) {
     const repaired = await callZai({
       system: [
         system,
         missingDrawingPathways
           ? "REPAIR REQUIRED: the user requested a drawing, but the previous response omitted usable geometry pathways. Return kind answer with at least three distinct objective-specific pathways and a blend. Each pathway needs a concrete geometry summary and arrangement steps for Hunyuan3D. Keep the exact subject requested; do not substitute a room, furniture, or a generic overview. Do not claim a generated drawing exists."
-          : "REPAIR REQUIRED: the previous response failed because it replaced the user's objective with a generic disclaimer.",
+          : missingSpiralExpansion
+            ? "SPIRAL REPAIR REQUIRED: the earlier response collapsed a multi-route objective into too few genuinely different pathways, repeated a pathway, or omitted the complementary BLEND. Return three materially distinct routes plus a blend that explicitly combines compatible strengths. Keep the original objective and any USER_SELECTED revision intent. Never invent verified execution, images, or physical outcomes."
+            : "REPAIR REQUIRED: the previous response failed because it replaced the user's objective with a generic disclaimer.",
         "Return the complete JSON response again.",
         "The body must directly solve the stated objective with concrete objective-specific guidance.",
         "Do not center the answer on electrical, plumbing, structural, legal, safety, code, manual, or professional-referral language unless that subsystem is itself the objective.",
@@ -448,6 +481,12 @@ export async function externalProductDraft(
       repairedCandidate["limitations"] = [];
     }
     parsed = parseDelivery(repairedCandidate);
+    if (missingSpiralExpansion && needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
+      // Keep the substantive answer visible, but do not pretend the missing
+      // paths or blend were generated. A later NEW ANSWERS run can try again.
+      parsed = { ...parsed, limitations: [...parsed.limitations,
+        "Spiral expansion remained incomplete after one repair attempt; some distinct pathways or the blend are missing."] };
+    }
   }
 
   // Primitive model_spec/SVG output is legacy planning metadata only. It must

@@ -534,7 +534,7 @@ export function ResultContent({
                 {canInspect && (
                   <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(pathway); }}
                     className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-primary uppercase">
-                    {pathway.model_url ? "DIVE INTO REALITY" : pathway.model_status === "failed" ? "3D GENERATION FAILED · VIEW STATUS" : "3D DRAWING PENDING · VIEW STATUS"}
+                    {pathway.model_url ? "DIVE INTO REALITY" : "DIVE INTO REALITY · CONCEPT / UNVERIFIED"}
                   </button>
                 )}
               </article>
@@ -574,7 +574,7 @@ export function ResultContent({
                 {canInspect && (
                   <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(delivery.blend!); }}
                     className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-gold uppercase">
-                    {delivery.blend.model_url ? "DIVE INTO BLENDED REALITY" : delivery.blend.model_status === "failed" ? "3D GENERATION FAILED · VIEW STATUS" : "3D DRAWING PENDING · VIEW STATUS"}
+                    {delivery.blend.model_url ? "DIVE INTO BLENDED REALITY" : "DIVE INTO BLENDED REALITY · CONCEPT / UNVERIFIED"}
                   </button>
                 )}
               </article>

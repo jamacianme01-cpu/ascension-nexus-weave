@@ -1501,6 +1501,7 @@ export function RealityViewer({
       } else orbit.update();
       if(locatedPart!==null && model && partAnchors[locatedPart])locationMarker.position.copy(partObjects[locatedPart]!.localToWorld(partAnchors[locatedPart]!.clone()));
       renderer.render(scene, camera);
+      const occupiedLabels: DOMRect[] = [];
       labelsHost.current?.querySelectorAll<HTMLButtonElement>("button").forEach((button, index) => {
         const anchor = partAnchors[index];
         if (!anchor || !model) { button.hidden = true; return; }
@@ -1508,6 +1509,11 @@ export function RealityViewer({
         button.hidden = projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
         button.style.left = `${(projected.x + 1) * 50}%`;
         button.style.top = `${(1 - projected.y) * 50}%`;
+        if (!button.hidden) {
+          const rect = button.getBoundingClientRect();
+          button.hidden = occupiedLabels.some(other => rect.left < other.right + 4 && rect.right > other.left - 4 && rect.top < other.bottom + 4 && rect.bottom > other.top - 4);
+          if (!button.hidden) occupiedLabels.push(rect);
+        }
       });
     });
       void (async () => {

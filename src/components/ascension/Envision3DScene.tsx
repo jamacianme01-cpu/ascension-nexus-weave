@@ -1162,8 +1162,8 @@ export function Envision3DScene({
       const semanticModel = path.model_spec;
 
       // ENVISION is 3D-only. Reference images are internal Hunyuan inputs and
-      // are never rendered to the user. Until the real GLB is loaded, the
-      // pathway remains in an explicit generation state with no fake geometry.
+      // are never rendered to the user. Canonical interpretive assemblies are
+      // explicitly unverified until a delivered GLB supplies the generated mesh.
       const modelViewActive = focus && generatedRef.current?.id === path.id;
 
 

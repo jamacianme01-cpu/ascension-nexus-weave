@@ -210,7 +210,7 @@ export function RealityViewer({
       window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 1800,
     );
     return () => window.clearTimeout(timer);
-  }, [ready]);
+  }, [ready, pathway.id, initialMode]);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;

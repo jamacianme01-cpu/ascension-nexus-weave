@@ -7,9 +7,6 @@
     "issuer": "https://fyqvejmqhupgosysevay.supabase.co/auth/v1",
     "accepted_audiences": [
       "authenticated"
-    ],
-    "required_scopes": [
-      "offline_access"
     ]
   },
   "mcp": {

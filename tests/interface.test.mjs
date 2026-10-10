@@ -414,7 +414,7 @@ try {
   });
   const priorPaidDrafts = process.env.ASCENSION_ALLOW_PAID_DRAFTS;
   const priorLovableAi = process.env.LOVABLE_API_KEY;
-  const priorLocalBase = process.env.LOCAL_LLM_BASE_URL;
+  const priorLocalBaseNoEngine = process.env.LOCAL_LLM_BASE_URL;
   delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
   delete process.env.LOVABLE_API_KEY;
   delete process.env.LOCAL_LLM_BASE_URL;
@@ -456,8 +456,8 @@ try {
     else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorPaidDrafts;
     if (priorLovableAi === undefined) delete process.env.LOVABLE_API_KEY;
     else process.env.LOVABLE_API_KEY = priorLovableAi;
-    if (priorLocalBase === undefined) delete process.env.LOCAL_LLM_BASE_URL;
-    else process.env.LOCAL_LLM_BASE_URL = priorLocalBase;
+    if (priorLocalBaseNoEngine === undefined) delete process.env.LOCAL_LLM_BASE_URL;
+    else process.env.LOCAL_LLM_BASE_URL = priorLocalBaseNoEngine;
   }
   const verifiedShoe = { ...runShoe, status: "verified", completed_at: "2026-09-28T13:06:48Z" };
   const noFilesYet = await deliveryEngine.resolveDelivery({

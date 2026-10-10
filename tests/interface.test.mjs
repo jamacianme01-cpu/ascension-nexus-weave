@@ -632,6 +632,11 @@ try {
     globalThis.fetch = async (_url, init) => {
       const reviewed = matchingReview(init);
       if (reviewed) return streamed(reviewed);
+      // Count only model generation calls. Internal knowledge retrieval may
+      // also issue fetch requests, but they are not extra Spiral repairs.
+      let isModelRequest = false;
+      try { isModelRequest = Array.isArray(JSON.parse(init?.body ?? "{}").messages); } catch { /* not a model call */ }
+      if (!isModelRequest) return streamed(visualDraft);
       const response = ++drawingCalls === 1
         ? { ...visualDraft, kind: "answer", pathways: [] }
         : { ...visualDraft, kind: "answer" };

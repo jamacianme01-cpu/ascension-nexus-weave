@@ -1,6 +1,7 @@
 # ASCENSION web layer — roadmap
 
 ## Open
+- [ ] Restore and browser-test immediate unverified pathway concept views, dissection, parts, and safe GLB upgrade.
 - [ ] Report production deployment status for `b9ca9651-c0e1-454c-9b90-6cec818ac92f` (no deployment-status tool available to this session).
 - [ ] One governed run could not be driven to `verified` from this machine: Supabase requires email confirmation for new accounts (no inbox access here). Owner should run one objective from a signed-in account to confirm the answer panel end to end.
 

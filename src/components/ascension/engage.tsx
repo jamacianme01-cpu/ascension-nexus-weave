@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
+import { Envision3DScene } from "@/components/ascension/Envision3DScene";
 import { createRealityAtmosphere, playSpatialSwell } from "./reality-audio";
 import {
   getObjectiveStatus,
@@ -1441,6 +1442,15 @@ export function Engage() {
                   delivery={delivery}
                   selectedId={treeChoiceId}
                   onUse={choosePathway}
+                />
+              )}
+              {immersiveChoices && (
+                <Envision3DScene
+                  delivery={delivery}
+                  selectedId={treeChoiceId}
+                  onSelect={setTreeChoiceId}
+                  onUse={(pathway, mode) => openTreeReality(pathway, mode ?? "cutaway")}
+                  objectiveText={run.objective}
                 />
               )}
               <ResultContent

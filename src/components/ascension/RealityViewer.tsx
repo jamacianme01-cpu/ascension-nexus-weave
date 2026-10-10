@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
 import { getDesignParts, getDissectedDesign } from "@/lib/ascension/parts.functions";
 import type { DesignPart } from "@/lib/ascension/parts-model";
-import { buildConceptDiagram, deriveConceptParts, explodeConcept } from "@/lib/ascension/concept-diagram";
+import { buildCanonicalAssembly, assemblyParts, explodeAssembly, pathwayKind } from "@/lib/ascension/canonical-assembly";
 import "./reality-viewer.css";
 
 export type RealityMode = "cutaway" | "blueprint" | "environment";
@@ -123,7 +123,7 @@ export function RealityViewer({
   const edited = useRef(false);
   const [loadedUrl, setLoadedUrl] = useState(pathway.model_url);
   const conceptual = !loadedUrl;
-  const conceptParts = deriveConceptParts(objective, pathway);
+  const conceptParts = assemblyParts(objective, pathway);
   const conceptPartsRef = useRef(conceptParts);
   conceptPartsRef.current = conceptParts;
   useEffect(() => { edited.current = false; setLoadedUrl(pathway.model_url); }, [pathway.id]);
@@ -1165,7 +1165,7 @@ export function RealityViewer({
     let annotationCamera: THREE.PerspectiveCamera | THREE.OrthographicCamera = camera.clone();
     const explodedPositions = new Map<THREE.Object3D, THREE.Vector3>();
     const controls: ViewerControls = {
-      explode(enabled) { if (model && conceptual) { explodeConcept(model, enabled, explodedPositions); fit(); } },
+      explode(enabled) { if (model && conceptual) { explodeAssembly(model, enabled, explodedPositions); fit(); } },
       locatePart(index){
         const anchor=partAnchors[index],object=partObjects[index];if(!model||!anchor||!object)return;
         locatedPart=index;locationMarker.visible=true;locationMarker.position.copy(object.localToWorld(anchor.clone()));
@@ -1519,14 +1519,10 @@ export function RealityViewer({
           if (disposed) { disposeModel(gltf.scene); return; }
           model = gltf.scene;
         } else {
-          const tokens = getComputedStyle(document.documentElement);
-          model = buildConceptDiagram(conceptPartsRef.current, {
-            structure: tokens.getPropertyValue("--concept-structure").trim(),
-            energy: tokens.getPropertyValue("--concept-energy").trim(),
-          });
+          model = buildCanonicalAssembly(objective, pathway);
         }
           const meshes:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node);});
-          for(const mesh of meshes){
+          for(const mesh of conceptual ? [] : meshes){
             const pieces=splitMeshIslands(mesh);
             if(pieces.length>1){const holder=new THREE.Group();holder.position.copy(mesh.position);holder.quaternion.copy(mesh.quaternion);holder.scale.copy(mesh.scale);mesh.parent!.add(holder);pieces.forEach(piece=>holder.add(piece));mesh.removeFromParent();mesh.geometry.dispose();}
           }
@@ -1683,7 +1679,7 @@ export function RealityViewer({
           NEW OBJECTIVE
         </button>
         <div className="reality-title">
-          <span>{conceptual ? "CONCEPT / UNVERIFIED · DERIVED PATHWAY DIAGRAM" : "HUNYUAN3D MESH / UNVERIFIED"}</span>
+          <span>{conceptual ? `CONCEPT / UNVERIFIED · ${pathway.model_spec || pathwayKind(pathway, objective) !== "generic" ? "SEMANTIC ASSEMBLY" : "INTERPRETIVE DIAGRAM · PHYSICAL GEOMETRY UNAVAILABLE"}` : "HUNYUAN3D MESH / UNVERIFIED"}</span>
           {conceptual && <p className="reality-pathway-label">{pathway.model_error ? `GLB: ${pathway.model_error}` : pathway.model_status ? `GLB creation: ${pathway.model_status}` : "Physical model unavailable · Concept available now"}</p>}
           {pathway.model_url && loadedUrl !== pathway.model_url && <Button variant="outline" onClick={() => { edited.current = false; setLoadedUrl(pathway.model_url); }}>REPLACE EDITED CONCEPT WITH HUNYUAN MODEL</Button>}
           <h1>{objective}</h1>

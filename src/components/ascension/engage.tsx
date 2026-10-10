@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
+import { Envision3DScene } from "@/components/ascension/Envision3DScene";
 import { createRealityAtmosphere, playSpatialSwell } from "./reality-audio";
 import {
   getObjectiveStatus,
@@ -1255,6 +1256,10 @@ export function Engage() {
           <div className="ascension-scene-hero" aria-hidden="true">
             <img className="ascension-tree-scene" src={BOOK_TREE_SCENE} alt="" draggable={false} />
           </div>
+          {delivery && run && revealed && immersiveChoices && (
+            <Envision3DScene delivery={delivery} selectedId={treeChoiceId}
+              onSelect={setTreeChoiceId} onUse={openTreeReality} objectiveText={run.objective} />
+          )}
 
           <button
             type="button"

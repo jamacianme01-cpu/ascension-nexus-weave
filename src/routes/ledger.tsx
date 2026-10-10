@@ -26,6 +26,8 @@ export const Route = createFileRoute("/ledger")({
           "Hash-chained transition ledger: previous_hash to record_hash continuity, execution receipts, verification state and transformation history.",
       },
       { property: "og:title", content: "Verified Δ Ledger — ASCENSION" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
         content:

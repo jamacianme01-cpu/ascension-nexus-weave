@@ -1721,7 +1721,7 @@ export function RealityViewer({
           {dissectionError && <button onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</button>}
         </div>}
         {conceptual && ready && (showParts || dissected) && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
-          {activeParts.map((part, index) => <button key={part.name + index} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);api.current?.locatePart(index);}}>{part.name}</button>)}
+          {activeParts.map((part, index) => <button key={part.name + index} title={part.name} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);api.current?.locatePart(index);}}><span>{part.name}</span></button>)}
         </div>}
       </div>
       {!ready && (

@@ -6,6 +6,10 @@ export const Route = createFileRoute("/knowledgeverse")({
   head: () => ({
     meta: [
       { title: "Knowledgeverse — ASCENSION" },
+      { property: "og:title", content: "Knowledgeverse — ASCENSION" },
+      { property: "og:description", content: "The living ASCENSION Knowledgeverse: relationships, identity, verified delta and lineage." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       {
         name: "description",
         content:

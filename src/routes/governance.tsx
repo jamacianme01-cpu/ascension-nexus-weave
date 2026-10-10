@@ -29,6 +29,8 @@ export const Route = createFileRoute("/governance")({
           "Active, applicable, remembered-not-applicable and superseded constraints with Guardian state and evidence provenance.",
       },
       { property: "og:title", content: "Governance, Constraints & Provenance — ASCENSION" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
         content:

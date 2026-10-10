@@ -9,6 +9,7 @@ import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
 import { getDesignParts, getDissectedDesign } from "@/lib/ascension/parts.functions";
 import type { DesignPart } from "@/lib/ascension/parts-model";
+import { buildConceptDiagram, deriveConceptParts, explodeConcept } from "@/lib/ascension/concept-diagram";
 import "./reality-viewer.css";
 
 export type RealityMode = "cutaway" | "blueprint" | "environment";
@@ -71,9 +72,10 @@ type ViewerControls = {
   combine: (source: string, target: string, blend: boolean) => void;
   undo: () => void;
   exportAssembly: () => Promise<void>;
+  explode: (enabled: boolean) => void;
 };
 
-/** Dedicated inspection screen. Every displayed object comes from the selected GLB. */
+/** Dedicated GLB workbench with an explicitly unverified, data-derived concept diagram. */
 export function RealityViewer({
   pathway,
   objective,
@@ -117,15 +119,23 @@ export function RealityViewer({
   const [undoCount, setUndoCount] = useState(0);
   const [arrived, setArrived] = useState(false);
   const [ready, setReady] = useState(false);
+  const edited = useRef(false);
+  const [loadedUrl, setLoadedUrl] = useState(pathway.model_url);
+  const conceptual = !loadedUrl;
+  const conceptParts = deriveConceptParts(objective, pathway);
+  const conceptPartsRef = useRef(conceptParts);
+  conceptPartsRef.current = conceptParts;
+  useEffect(() => { edited.current = false; setLoadedUrl(pathway.model_url); }, [pathway.id]);
+  useEffect(() => { if (!edited.current && pathway.model_url) setLoadedUrl(pathway.model_url); }, [pathway.model_url]);
   const labelsHost = useRef<HTMLDivElement>(null);
   const [dissected, setDissected] = useState(false);
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
-  useEffect(() => { setDissection(null); setDissected(false); setDissectionError(null); }, [pathway.id, pathway.model_url]);
+  useEffect(() => { setDissection(null); setDissected(false); setDissectionError(null); }, [pathway.id, loadedUrl]);
   useEffect(() => {
-    if (!dissected || !ready || !api.current || dissection) return;
+    if (!dissected || !ready || !api.current || dissection || conceptual) return;
     let active = true;
     setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
     getDissectedDesign({data:{objective,label:pathway.label,summary:pathway.summary,image:api.current.picture()}})
@@ -147,7 +157,7 @@ export function RealityViewer({
   }, [pathway.id, pathway.summary]);
   const partsStepsKey = JSON.stringify(pathway.steps);
   useEffect(() => {
-    if (!showParts || !ready || !api.current) return;
+    if (!showParts || !ready || !api.current || conceptual) return;
     let active = true;
     setPartsLoading(true);
     setPartsError(null);
@@ -157,7 +167,8 @@ export function RealityViewer({
       .finally(() => { if (active) setPartsLoading(false); });
     return () => { active = false; };
   }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
-  const activeParts = dissected ? dissection?.parts ?? [] : parts;
+  const activeParts = conceptual ? conceptParts : dissected ? dissection?.parts ?? [] : parts;
+  useEffect(() => { if (conceptual && ready) api.current?.explode(dissected); }, [conceptual, ready, dissected]);
   const selectedComponent = components.find(component=>component.id===componentId);
   const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected ? selectedComponent?.detail ?? null : null;
   const dive = useRef(onDive);
@@ -214,14 +225,6 @@ export function RealityViewer({
   useEffect(() => {
     const target = host.current;
     if (!target) return;
-    // A design specification is not a generated model. Keep the actual request
-    // visible while Hunyuan is pending instead of opening a fabricated room.
-    if (!pathway.model_url) {
-      setReady(false);
-      setError(null);
-      setArrived(true);
-      return;
-    }
     let disposed = false;
     let model: THREE.Group | null = null;
     let renderer: THREE.WebGLRenderer;
@@ -301,9 +304,11 @@ export function RealityViewer({
           Array.isArray(node.material) ? blue : blue[0],
         );
       });
+      edited.current = true;
       setObjectColor(value);
     };
     const addObject = (kind: CatalogKind) => {
+      edited.current = true;
       const group = new THREE.Group();
       const finish = new THREE.MeshStandardMaterial({
         color: objectColor,
@@ -1034,7 +1039,7 @@ export function RealityViewer({
     roomEnvironment.visible = false;
     scene.add(roomEnvironment);
     const roomMeshes: THREE.Mesh[] = [];
-    buildRoom("Workspace");
+    if (!conceptual) buildRoom("Workspace");
     const controller = new AbortController();
     const disposeModel = (object: THREE.Object3D) => {
       const textures = new Set<THREE.Texture>();
@@ -1124,7 +1129,7 @@ export function RealityViewer({
       configureOrbit();
       floor.visible = next === "environment";
       floor.receiveShadow = next === "environment";
-      roomEnvironment.visible = next === "environment";
+      roomEnvironment.visible = next === "environment" && !conceptual;
       grid.visible = next === "blueprint";
       lines.visible = false;
       displayEdges.forEach(edge=>{edge.visible=true;edge.material=next==="blueprint"?edgeMaterial:solidEdgeMaterial;});
@@ -1146,7 +1151,7 @@ export function RealityViewer({
     const componentDetails = new Map<string, DesignPart>();
     const history: Array<() => void> = [];
     const refreshComponents = () => setComponents([...componentObjects.values()].filter(object=>object.parent).map(object=>({id:object.uuid,name:object.userData["ascensionName"] ?? object.name ?? "Component",detail:componentDetails.get(object.uuid)??null})));
-    const remember = (undo:()=>void) => {history.push(undo);if(history.length>30)history.shift();setUndoCount(history.length);};
+    const remember = (undo:()=>void) => {edited.current=true;history.push(undo);if(history.length>30)history.shift();setUndoCount(history.length);};
     const snapshot = (object:THREE.Object3D) => {
       const parent=object.parent;const position=object.position.clone();const rotation=object.quaternion.clone();const scale=object.scale.clone();
       return ()=>{if(parent)parent.add(object);else object.removeFromParent();object.position.copy(position);object.quaternion.copy(rotation);object.scale.copy(scale);object.updateWorldMatrix(true,true);};
@@ -1157,7 +1162,9 @@ export function RealityViewer({
     const partNames:string[]=[];
     let locatedPart:number|null=null;
     let annotationCamera: THREE.PerspectiveCamera | THREE.OrthographicCamera = camera.clone();
+    const explodedPositions = new Map<THREE.Object3D, THREE.Vector3>();
     const controls: ViewerControls = {
+      explode(enabled) { if (model && conceptual) { explodeConcept(model, enabled, explodedPositions); fit(); } },
       locatePart(index){
         const anchor=partAnchors[index],object=partObjects[index];if(!model||!anchor||!object)return;
         locatedPart=index;locationMarker.visible=true;locationMarker.position.copy(object.localToWorld(anchor.clone()));
@@ -1504,20 +1511,15 @@ export function RealityViewer({
     });
       void (async () => {
         try {
-        const response = await fetch(pathway.model_url!, {
-          signal: controller.signal,
-        });
-        if (!response.ok)
-          throw new Error(`Model download returned HTTP ${response.status}`);
-          const gltf = await new GLTFLoader().parseAsync(
-            await response.arrayBuffer(),
-            new URL(".", pathway.model_url!).href,
-          );
-          if (disposed) {
-            disposeModel(gltf.scene);
-            return;
-          }
+        if (loadedUrl) {
+          const response = await fetch(loadedUrl, { signal: controller.signal });
+          if (!response.ok) throw new Error(`Model download returned HTTP ${response.status}`);
+          const gltf = await new GLTFLoader().parseAsync(await response.arrayBuffer(), new URL(".", loadedUrl).href);
+          if (disposed) { disposeModel(gltf.scene); return; }
           model = gltf.scene;
+        } else {
+          model = buildConceptDiagram(conceptPartsRef.current);
+        }
           const meshes:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node);});
           for(const mesh of meshes){
             const pieces=splitMeshIslands(mesh);
@@ -1581,6 +1583,11 @@ export function RealityViewer({
             editable.add(node);
             if(!node.name || /^(?:mesh|component|part|diagram|label)(?:[ _.-]*[a-z0-9]+)?$/i.test(node.name))node.name=`Unidentified geometry ${componentObjects.size+1}`;
             componentObjects.set(node.uuid,node);
+            const detail = node.userData["conceptPart"] as DesignPart | undefined;
+            if (detail) {
+              componentDetails.set(node.uuid, detail);
+              partObjects.push(node); partNames.push(detail.name); partAnchors.push(new THREE.Vector3());
+            }
             const edge = new THREE.LineSegments(
               new THREE.EdgesGeometry(node.geometry, 12),
               edgeMaterial,
@@ -1590,10 +1597,13 @@ export function RealityViewer({
           });
           floor.position.y = normalized.min.y - 0.03;
           grid.position.y = normalized.min.y - 0.04;
-          buildRoom(space);
+          if (!conceptual) buildRoom(space);
           scene.add(model);
           setMode(modeRef.current);
           refreshComponents();
+          applyMode(modeRef.current);
+          renderer.domElement.dataset["source"] = conceptual ? "concept" : "glb";
+          renderer.domElement.dataset["meshCount"] = String(componentObjects.size);
           setReady(true);
         } catch (cause) {
           if (!disposed) setError(cause instanceof Error ? cause.message : String(cause));
@@ -1629,7 +1639,7 @@ export function RealityViewer({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [pathway.id, pathway.model_url, attempt]);
+  }, [pathway.id, loadedUrl, attempt]);
 
   useEffect(() => {
     api.current?.mode(mode);
@@ -1642,6 +1652,7 @@ export function RealityViewer({
       ref={dialog}
       className="reality-screen"
       data-mode={mode}
+      data-visual-source={conceptual ? "concept" : "glb"}
       data-arrived={arrived}
       aria-label={`${pathway.label} — immersive reality`}
       onCancel={(event) => {
@@ -1667,7 +1678,9 @@ export function RealityViewer({
           NEW OBJECTIVE
         </button>
         <div className="reality-title">
-          <span>ASCENSION / ENVISION</span>
+          <span>{conceptual ? "CONCEPT / UNVERIFIED · DERIVED PATHWAY DIAGRAM" : "HUNYUAN3D MESH / UNVERIFIED"}</span>
+          {conceptual && <p className="reality-pathway-label">{pathway.model_error ? `GLB: ${pathway.model_error}` : pathway.model_status ? `GLB creation: ${pathway.model_status}` : "Physical model unavailable · Concept available now"}</p>}
+          {pathway.model_url && loadedUrl !== pathway.model_url && <button onClick={() => { edited.current = false; setLoadedUrl(pathway.model_url); }}>REPLACE EDITED CONCEPT WITH HUNYUAN MODEL</button>}
           <h1>{objective}</h1>
           <p className="reality-pathway-label">{pathway.label}</p>
         </div>
@@ -1688,7 +1701,7 @@ export function RealityViewer({
         </div>
       </header>
       <div className="reality-model-stage">
-        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:dissected ? "hidden" : "visible"}} />
+        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:dissected && !conceptual ? "hidden" : "visible"}} />
         {dissected && dissection && <div className="reality-dissection">
           <div className="reality-dissection-picture">
             <img src={dissection.imageUrl} alt={`Exploded concept illustration of ${pathway.label}`} />
@@ -1702,8 +1715,8 @@ export function RealityViewer({
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
           {dissectionError && <button onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</button>}
         </div>}
-        {false && !dissected && showParts && !partsLoading && !partsError && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
-          {parts.map((part, index) => <button key={part.name + index} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => setPartIndex(index)}>{part.name}</button>)}
+        {conceptual && ready && (showParts || dissected) && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
+          {activeParts.map((part, index) => <button key={part.name + index} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);api.current?.locatePart(index);}}>{part.name}</button>)}
         </div>}
       </div>
       {!ready && (
@@ -1726,7 +1739,7 @@ export function RealityViewer({
           )}
         </div>
       )}
-      {ready && !dissected && (
+      {ready && (!dissected || conceptual) && (
       <aside className="reality-tools" aria-label="Model controls">
         <button disabled={!ready} aria-label="Zoom in" onClick={() => api.current?.zoom(1.3)}>
           ＋
@@ -1753,9 +1766,9 @@ export function RealityViewer({
       <footer className="reality-footer">
         {(showParts || dissected) && (
           <section id="reality-parts" className="reality-parts" aria-label="Design parts">
-            {!dissected && <div className="reality-component-workbench">
+            {(!dissected || conceptual) && <div className="reality-component-workbench">
               {!partsLoading && !partsError && <div className="reality-named-parts" aria-label="Named parts and functions">
-                {parts.map((part,index)=><button key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);api.current?.locatePart(index);}}><strong>{part.name}</strong><span>{part.purpose}</span></button>)}
+                {activeParts.map((part,index)=><button key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);api.current?.locatePart(index);}}><strong>{part.name}</strong><span>{part.purpose}</span></button>)}
               </div>}
               <details className="reality-geometry-details"><summary>Editable model components</summary>
               <div className="reality-component-list" aria-label="Editable components">
@@ -1764,7 +1777,7 @@ export function RealityViewer({
               <div className="reality-component-actions">
                 {(["translate","rotate","scale"] as const).map(action=><button key={action} disabled={!componentId} aria-pressed={transformMode===action} onClick={()=>api.current?.transform(action)}>{action==="translate"?"MOVE":action.toUpperCase()}</button>)}
                 <select aria-label="Target component B" value={targetId} onChange={event=>setTargetId(event.target.value)}><option value="">Choose component B</option>{components.filter(component=>component.id!==componentId).map(component=><option key={component.id} value={component.id}>{component.name}</option>)}</select>
-                {[false,true].map(blend=><button key={String(blend)} disabled={!componentId||!targetId} onClick={()=>{try{setWorkbenchError(null);api.current?.combine(componentId!,targetId,blend);}catch(cause){setWorkbenchError(cause instanceof Error?cause.message:"Assembly change failed.");}}}>{blend?"BLEND ASSEMBLY":"ADD A TO B"}</button>)}
+                {[false,true].map(blend=><button key={String(blend)} disabled={!componentId||!targetId} onClick={()=>{try{setWorkbenchError(null);if (componentId) api.current?.combine(componentId,targetId,blend);}catch(cause){setWorkbenchError(cause instanceof Error?cause.message:"Assembly change failed.");}}}>{blend?"BLEND ASSEMBLY":"ADD A TO B"}</button>)}
                 <select aria-label="New component shape" value={addKind} onChange={event=>setAddKind(event.target.value as CatalogKind)}>{(["box","sphere","cylinder","panel","beam","coil","motor","battery"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}</select>
                 <button onClick={()=>api.current?.add(addKind)}>ADD COMPONENT</button>
                 <button disabled={!undoCount} onClick={()=>api.current?.undo()}>UNDO</button>

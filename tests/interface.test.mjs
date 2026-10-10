@@ -312,6 +312,37 @@ try {
     );
   });
   const deliveryEngine = await server.ssrLoadModule("/src/lib/ascension/engine/delivery.server.ts");
+  const spiralPaths = [
+    { id: "one", label: "Coils", summary: "Coil induction" },
+    { id: "two", label: "Rotor", summary: "Rotating field" },
+    { id: "three", label: "Linear", summary: "Linear motion" },
+  ];
+  check("Spiral repairs collapsed physical design pathways", () => {
+    assert.equal(deliveryEngine.needsSpiralExpansionRepair("Design a propulsion engine", [], [],
+      { pathways: spiralPaths.slice(0, 1), blend: null }), true);
+  });
+  check("Spiral preserves complete distinct pathways and blend", () => {
+    assert.equal(deliveryEngine.needsSpiralExpansionRepair("Design a propulsion engine", [], [],
+      { pathways: spiralPaths, blend: { id: "blend" } }), false);
+  });
+  check("Spiral detects repeated routes rather than counting duplicate labels", () => {
+    assert.equal(deliveryEngine.needsSpiralExpansionRepair("Draw an engine", [], [],
+      { pathways: [spiralPaths[0], spiralPaths[0], spiralPaths[2]], blend: { id: "blend" } }), true);
+  });
+  check("User-selected blend is not replaced by an automatic three-route expansion", () => {
+    const evidence = [JSON.stringify({ source: "ASCENSION_BLEND", action: "blend" })];
+    assert.equal(deliveryEngine.needsSpiralExpansionRepair("Design a propulsion engine", evidence, [],
+      { pathways: spiralPaths.slice(0, 1), blend: null }), false);
+  });
+  check("NEW ANSWERS requests materially new routes for an ordinary question", () => {
+    const evidence = [JSON.stringify({ source: "ASCENSION_REVISION", action: "new_answers" })];
+    assert.equal(deliveryEngine.needsSpiralExpansionRepair("How do magnets work?", evidence, [],
+      { pathways: spiralPaths.slice(0, 1), blend: null }), true);
+  });
+  check("Simple factual answers do not invent multiple pathways", () => {
+    assert.equal(deliveryEngine.needsSpiralExpansionRepair("What is two plus two?", [], [],
+      { pathways: [], blend: null }), false);
+  });
   const shoeObjective = "make a gel support shoe";
   const receipt =
     "# ASCENSION Result\nCreated create/document artifact.\nWorkspace: Public Workspace\nCapability: create\nOutput: document\nFolder: C:\\\\Users\\\\Gordo\\\\Projects\\\\clarity\\\\generated_artifacts\\\\workbench\nFiles:\n- document.md\nValidation: passed";

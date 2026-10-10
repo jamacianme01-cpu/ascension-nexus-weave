@@ -28,8 +28,6 @@ export const Route = createFileRoute("/pathways")({
           "Branch comparison, Outcome Predictor trajectory, confidence, contradictions, balance and Wisdom recommendation from published transition state.",
       },
       { property: "og:title", content: "DTF Pathways & Outcome Predictor — ASCENSION" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
         content:

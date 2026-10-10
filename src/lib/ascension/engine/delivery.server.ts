@@ -659,9 +659,10 @@ export async function resolveDelivery(args: {
   if (draft?.status === "completed" && !retry) {
     try {
       const saved = parseDelivery(draft.response_payload);
-      const assessment = assessResult(run.objective, saved.body, saved.files,
-        [...saved.pathways, ...(saved.blend ? [saved.blend] : [])].flatMap(pathway => pathway.visual_svg ? [pathway.visual_svg] : []));
-      if (saved.kind !== "not_produced" && (assessment.produced || hasEnvisionPreparation(run.objective, saved)))
+      // A completed draft is already a persisted delivery. Rechecking the
+      // current objective-fit heuristics here can reject older saved answers
+      // and cause duplicate generation when the user simply reopens a run.
+      if (saved.kind !== "not_produced" && (saved.body.trim() || saved.pathways.length || saved.blend))
         return { ...base, created_at: draft.created_at, engine_label: DRAFT_LABEL,
           engine_model: draft.engine_model, status: "completed", response_payload: saved,
           note: null, source: "external_draft" };

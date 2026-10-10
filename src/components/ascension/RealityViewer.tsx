@@ -1693,8 +1693,14 @@ export function RealityViewer({
         </div>
         </div>
         <div className="reality-view-controls" role="group" aria-label="Drawing views and parts">
-        <button disabled={!ready} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode(value=>value==="blueprint"?"cutaway":"blueprint");}}>
+        <button disabled={!ready} aria-pressed={!dissected && mode==="cutaway"} onClick={()=>{setDissected(false);setMode("cutaway");}}>
+          CUTAWAY
+        </button>
+        <button disabled={!ready} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
           BLUEPRINT
+        </button>
+        <button disabled={!ready} aria-pressed={!dissected && mode==="environment"} onClick={()=>{setDissected(false);setMode("environment");}}>
+          ENVIRONMENT
         </button>
         <button disabled={!ready} aria-pressed={dissected} onClick={() => {setDissected(value=>!value);setPartIndex(null);}}>
           {dissected ? "ASSEMBLED" : "DISSECTED"}
@@ -1722,7 +1728,7 @@ export function RealityViewer({
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
           {dissectionError && <button onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</button>}
         </div>}
-        {conceptual && ready && (showParts || dissected) && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
+        {ready && ((conceptual && (showParts || dissected)) || (!conceptual && showParts && !dissected)) && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
           {activeParts.map((part, index) => <button key={part.name + index} title={part.name} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);api.current?.locatePart(index);}}><span>{part.name}</span></button>)}
         </div>}
       </div>

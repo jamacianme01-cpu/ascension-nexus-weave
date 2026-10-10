@@ -3,13 +3,26 @@ param(
   [string]$HunyuanRoot = 'C:\AI\HY3D2\Hunyuan3D2_WinPortable'
 )
 
-$ErrorActionPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Stop'
 $python = Join-Path $HunyuanRoot 'python_standalone\python.exe'
-$apiDir = Join-Path $HunyuanRoot 'Hunyuan3D-2'
-$apiScript = Join-Path $apiDir 'api_server.py'
 $worker = Join-Path $Repo 'runtime_bridge\hunyuan_model_worker.py'
 $logDir = Join-Path $Repo 'runtime_bridge\logs'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+# Portable installations may use Hunyuan3D-2.1 instead of Hunyuan3D-2.
+# Locate the actual API script instead of silently failing at startup.
+$apiCandidates = @(
+  (Join-Path $HunyuanRoot 'Hunyuan3D-2.1'),
+  (Join-Path $HunyuanRoot 'Hunyuan3D-2')
+)
+$apiCandidates += @(Get-ChildItem -Path $HunyuanRoot -Directory -Filter 'Hunyuan3D-2*' -ErrorAction SilentlyContinue |
+  Sort-Object -Property Name -Descending | Select-Object -ExpandProperty FullName)
+$apiDir = $apiCandidates | Where-Object { Test-Path (Join-Path $_ 'api_server.py') } | Select-Object -First 1
+if (-not (Test-Path $python) -or -not (Test-Path $worker) -or -not $apiDir) {
+  $message = "Hunyuan bridge missing python, worker, or API script. Python=$python Worker=$worker Root=$HunyuanRoot"
+  Add-Content -Path (Join-Path $logDir 'hunyuan-bridge.err.log') -Value "$(Get-Date -Format o) $message"
+  throw $message
+}
 
 function Test-Hunyuan {
   return [bool](Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue)

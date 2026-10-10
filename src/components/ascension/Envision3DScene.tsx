@@ -1163,11 +1163,9 @@ export function Envision3DScene({
       const spec = blend ? null : (linearSpecs.get(path.id) ?? null);
       const semanticModel = path.model_spec;
 
-      // ENVISION is 3D-only. Reference images are internal Hunyuan inputs and
-      // are never rendered to the user. Until the real GLB is loaded, the
-      // pathway remains in an explicit generation state with no fake geometry.
+      // The original ENVISION procedural assembly remains visible immediately.
+      // A real Hunyuan GLB replaces it once loaded; neither implies verification.
       const modelViewActive = focus && generatedRef.current?.id === path.id;
-      if (!modelViewActive) return;
 
       // Focused realities glide from their overview slot into the inspection field.
       const glide = easeOutCubic(Math.min(1, (focus ? clocks.focus : 0) / 450));
@@ -2000,7 +1998,7 @@ export function Envision3DScene({
               ? "3D QUEUED"
               : "3D NOT AVAILABLE";
   const modeHint = !hasReal3D
-    ? modelStatusLabel
+    ? `CONCEPT / UNVERIFIED · ${visualMode.toUpperCase()} · ${modelStatusLabel}`
     : visualMode === "blueprint"
       ? "BLUEPRINT · SAME 3D REALITY · DRAG TO ROTATE · SCROLL TO ZOOM"
       : visualMode === "environment"

@@ -20,11 +20,9 @@ export default defineMcp({
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
-    // Request offline_access so Supabase issues a refresh token to the MCP
-    // client. Without it, ChatGPT's connector fails with
-    // run_with_credentials_failed_token_refresh_not_supported once the
-    // initial access token expires.
-    requiredScopes: ["offline_access"],
+    // Do not require offline_access as a scope on every access token:
+    // Supabase may issue valid access tokens without a scope claim.
+    // OAuth clients may still request offline_access during authorization.
   }),
   instructions:
     "Observation and objective-intake tools for the ASCENSION console. Callers must sign in as an operator of this app. The observation tools (ascension_chamber, ascension_knowledgeverse, ascension_pathways, ascension_governance, ascension_ledger, ascension_library_card) return published state with a source_classification field. ascension_execute submits a normal objective. ascension_code_walker submits a permission-scoped capability-extension objective for an existing authorized game/app/project/system. ascension_run_status reports either kind of run. These web tools record and observe requests; they do not themselves access a user's device, modify files, execute the governed cycle, or write governed ASCENSION state. Device/app/file actions belong to the authorized ASCENSION runtime / ExecutionEngine, and no change is Verified or Persisted until the governed core publishes the receipt. Absent fields and permissions are absent, never inferred.",

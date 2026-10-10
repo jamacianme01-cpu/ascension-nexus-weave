@@ -18,10 +18,22 @@ let passed = 0;
 function pass(name) { passed++; console.log(`PASS ${name}`); }
 function gateway(responses) {
   const calls = [];
+  let lastDraft = null;
   globalThis.fetch = async (_url, init) => {
-    calls.push(JSON.parse(init.body));
+    const request = JSON.parse(init.body);
+    // These scenarios isolate objective-meaning repairs. The Spiral engine may
+    // independently request one extra expansion; deliberately return the same
+    // underexpanded draft to verify meaning repair still catches wrong subjects,
+    // without consuming the meaning-review verdict fixtures.
+    if (String(request.messages?.[0]?.content ?? "").includes("SPIRAL REPAIR REQUIRED") && lastDraft) {
+      return new Response("data: " + JSON.stringify({
+        choices: [{ delta: { content: JSON.stringify(lastDraft) } }],
+      }) + "\n");
+    }
+    calls.push(request);
     assert.ok(responses.length, "Unexpected additional provider call");
     const response = responses.shift();
+    if (response?.kind) lastDraft = response;
     return new Response("data: " + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(response) } }] }) + "\n");
   };
   return calls;

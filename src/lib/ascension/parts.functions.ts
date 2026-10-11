@@ -36,14 +36,14 @@ export const getDesignParts = createServerFn({ method: 'POST' })
 
 const dissectedCache = new Map<string, Promise<{ imageUrl: string; parts: DesignPart[] }>>();
 export const getDissectedDesign = createServerFn({ method: 'POST' })
-  .inputValidator((input: { objective: string; label: string; summary: string; image: string; steps?: string[]; components?: string[]; faithful?: boolean; view?: "assembled" | "dissected"; referenceImageUrl?: string }) => {
+  .inputValidator((input: { objective: string; label: string; summary: string; image: string; steps?: string[]; components?: string[]; faithful?: boolean; view?: "assembled" | "dissected"; referenceImageUrl?: string; requestId?: string; pathwayId?: string }) => {
     if (!input || typeof input.image !== 'string' || input.image.length > 2500000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(input.image)) throw new Error('A model picture is required.');
     if (![input.objective,input.label,input.summary].every(value=>typeof value==='string')) throw new Error('A selected design is required.');
     const list=(value:unknown,count:number,size:number)=>Array.isArray(value)?value.filter((item):item is string=>typeof item==='string').slice(0,count).map(item=>item.slice(0,size)):[];
-    return {objective:input.objective.slice(0,3000),label:input.label.slice(0,200),summary:input.summary.slice(0,6000),image:input.image,steps:list(input.steps,20,1000),components:list(input.components,32,120),faithful:input.faithful===true,view:input.view==="assembled"?"assembled" as const:"dissected" as const,referenceImageUrl:typeof input.referenceImageUrl==="string"?input.referenceImageUrl.slice(0,4000):null};
+    return {objective:input.objective.slice(0,3000),label:input.label.slice(0,200),summary:input.summary.slice(0,6000),image:input.image,steps:list(input.steps,20,1000),components:list(input.components,32,120),faithful:input.faithful===true,view:input.view==="assembled"?"assembled" as const:"dissected" as const,referenceImageUrl:typeof input.referenceImageUrl==="string"?input.referenceImageUrl.slice(0,4000):null,requestId:typeof input.requestId==="string"&&/^[a-f0-9-]{36}$/i.test(input.requestId)?input.requestId:null,pathwayId:typeof input.pathwayId==="string"?input.pathwayId.slice(0,200):null};
   })
   .handler(async ({data}) => {
-    const key = JSON.stringify(data);
+    const key = JSON.stringify(data.view==="assembled"?{...data,image:"[non-authoritative preview]"}:data);
     const previous = dissectedCache.get(key);
     if (previous) return previous;
     const pending = (async () => {

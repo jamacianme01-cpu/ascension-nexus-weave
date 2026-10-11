@@ -35,7 +35,7 @@ try {
     assert.match(viewer, /if \(!dissected \|\| sourceReference \|\| !ready \|\| !api\.current \|\| dissection\) return/);
     assert.doesNotMatch(viewer, /if \(!dissected[^\n]*conceptual\) return/);
     assert.match(viewer, /getDissectedDesign\(/);
-    assert.match(viewer, /dissected && !sourceReference && dissection && <RealityDissection/);
+    assert.match(viewer, /!sourceReference && dissection && <RealityDissection/);
     assert.match(viewer, /imageUrl=\{dissection\.imageUrl\}/);
     assert.match(viewer, /dissected && dissection && !sourceReference \? dissection\.parts : conceptual/);
     assert.match(viewer, /sourceReference && <RealityDissection imageUrl=\{sourceReference\}/);
@@ -54,9 +54,9 @@ try {
     const toggle=engage.slice(engage.indexOf('const toggleSound'),engage.indexOf('const runQuery'));
     assert.match(toggle,/atmosphere\.current = null;/); assert.match(toggle,/createRealityAtmosphere\(ctx\)/); assert.match(toggle,/setSoundBlocked\(ctx\.state !== "running"\)/);
   });
-  check('DISSECTED keeps an editable 3D pane beside the picture and stays in dissected mode', () => {
+  check('Reference image persists beside CAD and Blueprint while 3D editing remains available', () => {
     assert.match(viewer, /<div ref=\{host\} className="reality-viewport"[^>]*aria-label="Editable 3D model/);
-    assert.match(viewer, /const splitReference = Boolean\(sourceReference \|\| \(dissected && dissection\)\)/);
+    assert.match(viewer, /const splitReference = Boolean\(sourceReference \|\| dissection\)/);
     assert.match(viewer, /data-split=\{splitReference \? "true" : undefined\}/);
     assert.doesNotMatch(viewer.slice(viewer.indexOf('const editIllustratedPart'), viewer.indexOf('const dive = useRef')), /setDissected\(false\)/);
     assert.match(viewer, /<div className="reality-component-workbench">/);

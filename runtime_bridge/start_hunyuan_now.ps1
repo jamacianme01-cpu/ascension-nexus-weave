@@ -19,6 +19,17 @@ if ([string]::IsNullOrWhiteSpace($token)) {
   throw 'ASCENSION_PUBLISH_TOKEN is absent from User and Machine environment. Worker cannot claim jobs.'
 }
 # Do not print the secret.
+# Install a persistent logon task where Windows permits it. Startup still works
+# for this session if Scheduled Tasks registration needs elevation.
+$taskName = 'ASCENSION Hunyuan Bridge'
+if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
+  try {
+    & (Join-Path $Repo 'runtime_bridge\install_hunyuan_bridge.ps1') -Repo $Repo | Out-Null
+    Write-Host 'Autostart task registered.'
+  } catch {
+    Write-Warning ('Autostart registration failed: ' + $_.Exception.Message)
+  }
+}
 $existing = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
   Where-Object {
     $_.Name -like '*powershell*.exe' -and

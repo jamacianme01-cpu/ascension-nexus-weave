@@ -1,20 +1,20 @@
 let realityContext: AudioContext | null = null;
 let realityOutput: GainNode | null = null;
+let realityVolume = 0.5;
 export function setRealityVolume(volume: number) {
-  if (realityContext && realityOutput) realityOutput.gain.setTargetAtTime(Math.min(0.7, Math.max(0, volume)) * 0.6, realityContext.currentTime, 0.15);
+  realityVolume = Math.min(0.7, Math.max(0, volume));
+  if (realityContext && realityOutput) realityOutput.gain.setTargetAtTime(realityVolume * 0.6, realityContext.currentTime, 0.15);
 }
 /** Synthesized interface feedback, not a physical recording. Uses the existing context. */
 export function realityFeedback(phase = 0) {
   const ctx = realityContext;
-  if (!ctx) return;
-  void ctx.resume().then(() => {
+   if (!ctx || ctx.state !== 'running' || !realityOutput || realityVolume === 0) return;
     const tone = ctx.createOscillator(), gain = ctx.createGain();
     tone.frequency.value = 260 + (phase % 6) * 65;
-    gain.gain.setValueAtTime(0.025, ctx.currentTime);
+     gain.gain.setValueAtTime(0.06 * realityVolume, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
     tone.connect(gain).connect(ctx.destination);tone.start();tone.stop(ctx.currentTime + 0.23);
     tone.onended = () => {tone.disconnect();gain.disconnect();};
-  }).catch(() => {});
 }
 /** Spatial air and low harmonic pressure. All sources are bounded and disposable. */
 function atmosphereGraph(ctx: AudioContext) {
@@ -109,8 +109,8 @@ function atmosphereGraph(ctx: AudioContext) {
 export function createRealityAtmosphere(ctx: AudioContext) {
   const graph = atmosphereGraph(ctx);
   realityContext = ctx; realityOutput = graph.output;
-  graph.output.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 1);
-  return { stop: () => { if (realityOutput === graph.output) realityOutput = null; graph.stop(0.65); } };
+   graph.output.gain.linearRampToValueAtTime(realityVolume * 0.6, ctx.currentTime + 1);
+   return { stop: () => { if (realityOutput === graph.output) { realityOutput = null; realityContext = null; } graph.stop(0.65); } };
 }
 
 export function playSpatialSwell(ctx: AudioContext, intensity = 1) {

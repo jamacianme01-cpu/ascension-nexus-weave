@@ -158,6 +158,7 @@ export function RealityViewer({
   const [volume, setVolume] = useState(0.5);
   const phases = demonstrationPhases(pathway, conceptParts);
   const frame = demonstrationFrame(seconds, phases.length);
+  const interpretiveDemo = conceptual && !pathway.model_spec && pathwayKind(pathway, objective) === 'generic';
   const demoRef = useRef({ active: false, names: [] as string[], progress: 0, reduced: false });
   demoRef.current = { active: simulate && !dissected, names: phases[frame.index]?.partNames ?? [], progress: frame.progress, reduced: typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches };
   useEffect(() => { setSimulate(false);setPlaying(false);setSeconds(0); }, [pathway.id]);
@@ -1767,8 +1768,15 @@ export function RealityViewer({
         </div>
       </header>
       <div className="reality-model-stage">
-        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:dissected && dissection ? "hidden" : "visible"}} />
+        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:(dissected && dissection) || (simulate && interpretiveDemo) ? "hidden" : "visible"}} />
         {dissected && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissection.parts} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);}}/>}
+        {simulate && interpretiveDemo && !dissected && phases.length > 0 && <div className="reality-semantic-sequence" aria-label="Animated pathway storyboard">
+          <span>CONCEPTUAL PROCESS · {frame.index + 1} / {phases.length}</span>
+          <h2>{phases[frame.index]?.caption}</h2>
+          {phases[frame.index]?.operation && <p>{phases[frame.index]?.operation}</p>}
+          <progress aria-label="Current phase progress" max={1} value={frame.progress}/>
+          {phases[frame.index + 1] && <p className="reality-sequence-next">→ {phases[frame.index + 1]?.caption}</p>}
+        </div>}
         {simulate && <section className="reality-demonstration" aria-label="Conceptual demonstration">
           <strong>CONCEPTUAL DEMONSTRATION · UNVERIFIED</strong>
           {!phases.length ? <p role="status">Operational animation unavailable</p> : <>

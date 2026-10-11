@@ -151,7 +151,7 @@ export function RealityViewer({
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
   const referenceImageUrl = dissection?.imageUrl ?? sourceReference;
   const splitReference = Boolean(referenceImageUrl);
-  const awaitingFaithfulMesh = Boolean(referenceImageUrl && conceptual);
+  const awaitingFaithfulMesh = Boolean(conceptual && (referenceImageUrl || ["queued","claimed","running"].includes(pathway.model_status ?? "")));
   const sourceMismatch = Boolean(dissection?.imageUrl && sourceReference && dissection.imageUrl !== sourceReference);
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
@@ -1841,9 +1841,10 @@ export function RealityViewer({
       </header>
       <div className="reality-model-stage" data-split={splitReference ? "true" : undefined}>
         <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:awaitingFaithfulMesh ? "hidden" : "visible"}} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />
+        {!referenceImageUrl && awaitingFaithfulMesh && <div className="reality-reference-pending" role="status"><strong>3D SOURCE IMAGE PENDING</strong><p>Select DISSECTED to create and save the image used for reconstruction, or wait for the Hunyuan worker to generate its reference.</p></div>}
         {referenceImageUrl && <RealityDissection imageUrl={referenceImageUrl} parts={dissected && dissection && referenceImageUrl === dissection.imageUrl ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection?.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
         {sourceMismatch && <p className="reality-source-warning" role="alert">The displayed reference is different from the image used for this model. The geometry is NOT image-matched.</p>}
-        {awaitingFaithfulMesh && <div className="reality-mesh-pending" role="status"><strong>AWAITING MATCHED 3D MODEL</strong><p>The approved left image is preserved. Hunyuan3D must reconstruct its geometry before CAD, Dissect and Blueprint can manipulate that same subject.</p><p>Model job: {pathway.model_status ?? "not started"}{pathway.model_error ? ` · ${pathway.model_error}` : ""}</p><small>No unrelated placeholder model is substituted for your design.</small></div>}
+        {awaitingFaithfulMesh && <div className="reality-mesh-pending" role="status"><strong>AWAITING SOURCE-DERIVED 3D MODEL</strong><p>The approved left image is preserved. Hunyuan3D must reconstruct its geometry before CAD, Dissect and Blueprint can manipulate that same subject.</p><p>Model job: {pathway.model_status ?? "not started"}{pathway.model_error ? ` · ${pathway.model_error}` : ""}</p><small>No unrelated placeholder model is substituted for your design.</small></div>}
         {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">
           <span className="reality-operation-eyebrow">CONCEPTUAL OPERATION · PHASE {frame.index + 1} OF {phases.length} · UNVERIFIED</span>
           <div className="reality-operation-flow" aria-label="Objective to current operating phase">

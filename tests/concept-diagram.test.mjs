@@ -28,5 +28,27 @@ try {
   check('model arrival protects edited assemblies', () => { assert.match(viewer,/if \(!edited.current && pathway.model_url\)/); assert.match(viewer,/REPLACE EDITED CONCEPT WITH HUNYUAN MODEL/); });
   check('all approved views are visible in full-screen editor on mobile', () => { const css=readFileSync('src/components/ascension/reality-viewer.css','utf8'); assert.match(css,/\.reality-view-controls[\s\S]*repeat\(6, minmax\(0, 1fr\)\)/); assert.match(css,/\.reality-view-controls \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/); for (const control of ['CUTAWAY','BLUEPRINT','ENVIRONMENT','DISSECTED','PARTS']) assert.ok(viewer.includes(control)); assert.match(viewer,/setMode\("environment"\)/); });
   check('part labels are clickable on the model picture for concepts and real GLBs', () => { assert.match(viewer,/!conceptual && showParts && !dissected/); assert.match(viewer,/aria-label="Labels on the model"/); assert.match(viewer,/api.current\?\.locatePart\(index\)/); });
+  check('DISSECTED generates a distinct labeled illustration even before Hunyuan GLB exists', () => {
+    assert.match(viewer, /if \(!dissected \|\| !ready \|\| !api\.current \|\| dissection\) return/);
+    assert.doesNotMatch(viewer, /if \(!dissected[^\n]*conceptual\) return/);
+    assert.match(viewer, /getDissectedDesign\(/);
+    assert.match(viewer, /dissected && dissection && <div className="reality-dissection"/);
+    assert.match(viewer, /<img src=\{dissection\.imageUrl\}/);
+    assert.match(viewer, /dissected && dissection \? dissection\.parts : conceptual/);
+  });
+  check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
+    assert.match(viewer, /onClick=\{\(\)=>\{setPartIndex\(index\);setShowParts\(true\);\}\}/);
+    assert.match(viewer, /reality-dissection-target/);
+    assert.match(viewer, /MANIPULATE THIS PART IN 3D/);
+    assert.match(viewer, /setEditorOpen\(true\)/);
+    assert.match(viewer, /api\.current\?\.selectComponent\(matching\.id\)/);
+    for (const detail of ['Purpose', 'How it works', 'Connections', 'Design limits']) assert.ok(viewer.includes(detail));
+  });
+  check('Generated picture hides the original assembly without removing the preserved 3D editor', () => {
+    assert.match(viewer, /visibility:dissected && dissection \? "hidden" : "visible"/);
+    assert.match(viewer, /if \(conceptual && ready\) api\.current\?\.explode\(false\)/);
+    assert.match(viewer, /!dissected && <div className="reality-component-workbench"/);
+    assert.match(readFileSync('src/components/ascension/reality-viewer.css','utf8'), /\.reality-dissection-label\[aria-pressed="true"\]/);
+  });
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

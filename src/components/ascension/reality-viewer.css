@@ -879,3 +879,8 @@
 
 .reality-source-warning {position:absolute;z-index:8;top:8px;left:calc(50% + 12px);right:12px;background:var(--void);border:1px solid var(--destructive);padding:10px;font-size:12px;}
 @media(max-width:760px){.reality-source-warning{top:calc(55% + 8px);left:8px;right:8px;}}
+
+.reality-reference-pending {position:absolute;z-index:3;left:0;right:50%;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:clamp(16px,3vw,32px);background:var(--void);}
+.reality-reference-pending strong {font-size:clamp(14px,1.6vw,18px);color:var(--gold);}
+.reality-reference-pending p {font-size:12px;line-height:1.55;}
+@media(max-width:760px){.reality-reference-pending{left:0;right:0;top:0;bottom:45%;}}

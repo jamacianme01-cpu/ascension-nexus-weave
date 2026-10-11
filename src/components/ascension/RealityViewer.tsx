@@ -1775,19 +1775,31 @@ export function RealityViewer({
         </Button>
         </div>
         <div className="reality-extra-controls">
-          <Button variant="outline" aria-pressed={simulate} onClick={()=>{setSimulate(value=>!value);setPlaying(false);}}>SIMULATE</Button>
+          <Button variant="outline" aria-pressed={simulate} onClick={()=>{const start=!simulate;setSimulate(start);setPlaying(start);setSeconds(0);if(start){setDissected(false);setShowParts(false);}}}>{simulate ? "EXIT SIMULATION" : "SIMULATE"}</Button>
           <label>Volume <input aria-label="Ambient volume" type="range" min="0" max="0.7" step="0.05" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
         </div>
       </header>
       <div className="reality-model-stage" data-split={dissected && dissection ? "true" : undefined}>
         <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:simulate && interpretiveDemo && !dissected ? "hidden" : "visible"}} aria-label={dissected && dissection ? "Editable 3D model beside the dissected reference picture" : undefined} />
         {dissected && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissection.parts} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
-        {simulate && interpretiveDemo && !dissected && phases.length > 0 && <div className="reality-semantic-sequence" aria-label="Animated pathway storyboard">
-          <span>CONCEPTUAL PROCESS · {frame.index + 1} / {phases.length}</span>
-          <h2>{phases[frame.index]?.caption}</h2>
-          {phases[frame.index]?.operation && <p>{phases[frame.index]?.operation}</p>}
+        {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">
+          <span className="reality-operation-eyebrow">CONCEPTUAL OPERATION · PHASE {frame.index + 1} OF {phases.length} · UNVERIFIED</span>
+          <div className="reality-operation-flow" aria-label="Objective to current operating phase">
+            <div className="reality-operation-node">
+              <small>OBJECTIVE</small>
+              <strong>{objective}</strong>
+            </div>
+            <div className="reality-operation-track" aria-hidden="true">
+              <span className="reality-operation-pulse" style={{left:`${Math.round(frame.progress*100)}%`}}/>
+            </div>
+            <div className="reality-operation-node reality-operation-node--active">
+              <small>OPERATING STEP</small>
+              <strong>{phases[frame.index]?.caption}</strong>
+            </div>
+          </div>
           <progress aria-label="Current phase progress" max={1} value={frame.progress}/>
-          {phases[frame.index + 1] && <p className="reality-sequence-next">→ {phases[frame.index + 1]?.caption}</p>}
+          {phases[frame.index]?.operation && <p>{phases[frame.index]?.operation}</p>}
+          <p className="reality-sequence-next">{phases[frame.index + 1] ? `NEXT · ${phases[frame.index + 1]?.caption}` : "FINAL PHASE · Conceptual operation only"}</p>
         </div>}
         {simulate && <section className="reality-demonstration" aria-label="Conceptual demonstration">
           <strong>CONCEPTUAL DEMONSTRATION · UNVERIFIED</strong>

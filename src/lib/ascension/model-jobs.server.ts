@@ -60,7 +60,7 @@ export async function attachCompletedModels(
 
   const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
   const { data, error } = await table
-    .select("pathway_id, model_url, status, error")
+    .select("pathway_id, model_url, source_image_url, status, error")
     .eq("request_id", requestId);
   if (error) throw new Error(error.message);
 
@@ -72,8 +72,13 @@ export async function attachCompletedModels(
     const job = jobs.get(pathway.id);
     if (!job) return pathway;
     const url = job["model_url"];
+    const source = job["source_image_url"];
+    const sourceUrl = typeof source === "string" && /^https:\/\//i.test(source) ? source : null;
     return {
       ...pathway,
+      // LEFT reference and RIGHT GLB now share the same recorded Hunyuan input.
+      // This documents lineage; it does NOT prove exact geometric reconstruction.
+      generated_image_url: sourceUrl ?? pathway.generated_image_url,
       model_url:
         job["status"] === "completed" && typeof url === "string" && /^https:\/\//i.test(url)
           ? url

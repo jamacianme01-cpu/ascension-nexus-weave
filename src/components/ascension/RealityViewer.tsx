@@ -133,11 +133,12 @@ export function RealityViewer({
   useEffect(() => { if (!edited.current && pathway.model_url) setLoadedUrl(pathway.model_url); }, [pathway.model_url]);
   const labelsHost = useRef<HTMLDivElement>(null);
   const [dissected, setDissected] = useState(false);
+  const [dissectionEditor, setDissectionEditor] = useState(false);
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
-  useEffect(() => { setDissection(null); setDissected(false); setDissectionError(null); }, [pathway.id, loadedUrl]);
+  useEffect(() => { setDissection(null); setDissected(false); setDissectionEditor(false); setDissectionError(null); }, [pathway.id, loadedUrl]);
   useEffect(() => {
     // DISSECTED creates a separate produced illustration for both provisional
     // assemblies and completed Hunyuan meshes, only when requested.
@@ -201,7 +202,9 @@ export function RealityViewer({
   const editIllustratedPart = () => {
     if (!selectedPart) return;
     const matching = groundedComponent(selectedPart.name, components);
-    setDissected(false);
+    // Stay in DISSECTED: switch its picture to the real editable mesh.
+    // A generated illustration is reference imagery, not editable pixels.
+    setDissectionEditor(true);
     setShowParts(true);
     setEditorOpen(true);
     setPartIndex(null);
@@ -1752,7 +1755,7 @@ export function RealityViewer({
         <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="environment"} onClick={()=>{setDissected(false);setMode("environment");}}>
           ENVIRONMENT
         </Button>
-        <Button variant="outline" disabled={!ready} aria-pressed={dissected} onClick={() => {setDissected(value=>!value);setPartIndex(null);}}>
+        <Button variant="outline" disabled={!ready} aria-pressed={dissected} onClick={() => {setDissected(value=>!value);setDissectionEditor(false);setPartIndex(null);}}>
           {dissected ? "ASSEMBLED" : "DISSECTED"}
         </Button>
         <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
@@ -1768,8 +1771,9 @@ export function RealityViewer({
         </div>
       </header>
       <div className="reality-model-stage">
-        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:(dissected && dissection) || (simulate && interpretiveDemo) ? "hidden" : "visible"}} />
-        {dissected && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissection.parts} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);}}/>}
+        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:(dissected && dissection && !dissectionEditor) || (simulate && interpretiveDemo) ? "hidden" : "visible"}} />
+        {dissected && dissection && !dissectionEditor && <RealityDissection imageUrl={dissection.imageUrl} parts={dissection.parts} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);}}/>}
+        {dissected && dissectionEditor && <div className="reality-editor-return"><Button variant="outline" onClick={() => setDissectionEditor(false)}>BACK TO DISSECTED PICTURE</Button><span>3D component manipulation · illustrative image preserved</span></div>}
         {simulate && interpretiveDemo && !dissected && phases.length > 0 && <div className="reality-semantic-sequence" aria-label="Animated pathway storyboard">
           <span>CONCEPTUAL PROCESS · {frame.index + 1} / {phases.length}</span>
           <h2>{phases[frame.index]?.caption}</h2>
@@ -1814,7 +1818,7 @@ export function RealityViewer({
           )}
         </div>
       )}
-      {ready && (!dissected || !dissection) && (
+      {ready && (!dissected || !dissection || dissectionEditor) && (
       <aside className="reality-tools" aria-label="Model controls">
         <Button variant="outline" disabled={!ready} aria-label="Zoom in" onClick={() => api.current?.zoom(1.3)}>
           ＋
@@ -1842,7 +1846,7 @@ export function RealityViewer({
         {showParts && (
           <section id="reality-parts" className="reality-parts" aria-label="Design parts">
             <Button variant="outline" className="reality-inspector-close" aria-label="Close part inspector" onClick={()=>setShowParts(false)}>✕</Button>
-            {!dissected && <div className="reality-component-workbench">
+            {(!dissected || dissectionEditor) && <div className="reality-component-workbench">
               {!partsLoading && !partsError && <div className="reality-named-parts" aria-label="Named parts and functions">
                 {activeParts.map((part,index)=><Button variant="outline" key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);api.current?.locatePart(index);}}><strong>{part.name}</strong><span>{part.purpose}</span></Button>)}
               </div>}

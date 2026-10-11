@@ -16,13 +16,13 @@ function validate(input: ReferenceInput): ReferenceInput {
  */
 async function recordReference(data: ReferenceInput) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const match = data.imageUrl.match(/\/storage\/v1\/object\/public\/ascension-models\/(dissected\/[a-f0-9]{64}\.png)$/);
-  if (!match) throw new Error("Only an ASCENSION-generated dissected image can be linked");
+  const match = data.imageUrl.match(/\/storage\/v1\/object\/public\/ascension-models\/(assembled\/[a-f0-9]{64}\.png)$/);
+  if (!match) throw new Error("Only an ASCENSION-generated assembled image can be linked");
   const objectPath = match[1]!;
   const publicUrl = supabaseAdmin.storage.from("ascension-models").getPublicUrl(objectPath).data.publicUrl;
   if (publicUrl !== data.imageUrl) throw new Error("Image URL is not from ASCENSION storage");
   const name = objectPath.split("/").at(-1)!;
-  const found = await supabaseAdmin.storage.from("ascension-models").list("dissected", {search:name,limit:10});
+  const found = await supabaseAdmin.storage.from("ascension-models").list("assembled", {search:name,limit:10});
   if (found.error) throw new Error(found.error.message);
   if (!(found.data ?? []).some(item => item.name === name))
     throw new Error("Reference image was not saved");

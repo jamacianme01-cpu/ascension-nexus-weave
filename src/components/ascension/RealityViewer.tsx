@@ -1842,7 +1842,10 @@ export function RealityViewer({
         </div>
         </div>
         <div className="reality-view-controls" role="group" aria-label="Drawing views and parts">
-        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cutaway"} onClick={()=>{setDissected(false);setMode("cutaway");}}>
+        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cutaway"} onClick={()=>{setDissected(false);setMode("cutaway");setSection(100);api.current?.section(100);}}>
+          ASSEMBLED
+        </Button>
+        <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="cutaway" && section < 100} onClick={()=>{setDissected(false);setMode("cutaway");setSection(50);api.current?.section(50);}}>
           CUTAWAY
         </Button>
         <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
@@ -1855,7 +1858,7 @@ export function RealityViewer({
           ENVIRONMENT
         </Button>
         <Button variant="outline" disabled={!ready} aria-pressed={dissected} onClick={() => {const next=!dissected;setDissected(next);setPartIndex(null);setSection(next?50:100);api.current?.section(next?50:100);if(next)setShowParts(true);}}>
-          {dissected ? "ASSEMBLED" : "DISSECTED"}
+          DISSECTED
         </Button>
         <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
           PARTS
@@ -1869,10 +1872,10 @@ export function RealityViewer({
           <label>Volume <input aria-label="Ambient volume" type="range" min="0" max="0.7" step="0.05" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
         </div>
       </header>
-      <div className="reality-model-stage" data-split={splitReference ? "true" : undefined}>
+      <div className="reality-model-stage" data-split={splitReference ? "true" : undefined} data-image-only={imageOnly ? "true" : undefined}>
         <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:awaitingFaithfulMesh ? "hidden" : "visible"}} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />
-        {!referenceImageUrl && awaitingFaithfulMesh && <div className="reality-reference-pending" role="status"><strong>3D SOURCE IMAGE PENDING</strong><p>Select DISSECTED to create and save the image used for reconstruction, or wait for the Hunyuan worker to generate its reference.</p></div>}
-        {referenceImageUrl && <RealityDissection imageUrl={referenceImageUrl} parts={dissected && dissection && referenceImageUrl === dissection.imageUrl ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection?.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
+        {!displayedImageUrl && awaitingFaithfulMesh && <div className="reality-reference-pending" role={assembledError?"alert":"status"}><strong>{assembledLoading?"CREATING COMPLETE ASSEMBLED IMAGE":"ASSEMBLED VIEW"}</strong><p>{assembledError ?? (assembledLoading?"Preparing a clear, complete view of your selected invention…":"Waiting for the complete assembled reference picture.")}</p>{assembledError && <Button variant="outline" onClick={()=>setAssembledAttempt(x=>x+1)}>RETRY ASSEMBLED IMAGE</Button>}</div>}
+        {displayedImageUrl && <RealityDissection imageUrl={displayedImageUrl} parts={dissected && dissection && displayedImageUrl === dissection.imageUrl ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection?.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
         {sourceMismatch && <p className="reality-source-warning" role="alert">The displayed reference is different from the image used for this model. The geometry is NOT image-matched.</p>}
         {awaitingFaithfulMesh && <div className="reality-mesh-pending" role="status"><strong>AWAITING SOURCE-DERIVED 3D MODEL</strong><p>The approved left image is preserved. Hunyuan3D must reconstruct its geometry before CAD, Dissect and Blueprint can manipulate that same subject.</p><p>Model job: {pathway.model_status ?? "not started"}{pathway.model_error ? ` · ${pathway.model_error}` : ""}</p><small>No unrelated placeholder model is substituted for your design.</small></div>}
         {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">
@@ -1905,8 +1908,8 @@ export function RealityViewer({
 
           </>}
         </section>}
-        {dissected && !sourceReference && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>
-          <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
+        {dissected && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>
+          <p>{dissectionError ?? "Creating the optional exploded view of this design…"}</p>
           {dissectionError && <Button variant="outline" onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</Button>}
         </div>}
         {ready && !dissected && showParts && !awaitingFaithfulMesh && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">

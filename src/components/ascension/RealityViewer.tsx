@@ -1790,9 +1790,9 @@ export function RealityViewer({
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
           {dissectionError && <Button variant="outline" onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</Button>}
         </div>}
-        {ready && !dissected && showParts && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
-          {activeParts.map((part, index) => <Button variant="outline" key={part.name + index} title={part.name} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);api.current?.locatePart(index);}}><span>{part.name}</span></Button>)}
-        </div>}
+        {/* Keep the central object unobstructed. Named parts and their technical
+            explanations belong in the side inspector; they remain selectable
+            from the part list without banners over the 3D picture. */}
       </div>
       {!ready && (
         <div className="reality-status" role={error ? "alert" : "status"}>

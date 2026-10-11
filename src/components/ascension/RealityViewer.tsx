@@ -152,6 +152,7 @@ export function RealityViewer({
   const referenceImageUrl = dissection?.imageUrl ?? sourceReference;
   const splitReference = Boolean(referenceImageUrl);
   const awaitingFaithfulMesh = Boolean(referenceImageUrl && conceptual);
+  const sourceMismatch = Boolean(dissection?.imageUrl && sourceReference && dissection.imageUrl !== sourceReference);
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
@@ -1814,13 +1815,13 @@ export function RealityViewer({
         <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cutaway"} onClick={()=>{setDissected(false);setMode("cutaway");}}>
           CUTAWAY
         </Button>
-        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
+        <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
           BLUEPRINT
         </Button>
-        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cad"} onClick={()=>{setDissected(false);setMode("cad");setShowParts(true);setEditorOpen(true);}}>
+        <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="cad"} onClick={()=>{setDissected(false);setMode("cad");setShowParts(true);setEditorOpen(true);}}>
           CAD
         </Button>
-        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="environment"} onClick={()=>{setDissected(false);setMode("environment");}}>
+        <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="environment"} onClick={()=>{setDissected(false);setMode("environment");}}>
           ENVIRONMENT
         </Button>
         <Button variant="outline" disabled={!ready} aria-pressed={dissected} onClick={() => {const next=!dissected;setDissected(next);setPartIndex(null);setSection(next?50:100);api.current?.section(next?50:100);if(next)setShowParts(true);}}>
@@ -1841,6 +1842,7 @@ export function RealityViewer({
       <div className="reality-model-stage" data-split={splitReference ? "true" : undefined}>
         <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:awaitingFaithfulMesh ? "hidden" : "visible"}} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />
         {referenceImageUrl && <RealityDissection imageUrl={referenceImageUrl} parts={dissected && dissection && referenceImageUrl === dissection.imageUrl ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection?.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
+        {sourceMismatch && <p className="reality-source-warning" role="alert">The displayed reference is different from the image used for this model. The geometry is NOT image-matched.</p>}
         {awaitingFaithfulMesh && <div className="reality-mesh-pending" role="status"><strong>AWAITING MATCHED 3D MODEL</strong><p>The approved left image is preserved. Hunyuan3D must reconstruct its geometry before CAD, Dissect and Blueprint can manipulate that same subject.</p><p>Model job: {pathway.model_status ?? "not started"}{pathway.model_error ? ` · ${pathway.model_error}` : ""}</p><small>No unrelated placeholder model is substituted for your design.</small></div>}
         {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">
           <span className="reality-operation-eyebrow">CONCEPTUAL OPERATION · PHASE {frame.index + 1} OF {phases.length} · UNVERIFIED</span>
@@ -1900,7 +1902,7 @@ export function RealityViewer({
           )}
         </div>
       )}
-      {ready && (
+      {ready && !awaitingFaithfulMesh && (
       <aside className="reality-tools" aria-label="Model controls">
         <Button variant="outline" disabled={!ready} aria-label="Zoom in" onClick={() => api.current?.zoom(1.3)}>
           ＋
@@ -1933,7 +1935,7 @@ export function RealityViewer({
               {!partsLoading && !partsError && <div className="reality-named-parts" aria-label="Named parts and functions">
                 {activeParts.map((part,index)=><Button variant="outline" key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);if(dissected && dissection){const match=groundedComponent(part.name,components);if(match){setWorkbenchError(null);api.current?.selectComponent(match.id);}else{setComponentId(null);setWorkbenchError("Picture-to-mesh mapping unavailable for this part; choose a 3D component manually.");}}else api.current?.locatePart(index);}}><strong>{index + 1}. {part.name}</strong><span>{part.purpose}</span></Button>)}
               </div>}
-              <details className="reality-geometry-details" open={editorOpen} onToggle={event=>setEditorOpen(event.currentTarget.open)}><summary>Editable model components</summary>
+              {!awaitingFaithfulMesh && <details className="reality-geometry-details" open={editorOpen} onToggle={event=>setEditorOpen(event.currentTarget.open)}><summary>Editable model components</summary>
               <div className="reality-component-list" aria-label="Editable components">
                 {components.map(component=><Button variant="outline" key={component.id} aria-pressed={componentId===component.id} onClick={()=>{setPartIndex(null);api.current?.selectComponent(component.id);}}>{component.name}</Button>)}
               </div>
@@ -1947,8 +1949,8 @@ export function RealityViewer({
                 <Button variant="outline" disabled={!undoCount} onClick={()=>api.current?.undo()}>UNDO</Button>
                 <Button variant="outline" onClick={()=>{void api.current?.exportAssembly().catch(cause=>setWorkbenchError(String(cause)));}}>SAVE GLB</Button>
               </div>
-              </details>
-              <p className="reality-parts-hint">Select a component to highlight it. Drag its handles to edit. Blend combines components into an editable assembly.</p>
+              </details>}
+              <p className="reality-parts-hint">{awaitingFaithfulMesh ? "3D editing awaits the real GLB generated from the image above." : "Select a component to highlight it. Drag its handles to edit. Blend combines components into an editable assembly."}</p>
               {selectedComponent && !selectedComponent.detail && <p>{selectedComponent.name}: extracted model geometry. Its technical role has not been identified.</p>}
               {workbenchError && <p role="alert">{workbenchError}</p>}
             </div>
@@ -1958,7 +1960,7 @@ export function RealityViewer({
             {!dissected && partsError && <div role="alert"><p>{partsError}</p><Button variant="outline" onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</Button></div>}
             {selectedPart && (dissected || (!partsLoading && !partsError)) && <article id="reality-part-detail" className="reality-part-detail" aria-live="polite">
               <h2>{selectedPart.name}</h2>
-              {dissected && dissection && <Button variant="outline" className="reality-edit-illustrated-part" onClick={editIllustratedPart}>MANIPULATE THIS PART IN 3D</Button>}
+              {dissected && dissection && !awaitingFaithfulMesh && <Button variant="outline" className="reality-edit-illustrated-part" onClick={editIllustratedPart}>MANIPULATE THIS PART IN 3D</Button>}
               {dissected && dissection && <p className="reality-parts-hint">{componentId ? "Mapped 3D component selected — edit it in the 3D pane beside the picture." : "No grounded 3D component mapped; manipulation disabled until you pick one."}</p>}
               <label className="reality-blend-choice">
                 <input type="checkbox" checked={isPartSelected(selectedPart)} onChange={() => onTogglePart(selectedPart)} />
@@ -1983,7 +1985,7 @@ export function RealityViewer({
         )}
         {ready && (mode==="blueprint" || mode==="cad") && displayExtents && <div className="reality-measurements" role="note">Mesh bounding box: {displayExtents.x.toFixed(2)} × {displayExtents.y.toFixed(2)} × {displayExtents.z.toFixed(2)} display units. Physical dimensions and tolerances are not specified; export is not a manufacturing drawing.</div>}
         {ready && (mode==="blueprint" || mode==="cad") && <div className="reality-mode-controls" aria-label="Blueprint camera views">{(["top","front","side","perspective"] as const).map(view=><Button variant="outline" key={view} onClick={()=>api.current?.view(view)}>{view==="perspective"?"3D":view.toUpperCase()}</Button>)}</div>}
-        {ready && (dissected || mode==="cutaway" || mode==="cad") && <div className="reality-assembly-controls">
+        {ready && !awaitingFaithfulMesh && (dissected || mode==="cutaway" || mode==="cad") && <div className="reality-assembly-controls">
           <label>SECTION {section}% <input type="range" aria-label="3D section plane" min="0" max="100" step="1" value={section} onChange={event=>{const next=Number(event.target.value);setSection(next);api.current?.section(next);}} /></label>
           <Button variant="outline" disabled={!ready} aria-pressed={exploded} onClick={()=>{try{api.current?.explode(!exploded);setExploded(!exploded);setExplosionError(null);}catch(cause){setExplosionError(cause instanceof Error?cause.message:"Exploded view failed.");}}}>{exploded?"IMPLODE · ASSEMBLE":"EXPLODE · DISASSEMBLE"}</Button>
           {explosionError && <p role="alert">{explosionError}</p>}

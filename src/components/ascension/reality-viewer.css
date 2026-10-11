@@ -562,6 +562,27 @@
 .reality-dissection-picture svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .reality-dissection-picture polyline { fill: none; stroke: #23566e; stroke-width: 0.3; }
 .reality-dissection-label { position: absolute; width: 20%; transform: translateY(-50%); min-height: 32px !important; padding: 5px !important; font-size: clamp(9px, 1vw, 12px) !important; letter-spacing: 0 !important; overflow-wrap: anywhere; }
+/* Produced breakdown illustration: selecting a label marks that component
+   on the separate picture. The actual transform remains in the 3D workbench. */
+.reality-dissection-label { z-index: 3; text-align: left; }
+.reality-dissection-label[aria-pressed="true"] { background: #126285 !important; color: #fff !important; border-color: #fff !important; }
+.reality-dissection-target {
+  position: absolute;
+  z-index: 2;
+  width: clamp(35px, 8%, 85px);
+  aspect-ratio: 1;
+  border: 3px solid #ef8f37;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px #fff8, 0 0 16px #d55d11;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.reality-edit-illustrated-part { width: 100%; margin-bottom: 12px; font-weight: 700; background: #126285 !important; }
+@media (max-width: 760px) {
+  .reality-dissection-label { width: 24%; font-size: 10px !important; padding: 6px 4px !important; }
+  .reality-dissection-picture { width: min(100%, 100dvh); }
+}
+
 
 .reality-component-list,.reality-component-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 .reality-component-list { max-height:120px; overflow:auto; }

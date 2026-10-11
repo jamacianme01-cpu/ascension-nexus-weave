@@ -1,6 +1,9 @@
 # ASCENSION web layer — roadmap
 
 ## Open
+- [ ] Repair full-screen visual sizing, dissection zoom/pan and grounded part manipulation.
+- [ ] Add persistent controllable audio and unverified semantic operational demonstrations.
+- [ ] Validate four unlike no-network fixtures on desktop/mobile and run interface checks.
 - [x] Restore canonical ENVISION semantic assemblies and holograms; verify fixture controls on desktop/mobile without new AI objectives.
 - [x] Restore and browser-test immediate unverified pathway concept views, dissection, parts, and safe GLB upgrade.
 - [ ] Report production deployment status for `b9ca9651-c0e1-454c-9b90-6cec818ac92f` (no deployment-status tool available to this session).

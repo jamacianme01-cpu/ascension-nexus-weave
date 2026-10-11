@@ -32,13 +32,13 @@ try {
     assert.match(viewer, /if \(!dissected \|\| !ready \|\| !api\.current \|\| dissection\) return/);
     assert.doesNotMatch(viewer, /if \(!dissected[^\n]*conceptual\) return/);
     assert.match(viewer, /getDissectedDesign\(/);
-    assert.match(viewer, /dissected && dissection && <div className="reality-dissection"/);
-    assert.match(viewer, /<img src=\{dissection\.imageUrl\}/);
+    assert.match(viewer, /dissected && dissection && <RealityDissection/);
+    assert.match(viewer, /imageUrl=\{dissection\.imageUrl\}/);
     assert.match(viewer, /dissected && dissection \? dissection\.parts : conceptual/);
   });
   check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
-    assert.match(viewer, /onClick=\{\(\)=>\{setPartIndex\(index\);setShowParts\(true\);\}\}/);
-    assert.match(viewer, /reality-dissection-target/);
+    assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);\}\}/);
+    assert.match(readFileSync('src/components/ascension/RealityDissection.tsx','utf8'), /reality-dissection-target/);
     assert.match(viewer, /MANIPULATE THIS PART IN 3D/);
     assert.match(viewer, /setEditorOpen\(true\)/);
     assert.match(viewer, /api\.current\?\.selectComponent\(matching\.id\)/);
@@ -50,5 +50,20 @@ try {
     assert.match(viewer, /!dissected && <div className="reality-component-workbench"/);
     assert.match(readFileSync('src/components/ascension/reality-viewer.css','utf8'), /\.reality-dissection-label\[aria-pressed="true"\]/);
   });
+
+  const {demonstrationPhases,demonstrationFrame,zoomImage,fitImage,groundedComponent}=await server.ssrLoadModule('/src/components/ascension/reality-demonstration.ts');
+  check('four unlike inquiries retain actual pathway steps without example branches',()=>{
+    for(const steps of [['Charge battery','Power sensor','Read sensor'],['Parse source','Compile module','Run tests'],['Mix pigment','Apply brush strokes','Dry painted layer'],['Read evidence','Compare accounts','Explain historical causes']]){
+      const phases=demonstrationPhases({...pathway,steps},[]);assert.deepEqual(phases.map(p=>p.caption),steps);
+    }
+    assert.deepEqual(demonstrationPhases({...pathway,steps:[]},[]),[]);
+  });
+  check('12 second timeline is bounded and scrub selects correct phase',()=>{assert.deepEqual(demonstrationFrame(6,3),{index:1,progress:.5});assert.deepEqual(demonstrationFrame(15,3),{index:2,progress:1});});
+  check('image fit letterboxes landscape and square without narrow-strip constraints',()=>{assert.deepEqual(fitImage(1200,600,1600,900),{width:1066.6666666666665,height:600,x:66.66666666666674,y:0});assert.equal(fitImage(390,450,1024,1024).width,390);});
+  check('zoom preserves pointer anchored image coordinates and caps scale',()=>{const a={x:0,y:0,zoom:1};const b=zoomImage(a,2,300,200);assert.equal((300-b.x)/b.zoom,300);assert.equal((200-b.y)/b.zoom,200);assert.equal(zoomImage(a,20,0,0).zoom,6);});
+  check('picture mapping requires unique named semantic evidence not an arbitrary mesh name',()=>{assert.equal(groundedComponent('Coil',[{id:'x',name:'Coil',detail:null}]),null);assert.equal(groundedComponent('Copper coil',[{id:'a',name:'Mesh',detail:{...parts[0],name:'Copper coil'}}]).id,'a');assert.equal(groundedComponent('Copper coil',[{id:'a',name:'Coil',detail:{...parts[0],name:'Copper coil'}},{id:'b',name:'Coil',detail:{...parts[0],name:'Copper coil'}}]),null);});
+  check('image navigation has native wheel pinch drag fit focus and accessible labels',()=>{const image=readFileSync('src/components/ascension/RealityDissection.tsx','utf8');for(const marker of ['passive:false','setPointerCapture','onPointerMove','Focus selected part','Fit illustration','part.purpose','data-x','data-y'])assert.ok(image.includes(marker));});
+  check('demonstration exposes playback scrub and causal mesh cues without mutating transforms',()=>{for(const marker of ['CONCEPTUAL DEMONSTRATION · UNVERIFIED','Operational animation unavailable','Demonstration timeline','REPLAY','demoCue.position','demoMaterials.clear()'])assert.ok(viewer.includes(marker));});
+  check('sound remains sustained and bounded with feedback and volume control',()=>{const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8');assert.doesNotMatch(audio,/graph.scheduleDim\(12_000\)/);assert.match(audio,/setRealityVolume/);assert.match(audio,/tone.onended/);assert.match(viewer,/Ambient volume/);});
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

@@ -731,3 +731,14 @@
  .reality-demo-actions { grid-template-columns:auto auto minmax(40px,1fr); }
  .reality-demo-actions output { grid-column:1/-1; }
 }
+
+/* Part information lives in the separate inspector; on-image markers stay small. */
+.reality-dissection-label {
+  width: 44px !important;
+  max-width: 44px !important;
+  height: 44px;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  text-align: center;
+  justify-content: center;
+}

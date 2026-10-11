@@ -14,6 +14,7 @@ import { buildCanonicalAssembly, assemblyParts, explodeAssembly, assemblyStatus,
 import "./reality-viewer.css";
 import { RealityDissection } from './RealityDissection';
 import { RealityEngineeringSimulation } from './RealityEngineeringSimulation';
+import { bindViewerReference } from "@/lib/ascension/viewer-reference.functions";
 import { demonstrationPhases, demonstrationFrame, DEMONSTRATION_SECONDS, groundedComponent } from './reality-demonstration';
 import { realityFeedback, setRealityVolume } from './reality-audio';
 
@@ -85,6 +86,7 @@ type ViewerControls = {
 export function RealityViewer({
   pathway,
   objective,
+  requestId,
   initialMode,
   onClose,
   onNewObjective,
@@ -101,6 +103,7 @@ export function RealityViewer({
 }: {
   pathway: ObjectivePathway;
   objective: string;
+  requestId: string | null;
   initialMode: RealityMode;
   onClose: () => void;
   onNewObjective: () => void;
@@ -144,7 +147,9 @@ export function RealityViewer({
   const [displayExtents, setDisplayExtents] = useState<{x:number;y:number;z:number}|null>(null);
   const sourceReference = pathway.generated_image_url;
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
-  const splitReference = Boolean(sourceReference || dissection);
+  const referenceImageUrl = dissection?.imageUrl ?? sourceReference;
+  const splitReference = Boolean(referenceImageUrl);
+  const awaitingFaithfulMesh = Boolean(referenceImageUrl && conceptual);
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
@@ -156,11 +161,19 @@ export function RealityViewer({
     let active = true;
     setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
     getDissectedDesign({data:{objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual || specFidelity(pathway).status==='complete' || assemblyStatus(objective,pathway)==='semantic'}})
-      .then(result => { if(active) setDissection(result); })
+      .then(result => {
+        if (!active) return;
+        setDissection(result);
+        // Persist the image seen on the LEFT as the source of this EXACT pathway's
+        // queued Hunyuan job. The real source URL is returned on subsequent delivery reads.
+        if (requestId) void bindViewerReference({data:{requestId,pathwayId:pathway.id,imageUrl:result.imageUrl}})
+          .then(link=>{if(active && !link.linked)setWorkbenchError(`3D source not linked: ${link.reason ?? link.status}`);})
+          .catch(cause=>{if(active)setWorkbenchError(`3D reference link failed: ${cause instanceof Error ? cause.message : String(cause)}`);});
+      })
       .catch(cause => { if(active) setDissectionError(cause instanceof Error ? cause.message : "Dissected view could not be generated."); })
       .finally(()=>{if(active)setDissectionLoading(false);});
     return ()=>{active=false;};
-  }, [dissected, sourceReference, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
+  }, [dissected, sourceReference, requestId, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(false);
   useEffect(() => { if (window.matchMedia('(min-width: 761px)').matches) setShowParts(true); }, []);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -208,7 +221,7 @@ export function RealityViewer({
       .finally(() => { if (active) setPartsLoading(false); });
     return () => { active = false; };
   }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
-  const activeParts = dissected && dissection && !sourceReference ? dissection.parts : conceptual ? conceptParts : parts;
+  const activeParts = dissected && dissection ? dissection.parts : conceptual ? conceptParts : parts;
   // Reference image stays unchanged; 3D sectioning and explosion affect the mesh only.
   const selectedComponent = components.find(component=>component.id===componentId);
   const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected || conceptual ? selectedComponent?.detail ?? null : null;
@@ -1822,9 +1835,9 @@ export function RealityViewer({
         </div>
       </header>
       <div className="reality-model-stage" data-split={splitReference ? "true" : undefined}>
-        <div ref={host} className="reality-viewport" data-ready={ready} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />
-        {sourceReference && <RealityDissection imageUrl={sourceReference} parts={[]} selected={null} label={pathway.label} onSelect={()=>{}} />}
-        {!sourceReference && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissected ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
+        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:awaitingFaithfulMesh ? "hidden" : "visible"}} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />
+        {referenceImageUrl && <RealityDissection imageUrl={referenceImageUrl} parts={dissected && dissection && referenceImageUrl === dissection.imageUrl ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection?.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
+        {awaitingFaithfulMesh && <div className="reality-mesh-pending" role="status"><strong>AWAITING MATCHED 3D MODEL</strong><p>The approved left image is preserved. Hunyuan3D must reconstruct its geometry before CAD, Dissect and Blueprint can manipulate that same subject.</p><p>Model job: {pathway.model_status ?? "not started"}{pathway.model_error ? ` · ${pathway.model_error}` : ""}</p><small>No unrelated placeholder model is substituted for your design.</small></div>}
         {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">
           <span className="reality-operation-eyebrow">CONCEPTUAL OPERATION · PHASE {frame.index + 1} OF {phases.length} · UNVERIFIED</span>
           <div className="reality-operation-flow" aria-label="Objective to current operating phase">
@@ -1859,7 +1872,7 @@ export function RealityViewer({
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
           {dissectionError && <Button variant="outline" onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</Button>}
         </div>}
-        {ready && !dissected && showParts && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
+        {ready && !dissected && showParts && !awaitingFaithfulMesh && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
           {activeParts.map((part, index) => <Button variant="outline" key={part.name + index} title={part.name} aria-pressed={partIndex === index} aria-label={`${index + 1}. ${part.name}: ${part.purpose}`} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);setShowParts(true);api.current?.locatePart(index);}}><span aria-hidden="true">{index + 1}</span></Button>)}
         </div>}
       </div>

@@ -139,6 +139,8 @@ export function RealityViewer({
   const [dissected, setDissected] = useState(false);
   const [exploded, setExploded] = useState(false);
   const [explosionError, setExplosionError] = useState<string | null>(null);
+  // A freshly built scene (concept or newly arrived GLB) is always assembled; keep the EXPLODE/IMPLODE state truthful.
+  useEffect(() => { if (!ready) return; try { api.current?.explode(false); } catch { /* no model yet */ } setExploded(false); }, [ready]);
   const [displayExtents, setDisplayExtents] = useState<{x:number;y:number;z:number}|null>(null);
   const sourceReference = pathway.generated_image_url;
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);

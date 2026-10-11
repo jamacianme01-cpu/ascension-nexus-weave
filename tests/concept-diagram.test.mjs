@@ -45,7 +45,7 @@ try {
     for (const detail of ['Purpose', 'How it works', 'Connections', 'Design limits']) assert.ok(viewer.includes(detail));
   });
   check('Generated picture hides the original assembly without removing the preserved 3D editor', () => {
-    assert.match(viewer, /visibility:\(dissected && dissection\) \|\| \(simulate && interpretiveDemo\) \? "hidden" : "visible"/);
+    assert.match(viewer, /visibility:\(dissected && dissection && !dissectionEditor\) \|\| \(simulate && interpretiveDemo\) \? "hidden" : "visible"/);
     assert.match(viewer, /if \(conceptual && ready\) api\.current\?\.explode\(false\)/);
     assert.match(viewer, /!dissected && <div className="reality-component-workbench"/);
     assert.match(readFileSync('src/components/ascension/reality-viewer.css','utf8'), /\.reality-dissection-label\[aria-pressed="true"\]/);

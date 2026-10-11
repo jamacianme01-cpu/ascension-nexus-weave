@@ -1518,7 +1518,7 @@ export function RealityViewer({
     renderer.domElement.addEventListener("pointercancel", pointerUp);
     let previous = performance.now();
     const demoMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
-    const demoOverlay = new THREE.MeshBasicMaterial({color: new THREE.Color(getComputedStyle(target).getPropertyValue('--photon').trim() || 'cyan'), wireframe:true, transparent:true, opacity:0.85, depthTest:false});
+    const demoOverlay = new THREE.MeshBasicMaterial({color: solidEdgeMaterial.color, wireframe:true, transparent:true, opacity:0.85, depthTest:false});
     const demoCue = new THREE.Mesh(new THREE.SphereGeometry(0.12,12,8),demoOverlay);
     demoCue.visible=false;scene.add(demoCue);
     renderer.setAnimationLoop((now) => {
@@ -1545,7 +1545,8 @@ export function RealityViewer({
       if(demo.active && model){
         const related=[...componentObjects.values()].filter(object=>demo.names.includes(componentDetails.get(object.uuid)?.name ?? ''));
         related.forEach(object=>{if(object instanceof THREE.Mesh){demoMaterials.set(object,object.material);object.material=demoOverlay;}});
-        if(related.length){const from=new THREE.Box3().setFromObject(related[0]).getCenter(new THREE.Vector3());const to=new THREE.Box3().setFromObject(related[related.length-1]).getCenter(new THREE.Vector3());demoCue.position.copy(from.lerp(to,demo.reduced?0:demo.progress));demoCue.scale.setScalar(demo.reduced?1:1+Math.sin(demo.progress*Math.PI)*2);demoCue.visible=true;}
+        const first=related[0],last=related[related.length-1];
+        if(first && last){const from=new THREE.Box3().setFromObject(first).getCenter(new THREE.Vector3());const to=new THREE.Box3().setFromObject(last).getCenter(new THREE.Vector3());demoCue.position.copy(from.lerp(to,demo.reduced?0:demo.progress));demoCue.scale.setScalar(demo.reduced?1:1+Math.sin(demo.progress*Math.PI)*2);demoCue.visible=true;}
       }
       renderer.render(scene, camera);
       const occupiedLabels: DOMRect[] = [];
@@ -1773,7 +1774,7 @@ export function RealityViewer({
           {!phases.length ? <p role="status">Operational animation unavailable</p> : <>
             <div className="reality-demo-flow" aria-label="Pathway process">{phases.map((phase,index)=><span key={index} aria-current={index===frame.index?'step':undefined}>{phase.caption}</span>)}<i style={{left:`${seconds/DEMONSTRATION_SECONDS*100}%`}} aria-hidden="true"/></div>
             <p aria-live="polite">{phases[frame.index]?.caption}</p>
-            {phases[frame.index]?.operation && <p>{phases[frame.index].operation}</p>}
+            {phases[frame.index]?.operation && <p>{phases[frame.index]?.operation}</p>}
             <div className="reality-demo-actions"><Button variant="outline" onClick={()=>{if(seconds>=DEMONSTRATION_SECONDS)setSeconds(0);setPlaying(value=>!value);}}>{playing?'PAUSE':'PLAY'}</Button><Button variant="outline" onClick={()=>{setSeconds(0);setPlaying(true);}}>REPLAY</Button><input aria-label="Demonstration timeline" type="range" min="0" max={DEMONSTRATION_SECONDS} step="0.05" value={seconds} onChange={event=>{setPlaying(false);setSeconds(Number(event.target.value));}}/><output>{seconds.toFixed(1)} / 12s</output></div>
           </>}
         </section>}

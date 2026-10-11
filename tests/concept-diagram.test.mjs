@@ -68,5 +68,12 @@ try {
   check('muted feedback cannot resume context or bypass zero volume',()=>{const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8');assert.match(audio,/ctx.state !== 'running'/);assert.match(audio,/realityVolume === 0/);assert.doesNotMatch(audio,/ctx.resume\(/);assert.match(audio,/realityContext = null/);});
   check('nonphysical demonstrations show actual pathway storyboard instead of unrelated physical geometry',()=>{assert.match(viewer,/simulate && interpretiveDemo && !dissected/);assert.match(viewer,/Animated pathway storyboard/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
   check('image navigation avoids lower inspector overlap and desktop inspector leaves image room',()=>{const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');assert.match(css,/\.reality-image-tools \{[^}]*top:8px; bottom:auto/);assert.match(css,/\.reality-screen:has\(\.reality-parts\) \.reality-dissection \{ right:414px/);});
+  check('DISSECTED editing preserves its mode and switches the reference picture to real 3D', () => {
+    assert.match(viewer,/setDissectionEditor\(true\)/);
+    assert.match(viewer,/dissected && dissectionEditor && <div className="reality-editor-return"/);
+    assert.match(viewer,/BACK TO DISSECTED PICTURE/);
+    assert.match(viewer,/dissected && dissection && !dissectionEditor && <RealityDissection/);
+    assert.match(viewer,/\(!dissected \|\| dissectionEditor\) && <div className="reality-component-workbench"/);
+  });
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

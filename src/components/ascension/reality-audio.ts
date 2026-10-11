@@ -52,14 +52,17 @@ function atmosphereGraph(ctx: AudioContext) {
   wind.connect(filter).connect(windLevel).connect(output);
   sources.push(wind);
   nodes.push(filter, windLevel);
-  // Soft, sustained fifths, spread across the room; no arpeggio or alert tones.
-  [55, 82.41, 110.12].forEach((frequency, i) => {
+  // Gentle speaker-range harmonies, rather than sub-bass that laptop and
+  // phone speakers cannot reproduce. This is synthesized interface music,
+  // not a claimed recording of the selected machine.
+  [220, 277.18, 329.63, 440].forEach((frequency, i) => {
     const tone = ctx.createOscillator();
+    tone.type = "sine";
     tone.frequency.value = frequency;
     const level = ctx.createGain();
-    level.gain.value = i === 0 ? 0.055 : 0.018;
+    level.gain.value = i === 0 ? 0.095 : 0.05;
     const pan = ctx.createStereoPanner();
-    pan.pan.value = (i - 1) * 0.65;
+    pan.pan.value = (i - 1.5) * 0.32;
     tone.connect(level).connect(pan).connect(output);
     const delay = ctx.createDelay(1);
     delay.delayTime.value = 0.29 + i * 0.13;

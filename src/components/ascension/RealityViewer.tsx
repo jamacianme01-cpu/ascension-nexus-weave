@@ -12,6 +12,9 @@ import { getDesignParts, getDissectedDesign } from "@/lib/ascension/parts.functi
 import type { DesignPart } from "@/lib/ascension/parts-model";
 import { buildCanonicalAssembly, assemblyParts, explodeAssembly, pathwayKind } from "@/lib/ascension/canonical-assembly";
 import "./reality-viewer.css";
+import { RealityDissection } from './RealityDissection';
+import { demonstrationPhases, demonstrationFrame, DEMONSTRATION_SECONDS, groundedComponent } from './reality-demonstration';
+import { realityFeedback, setRealityVolume } from './reality-audio';
 
 export type RealityMode = "cutaway" | "blueprint" | "environment";
 type View = "perspective" | "top" | "front" | "side";
@@ -149,6 +152,23 @@ export function RealityViewer({
   }, [dissected, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [simulate, setSimulate] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [volume, setVolume] = useState(0.5);
+  const phases = demonstrationPhases(pathway, conceptParts);
+  const frame = demonstrationFrame(seconds, phases.length);
+  const demoRef = useRef({ active: false, names: [] as string[], progress: 0, reduced: false });
+  demoRef.current = { active: simulate && !dissected, names: phases[frame.index]?.partNames ?? [], progress: frame.progress, reduced: typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches };
+  useEffect(() => { setSimulate(false);setPlaying(false);setSeconds(0); }, [pathway.id]);
+  useEffect(() => {
+    if (!simulate || !playing) return;
+    let previous = performance.now();
+    const timer = window.setInterval(() => {const now=performance.now();const delta=(now-previous)/1000;previous=now;setSeconds(value=>{const next=Math.min(DEMONSTRATION_SECONDS,value+delta);if(next===DEMONSTRATION_SECONDS)setPlaying(false);return next;});},50);
+    return () => window.clearInterval(timer);
+  }, [simulate, playing]);
+  useEffect(() => { if (simulate && playing && soundEnabled) realityFeedback(frame.index); }, [frame.index, simulate, playing, soundEnabled]);
+  useEffect(() => {setRealityVolume(volume);}, [volume, soundEnabled]);
   const [parts, setParts] = useState<DesignPart[]>([]);
   const [partIndex, setPartIndex] = useState<number | null>(null);
   const [partsLoading, setPartsLoading] = useState(false);
@@ -179,14 +199,13 @@ export function RealityViewer({
   const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected || conceptual ? selectedComponent?.detail ?? null : null;
   const editIllustratedPart = () => {
     if (!selectedPart) return;
-    const normalized = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    const matching = components.find(component => normalized(component.name) === normalized(selectedPart.name));
+    const matching = groundedComponent(selectedPart.name, components);
     setDissected(false);
     setShowParts(true);
     setEditorOpen(true);
     setPartIndex(null);
     if (matching) api.current?.selectComponent(matching.id);
-    else setWorkbenchError("Select the corresponding 3D component below to move, rotate or scale it. The generated illustration is a separate reference picture, not an independently editable mesh.");
+    else { setComponentId(null);setWorkbenchError("Picture-to-mesh mapping unavailable. Select a 3D component manually below. Illustration pixels are not editable mesh geometry."); }
   };
   const dive = useRef(onDive);
   dive.current = onDive;
@@ -1498,6 +1517,10 @@ export function RealityViewer({
     renderer.domElement.addEventListener("pointerup", pointerUp);
     renderer.domElement.addEventListener("pointercancel", pointerUp);
     let previous = performance.now();
+    const demoMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+    const demoOverlay = new THREE.MeshBasicMaterial({color: new THREE.Color(getComputedStyle(target).getPropertyValue('--photon').trim() || 'cyan'), wireframe:true, transparent:true, opacity:0.85, depthTest:false});
+    const demoCue = new THREE.Mesh(new THREE.SphereGeometry(0.12,12,8),demoOverlay);
+    demoCue.visible=false;scene.add(demoCue);
     renderer.setAnimationLoop((now) => {
       const dt = Math.min((now - previous) / 1000, 0.05);
       previous = now;
@@ -1516,6 +1539,14 @@ export function RealityViewer({
         if (keys.has("q")) camera.position.y -= speed;
       } else orbit.update();
       if(locatedPart!==null && model && partAnchors[locatedPart])locationMarker.position.copy(partObjects[locatedPart]!.localToWorld(partAnchors[locatedPart]!.clone()));
+      // Temporal causal emphasis on grounded named meshes; never mutate user transforms.
+      demoMaterials.forEach((material,mesh)=>{mesh.material=material;});demoMaterials.clear();demoCue.visible=false;
+      const demo=demoRef.current;
+      if(demo.active && model){
+        const related=[...componentObjects.values()].filter(object=>demo.names.includes(componentDetails.get(object.uuid)?.name ?? ''));
+        related.forEach(object=>{if(object instanceof THREE.Mesh){demoMaterials.set(object,object.material);object.material=demoOverlay;}});
+        if(related.length){const from=new THREE.Box3().setFromObject(related[0]).getCenter(new THREE.Vector3());const to=new THREE.Box3().setFromObject(related[related.length-1]).getCenter(new THREE.Vector3());demoCue.position.copy(from.lerp(to,demo.reduced?0:demo.progress));demoCue.scale.setScalar(demo.reduced?1:1+Math.sin(demo.progress*Math.PI)*2);demoCue.visible=true;}
+      }
       renderer.render(scene, camera);
       const occupiedLabels: DOMRect[] = [];
       labelsHost.current?.querySelectorAll<HTMLButtonElement>("button").forEach((button, index) => {
@@ -1637,6 +1668,7 @@ export function RealityViewer({
       controller.abort();
       api.current = null;
       renderer.setAnimationLoop(null);
+      demoMaterials.forEach((material,mesh)=>{mesh.material=material;});demoOverlay.dispose();demoCue.geometry.dispose();
       observer.disconnect();
       orbit.dispose();
       transform.dispose();
@@ -1724,23 +1756,27 @@ export function RealityViewer({
         <button className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
           PARTS
         </button>
-        <button className="reality-sound" aria-pressed={soundEnabled} onClick={onToggleSound}>
+        <button className="reality-sound" aria-pressed={soundEnabled} onClick={()=>{onToggleSound();if(!soundEnabled)window.setTimeout(()=>realityFeedback(),100);}}>
           {soundEnabled ? "SOUND ON" : "SOUND OFF"}
         </button>
+        </div>
+        <div className="reality-extra-controls">
+          <Button variant="outline" aria-pressed={simulate} onClick={()=>{setSimulate(value=>!value);setPlaying(false);}}>SIMULATE</Button>
+          <label>Volume <input aria-label="Ambient volume" type="range" min="0" max="0.7" step="0.05" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
         </div>
       </header>
       <div className="reality-model-stage">
         <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:dissected && dissection ? "hidden" : "visible"}} />
-        {dissected && dissection && <div className="reality-dissection" aria-label="Generated dissected illustration with selectable labeled parts">
-          <div className="reality-dissection-picture">
-            <img src={dissection.imageUrl} alt={`Exploded concept illustration of ${pathway.label}`} />
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              {dissection.parts.map((part,index)=>{const right=index%2===1;const row=Math.floor(index/2);const total=Math.ceil(dissection.parts.length/2);const y=(row+0.5)*100/total;return <polyline key={index} points={`${part.x*100},${part.y*100} ${right?80:20},${y} ${right?98:2},${y}`} />;})}
-            </svg>
-            {dissection.parts.map((part,index)=>{const right=index%2===1;const row=Math.floor(index/2);const total=Math.ceil(dissection.parts.length/2);return <button className="reality-dissection-label" key={part.name+index} style={{left:right?"80%":"0%",top:`${(row+0.5)*100/total}%`}} aria-controls="reality-part-detail" aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);setShowParts(true);}}>{part.name}</button>;})}
-            {partIndex!==null && dissection.parts[partIndex] && <span className="reality-dissection-target" aria-hidden="true" style={{left:`${dissection.parts[partIndex]!.x*100}%`,top:`${dissection.parts[partIndex]!.y*100}%`}} />}
-          </div>
-        </div>}
+        {dissected && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissection.parts} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);}}/>}
+        {simulate && <section className="reality-demonstration" aria-label="Conceptual demonstration">
+          <strong>CONCEPTUAL DEMONSTRATION · UNVERIFIED</strong>
+          {!phases.length ? <p role="status">Operational animation unavailable</p> : <>
+            <div className="reality-demo-flow" aria-label="Pathway process">{phases.map((phase,index)=><span key={index} aria-current={index===frame.index?'step':undefined}>{phase.caption}</span>)}<i style={{left:`${seconds/DEMONSTRATION_SECONDS*100}%`}} aria-hidden="true"/></div>
+            <p aria-live="polite">{phases[frame.index]?.caption}</p>
+            {phases[frame.index]?.operation && <p>{phases[frame.index].operation}</p>}
+            <div className="reality-demo-actions"><Button variant="outline" onClick={()=>{if(seconds>=DEMONSTRATION_SECONDS)setSeconds(0);setPlaying(value=>!value);}}>{playing?'PAUSE':'PLAY'}</Button><Button variant="outline" onClick={()=>{setSeconds(0);setPlaying(true);}}>REPLAY</Button><input aria-label="Demonstration timeline" type="range" min="0" max={DEMONSTRATION_SECONDS} step="0.05" value={seconds} onChange={event=>{setPlaying(false);setSeconds(Number(event.target.value));}}/><output>{seconds.toFixed(1)} / 12s</output></div>
+          </>}
+        </section>}
         {dissected && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
           {dissectionError && <button onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</button>}

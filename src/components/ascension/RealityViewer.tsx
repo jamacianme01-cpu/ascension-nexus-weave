@@ -144,11 +144,11 @@ export function RealityViewer({
   const [displayExtents, setDisplayExtents] = useState<{x:number;y:number;z:number}|null>(null);
   const sourceReference = pathway.generated_image_url;
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
-  const splitReference = Boolean(sourceReference || (dissected && dissection));
+  const splitReference = Boolean(sourceReference || dissection);
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
-  useEffect(() => { setDissection(null); setDissected(false); setDissectionError(null); }, [pathway.id, loadedUrl]);
+  useEffect(() => { setDissection(null); setDissected(false); setDissectionError(null); }, [pathway.id]);
   useEffect(() => {
     // DISSECTED creates a separate produced illustration for both provisional
     // assemblies and completed Hunyuan meshes, only when requested.
@@ -1786,8 +1786,8 @@ export function RealityViewer({
           NEW OBJECTIVE
         </Button>
         <div className="reality-title">
-          <span>{conceptual ? `CONCEPT / UNVERIFIED · ${geometryStatus === "semantic" ? "SEMANTIC ASSEMBLY" : geometryStatus === "incomplete" ? "PHYSICAL GEOMETRY INCOMPLETE · INTERPRETIVE ONLY" : "INTERPRETIVE DIAGRAM · PHYSICAL GEOMETRY UNAVAILABLE"}` : "HUNYUAN3D MESH / UNVERIFIED"}</span>
-          {conceptual && <p className="reality-pathway-label">{pathway.model_error ? `GLB: ${pathway.model_error}` : pathway.model_status ? `GLB creation: ${pathway.model_status}` : "Physical model unavailable · Concept available now"}</p>}
+          <span>{conceptual ? `CONCEPT / UNVERIFIED · ${geometryStatus === "semantic" ? "SEMANTIC ASSEMBLY · NOT IMAGE-MATCHED CAD" : geometryStatus === "incomplete" ? "PHYSICAL GEOMETRY INCOMPLETE · INTERPRETIVE ONLY" : "INTERPRETIVE DIAGRAM · PHYSICAL GEOMETRY UNAVAILABLE"}` : "HUNYUAN3D MESH / UNVERIFIED"}</span>
+          {conceptual && <p className="reality-pathway-label">{pathway.model_error ? `GLB: ${pathway.model_error}` : pathway.model_status ? `GLB creation: ${pathway.model_status}${pathway.model_status === "queued" ? " · awaiting local Hunyuan worker" : ""}` : "Physical model unavailable · Concept available now"}</p>}
           {pathway.model_url && loadedUrl !== pathway.model_url && <Button variant="outline" onClick={() => { edited.current = false; setLoadedUrl(pathway.model_url); }}>REPLACE EDITED CONCEPT WITH HUNYUAN MODEL</Button>}
           <h1>{objective}</h1>
           <p className="reality-pathway-label">{pathway.label}</p>
@@ -1824,7 +1824,7 @@ export function RealityViewer({
       <div className="reality-model-stage" data-split={splitReference ? "true" : undefined}>
         <div ref={host} className="reality-viewport" data-ready={ready} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />
         {sourceReference && <RealityDissection imageUrl={sourceReference} parts={[]} selected={null} label={pathway.label} onSelect={()=>{}} />}
-        {dissected && !sourceReference && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissection.parts} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
+        {!sourceReference && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissected ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
         {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">
           <span className="reality-operation-eyebrow">CONCEPTUAL OPERATION · PHASE {frame.index + 1} OF {phases.length} · UNVERIFIED</span>
           <div className="reality-operation-flow" aria-label="Objective to current operating phase">

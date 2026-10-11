@@ -13,10 +13,11 @@ import type { DesignPart } from "@/lib/ascension/parts-model";
 import { buildCanonicalAssembly, assemblyParts, explodeAssembly, assemblyStatus, specFidelity } from "@/lib/ascension/canonical-assembly";
 import "./reality-viewer.css";
 import { RealityDissection } from './RealityDissection';
+import { RealityEngineeringSimulation } from './RealityEngineeringSimulation';
 import { demonstrationPhases, demonstrationFrame, DEMONSTRATION_SECONDS, groundedComponent } from './reality-demonstration';
 import { realityFeedback, setRealityVolume } from './reality-audio';
 
-export type RealityMode = "cutaway" | "blueprint" | "environment";
+export type RealityMode = "cutaway" | "blueprint" | "environment" | "cad";
 type View = "perspective" | "top" | "front" | "side";
 type RoomName = "Workspace" | "Living Area" | "Bathroom" | "Bedroom" | "Kitchen" | "Garage";
 type CatalogKind =
@@ -132,10 +133,15 @@ export function RealityViewer({
   const conceptParts = assemblyParts(objective, pathway);
   const conceptPartsRef = useRef(conceptParts);
   conceptPartsRef.current = conceptParts;
-  useEffect(() => { edited.current = false; setLoadedUrl(pathway.model_url); }, [pathway.id]);
+  useEffect(() => { edited.current = false; setLoadedUrl(pathway.model_url); setExploded(false); setDisplayExtents(null); }, [pathway.id]);
   useEffect(() => { if (!edited.current && pathway.model_url) setLoadedUrl(pathway.model_url); }, [pathway.model_url]);
   const labelsHost = useRef<HTMLDivElement>(null);
   const [dissected, setDissected] = useState(false);
+  const [exploded, setExploded] = useState(false);
+  const [explosionError, setExplosionError] = useState<string | null>(null);
+  const [displayExtents, setDisplayExtents] = useState<{x:number;y:number;z:number}|null>(null);
+  const sourceReference = pathway.generated_image_url;
+  const splitReference = Boolean(sourceReference || (dissected && dissection));
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
@@ -144,7 +150,7 @@ export function RealityViewer({
   useEffect(() => {
     // DISSECTED creates a separate produced illustration for both provisional
     // assemblies and completed Hunyuan meshes, only when requested.
-    if (!dissected || !ready || !api.current || dissection) return;
+    if (!dissected || sourceReference || !ready || !api.current || dissection) return;
     let active = true;
     setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
     getDissectedDesign({data:{objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual || specFidelity(pathway).status==='complete' || assemblyStatus(objective,pathway)==='semantic'}})
@@ -152,7 +158,7 @@ export function RealityViewer({
       .catch(cause => { if(active) setDissectionError(cause instanceof Error ? cause.message : "Dissected view could not be generated."); })
       .finally(()=>{if(active)setDissectionLoading(false);});
     return ()=>{active=false;};
-  }, [dissected, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
+  }, [dissected, sourceReference, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(false);
   useEffect(() => { if (window.matchMedia('(min-width: 761px)').matches) setShowParts(true); }, []);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -200,10 +206,8 @@ export function RealityViewer({
       .finally(() => { if (active) setPartsLoading(false); });
     return () => { active = false; };
   }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
-  const activeParts = dissected && dissection ? dissection.parts : conceptual ? conceptParts : parts;
-  // Keep the object assembled while the separate illustrated breakdown is made.
-  // The produced image is the dissected view, not the old pulled-apart mesh.
-  useEffect(() => { if (conceptual && ready) api.current?.explode(false); }, [conceptual, ready, dissected]);
+  const activeParts = dissected && dissection && !sourceReference ? dissection.parts : conceptual ? conceptParts : parts;
+  // Reference image stays unchanged; 3D sectioning and explosion affect the mesh only.
   const selectedComponent = components.find(component=>component.id===componentId);
   const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected || conceptual ? selectedComponent?.detail ?? null : null;
   const editIllustratedPart = () => {
@@ -306,6 +310,9 @@ export function RealityViewer({
     scene.add(transform.getHelper());
     const setSelected = (object: THREE.Object3D | null) => {
       selected = object;
+      const selectedBounds = object ? new THREE.Box3().setFromObject(object) : model ? new THREE.Box3().setFromObject(model) : null;
+      const extent = selectedBounds && !selectedBounds.isEmpty() ? selectedBounds.getSize(new THREE.Vector3()) : null;
+      setDisplayExtents(extent ? {x:extent.x,y:extent.y,z:extent.z} : null);
       setComponentId(object?.uuid ?? null);
       transform.detach();
       if (selectedHelper) {
@@ -1211,7 +1218,33 @@ export function RealityViewer({
         const target=id?componentObjects.get(id):null;
         model?.traverse(node=>{if(!(node instanceof THREE.Mesh)||node.userData["ascensionDisplayEdge"])return;node.visible=!target||isAncestor(target,node)||node===target||isAncestor(node,target);});
       },
-      explode(enabled) { if (model && conceptual) { explodeAssembly(model, enabled, explodedPositions); fit(); } },
+      explode(enabled) {
+        if (!model) throw new Error("The 3D model has not loaded.");
+        if (conceptual) {
+          explodeAssembly(model, enabled, explodedPositions);
+        } else if (!enabled) {
+          for (const [object, position] of explodedPositions) object.position.copy(position);
+          explodedPositions.clear();
+        } else {
+          const all = [...componentObjects.values()].filter(object => object.parent);
+          const roots = all.filter(object => !all.some(other => other !== object && isAncestor(other, object)));
+          if (roots.length < 2) throw new Error("This GLB does not contain two independently separable components.");
+          model.updateWorldMatrix(true, true);
+          roots.forEach((object, index) => {
+            if (explodedPositions.has(object)) return;
+            explodedPositions.set(object, object.position.clone());
+            const worldCenter = new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3());
+            const direction = worldCenter.clone().sub(center);
+            if (direction.lengthSq() < 1e-8) direction.set(Math.cos(index * 2.4), Math.sin(index * 2.4), 0);
+            direction.normalize().multiplyScalar(Math.max(0.4, bounds.length() * 0.16));
+            const parent = object.parent!;
+            const offset = parent.worldToLocal(worldCenter.clone().add(direction)).sub(parent.worldToLocal(worldCenter));
+            object.position.add(offset);
+          });
+        }
+        model.updateWorldMatrix(true, true);
+        fit();
+      },
       locatePart(index){
         const anchor=partAnchors[index],object=partObjects[index];if(!model||!anchor||!object)return;
         locatedPart=index;locationMarker.visible=true;locationMarker.position.copy(object.localToWorld(anchor.clone()));
@@ -1384,6 +1417,9 @@ export function RealityViewer({
         const startingMode =
           "cutaway";
         while(history.length)history.pop()!();
+        if (model && conceptual) explodeAssembly(model, false, explodedPositions);
+        else for (const [object, position] of explodedPositions) object.position.copy(position);
+        explodedPositions.clear();setExploded(false);setExplosionError(null);
         setUndoCount(0);
         setSelected(null);
         for (const object of [...addedObjects]) {
@@ -1603,6 +1639,7 @@ export function RealityViewer({
           const normalized = new THREE.Box3().setFromObject(model);
           normalized.getSize(bounds);
           normalized.getCenter(center);
+          setDisplayExtents({x:bounds.x,y:bounds.y,z:bounds.z});
           originalModelTransform = {
             position: model.position.clone(),
             quaternion: model.quaternion.clone(),
@@ -1761,10 +1798,13 @@ export function RealityViewer({
         <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
           BLUEPRINT
         </Button>
+        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cad"} onClick={()=>{setDissected(false);setMode("cad");setShowParts(true);setEditorOpen(true);}}>
+          CAD
+        </Button>
         <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="environment"} onClick={()=>{setDissected(false);setMode("environment");}}>
           ENVIRONMENT
         </Button>
-        <Button variant="outline" disabled={!ready} aria-pressed={dissected} onClick={() => {setDissected(value=>!value);setPartIndex(null);}}>
+        <Button variant="outline" disabled={!ready} aria-pressed={dissected} onClick={() => {const next=!dissected;setDissected(next);setPartIndex(null);setSection(next?50:100);api.current?.section(next?50:100);if(next)setShowParts(true);}}>
           {dissected ? "ASSEMBLED" : "DISSECTED"}
         </Button>
         <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
@@ -1779,9 +1819,10 @@ export function RealityViewer({
           <label>Volume <input aria-label="Ambient volume" type="range" min="0" max="0.7" step="0.05" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
         </div>
       </header>
-      <div className="reality-model-stage" data-split={dissected && dissection ? "true" : undefined}>
-        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:simulate && interpretiveDemo && !dissected ? "hidden" : "visible"}} aria-label={dissected && dissection ? "Editable 3D model beside the dissected reference picture" : undefined} />
-        {dissected && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissection.parts} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
+      <div className="reality-model-stage" data-split={splitReference ? "true" : undefined}>
+        <div ref={host} className="reality-viewport" data-ready={ready} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />
+        {sourceReference && <RealityDissection imageUrl={sourceReference} parts={[]} selected={null} label={pathway.label} onSelect={()=>{}} />}
+        {dissected && !sourceReference && dissection && <RealityDissection imageUrl={dissection.imageUrl} parts={dissection.parts} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
         {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">
           <span className="reality-operation-eyebrow">CONCEPTUAL OPERATION · PHASE {frame.index + 1} OF {phases.length} · UNVERIFIED</span>
           <div className="reality-operation-flow" aria-label="Objective to current operating phase">
@@ -1801,7 +1842,8 @@ export function RealityViewer({
           {phases[frame.index]?.operation && <p>{phases[frame.index]?.operation}</p>}
           <p className="reality-sequence-next">{phases[frame.index + 1] ? `NEXT · ${phases[frame.index + 1]?.caption}` : "FINAL PHASE · Conceptual operation only"}</p>
         </div>}
-        {simulate && <section className="reality-demonstration" aria-label="Conceptual demonstration">
+        {simulate && <section className="reality-demonstration" aria-label="Simulation calculations and operating sequence">
+          <RealityEngineeringSimulation progress={seconds/DEMONSTRATION_SECONDS} />
           <strong>CONCEPTUAL DEMONSTRATION · UNVERIFIED</strong>
           {!phases.length ? <p role="status">Operational animation unavailable</p> : <>
             <div className="reality-demo-actions"><Button variant="outline" onClick={()=>{if(seconds>=DEMONSTRATION_SECONDS)setSeconds(0);setPlaying(value=>!value);}}>{playing?'PAUSE':'PLAY'}</Button><Button variant="outline" onClick={()=>{setSeconds(0);setPlaying(true);}}>REPLAY</Button><input aria-label="Demonstration timeline" type="range" min="0" max={DEMONSTRATION_SECONDS} step="0.05" value={seconds} onChange={event=>{setPlaying(false);setSeconds(Number(event.target.value));}}/><output>{seconds.toFixed(1)} / 12s</output></div>
@@ -1811,7 +1853,7 @@ export function RealityViewer({
 
           </>}
         </section>}
-        {dissected && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>
+        {dissected && !sourceReference && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
           {dissectionError && <Button variant="outline" onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</Button>}
         </div>}
@@ -1920,7 +1962,13 @@ export function RealityViewer({
             </article>}
           </section>
         )}
-        {ready && !dissected && mode==="blueprint" && <div className="reality-mode-controls" aria-label="Blueprint camera views">{(["top","front","side","perspective"] as const).map(view=><Button variant="outline" key={view} onClick={()=>api.current?.view(view)}>{view==="perspective"?"3D":view.toUpperCase()}</Button>)}</div>}
+        {ready && (mode==="blueprint" || mode==="cad") && displayExtents && <div className="reality-measurements" role="note">Mesh bounding box: {displayExtents.x.toFixed(2)} × {displayExtents.y.toFixed(2)} × {displayExtents.z.toFixed(2)} display units. Physical dimensions and tolerances are not specified; export is not a manufacturing drawing.</div>}
+        {ready && (mode==="blueprint" || mode==="cad") && <div className="reality-mode-controls" aria-label="Blueprint camera views">{(["top","front","side","perspective"] as const).map(view=><Button variant="outline" key={view} onClick={()=>api.current?.view(view)}>{view==="perspective"?"3D":view.toUpperCase()}</Button>)}</div>}
+        {ready && (dissected || mode==="cutaway" || mode==="cad") && <div className="reality-assembly-controls">
+          <label>SECTION {section}% <input type="range" aria-label="3D section plane" min="0" max="100" step="1" value={section} onChange={event=>{const next=Number(event.target.value);setSection(next);api.current?.section(next);}} /></label>
+          <Button variant="outline" disabled={!ready} aria-pressed={exploded} onClick={()=>{try{api.current?.explode(!exploded);setExploded(!exploded);setExplosionError(null);}catch(cause){setExplosionError(cause instanceof Error?cause.message:"Exploded view failed.");}}}>{exploded?"IMPLODE · ASSEMBLE":"EXPLODE · DISASSEMBLE"}</Button>
+          {explosionError && <p role="alert">{explosionError}</p>}
+        </div>}
         {ready && !dissected && <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>}
         <div className="reality-revision-actions" aria-label="Work from this result">
           <Button variant="outline" disabled={newObjectiveDisabled} onClick={onBuildOn}>BUILD ON RESULT</Button>

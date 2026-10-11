@@ -14,7 +14,7 @@ import { buildCanonicalAssembly, assemblyParts, explodeAssembly, assemblyStatus,
 import "./reality-viewer.css";
 import { RealityDissection } from './RealityDissection';
 import { RealityEngineeringSimulation } from './RealityEngineeringSimulation';
-import { bindViewerReference } from "@/lib/ascension/viewer-reference.functions";
+import { bindViewerReference, bindGuestViewerReference } from "@/lib/ascension/viewer-reference.functions";
 import { demonstrationPhases, demonstrationFrame, DEMONSTRATION_SECONDS, groundedComponent } from './reality-demonstration';
 import { realityFeedback, setRealityVolume } from './reality-audio';
 
@@ -87,6 +87,7 @@ export function RealityViewer({
   pathway,
   objective,
   requestId,
+  guestToken,
   initialMode,
   onClose,
   onNewObjective,
@@ -104,6 +105,7 @@ export function RealityViewer({
   pathway: ObjectivePathway;
   objective: string;
   requestId: string | null;
+  guestToken?: string | null;
   initialMode: RealityMode;
   onClose: () => void;
   onNewObjective: () => void;
@@ -166,14 +168,16 @@ export function RealityViewer({
         setDissection(result);
         // Persist the image seen on the LEFT as the source of this EXACT pathway's
         // queued Hunyuan job. The real source URL is returned on subsequent delivery reads.
-        if (requestId) void bindViewerReference({data:{requestId,pathwayId:pathway.id,imageUrl:result.imageUrl}})
+        if (requestId) void (guestToken
+          ? bindGuestViewerReference({data:{requestId,guestToken,pathwayId:pathway.id,imageUrl:result.imageUrl}})
+          : bindViewerReference({data:{requestId,pathwayId:pathway.id,imageUrl:result.imageUrl}}))
           .then(link=>{if(active && !link.linked)setWorkbenchError(`3D source not linked: ${link.reason ?? link.status}`);})
           .catch(cause=>{if(active)setWorkbenchError(`3D reference link failed: ${cause instanceof Error ? cause.message : String(cause)}`);});
       })
       .catch(cause => { if(active) setDissectionError(cause instanceof Error ? cause.message : "Dissected view could not be generated."); })
       .finally(()=>{if(active)setDissectionLoading(false);});
     return ()=>{active=false;};
-  }, [dissected, sourceReference, requestId, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
+  }, [dissected, sourceReference, requestId, guestToken, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(false);
   useEffect(() => { if (window.matchMedia('(min-width: 761px)').matches) setShowParts(true); }, []);
   const [editorOpen, setEditorOpen] = useState(false);

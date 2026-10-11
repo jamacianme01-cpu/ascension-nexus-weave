@@ -1,4 +1,25 @@
-/** Quiet spatial air and low harmonic pressure. All sources are bounded and disposable. */
+let realityContext: AudioContext | null = null;
+let realityOutput: GainNode | null = null;
+let realityVolume = 0.5;
+export function setRealityVolume(volume: number) {
+  realityVolume = Math.min(0.7, Math.max(0, volume));
+  if (realityContext && realityOutput) {
+    realityOutput.gain.cancelAndHoldAtTime(realityContext.currentTime);
+    realityOutput.gain.setTargetAtTime(realityVolume * 0.6, realityContext.currentTime, 0.15);
+  }
+}
+/** Synthesized interface feedback, not a physical recording. Uses the existing context. */
+export function realityFeedback(phase = 0) {
+  const ctx = realityContext;
+   if (!ctx || ctx.state !== 'running' || !realityOutput || realityVolume === 0) return;
+    const tone = ctx.createOscillator(), gain = ctx.createGain();
+    tone.frequency.value = 260 + (phase % 6) * 65;
+     gain.gain.setValueAtTime(0.06 * realityVolume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+    tone.connect(gain).connect(ctx.destination);tone.start();tone.stop(ctx.currentTime + 0.23);
+    tone.onended = () => {tone.disconnect();gain.disconnect();};
+}
+/** Spatial air and low harmonic pressure. All sources are bounded and disposable. */
 function atmosphereGraph(ctx: AudioContext) {
   const output = ctx.createGain();
   output.gain.value = 0;
@@ -90,9 +111,9 @@ function atmosphereGraph(ctx: AudioContext) {
 
 export function createRealityAtmosphere(ctx: AudioContext) {
   const graph = atmosphereGraph(ctx);
-  graph.output.gain.linearRampToValueAtTime(0.17, ctx.currentTime + 2.5);
-  graph.scheduleDim(12_000);
-  return { stop: () => graph.stop(0.65) };
+  realityContext = ctx; realityOutput = graph.output;
+   graph.output.gain.linearRampToValueAtTime(realityVolume * 0.6, ctx.currentTime + 1);
+   return { stop: () => { if (realityOutput === graph.output) { realityOutput = null; realityContext = null; } graph.stop(0.65); } };
 }
 
 export function playSpatialSwell(ctx: AudioContext, intensity = 1) {

@@ -884,3 +884,38 @@
 .reality-reference-pending strong {font-size:clamp(14px,1.6vw,18px);color:var(--gold);}
 .reality-reference-pending p {font-size:12px;line-height:1.55;}
 @media(max-width:760px){.reality-reference-pending{left:0;right:0;top:0;bottom:45%;}}
+
+/* ASSEMBLED is the primary visual, not a tiny thumbnail sharing space with
+   a worker-status panel. Give the picture the full viewport until GLB exists. */
+.reality-model-stage[data-image-only="true"] .reality-dissection {
+  inset:0 !important; right:0 !important; bottom:0 !important;
+}
+.reality-model-stage[data-image-only="true"] .reality-mesh-pending {
+  left:auto; right:10px; top:auto; bottom:10px; width:min(285px,calc(100% - 20px));
+  padding:8px 10px; max-height:72px; overflow:hidden; display:block;
+  background:rgba(3,11,21,.88); border:1px solid var(--border); border-radius:8px;
+}
+.reality-model-stage[data-image-only="true"] .reality-mesh-pending strong {
+  font-size:10px; line-height:1.25;
+}
+.reality-model-stage[data-image-only="true"] .reality-mesh-pending p:first-of-type,
+.reality-model-stage[data-image-only="true"] .reality-mesh-pending small {display:none;}
+.reality-model-stage[data-image-only="true"] .reality-mesh-pending p {font-size:10px;line-height:1.25;margin-top:3px;}
+/* Single horizontal control row to reclaim vertical space for the design. */
+.reality-view-controls, .reality-view-controls.reality-view-controls {
+  display:flex; grid-template-columns:none; gap:5px;
+  flex-wrap:nowrap; overflow-x:auto; padding-bottom:3px; scrollbar-width:thin;
+}
+.reality-view-controls button { flex:1 0 auto; min-width:98px; min-height:40px; padding:6px 9px; }
+.reality-screen[open] {grid-template-rows:auto minmax(65dvh,1fr) auto auto;}
+.reality-model-stage {min-height:65dvh;}
+@media(max-width:760px) {
+  .reality-view-controls, .reality-view-controls.reality-view-controls {grid-template-columns:none;}
+  .reality-view-controls button {flex:0 0 auto;min-width:106px;min-height:40px;}
+  .reality-model-stage[data-image-only="true"] .reality-dissection {
+    inset:0 !important;right:0 !important;bottom:0 !important;
+  }
+  .reality-model-stage[data-image-only="true"] .reality-mesh-pending {
+    left:auto;right:8px;top:auto;bottom:8px;max-height:55px;max-width:230px;
+  }
+}

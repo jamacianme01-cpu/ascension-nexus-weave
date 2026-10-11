@@ -93,7 +93,7 @@ try {
     assert.match(css,/\.reality-operation-stage \{/);
     assert.match(css,/@media \(max-width:760px\) \{[\s\S]*\.reality-operation-stage/);
   });
-  check('nonphysical demonstrations show the actual pathway rather than unrelated 3D geometry',()=>{assert.match(viewer,/simulate && interpretiveDemo && !dissected/);assert.match(viewer,/CONCEPTUAL OPERATION/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
+  check('nonphysical demonstrations show the actual pathway rather than unrelated 3D geometry',()=>{assert.match(viewer,/reality-operation-stage\$\{interpretiveDemo \? "" : " reality-operation-stage--with-model"\}/);assert.match(viewer,/CONCEPTUAL OPERATION/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
   check('image navigation avoids lower inspector overlap and desktop inspector leaves image room',()=>{const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');assert.match(css,/\.reality-image-tools \{[^}]*top:8px; bottom:auto/);assert.match(css,/\.reality-screen:has\(\.reality-parts\) \.reality-dissection \{ right:414px/);});
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

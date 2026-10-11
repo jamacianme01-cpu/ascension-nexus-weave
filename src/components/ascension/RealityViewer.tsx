@@ -171,7 +171,7 @@ export function RealityViewer({
   useEffect(() => {
     // Open the objective with the complete assembled object, not the exploded
     // alternate. The generation result is also the model worker's source.
-    if (!ready || !requestId || !api.current || sourceReference || assembledImage || ["claimed","running","completed"].includes(pathway.model_status ?? "")) return;
+    if (!requestId || sourceReference || assembledImage || ["claimed","running","completed"].includes(pathway.model_status ?? "")) return;
     let active = true;
     setAssembledLoading(true);setAssembledError(null);
     getDissectedDesign({data:{
@@ -197,7 +197,7 @@ export function RealityViewer({
       .catch(cause=>{if(active)setAssembledError(cause instanceof Error?cause.message:String(cause));})
       .finally(()=>{if(active)setAssembledLoading(false);});
     return()=>{active=false;};
-  },[ready,requestId,guestToken,sourceReference,assembledImage,assembledAttempt,pathway.id,pathway.label,pathway.summary,pathway.model_status,objective]);
+  },[requestId,guestToken,sourceReference,assembledImage,assembledAttempt,pathway.id,pathway.label,pathway.summary,pathway.model_status,objective]);
 
   useEffect(() => {
     // DISSECTED is optional: a separate exploded illustration, NEVER the

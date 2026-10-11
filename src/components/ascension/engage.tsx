@@ -1240,6 +1240,7 @@ export function Engage() {
         <RealityViewer
           pathway={realityPathway}
           objective={run?.objective ?? objective}
+          requestId={run?.id ?? null}
           initialMode={reality.mode}
           soundEnabled={soundEnabled}
           onToggleSound={toggleSound}

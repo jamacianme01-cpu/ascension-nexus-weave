@@ -171,7 +171,7 @@ export function RealityViewer({
   useEffect(() => {
     // Open the objective with the complete assembled object, not the exploded
     // alternate. The generation result is also the model worker's source.
-    if (!ready || !requestId || !api.current || sourceReference || assembledImage) return;
+    if (!ready || !requestId || !api.current || sourceReference || assembledImage || ["claimed","running","completed"].includes(pathway.model_status ?? "")) return;
     let active = true;
     setAssembledLoading(true);setAssembledError(null);
     getDissectedDesign({data:{
@@ -179,19 +179,25 @@ export function RealityViewer({
       objective,label:pathway.label,summary:pathway.summary,
       image:api.current.picture(),steps:pathway.steps
     }})
-      .then(result => {
+      .then(async result => {
         if(!active)return;
-        setAssembledImage(result.imageUrl);
-        void (guestToken
-          ? bindGuestViewerReference({data:{requestId,guestToken,pathwayId:pathway.id,imageUrl:result.imageUrl}})
-          : bindViewerReference({data:{requestId,pathwayId:pathway.id,imageUrl:result.imageUrl}}))
-          .then(link=>{if(active && !link.linked)setAssembledError(`3D source not linked: ${link.reason ?? link.status}`);})
-          .catch(cause=>{if(active)setAssembledError(`3D reference link failed: ${cause instanceof Error?cause.message:String(cause)}`);});
+        try {
+          const link=await (guestToken
+            ? bindGuestViewerReference({data:{requestId,guestToken,pathwayId:pathway.id,imageUrl:result.imageUrl}})
+            : bindViewerReference({data:{requestId,pathwayId:pathway.id,imageUrl:result.imageUrl}}));
+          if(!active)return;
+          setAssembledImage(result.imageUrl);
+          if(!link.linked)setAssembledError(`3D source not linked: ${link.reason ?? link.status}`);
+        } catch(cause) {
+          if(!active)return;
+          setAssembledImage(result.imageUrl);
+          setAssembledError(`3D reference link failed: ${cause instanceof Error?cause.message:String(cause)}`);
+        }
       })
       .catch(cause=>{if(active)setAssembledError(cause instanceof Error?cause.message:String(cause));})
       .finally(()=>{if(active)setAssembledLoading(false);});
     return()=>{active=false;};
-  },[ready,requestId,guestToken,sourceReference,assembledImage,assembledAttempt,pathway.id,pathway.label,pathway.summary,objective]);
+  },[ready,requestId,guestToken,sourceReference,assembledImage,assembledAttempt,pathway.id,pathway.label,pathway.summary,pathway.model_status,objective]);
 
   useEffect(() => {
     // DISSECTED is optional: a separate exploded illustration, NEVER the
@@ -1875,7 +1881,7 @@ export function RealityViewer({
       <div className="reality-model-stage" data-split={splitReference ? "true" : undefined} data-image-only={imageOnly ? "true" : undefined}>
         <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:awaitingFaithfulMesh ? "hidden" : "visible"}} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />
         {!displayedImageUrl && awaitingFaithfulMesh && <div className="reality-reference-pending" role={assembledError?"alert":"status"}><strong>{assembledLoading?"CREATING COMPLETE ASSEMBLED IMAGE":"ASSEMBLED VIEW"}</strong><p>{assembledError ?? (assembledLoading?"Preparing a clear, complete view of your selected invention…":"Waiting for the complete assembled reference picture.")}</p>{assembledError && <Button variant="outline" onClick={()=>setAssembledAttempt(x=>x+1)}>RETRY ASSEMBLED IMAGE</Button>}</div>}
-        {displayedImageUrl && <RealityDissection imageUrl={displayedImageUrl} parts={dissected && dissection && displayedImageUrl === dissection.imageUrl ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection?.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
+        {displayedImageUrl && <RealityDissection imageUrl={displayedImageUrl} view={dissected && dissection ? "dissected" : "assembled"} parts={dissected && dissection && displayedImageUrl === dissection.imageUrl ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection?.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
         {sourceMismatch && <p className="reality-source-warning" role="alert">The displayed reference is different from the image used for this model. The geometry is NOT image-matched.</p>}
         {awaitingFaithfulMesh && <div className="reality-mesh-pending" role="status"><strong>AWAITING SOURCE-DERIVED 3D MODEL</strong><p>The approved left image is preserved. Hunyuan3D must reconstruct its geometry before CAD, Dissect and Blueprint can manipulate that same subject.</p><p>Model job: {pathway.model_status ?? "not started"}{pathway.model_error ? ` · ${pathway.model_error}` : ""}</p><small>No unrelated placeholder model is substituted for your design.</small></div>}
         {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">

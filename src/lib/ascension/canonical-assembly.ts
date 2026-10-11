@@ -2,6 +2,15 @@ import * as THREE from "three";
 import type { ObjectivePathway, ObjectiveModelPart } from "./result-model";
 import type { DesignPart } from "./parts-model";
 import { linearSpecFromText } from "./manifestation";
+import { specFidelity } from "./spec-fidelity";
+export { specFidelity };
+/** How the concept view may be presented: full semantic assembly or interpretive only. */
+export function assemblyStatus(objective: string, path: ObjectivePathway): "semantic" | "incomplete" | "interpretive" {
+  const f = specFidelity(path);
+  if (f.status === "complete") return "semantic";
+  if (pathwayKind(path, objective) !== "generic") return "semantic";
+  return f.status === "incomplete" ? "incomplete" : "interpretive";
+}
 
 type Vec3 = [number, number, number];
 function norm(v: Vec3): Vec3 { const d = Math.hypot(...v) || 1; return [v[0]/d,v[1]/d,v[2]/d]; }
@@ -195,10 +204,13 @@ export function canonicalAssembly(objective: string, path: ObjectivePathway): As
   const label = name ?? `${semantic} ${result.filter(p=>p.detail.name.startsWith(semantic)).length+1}`;
   result.push({vertices,position,rotation,scale,color,detail:detail(label,position)});
  };
- if (path.model_spec) {
+ const fidelity = specFidelity(path);
+ if (path.model_spec && fidelity.status === "complete") {
   for (const p of path.model_spec.parts) model(geometry[p.primitive],p.position,p.rotation,p.scale,palette[p.material],0,1,p.name);
   return result;
  }
+ // An incomplete saved spec is never presented as the finished subject: fall
+ // through to grounded category geometry or named interpretive points.
  const kind=pathwayKind(path,objective), spec=linearSpecFromText(objective,path.label,path.summary,path.spiral_form), k=1;
         if (kind === "turbofan") {
           model(

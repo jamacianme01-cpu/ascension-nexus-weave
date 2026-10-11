@@ -26,7 +26,7 @@ export function RealityDissection({imageUrl,parts,selected,onSelect,label}:{imag
  <div className="reality-image-transform" style={{transform:`translate(${transform.x}px,${transform.y}px) scale(${transform.zoom})`}}>
  <div className="reality-dissection-picture" style={{width:fit.width,height:fit.height,left:fit.x,top:fit.y}}>
  <img src={imageUrl} alt={`Separated concept illustration of ${label}`} draggable={false} onLoad={event=>setNatural({width:event.currentTarget.naturalWidth,height:event.currentTarget.naturalHeight})}/>
- {parts.map((part,index)=><Button variant="outline" className="reality-dissection-label" key={part.name+index} style={{left:`${part.x*100}%`,top:`${part.y*100}%`,transform:`translate(-50%,-100%) scale(${1/transform.zoom})`}} aria-label={`${part.name}: ${part.purpose}`} aria-controls="reality-part-detail" aria-pressed={selected===index} onClick={()=>onSelect(index)}>{part.name}</Button>)}
+ {parts.map((part,index)=><Button variant="outline" className="reality-dissection-label" key={part.name+index} style={{left:`${part.x*100}%`,top:`${part.y*100}%`,transform:`translate(-50%,-100%) scale(${1/transform.zoom})`}} aria-label={`${index+1}. ${part.name}: ${part.purpose}`} title={part.name} aria-controls="reality-part-detail" aria-pressed={selected===index} onClick={()=>onSelect(index)}><span aria-hidden="true">{index+1}</span></Button>)}
  {selected!==null && parts[selected] && <span className="reality-dissection-target" data-x={parts[selected].x} data-y={parts[selected].y} style={{left:`${parts[selected].x*100}%`,top:`${parts[selected].y*100}%`}} aria-hidden="true"/>}
  </div></div></div>
  <div className="reality-image-tools" role="group" aria-label="Illustration controls">

@@ -18,7 +18,10 @@ try {
   check('historical linear engine restores object-shaped coil winding and rail assembly',()=>{const assembly=canonicalAssembly('Draw a 48 V linear propulsion engine with 9 coils and 3 rails',engine); assert.ok(assembly.length>30); assert.ok(assembly.some(p=>p.detail.name.includes('Copper winding'))); assert.ok(assembly.some(p=>p.vertices.length>1000)); const g=buildCanonicalAssembly('Linear propulsion engine',engine); assert.ok(new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3()).x>2);});
   check('unknown linear wording does not falsely classify a physical engine',()=>{assert.equal(pathwayKind({...pathway,label:'Linear reasoning for a community'},'Explain logic'),'generic'); assert.equal(pathwayKind(pathway,'Explain electromagnetic induction'),'generic');});
   const model_spec={title:'Coil and moving magnet',description:'CONCEPT / UNVERIFIED coil experiment',hero_rotation:[0,0,0],hero_scale:1,parts:[{name:'Copper coil',primitive:'ring',position:[0,0,0],rotation:[0,Math.PI/2,0],scale:[.6,.6,.6],material:'copper'},{name:'Moving magnet',primitive:'cylinder',position:[.9,0,0],rotation:[0,0,0],scale:[.8,.18,.18],material:'blue'}]};
-  check('supplied semantic shapes take precedence over historical engine fallback',()=>{const specified={...engine,model_spec}; const a=canonicalAssembly('Engine',specified); assert.equal(a.length,2); assert.deepEqual(a.map(p=>p.detail.name),['Copper coil','Moving magnet']); assert.notEqual(a[0].vertices.length,a[1].vertices.length);});
+  const fid={...(await server.ssrLoadModule('/src/lib/ascension/spec-fidelity.ts')),assemblyStatus:(await server.ssrLoadModule('/src/lib/ascension/canonical-assembly.ts')).assemblyStatus};
+  const richSpec={...model_spec,parts:[...model_spec.parts,{name:'Coil housings',primitive:'box',position:[0,-.5,0],rotation:[0,0,0],scale:[.9,.1,.4],material:'steel'},{name:'Support rails',primitive:'box',position:[0,.5,0],rotation:[0,0,0],scale:[1.4,.05,.05],material:'blue'}]};
+  check('supplied semantic shapes with adequate coverage take precedence over historical fallback',()=>{const a=canonicalAssembly('Engine',{...engine,model_spec:richSpec}); assert.equal(a.length,4); assert.deepEqual(a.map(p=>p.detail.name),['Copper coil','Moving magnet','Coil housings','Support rails']);});
+  check('incomplete two-primitive spec is never shown as a finished subject',()=>{const {specFidelity,assemblyStatus}=fid; const drone={id:'d',label:'Hybrid Industrial Manipulator',summary:'Worker drone',steps:['Build a heavy-lift hexacopter frame','Mount a 3-DOF robot arm','Add swarm communications','Integrate flight controller'],tradeoffs:[],model_spec:{...model_spec,parts:[{name:'main_chassis',primitive:'box',position:[0,0,0],rotation:[0,0,0],scale:[.5,.2,.5],material:'steel'},{name:'arm_assembly',primitive:'cylinder',position:[.5,0,0],rotation:[0,0,0],scale:[.6,.1,.1],material:'gold'}]},model_url:null}; const f=specFidelity(drone); assert.equal(f.status,'incomplete'); assert.ok(f.missing.length>=2); assert.equal(assemblyStatus('make worker drones',drone),'incomplete'); const a=canonicalAssembly('make worker drones',drone); assert.ok(!a.some(p=>/main_chassis|arm_assembly/.test(p.detail.name))); assert.deepEqual(a.map(p=>p.detail.name),drone.steps); const good={...drone,model_spec:{...model_spec,parts:['Hexacopter frame','Rotor arm 1','Rotor arm 2','Robot arm (3-DOF)','Swarm communications antenna','Flight controller board'].map((name,i)=>({name,primitive:i%2?'cylinder':'box',position:[i*.2,0,0],rotation:[0,0,0],scale:[.2,.2,.2],material:'steel'}))}}; assert.equal(specFidelity(good).status,'complete'); assert.equal(canonicalAssembly('make worker drones',good).length,6);});
   const {parseDelivery}=await server.ssrLoadModule('/src/lib/ascension/result-model.ts');
   check('parser preserves validated pathway and blend specs and caps parts at 32',()=>{const raw={kind:'answer',title:'Experiment',body:'A moving magnet changes flux through a coil.',files:[],limitations:[],pathways:[{...pathway,model_spec:{...model_spec,parts:Array(40).fill(model_spec.parts[0])}}],blend:{...pathway,id:'blend',model_spec,blend_from:['coil'],blend_reason:'Combine supplied coil and magnet observations'}};const parsed=parseDelivery(raw);assert.equal(parsed.pathways[0].model_spec.parts.length,32);assert.equal(parsed.blend.model_spec.parts.length,2);const invalid=parseDelivery({...raw,pathways:[{...pathway,model_spec:{...model_spec,parts:[model_spec.parts[0]]}}]});assert.equal(invalid.pathways[0].model_spec,null);});
   check('approved immersive entry has no rejected top hologram; original geometry remains available',()=>{const scene=readFileSync('src/components/ascension/Envision3DScene.tsx','utf8');const engage=readFileSync('src/components/ascension/engage.tsx','utf8');assert.doesNotMatch(engage,/<Envision3DScene delivery=/);assert.match(engage,/<RealityViewer/);assert.match(engage,/onInspect={inspectPathwayReality}/);assert.doesNotMatch(scene,/if \(!modelViewActive\) return/);assert.match(scene,/assemblyCache.get/);assert.match(scene,/setVisualMode\(m\)/);assert.doesNotMatch(readFileSync('src/components/ascension/RealityViewer.tsx','utf8'),/buildConceptDiagram|concept-diagram/);});
@@ -37,18 +40,30 @@ try {
     assert.match(viewer, /dissected && dissection \? dissection\.parts : conceptual/);
   });
   check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
-    assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);\}\}/);
+    assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);/);
     assert.match(readFileSync('src/components/ascension/RealityDissection.tsx','utf8'), /reality-dissection-target/);
     assert.match(viewer, /MANIPULATE THIS PART IN 3D/);
     assert.match(viewer, /setEditorOpen\(true\)/);
     assert.match(viewer, /api\.current\?\.selectComponent\(matching\.id\)/);
     for (const detail of ['Purpose', 'How it works', 'Connections', 'Design limits']) assert.ok(viewer.includes(detail));
   });
-  check('Generated picture hides the original assembly without removing the preserved 3D editor', () => {
-    assert.match(viewer, /visibility:\(dissected && dissection\) \|\| \(simulate && interpretiveDemo\) \? "hidden" : "visible"/);
-    assert.match(viewer, /if \(conceptual && ready\) api\.current\?\.explode\(false\)/);
-    assert.match(viewer, /!dissected && <div className="reality-component-workbench"/);
-    assert.match(readFileSync('src/components/ascension/reality-viewer.css','utf8'), /\.reality-dissection-label\[aria-pressed="true"\]/);
+  check('sound OFF clears the atmosphere and ON rebuilds an audible midrange graph', () => {
+    const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8'); const engage=readFileSync('src/components/ascension/engage.tsx','utf8');
+    assert.match(audio,/atmosphereGraph\(ctx, true\)/); assert.match(audio,/\[220, 277\.18, 329\.63, 440\]/); assert.doesNotMatch(audio,/scheduleDim\(12_000\)/);
+    const toggle=engage.slice(engage.indexOf('const toggleSound'),engage.indexOf('const runQuery'));
+    assert.match(toggle,/atmosphere\.current = null;/); assert.match(toggle,/createRealityAtmosphere\(ctx\)/); assert.match(toggle,/setSoundBlocked\(ctx\.state !== "running"\)/);
+  });
+  check('DISSECTED keeps an editable 3D pane beside the picture and stays in dissected mode', () => {
+    assert.match(viewer, /visibility:simulate && interpretiveDemo && !dissected \? "hidden" : "visible"/);
+    assert.match(viewer, /data-split=\{dissected && dissection \? "true" : undefined\}/);
+    assert.doesNotMatch(viewer.slice(viewer.indexOf('const editIllustratedPart'), viewer.indexOf('const dive = useRef')), /setDissected\(false\)/);
+    assert.match(viewer, /<div className="reality-component-workbench">/);
+    assert.match(viewer, />ISOLATE</);
+    assert.match(viewer, /isolate\(id\)/);
+    const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');
+    assert.match(css, /data-split="true"\] \.reality-viewport \{ left:50%/);
+    assert.match(css, /data-sidebar="open"\] \{ padding-right:min\(380px,32vw\)/);
+    assert.match(css, /\.reality-dissection-label\[aria-pressed="true"\]/);
   });
 
   const {demonstrationPhases,demonstrationFrame,zoomImage,fitImage,groundedComponent}=await server.ssrLoadModule('/src/components/ascension/reality-demonstration.ts');

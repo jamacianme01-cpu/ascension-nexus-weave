@@ -731,3 +731,25 @@
  .reality-demo-actions { grid-template-columns:auto auto minmax(40px,1fr); }
  .reality-demo-actions output { grid-column:1/-1; }
 }
+
+/* Right sidebar inspector: reserves its own width on desktop, drawer on mobile. */
+@media (min-width: 761px) {
+  .reality-screen[open][data-sidebar="open"] { padding-right:min(380px,32vw); }
+  .reality-screen[data-sidebar="open"] .reality-parts { top:0; bottom:0; right:0; width:min(380px,32vw); max-height:none; border-radius:0; border-width:0 0 0 1px; box-shadow:none; }
+}
+@media (max-width: 760px) {
+  .reality-screen[data-sidebar="open"] .reality-parts { top:0; bottom:0; right:0; width:min(88vw,340px); max-height:none; border-radius:0; z-index:30; }
+}
+/* Tiny numbered markers only; names and details live in the sidebar. */
+.reality-picture-labels button,
+.reality-screen .reality-dissection-label { min-width:22px!important; width:22px!important; max-width:22px!important; min-height:22px!important; height:22px!important; padding:0!important; border-radius:50%!important; font-size:10px!important; line-height:1; display:grid; place-items:center; opacity:.85; box-shadow:none; }
+.reality-picture-labels button::after { display:none; }
+.reality-picture-labels button[aria-pressed="true"],.reality-screen .reality-dissection-label[aria-pressed="true"] { opacity:1; }
+/* DISSECTED keeps an editable 3D pane beside the reference picture. */
+.reality-model-stage[data-split="true"] .reality-dissection { right:50%; }
+.reality-model-stage[data-split="true"] .reality-viewport { left:50%; border-left:1px solid var(--border); }
+@media (max-width: 760px) {
+  .reality-model-stage[data-split="true"] .reality-dissection { right:0; bottom:45%; }
+  .reality-model-stage[data-split="true"] .reality-viewport { left:0; top:55%; border-left:0; border-top:1px solid var(--border); }
+}
+@media (max-width: 760px) { .reality-screen[data-sidebar="open"] .reality-footer { z-index:30; } }

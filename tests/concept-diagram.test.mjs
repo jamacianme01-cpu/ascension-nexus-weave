@@ -32,12 +32,13 @@ try {
   check('all approved views are visible in full-screen editor on mobile', () => { const css=readFileSync('src/components/ascension/reality-viewer.css','utf8'); assert.match(css,/\.reality-view-controls[\s\S]*repeat\(6, minmax\(0, 1fr\)\)/); assert.match(css,/\.reality-view-controls \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/); for (const control of ['CUTAWAY','BLUEPRINT','ENVIRONMENT','DISSECTED','PARTS']) assert.ok(viewer.includes(control)); assert.match(viewer,/setMode\("environment"\)/); });
   check('part labels are clickable on the model picture for concepts and real GLBs', () => { assert.match(viewer,/ready && !dissected && showParts/); assert.match(viewer,/aria-label="Labels on the model"/); assert.match(viewer,/api.current\?\.locatePart\(index\)/); });
   check('DISSECTED generates a distinct labeled illustration even before Hunyuan GLB exists', () => {
-    assert.match(viewer, /if \(!dissected \|\| !ready \|\| !api\.current \|\| dissection\) return/);
+    assert.match(viewer, /if \(!dissected \|\| sourceReference \|\| !ready \|\| !api\.current \|\| dissection\) return/);
     assert.doesNotMatch(viewer, /if \(!dissected[^\n]*conceptual\) return/);
     assert.match(viewer, /getDissectedDesign\(/);
-    assert.match(viewer, /dissected && dissection && <RealityDissection/);
+    assert.match(viewer, /dissected && !sourceReference && dissection && <RealityDissection/);
     assert.match(viewer, /imageUrl=\{dissection\.imageUrl\}/);
-    assert.match(viewer, /dissected && dissection \? dissection\.parts : conceptual/);
+    assert.match(viewer, /dissected && dissection && !sourceReference \? dissection\.parts : conceptual/);
+    assert.match(viewer, /sourceReference && <RealityDissection imageUrl=\{sourceReference\}/);
   });
   check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
     assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);/);
@@ -54,8 +55,9 @@ try {
     assert.match(toggle,/atmosphere\.current = null;/); assert.match(toggle,/createRealityAtmosphere\(ctx\)/); assert.match(toggle,/setSoundBlocked\(ctx\.state !== "running"\)/);
   });
   check('DISSECTED keeps an editable 3D pane beside the picture and stays in dissected mode', () => {
-    assert.match(viewer, /visibility:simulate && interpretiveDemo && !dissected \? "hidden" : "visible"/);
-    assert.match(viewer, /data-split=\{dissected && dissection \? "true" : undefined\}/);
+    assert.match(viewer, /<div ref=\{host\} className="reality-viewport"[^>]*aria-label="Editable 3D model/);
+    assert.match(viewer, /const splitReference = Boolean\(sourceReference \|\| \(dissected && dissection\)\)/);
+    assert.match(viewer, /data-split=\{splitReference \? "true" : undefined\}/);
     assert.doesNotMatch(viewer.slice(viewer.indexOf('const editIllustratedPart'), viewer.indexOf('const dive = useRef')), /setDissected\(false\)/);
     assert.match(viewer, /<div className="reality-component-workbench">/);
     assert.match(viewer, />ISOLATE</);
@@ -91,7 +93,7 @@ try {
     assert.match(css,/\.reality-operation-stage \{/);
     assert.match(css,/@media \(max-width:760px\) \{[\s\S]*\.reality-operation-stage/);
   });
-  check('nonphysical demonstrations show the actual pathway rather than unrelated 3D geometry',()=>{assert.match(viewer,/simulate && interpretiveDemo && !dissected/);assert.match(viewer,/CONCEPTUAL OPERATION/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
+  check('nonphysical demonstrations show the actual pathway rather than unrelated 3D geometry',()=>{assert.match(viewer,/reality-operation-stage\$\{interpretiveDemo \? "" : " reality-operation-stage--with-model"\}/);assert.match(viewer,/CONCEPTUAL OPERATION/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
   check('image navigation avoids lower inspector overlap and desktop inspector leaves image room',()=>{const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');assert.match(css,/\.reality-image-tools \{[^}]*top:8px; bottom:auto/);assert.match(css,/\.reality-screen:has\(\.reality-parts\) \.reality-dissection \{ right:414px/);});
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

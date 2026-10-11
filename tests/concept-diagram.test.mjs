@@ -37,7 +37,8 @@ try {
     assert.match(viewer, /getDissectedDesign\(/);
     assert.match(viewer, /dissected && !sourceReference && dissection && <RealityDissection/);
     assert.match(viewer, /imageUrl=\{dissection\.imageUrl\}/);
-    assert.match(viewer, /dissected && dissection && !sourceReference \? dissection\.parts : conceptual/);\n    assert.match(viewer, /sourceReference && <RealityDissection imageUrl=\{sourceReference\}/);
+    assert.match(viewer, /dissected && dissection && !sourceReference \? dissection\.parts : conceptual/);
+    assert.match(viewer, /sourceReference && <RealityDissection imageUrl=\{sourceReference\}/);
   });
   check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
     assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);/);

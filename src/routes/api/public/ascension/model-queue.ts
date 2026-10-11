@@ -96,14 +96,28 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
           return json({ error: "model_stale_claim_recovery_failed" }, 500);
         }
 
-        const { data: pending, error: readError } = await table
-          .select(
-            "id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at",
-          )
+        const columns =
+          "id, request_id, pathway_id, label, summary, visual_svg, source_image_url, created_at";
+        // A saved user-selected reference is the exact artwork promised in the
+        // viewer. Consume those jobs first instead of spending image credits on
+        // older jobs whose source still needs generation.
+        const { data: referenced, error: referenceReadError } = await table
+          .select(columns)
           .eq("status", "queued")
+          .not("source_image_url", "is", null)
           .order("created_at", { ascending: true })
           .limit(1);
-        if (readError) return json({ error: "model_queue_read_failed" }, 500);
+        if (referenceReadError) return json({ error: "model_queue_read_failed" }, 500);
+        let pending = referenced;
+        if (!pending?.length) {
+          const fallback = await table
+            .select(columns)
+            .eq("status", "queued")
+            .order("created_at", { ascending: true })
+            .limit(1);
+          if (fallback.error) return json({ error: "model_queue_read_failed" }, 500);
+          pending = fallback.data;
+        }
 
         const next = pending?.[0];
         if (!next) return json({ item: null });

@@ -1726,12 +1726,12 @@ export function RealityViewer({
       )}
       <header className="reality-header">
         <div className="reality-navigation">
-        <button className="reality-back" onClick={onClose}>
+        <Button variant="outline" className="reality-back" onClick={onClose}>
           ← BACK TO PATHWAYS
-        </button>
-        <button onClick={onNewObjective} disabled={newObjectiveDisabled}>
+        </Button>
+        <Button variant="outline" onClick={onNewObjective} disabled={newObjectiveDisabled}>
           NEW OBJECTIVE
-        </button>
+        </Button>
         <div className="reality-title">
           <span>{conceptual ? `CONCEPT / UNVERIFIED · ${pathway.model_spec || pathwayKind(pathway, objective) !== "generic" ? "SEMANTIC ASSEMBLY" : "INTERPRETIVE DIAGRAM · PHYSICAL GEOMETRY UNAVAILABLE"}` : "HUNYUAN3D MESH / UNVERIFIED"}</span>
           {conceptual && <p className="reality-pathway-label">{pathway.model_error ? `GLB: ${pathway.model_error}` : pathway.model_status ? `GLB creation: ${pathway.model_status}` : "Physical model unavailable · Concept available now"}</p>}
@@ -1741,24 +1741,24 @@ export function RealityViewer({
         </div>
         </div>
         <div className="reality-view-controls" role="group" aria-label="Drawing views and parts">
-        <button disabled={!ready} aria-pressed={!dissected && mode==="cutaway"} onClick={()=>{setDissected(false);setMode("cutaway");}}>
+        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cutaway"} onClick={()=>{setDissected(false);setMode("cutaway");}}>
           CUTAWAY
-        </button>
-        <button disabled={!ready} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
+        </Button>
+        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
           BLUEPRINT
-        </button>
-        <button disabled={!ready} aria-pressed={!dissected && mode==="environment"} onClick={()=>{setDissected(false);setMode("environment");}}>
+        </Button>
+        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="environment"} onClick={()=>{setDissected(false);setMode("environment");}}>
           ENVIRONMENT
-        </button>
-        <button disabled={!ready} aria-pressed={dissected} onClick={() => {setDissected(value=>!value);setPartIndex(null);}}>
+        </Button>
+        <Button variant="outline" disabled={!ready} aria-pressed={dissected} onClick={() => {setDissected(value=>!value);setPartIndex(null);}}>
           {dissected ? "ASSEMBLED" : "DISSECTED"}
-        </button>
-        <button className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
+        </Button>
+        <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
           PARTS
-        </button>
-        <button className="reality-sound" aria-pressed={soundEnabled} onClick={()=>{onToggleSound();if(!soundEnabled)window.setTimeout(()=>realityFeedback(),100);}}>
+        </Button>
+        <Button variant="outline" className="reality-sound" aria-pressed={soundEnabled} onClick={()=>{onToggleSound();if(!soundEnabled)window.setTimeout(()=>realityFeedback(),100);}}>
           {soundEnabled ? "SOUND ON" : "SOUND OFF"}
-        </button>
+        </Button>
         </div>
         <div className="reality-extra-controls">
           <Button variant="outline" aria-pressed={simulate} onClick={()=>{setSimulate(value=>!value);setPlaying(false);}}>SIMULATE</Button>
@@ -1779,10 +1779,10 @@ export function RealityViewer({
         </section>}
         {dissected && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
-          {dissectionError && <button onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</button>}
+          {dissectionError && <Button variant="outline" onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</Button>}
         </div>}
         {ready && !dissected && showParts && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
-          {activeParts.map((part, index) => <button key={part.name + index} title={part.name} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);api.current?.locatePart(index);}}><span>{part.name}</span></button>)}
+          {activeParts.map((part, index) => <Button variant="outline" key={part.name + index} title={part.name} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);api.current?.locatePart(index);}}><span>{part.name}</span></Button>)}
         </div>}
       </div>
       {!ready && (
@@ -1799,21 +1799,21 @@ export function RealityViewer({
                 : "Loading your model…")}
           </p>
           {error && (
-            <button onClick={() => setAttempt((value) => value + 1)}>
+            <Button variant="outline" onClick={() => setAttempt((value) => value + 1)}>
               RETRY LOAD
-            </button>
+            </Button>
           )}
         </div>
       )}
       {ready && (!dissected || !dissection) && (
       <aside className="reality-tools" aria-label="Model controls">
-        <button disabled={!ready} aria-label="Zoom in" onClick={() => api.current?.zoom(1.3)}>
+        <Button variant="outline" disabled={!ready} aria-label="Zoom in" onClick={() => api.current?.zoom(1.3)}>
           ＋
-        </button>
-        <button disabled={!ready} aria-label="Zoom out" onClick={() => api.current?.zoom(1 / 1.3)}>
+        </Button>
+        <Button variant="outline" disabled={!ready} aria-label="Zoom out" onClick={() => api.current?.zoom(1 / 1.3)}>
           −
-        </button>
-        <button
+        </Button>
+        <Button variant="outline"
           disabled={!ready}
           onClick={() => {
             setExploring(false);
@@ -1822,32 +1822,33 @@ export function RealityViewer({
           }}
         >
           FIT MODEL
-        </button>
-        <button disabled={!ready} onClick={() => api.current?.reset()}>
+        </Button>
+        <Button variant="outline" disabled={!ready} onClick={() => api.current?.reset()}>
           RESET REALITY
-        </button>
+        </Button>
       </aside>
       )}
       {(ready || showParts || dissected) && (
       <footer className="reality-footer">
-        {(showParts || dissected) && (
+        {showParts && (
           <section id="reality-parts" className="reality-parts" aria-label="Design parts">
+            <Button variant="outline" className="reality-inspector-close" aria-label="Close part inspector" onClick={()=>setShowParts(false)}>✕</Button>
             {!dissected && <div className="reality-component-workbench">
               {!partsLoading && !partsError && <div className="reality-named-parts" aria-label="Named parts and functions">
-                {activeParts.map((part,index)=><button key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);api.current?.locatePart(index);}}><strong>{part.name}</strong><span>{part.purpose}</span></button>)}
+                {activeParts.map((part,index)=><Button variant="outline" key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);api.current?.locatePart(index);}}><strong>{part.name}</strong><span>{part.purpose}</span></Button>)}
               </div>}
               <details className="reality-geometry-details" open={editorOpen} onToggle={event=>setEditorOpen(event.currentTarget.open)}><summary>Editable model components</summary>
               <div className="reality-component-list" aria-label="Editable components">
-                {components.map(component=><button key={component.id} aria-pressed={componentId===component.id} onClick={()=>{setPartIndex(null);api.current?.selectComponent(component.id);}}>{component.name}</button>)}
+                {components.map(component=><Button variant="outline" key={component.id} aria-pressed={componentId===component.id} onClick={()=>{setPartIndex(null);api.current?.selectComponent(component.id);}}>{component.name}</Button>)}
               </div>
               <div className="reality-component-actions">
-                {(["translate","rotate","scale"] as const).map(action=><button key={action} disabled={!componentId} aria-pressed={transformMode===action} onClick={()=>api.current?.transform(action)}>{action==="translate"?"MOVE":action.toUpperCase()}</button>)}
+                {(["translate","rotate","scale"] as const).map(action=><Button variant="outline" key={action} disabled={!componentId} aria-pressed={transformMode===action} onClick={()=>api.current?.transform(action)}>{action==="translate"?"MOVE":action.toUpperCase()}</Button>)}
                 <select aria-label="Target component B" value={targetId} onChange={event=>setTargetId(event.target.value)}><option value="">Choose component B</option>{components.filter(component=>component.id!==componentId).map(component=><option key={component.id} value={component.id}>{component.name}</option>)}</select>
-                {[false,true].map(blend=><button key={String(blend)} disabled={!componentId||!targetId} onClick={()=>{try{setWorkbenchError(null);if (componentId) api.current?.combine(componentId,targetId,blend);}catch(cause){setWorkbenchError(cause instanceof Error?cause.message:"Assembly change failed.");}}}>{blend?"BLEND ASSEMBLY":"ADD A TO B"}</button>)}
+                {[false,true].map(blend=><Button variant="outline" key={String(blend)} disabled={!componentId||!targetId} onClick={()=>{try{setWorkbenchError(null);if (componentId) api.current?.combine(componentId,targetId,blend);}catch(cause){setWorkbenchError(cause instanceof Error?cause.message:"Assembly change failed.");}}}>{blend?"BLEND ASSEMBLY":"ADD A TO B"}</Button>)}
                 <select aria-label="New component shape" value={addKind} onChange={event=>setAddKind(event.target.value as CatalogKind)}>{(["box","sphere","cylinder","panel","beam","coil","motor","battery"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}</select>
-                <button onClick={()=>api.current?.add(addKind)}>ADD COMPONENT</button>
-                <button disabled={!undoCount} onClick={()=>api.current?.undo()}>UNDO</button>
-                <button onClick={()=>{void api.current?.exportAssembly().catch(cause=>setWorkbenchError(String(cause)));}}>SAVE GLB</button>
+                <Button variant="outline" onClick={()=>api.current?.add(addKind)}>ADD COMPONENT</Button>
+                <Button variant="outline" disabled={!undoCount} onClick={()=>api.current?.undo()}>UNDO</Button>
+                <Button variant="outline" onClick={()=>{void api.current?.exportAssembly().catch(cause=>setWorkbenchError(String(cause)));}}>SAVE GLB</Button>
               </div>
               </details>
               <p className="reality-parts-hint">Select a component to highlight it. Drag its handles to edit. Blend combines components into an editable assembly.</p>
@@ -1857,10 +1858,10 @@ export function RealityViewer({
             <p className="reality-parts-hint">Select a component to explore how it works.</p>
             {dissected && <p className="reality-parts-hint">Exploded concept illustration · Internal construction is illustrative.</p>}
             {!dissected && partsLoading && <p role="status">Loading part labels…</p>}
-            {!dissected && partsError && <div role="alert"><p>{partsError}</p><button onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</button></div>}
+            {!dissected && partsError && <div role="alert"><p>{partsError}</p><Button variant="outline" onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</Button></div>}
             {selectedPart && (dissected || (!partsLoading && !partsError)) && <article id="reality-part-detail" className="reality-part-detail" aria-live="polite">
               <h2>{selectedPart.name}</h2>
-              {dissected && dissection && <button className="reality-edit-illustrated-part" onClick={editIllustratedPart}>MANIPULATE THIS PART IN 3D</button>}
+              {dissected && dissection && <Button variant="outline" className="reality-edit-illustrated-part" onClick={editIllustratedPart}>MANIPULATE THIS PART IN 3D</Button>}
               <label className="reality-blend-choice">
                 <input type="checkbox" checked={isPartSelected(selectedPart)} onChange={() => onTogglePart(selectedPart)} />
                 Use {selectedPart.name} in a new blend
@@ -1882,11 +1883,11 @@ export function RealityViewer({
             </article>}
           </section>
         )}
-        {ready && !dissected && mode==="blueprint" && <div className="reality-mode-controls" aria-label="Blueprint camera views">{(["top","front","side","perspective"] as const).map(view=><button key={view} onClick={()=>api.current?.view(view)}>{view==="perspective"?"3D":view.toUpperCase()}</button>)}</div>}
+        {ready && !dissected && mode==="blueprint" && <div className="reality-mode-controls" aria-label="Blueprint camera views">{(["top","front","side","perspective"] as const).map(view=><Button variant="outline" key={view} onClick={()=>api.current?.view(view)}>{view==="perspective"?"3D":view.toUpperCase()}</Button>)}</div>}
         {ready && !dissected && <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>}
         <div className="reality-revision-actions" aria-label="Work from this result">
-          <button disabled={newObjectiveDisabled} onClick={onBuildOn}>BUILD ON RESULT</button>
-          <button disabled={newObjectiveDisabled} onClick={onNewAnswers}>NEW ANSWERS</button>
+          <Button variant="outline" disabled={newObjectiveDisabled} onClick={onBuildOn}>BUILD ON RESULT</Button>
+          <Button variant="outline" disabled={newObjectiveDisabled} onClick={onNewAnswers}>NEW ANSWERS</Button>
         </div>
         {blendControls}
       </footer>

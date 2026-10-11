@@ -37,7 +37,7 @@ export const getDesignParts = createServerFn({ method: 'POST' })
 const dissectedCache = new Map<string, Promise<{ imageUrl: string; parts: DesignPart[] }>>();
 export const getDissectedDesign = createServerFn({ method: 'POST' })
   .inputValidator((input: { objective: string; label: string; summary: string; image: string; steps?: string[]; components?: string[]; faithful?: boolean; view?: "assembled" | "dissected"; referenceImageUrl?: string; requestId?: string; pathwayId?: string }) => {
-    if (!input || typeof input.image !== 'string' || input.image.length > 2500000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(input.image)) throw new Error('A model picture is required.');
+    if (!input || (input.view !== "assembled" && (typeof input.image !== 'string' || input.image.length > 2500000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(input.image)))) throw new Error('A model picture is required for dissected view.');
     if (![input.objective,input.label,input.summary].every(value=>typeof value==='string')) throw new Error('A selected design is required.');
     const list=(value:unknown,count:number,size:number)=>Array.isArray(value)?value.filter((item):item is string=>typeof item==='string').slice(0,count).map(item=>item.slice(0,size)):[];
     return {objective:input.objective.slice(0,3000),label:input.label.slice(0,200),summary:input.summary.slice(0,6000),image:input.image,steps:list(input.steps,20,1000),components:list(input.components,32,120),faithful:input.faithful===true,view:input.view==="assembled"?"assembled" as const:"dissected" as const,referenceImageUrl:typeof input.referenceImageUrl==="string"?input.referenceImageUrl.slice(0,4000):null,requestId:typeof input.requestId==="string"&&/^[a-f0-9-]{36}$/i.test(input.requestId)?input.requestId:null,pathwayId:typeof input.pathwayId==="string"?input.pathwayId.slice(0,200):null};
@@ -52,6 +52,16 @@ export const getDissectedDesign = createServerFn({ method: 'POST' })
       const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(key));
       const hash=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
       if(data.view==='assembled') {
+        // Stable, persisted source: reopening a pathway must not charge for or
+        // generate another image when the exact one has already been saved.
+        const {supabaseAdmin}=await import('@/integrations/supabase/client.server');
+        const stored=await supabaseAdmin.storage.from('ascension-models').list('assembled',{
+          search:`${hash}.png`,limit:10
+        });
+        if(stored.error)throw new Error(`Unable to check saved assembled artwork: ${stored.error.message}`);
+        if((stored.data??[]).some(item=>item.name===`${hash}.png`)) {
+          return {imageUrl:supabaseAdmin.storage.from('ascension-models').getPublicUrl(`assembled/${hash}.png`).data.publicUrl,parts:[] as DesignPart[]};
+        }
         const prompt=[
           conceptImagePrompt(data.objective,{label:data.label,summary:data.summary}),
           'Show the COMPLETE FULLY ASSEMBLED invention in one clear three-quarter view, not a disassembly or a collection of parts.',

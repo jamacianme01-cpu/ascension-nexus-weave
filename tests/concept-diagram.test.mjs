@@ -81,7 +81,17 @@ try {
   check('demonstration exposes playback scrub and causal mesh cues without mutating transforms',()=>{for(const marker of ['CONCEPTUAL DEMONSTRATION · UNVERIFIED','Operational animation unavailable','Demonstration timeline','REPLAY','demoCue.position','demoMaterials.clear()'])assert.ok(viewer.includes(marker));});
   check('sound remains sustained and bounded with feedback and volume control',()=>{const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8');assert.doesNotMatch(audio,/graph.scheduleDim\(12_000\)/);assert.match(audio,/setRealityVolume/);assert.match(audio,/tone.onended/);assert.match(viewer,/Ambient volume/);});
   check('muted feedback cannot resume context or bypass zero volume',()=>{const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8');assert.match(audio,/ctx.state !== 'running'/);assert.match(audio,/realityVolume === 0/);assert.doesNotMatch(audio,/ctx.resume\(/);assert.match(audio,/realityContext = null/);});
-  check('nonphysical demonstrations show actual pathway storyboard instead of unrelated physical geometry',()=>{assert.match(viewer,/simulate && interpretiveDemo && !dissected/);assert.match(viewer,/Animated pathway storyboard/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
+  check('SIMULATE click starts playback immediately and the central objective animation is visible',()=>{
+    assert.match(viewer,/const start=!simulate;setSimulate\(start\);setPlaying\(start\);setSeconds\(0\)/);
+    assert.match(viewer,/if\(start\)\{setDissected\(false\);setShowParts\(false\);\}/);
+    assert.match(viewer,/simulate && !dissected && phases.length > 0 && <div className=/);
+    assert.match(viewer,/Animated objective operation/);
+    assert.match(viewer,/reality-operation-pulse/);
+    const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');
+    assert.match(css,/\.reality-operation-stage \{/);
+    assert.match(css,/@media \(max-width:760px\) \{[\s\S]*\.reality-operation-stage/);
+  });
+  check('nonphysical demonstrations show the actual pathway rather than unrelated 3D geometry',()=>{assert.match(viewer,/simulate && interpretiveDemo && !dissected/);assert.match(viewer,/CONCEPTUAL OPERATION/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
   check('image navigation avoids lower inspector overlap and desktop inspector leaves image room',()=>{const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');assert.match(css,/\.reality-image-tools \{[^}]*top:8px; bottom:auto/);assert.match(css,/\.reality-screen:has\(\.reality-parts\) \.reality-dissection \{ right:414px/);});
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

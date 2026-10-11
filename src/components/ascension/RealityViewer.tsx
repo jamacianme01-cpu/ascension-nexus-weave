@@ -141,8 +141,8 @@ export function RealityViewer({
   const [explosionError, setExplosionError] = useState<string | null>(null);
   const [displayExtents, setDisplayExtents] = useState<{x:number;y:number;z:number}|null>(null);
   const sourceReference = pathway.generated_image_url;
-  const splitReference = Boolean(sourceReference || (dissected && dissection));
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
+  const splitReference = Boolean(sourceReference || (dissected && dissection));
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
   const [dissectionAttempt, setDissectionAttempt] = useState(0);

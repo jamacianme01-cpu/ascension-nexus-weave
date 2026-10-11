@@ -1180,7 +1180,7 @@ export function RealityViewer({
       floor.visible = next === "environment";
       floor.receiveShadow = next === "environment";
       roomEnvironment.visible = next === "environment" && !conceptual;
-      grid.visible = next === "blueprint";
+      grid.visible = next === "blueprint" || next === "cad";
       lines.visible = false;
       displayEdges.forEach(edge=>{edge.visible=true;edge.material=next==="blueprint"?edgeMaterial:solidEdgeMaterial;});
       transform.getHelper().visible = next !== "environment" || selected !== null;

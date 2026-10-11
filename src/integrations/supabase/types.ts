@@ -318,6 +318,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -363,6 +387,13 @@ export type Database = {
         Args: { p_guest_key: string; p_request_id: string }
         Returns: Json
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       submit_guest_objective: {
         Args: {
           p_constraints: Json
@@ -374,7 +405,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "owner" | "publication_reader"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -501,6 +532,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["owner", "publication_reader"],
+    },
   },
 } as const

@@ -1241,6 +1241,7 @@ export function Engage() {
           pathway={realityPathway}
           objective={run?.objective ?? objective}
           requestId={run?.id ?? null}
+          guestToken={access === "guest" ? guestToken : null}
           initialMode={reality.mode}
           soundEnabled={soundEnabled}
           onToggleSound={toggleSound}

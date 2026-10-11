@@ -148,37 +148,67 @@ export function RealityViewer({
   useEffect(() => { if (!ready) return; try { api.current?.explode(false); } catch { /* no model yet */ } setExploded(false); }, [ready]);
   const [displayExtents, setDisplayExtents] = useState<{x:number;y:number;z:number}|null>(null);
   const sourceReference = pathway.generated_image_url;
+  const [assembledImage, setAssembledImage] = useState<string | null>(null);
+  const [assembledLoading, setAssembledLoading] = useState(false);
+  const [assembledError, setAssembledError] = useState<string | null>(null);
+  const [assembledAttempt, setAssembledAttempt] = useState(0);
   const [dissection, setDissection] = useState<{imageUrl: string; parts: DesignPart[]} | null>(null);
-  const referenceImageUrl = dissection?.imageUrl ?? sourceReference;
-  const splitReference = Boolean(referenceImageUrl);
+  // One complete picture is the canonical source of Hunyuan geometry.
+  // Dissection is a separate, optional illustration and is never bound as its input.
+  const referenceImageUrl = sourceReference ?? assembledImage;
+  const displayedImageUrl = dissected && dissection ? dissection.imageUrl : referenceImageUrl;
+  const splitReference = Boolean(displayedImageUrl);
   const awaitingFaithfulMesh = Boolean(conceptual && (referenceImageUrl || ["queued","claimed","running"].includes(pathway.model_status ?? "")));
-  const sourceMismatch = Boolean(dissection?.imageUrl && sourceReference && dissection.imageUrl !== sourceReference);
+  const imageOnly = Boolean(awaitingFaithfulMesh && displayedImageUrl);
+  const sourceMismatch = Boolean(assembledImage && sourceReference && assembledImage !== sourceReference);
   const [dissectionLoading, setDissectionLoading] = useState(false);
   const [dissectionError, setDissectionError] = useState<string | null>(null);
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
-  useEffect(() => { setDissection(null); setDissected(false); setDissectionError(null); }, [pathway.id]);
   useEffect(() => {
-    // DISSECTED creates a separate produced illustration for both provisional
-    // assemblies and completed Hunyuan meshes, only when requested.
-    if (!dissected || sourceReference || !ready || !api.current || dissection) return;
+    setAssembledImage(null);setAssembledError(null);setAssembledLoading(false);
+    setDissection(null);setDissected(false);setDissectionError(null);
+  }, [pathway.id]);
+  useEffect(() => {
+    // Open the objective with the complete assembled object, not the exploded
+    // alternate. The generation result is also the model worker's source.
+    if (!ready || !requestId || !api.current || sourceReference || assembledImage) return;
+    let active = true;
+    setAssembledLoading(true);setAssembledError(null);
+    getDissectedDesign({data:{
+      view:"assembled",requestId,pathwayId:pathway.id,
+      objective,label:pathway.label,summary:pathway.summary,
+      image:api.current.picture(),steps:pathway.steps
+    }})
+      .then(result => {
+        if(!active)return;
+        setAssembledImage(result.imageUrl);
+        void (guestToken
+          ? bindGuestViewerReference({data:{requestId,guestToken,pathwayId:pathway.id,imageUrl:result.imageUrl}})
+          : bindViewerReference({data:{requestId,pathwayId:pathway.id,imageUrl:result.imageUrl}}))
+          .then(link=>{if(active && !link.linked)setAssembledError(`3D source not linked: ${link.reason ?? link.status}`);})
+          .catch(cause=>{if(active)setAssembledError(`3D reference link failed: ${cause instanceof Error?cause.message:String(cause)}`);});
+      })
+      .catch(cause=>{if(active)setAssembledError(cause instanceof Error?cause.message:String(cause));})
+      .finally(()=>{if(active)setAssembledLoading(false);});
+    return()=>{active=false;};
+  },[ready,requestId,guestToken,sourceReference,assembledImage,assembledAttempt,pathway.id,pathway.label,pathway.summary,objective]);
+
+  useEffect(() => {
+    // DISSECTED is optional: a separate exploded illustration, NEVER the
+    // main image-to-3D reference for the assembled invention.
+    if (!dissected || !ready || !api.current || dissection) return;
     let active = true;
     setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
-    getDissectedDesign({data:{objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual}})
+    getDissectedDesign({data:{view:"dissected",requestId:requestId ?? undefined,pathwayId:pathway.id,referenceImageUrl:referenceImageUrl ?? undefined,objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual}})
       .then(result => {
         if (!active) return;
         setDissection(result);
-        // Persist the image seen on the LEFT as the source of this EXACT pathway's
-        // queued Hunyuan job. The real source URL is returned on subsequent delivery reads.
-        if (requestId) void (guestToken
-          ? bindGuestViewerReference({data:{requestId,guestToken,pathwayId:pathway.id,imageUrl:result.imageUrl}})
-          : bindViewerReference({data:{requestId,pathwayId:pathway.id,imageUrl:result.imageUrl}}))
-          .then(link=>{if(active && !link.linked)setWorkbenchError(`3D source not linked: ${link.reason ?? link.status}`);})
-          .catch(cause=>{if(active)setWorkbenchError(`3D reference link failed: ${cause instanceof Error ? cause.message : String(cause)}`);});
+        // Never replace the queued worker source with an exploded view.
       })
       .catch(cause => { if(active) setDissectionError(cause instanceof Error ? cause.message : "Dissected view could not be generated."); })
       .finally(()=>{if(active)setDissectionLoading(false);});
     return ()=>{active=false;};
-  }, [dissected, sourceReference, requestId, guestToken, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
+  }, [dissected, referenceImageUrl, requestId, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(false);
   useEffect(() => { if (window.matchMedia('(min-width: 761px)').matches) setShowParts(true); }, []);
   const [editorOpen, setEditorOpen] = useState(false);

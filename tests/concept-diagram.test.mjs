@@ -31,14 +31,14 @@ try {
   check('model arrival protects edited assemblies', () => { assert.match(viewer,/if \(!edited.current && pathway.model_url\)/); assert.match(viewer,/REPLACE EDITED CONCEPT WITH HUNYUAN MODEL/); });
   check('all approved views are visible in full-screen editor on mobile', () => { const css=readFileSync('src/components/ascension/reality-viewer.css','utf8'); assert.match(css,/\.reality-view-controls[\s\S]*repeat\(6, minmax\(0, 1fr\)\)/); assert.match(css,/\.reality-view-controls \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/); for (const control of ['CUTAWAY','BLUEPRINT','ENVIRONMENT','DISSECTED','PARTS']) assert.ok(viewer.includes(control)); assert.match(viewer,/setMode\("environment"\)/); });
   check('part labels are clickable on the model picture for concepts and real GLBs', () => { assert.match(viewer,/ready && !dissected && showParts/); assert.match(viewer,/aria-label="Labels on the model"/); assert.match(viewer,/api.current\?\.locatePart\(index\)/); });
-  check('DISSECTED generates a distinct labeled illustration even before Hunyuan GLB exists', () => {
+  check('DISSECTED preserves its generated illustration as the saved pathway reference', () => {
     assert.match(viewer, /if \(!dissected \|\| sourceReference \|\| !ready \|\| !api\.current \|\| dissection\) return/);
     assert.doesNotMatch(viewer, /if \(!dissected[^\n]*conceptual\) return/);
     assert.match(viewer, /getDissectedDesign\(/);
-    assert.match(viewer, /!sourceReference && dissection && <RealityDissection/);
+    assert.match(viewer, /referenceImageUrl && <RealityDissection/);
     assert.match(viewer, /imageUrl=\{dissection\.imageUrl\}/);
-    assert.match(viewer, /dissected && dissection && !sourceReference \? dissection\.parts : conceptual/);
-    assert.match(viewer, /sourceReference && <RealityDissection imageUrl=\{sourceReference\}/);
+    assert.match(viewer, /dissected && dissection \? dissection\.parts : conceptual/);
+    assert.match(viewer, /imageUrl=\{referenceImageUrl\}/);
   });
   check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
     assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);/);
@@ -56,8 +56,12 @@ try {
   });
   check('Reference image persists beside CAD and Blueprint while 3D editing remains available', () => {
     assert.match(viewer, /<div ref=\{host\} className="reality-viewport"[^>]*aria-label="Editable 3D model/);
-    assert.match(viewer, /const splitReference = Boolean\(sourceReference \|\| dissection\)/);
+    assert.match(viewer, /const referenceImageUrl = dissection\?\.imageUrl \?\? sourceReference/);
+    assert.match(viewer, /const splitReference = Boolean\(referenceImageUrl\)/);
+    assert.match(viewer, /const awaitingFaithfulMesh = Boolean\(referenceImageUrl && conceptual\)/);
     assert.match(viewer, /data-split=\{splitReference \? "true" : undefined\}/);
+    assert.match(viewer, /visibility:awaitingFaithfulMesh \? "hidden" : "visible"/);
+    assert.match(viewer, /AWAITING MATCHED 3D MODEL/);
     assert.doesNotMatch(viewer.slice(viewer.indexOf('const editIllustratedPart'), viewer.indexOf('const dive = useRef')), /setDissected\(false\)/);
     assert.match(viewer, /<div className="reality-component-workbench">/);
     assert.match(viewer, />ISOLATE</);

@@ -163,7 +163,7 @@ export function RealityViewer({
     if (!dissected || sourceReference || !ready || !api.current || dissection) return;
     let active = true;
     setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
-    getDissectedDesign({data:{objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual || specFidelity(pathway).status==='complete' || assemblyStatus(objective,pathway)==='semantic'}})
+    getDissectedDesign({data:{objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual}})
       .then(result => {
         if (!active) return;
         setDissection(result);

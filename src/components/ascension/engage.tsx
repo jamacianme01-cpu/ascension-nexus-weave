@@ -746,11 +746,20 @@ export function Engage() {
     setSoundEnabled(next);
     save(SOUND_PREF, next ? "on" : "off");
     if (next) {
+      // Resume from the direct user gesture, then rebuild the soundscape.
+      // Never reuse a stopped or disconnected atmosphere after toggling OFF.
       const ctx = audioContextFor(audioContextRef);
-      if (ctx) void ctx.resume().catch(() => {});
-      if (ctx && reality && !atmosphere.current) atmosphere.current = createRealityAtmosphere(ctx);
-    } else if (audioContextRef.current?.state === "running") {
-      void audioContextRef.current.suspend();
+      if (ctx) void ctx.resume().then(() => {
+        if (ctx.state === "running" && reality && !atmosphere.current) {
+          atmosphere.current = createRealityAtmosphere(ctx);
+          playSpatialSwell(ctx, 0.4);
+        }
+      }).catch(() => {});
+    } else {
+      atmosphere.current?.stop();
+      atmosphere.current = null;
+      if (audioContextRef.current?.state === "running")
+        void audioContextRef.current.suspend();
     }
   };
 

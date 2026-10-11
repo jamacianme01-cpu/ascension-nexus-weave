@@ -876,3 +876,6 @@
  .reality-mesh-pending strong {font-size:15px;}
  .reality-mesh-pending p {font-size:12px;}
 }
+
+.reality-source-warning {position:absolute;z-index:8;top:8px;left:calc(50% + 12px);right:12px;background:var(--void);border:1px solid var(--destructive);padding:10px;font-size:12px;}
+@media(max-width:760px){.reality-source-warning{top:calc(55% + 8px);left:8px;right:8px;}}

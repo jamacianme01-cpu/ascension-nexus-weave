@@ -98,6 +98,14 @@ try {
   result = parseDelivery(await attachCompletedModels("request", delivery));
   assert.equal(result.pathways[0].model_url, rows[0].model_url);
   console.log("PASS only completed jobs attach their model URL");
+  // The reference image shown in the viewer MUST be exactly the image URL
+  // attached to this job. A separately generated picture has no such provenance.
+  rows[0].source_image_url = "https://example.invalid/pathway-source.png";
+  result = parseDelivery(await attachCompletedModels("request", delivery));
+  assert.equal(result.pathways[0].generated_image_url, rows[0].source_image_url);
+  assert.equal(result.pathways[0].model_url, rows[0].model_url);
+  console.log("PASS one source-image URL is shared by the viewer and completed GLB");
+
 } finally {
   delete globalThis.__modelJobTestDatabase;
   await server.close();

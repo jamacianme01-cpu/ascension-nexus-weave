@@ -177,7 +177,7 @@ export function RealityViewer({
     getDissectedDesign({data:{
       view:"assembled",requestId,pathwayId:pathway.id,
       objective,label:pathway.label,summary:pathway.summary,
-      image:api.current.picture(),steps:pathway.steps
+      image:"",steps:pathway.steps
     }})
       .then(async result => {
         if(!active)return;

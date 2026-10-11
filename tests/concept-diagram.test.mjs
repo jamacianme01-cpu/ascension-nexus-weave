@@ -31,14 +31,19 @@ try {
   check('model arrival protects edited assemblies', () => { assert.match(viewer,/if \(!edited.current && pathway.model_url\)/); assert.match(viewer,/REPLACE EDITED CONCEPT WITH HUNYUAN MODEL/); });
   check('all approved views are visible in full-screen editor on mobile', () => { const css=readFileSync('src/components/ascension/reality-viewer.css','utf8'); assert.match(css,/\.reality-view-controls[\s\S]*repeat\(6, minmax\(0, 1fr\)\)/); assert.match(css,/\.reality-view-controls \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/); for (const control of ['CUTAWAY','BLUEPRINT','ENVIRONMENT','DISSECTED','PARTS']) assert.ok(viewer.includes(control)); assert.match(viewer,/setMode\("environment"\)/); });
   check('part labels are clickable on the model picture for concepts and real GLBs', () => { assert.match(viewer,/ready && !dissected && showParts/); assert.match(viewer,/aria-label="Labels on the model"/); assert.match(viewer,/api.current\?\.locatePart\(index\)/); });
-  check('DISSECTED preserves its generated illustration as the saved pathway reference', () => {
-    assert.match(viewer, /if \(!dissected \|\| sourceReference \|\| !ready \|\| !api\.current \|\| dissection\) return/);
-    assert.doesNotMatch(viewer, /if \(!dissected[^\n]*conceptual\) return/);
-    assert.match(viewer, /getDissectedDesign\(/);
-    assert.match(viewer, /referenceImageUrl && <RealityDissection/);
-    assert.match(viewer, /imageUrl=\{dissection\.imageUrl\}/);
-    assert.match(viewer, /dissected && dissection \? dissection\.parts : conceptual/);
-    assert.match(viewer, /imageUrl=\{referenceImageUrl\}/);
+  check('ASSEMBLED automatically generates the primary picture, DISSECTED remains optional', () => {
+    assert.match(viewer, /view:"assembled",requestId,pathwayId:pathway\.id/);
+    assert.match(viewer, /if \(!dissected \|\| !ready \|\| !api\.current \|\| dissection\) return/);
+    assert.match(viewer, /view:"dissected",requestId:requestId \?\? undefined/);
+    assert.match(viewer, /const referenceImageUrl = sourceReference \?\? assembledImage/);
+    assert.match(viewer, /const displayedImageUrl = dissected && dissection \? dissection\.imageUrl : referenceImageUrl/);
+    assert.match(viewer, /displayedImageUrl && <RealityDissection imageUrl=\{displayedImageUrl\}/);
+    const extras = viewer.slice(viewer.indexOf('view:"dissected"'),viewer.indexOf('const [showParts,'));
+    assert.doesNotMatch(extras,/bindViewerReference\(/);
+    const imageFn=readFileSync('src/lib/ascension/parts.functions.ts','utf8');
+    assert.match(imageFn, /data\.view==='assembled'/);
+    assert.match(imageFn, /assembled\/\$\{hash\}\.png/);
+    assert.match(imageFn, /NO exploded view/);
   });
   check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
     assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);/);
@@ -56,10 +61,11 @@ try {
   });
   check('Reference image persists beside CAD and Blueprint while 3D editing remains available', () => {
     assert.match(viewer, /<div ref=\{host\} className="reality-viewport"[^>]*aria-label="Editable 3D model/);
-    assert.match(viewer, /const referenceImageUrl = dissection\?\.imageUrl \?\? sourceReference/);
-    assert.match(viewer, /const splitReference = Boolean\(referenceImageUrl\)/);
+    assert.match(viewer, /const referenceImageUrl = sourceReference \?\? assembledImage/);
+    assert.match(viewer, /const splitReference = Boolean\(displayedImageUrl\)/);
     assert.match(viewer, /const awaitingFaithfulMesh = Boolean\(conceptual && \(referenceImageUrl \|\| \["queued","claimed","running"\]\.includes\(pathway\.model_status \?\? ""\)\)\)/);
     assert.match(viewer, /data-split=\{splitReference \? "true" : undefined\}/);
+    assert.match(viewer, /data-image-only=\{imageOnly \? "true" : undefined\}/);
     assert.match(viewer, /visibility:awaitingFaithfulMesh \? "hidden" : "visible"/);
     assert.match(viewer, /AWAITING SOURCE-DERIVED 3D MODEL/);
     assert.doesNotMatch(viewer.slice(viewer.indexOf('const editIllustratedPart'), viewer.indexOf('const dive = useRef')), /setDissected\(false\)/);

@@ -3,7 +3,10 @@ let realityOutput: GainNode | null = null;
 let realityVolume = 0.5;
 export function setRealityVolume(volume: number) {
   realityVolume = Math.min(0.7, Math.max(0, volume));
-  if (realityContext && realityOutput) realityOutput.gain.setTargetAtTime(realityVolume * 0.6, realityContext.currentTime, 0.15);
+  if (realityContext && realityOutput) {
+    realityOutput.gain.cancelAndHoldAtTime(realityContext.currentTime);
+    realityOutput.gain.setTargetAtTime(realityVolume * 0.6, realityContext.currentTime, 0.15);
+  }
 }
 /** Synthesized interface feedback, not a physical recording. Uses the existing context. */
 export function realityFeedback(phase = 0) {

@@ -136,7 +136,9 @@ export function RealityViewer({
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
   useEffect(() => { setDissection(null); setDissected(false); setDissectionError(null); }, [pathway.id, loadedUrl]);
   useEffect(() => {
-    if (!dissected || !ready || !api.current || dissection || conceptual) return;
+    // DISSECTED creates a separate produced illustration for both provisional
+    // assemblies and completed Hunyuan meshes, only when requested.
+    if (!dissected || !ready || !api.current || dissection) return;
     let active = true;
     setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
     getDissectedDesign({data:{objective,label:pathway.label,summary:pathway.summary,image:api.current.picture()}})
@@ -146,6 +148,7 @@ export function RealityViewer({
     return ()=>{active=false;};
   }, [dissected, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [parts, setParts] = useState<DesignPart[]>([]);
   const [partIndex, setPartIndex] = useState<number | null>(null);
   const [partsLoading, setPartsLoading] = useState(false);
@@ -168,10 +171,23 @@ export function RealityViewer({
       .finally(() => { if (active) setPartsLoading(false); });
     return () => { active = false; };
   }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
-  const activeParts = conceptual ? conceptParts : dissected ? dissection?.parts ?? [] : parts;
-  useEffect(() => { if (conceptual && ready) api.current?.explode(dissected); }, [conceptual, ready, dissected]);
+  const activeParts = dissected && dissection ? dissection.parts : conceptual ? conceptParts : parts;
+  // Keep the object assembled while the separate illustrated breakdown is made.
+  // The produced image is the dissected view, not the old pulled-apart mesh.
+  useEffect(() => { if (conceptual && ready) api.current?.explode(false); }, [conceptual, ready, dissected]);
   const selectedComponent = components.find(component=>component.id===componentId);
   const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected || conceptual ? selectedComponent?.detail ?? null : null;
+  const editIllustratedPart = () => {
+    if (!selectedPart) return;
+    const normalized = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const matching = components.find(component => normalized(component.name) === normalized(selectedPart.name));
+    setDissected(false);
+    setShowParts(true);
+    setEditorOpen(true);
+    setPartIndex(null);
+    if (matching) api.current?.selectComponent(matching.id);
+    else setWorkbenchError("Select the corresponding 3D component below to move, rotate or scale it. The generated illustration is a separate reference picture, not an independently editable mesh.");
+  };
   const dive = useRef(onDive);
   dive.current = onDive;
   const [mode, setMode] = useState<RealityMode>(
@@ -1714,21 +1730,22 @@ export function RealityViewer({
         </div>
       </header>
       <div className="reality-model-stage">
-        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:dissected && !conceptual ? "hidden" : "visible"}} />
-        {dissected && dissection && <div className="reality-dissection">
+        <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:dissected && dissection ? "hidden" : "visible"}} />
+        {dissected && dissection && <div className="reality-dissection" aria-label="Generated dissected illustration with selectable labeled parts">
           <div className="reality-dissection-picture">
             <img src={dissection.imageUrl} alt={`Exploded concept illustration of ${pathway.label}`} />
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               {dissection.parts.map((part,index)=>{const right=index%2===1;const row=Math.floor(index/2);const total=Math.ceil(dissection.parts.length/2);const y=(row+0.5)*100/total;return <polyline key={index} points={`${part.x*100},${part.y*100} ${right?80:20},${y} ${right?98:2},${y}`} />;})}
             </svg>
-            {dissection.parts.map((part,index)=>{const right=index%2===1;const row=Math.floor(index/2);const total=Math.ceil(dissection.parts.length/2);return <button className="reality-dissection-label" key={part.name+index} style={{left:right?"80%":"0%",top:`${(row+0.5)*100/total}%`}} aria-pressed={partIndex===index} onClick={()=>setPartIndex(index)}>{part.name}</button>;})}
+            {dissection.parts.map((part,index)=>{const right=index%2===1;const row=Math.floor(index/2);const total=Math.ceil(dissection.parts.length/2);return <button className="reality-dissection-label" key={part.name+index} style={{left:right?"80%":"0%",top:`${(row+0.5)*100/total}%`}} aria-controls="reality-part-detail" aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);setShowParts(true);}}>{part.name}</button>;})}
+            {partIndex!==null && dissection.parts[partIndex] && <span className="reality-dissection-target" aria-hidden="true" style={{left:`${dissection.parts[partIndex]!.x*100}%`,top:`${dissection.parts[partIndex]!.y*100}%`}} />}
           </div>
         </div>}
         {dissected && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>
           <p>{dissectionError ?? "Creating a separated, labeled concept view…"}</p>
           {dissectionError && <button onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</button>}
         </div>}
-        {ready && ((conceptual && (showParts || dissected)) || (!conceptual && showParts && !dissected)) && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
+        {ready && !dissected && showParts && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
           {activeParts.map((part, index) => <button key={part.name + index} title={part.name} aria-pressed={partIndex === index} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);api.current?.locatePart(index);}}><span>{part.name}</span></button>)}
         </div>}
       </div>
@@ -1752,7 +1769,7 @@ export function RealityViewer({
           )}
         </div>
       )}
-      {ready && (!dissected || conceptual) && (
+      {ready && (!dissected || !dissection) && (
       <aside className="reality-tools" aria-label="Model controls">
         <button disabled={!ready} aria-label="Zoom in" onClick={() => api.current?.zoom(1.3)}>
           ＋
@@ -1779,11 +1796,11 @@ export function RealityViewer({
       <footer className="reality-footer">
         {(showParts || dissected) && (
           <section id="reality-parts" className="reality-parts" aria-label="Design parts">
-            {(!dissected || conceptual) && <div className="reality-component-workbench">
+            {!dissected && <div className="reality-component-workbench">
               {!partsLoading && !partsError && <div className="reality-named-parts" aria-label="Named parts and functions">
                 {activeParts.map((part,index)=><button key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);api.current?.locatePart(index);}}><strong>{part.name}</strong><span>{part.purpose}</span></button>)}
               </div>}
-              <details className="reality-geometry-details"><summary>Editable model components</summary>
+              <details className="reality-geometry-details" open={editorOpen} onToggle={event=>setEditorOpen(event.currentTarget.open)}><summary>Editable model components</summary>
               <div className="reality-component-list" aria-label="Editable components">
                 {components.map(component=><button key={component.id} aria-pressed={componentId===component.id} onClick={()=>{setPartIndex(null);api.current?.selectComponent(component.id);}}>{component.name}</button>)}
               </div>
@@ -1807,6 +1824,7 @@ export function RealityViewer({
             {!dissected && partsError && <div role="alert"><p>{partsError}</p><button onClick={() => setPartsAttempt(value => value + 1)}>RETRY LABELS</button></div>}
             {selectedPart && (dissected || (!partsLoading && !partsError)) && <article id="reality-part-detail" className="reality-part-detail" aria-live="polite">
               <h2>{selectedPart.name}</h2>
+              {dissected && dissection && <button className="reality-edit-illustrated-part" onClick={editIllustratedPart}>MANIPULATE THIS PART IN 3D</button>}
               <label className="reality-blend-choice">
                 <input type="checkbox" checked={isPartSelected(selectedPart)} onChange={() => onTogglePart(selectedPart)} />
                 Use {selectedPart.name} in a new blend

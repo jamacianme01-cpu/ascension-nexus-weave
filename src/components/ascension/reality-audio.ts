@@ -13,14 +13,14 @@ export function realityFeedback(phase = 0) {
   const ctx = realityContext;
    if (!ctx || ctx.state !== 'running' || !realityOutput || realityVolume === 0) return;
     const tone = ctx.createOscillator(), gain = ctx.createGain();
-    tone.frequency.value = 260 + (phase % 6) * 65;
-     gain.gain.setValueAtTime(0.06 * realityVolume, ctx.currentTime);
+    tone.frequency.value = 440 + (phase % 6) * 66;
+     gain.gain.setValueAtTime(0.18 * realityVolume, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
-    tone.connect(gain).connect(ctx.destination);tone.start();tone.stop(ctx.currentTime + 0.23);
+    tone.connect(gain).connect(realityOutput ?? ctx.destination);tone.start();tone.stop(ctx.currentTime + 0.23);
     tone.onended = () => {tone.disconnect();gain.disconnect();};
 }
 /** Spatial air and low harmonic pressure. All sources are bounded and disposable. */
-function atmosphereGraph(ctx: AudioContext) {
+function atmosphereGraph(ctx: AudioContext, music = false) {
   const output = ctx.createGain();
   output.gain.value = 0;
   const limiter = ctx.createDynamicsCompressor();
@@ -69,6 +69,35 @@ function atmosphereGraph(ctx: AudioContext) {
     sources.push(tone);
     nodes.push(level, pan, delay, reflection);
   });
+  // Speaker-range synthesized music (220–880 Hz): a slow, original chord cycle
+  // audible on laptop and phone speakers. Not a recording; no external audio.
+  let chordTimer: number | undefined;
+  if (music) {
+    const chords = [[220, 277.18, 329.63, 440], [246.94, 293.66, 369.99, 493.88], [196, 293.66, 392, 587.33], [220, 329.63, 440, 659.25]];
+    const pad = ctx.createBiquadFilter(); pad.type = "lowpass"; pad.frequency.value = 1800;
+    const padLevel = ctx.createGain(); padLevel.gain.value = 0.5;
+    pad.connect(padLevel).connect(output); nodes.push(pad, padLevel);
+    const voices = chords[0]!.map((frequency, i) => {
+      const tone = ctx.createOscillator(); tone.type = "triangle"; tone.frequency.value = frequency; tone.detune.value = (i - 1.5) * 4;
+      const level = ctx.createGain(); level.gain.value = 0.07;
+      const pan = ctx.createStereoPanner(); pan.pan.value = (i - 1.5) * 0.35;
+      tone.connect(level).connect(pan).connect(pad); sources.push(tone); nodes.push(level, pan);
+      return tone;
+    });
+    const bell = () => {
+      const now = ctx.currentTime, tone = ctx.createOscillator(), level = ctx.createGain();
+      tone.type = "sine"; tone.frequency.value = (chords[step % chords.length]![3] ?? 440) * (step % 2 ? 1 : 1.5);
+      level.gain.setValueAtTime(0.0001, now); level.gain.exponentialRampToValueAtTime(0.09, now + 0.04); level.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+      tone.connect(level).connect(pad); tone.start(now); tone.stop(now + 2.5); tone.onended = () => { tone.disconnect(); level.disconnect(); };
+    };
+    let step = 0;
+    chordTimer = window.setInterval(() => {
+      if (stopped) return; step++;
+      const chord = chords[step % chords.length]!;
+      voices.forEach((voice, i) => voice.frequency.setTargetAtTime(chord[i] ?? 220, ctx.currentTime, 0.8));
+      if (ctx.state === "running") bell();
+    }, 5000);
+  }
   sources.forEach((source) => source.start());
   let stopped = false;
   let dimTimer: number | undefined;
@@ -88,6 +117,7 @@ function atmosphereGraph(ctx: AudioContext) {
       if (stopped) return;
       stopped = true;
       if (dimTimer !== undefined) window.clearTimeout(dimTimer);
+      if (chordTimer !== undefined) window.clearInterval(chordTimer);
       const now = ctx.currentTime;
       output.gain.cancelAndHoldAtTime(now);
       output.gain.linearRampToValueAtTime(0, now + after);
@@ -110,7 +140,7 @@ function atmosphereGraph(ctx: AudioContext) {
 }
 
 export function createRealityAtmosphere(ctx: AudioContext) {
-  const graph = atmosphereGraph(ctx);
+  const graph = atmosphereGraph(ctx, true);
   realityContext = ctx; realityOutput = graph.output;
    graph.output.gain.linearRampToValueAtTime(realityVolume * 0.6, ctx.currentTime + 1);
    return { stop: () => { if (realityOutput === graph.output) { realityOutput = null; realityContext = null; } graph.stop(0.65); } };

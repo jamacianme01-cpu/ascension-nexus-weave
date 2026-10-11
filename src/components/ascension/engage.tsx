@@ -741,16 +741,23 @@ export function Engage() {
     playAscensionSound(audioContextRef, cue);
   };
 
+  const [soundBlocked, setSoundBlocked] = useState(false);
   const toggleSound = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
     save(SOUND_PREF, next ? "on" : "off");
     if (next) {
+      // Runs inside the click gesture: resume, then rebuild a fresh graph.
       const ctx = audioContextFor(audioContextRef);
-      if (ctx) void ctx.resume().catch(() => {});
-      if (ctx && reality && !atmosphere.current) atmosphere.current = createRealityAtmosphere(ctx);
-    } else if (audioContextRef.current?.state === "running") {
-      void audioContextRef.current.suspend();
+      if (!ctx) { setSoundBlocked(true); return; }
+      atmosphere.current?.stop();
+      atmosphere.current = reality ? createRealityAtmosphere(ctx) : null;
+      void ctx.resume().then(() => setSoundBlocked(ctx.state !== "running")).catch(() => setSoundBlocked(true));
+    } else {
+      atmosphere.current?.stop();
+      atmosphere.current = null;
+      setSoundBlocked(false);
+      if (audioContextRef.current?.state === "running") void audioContextRef.current.suspend();
     }
   };
 
@@ -1058,7 +1065,7 @@ export function Engage() {
   ) => {
     const ctx = audioContextFor(audioContextRef);
     if (ctx && soundEnabled) {
-      void ctx.resume().catch(() => {});
+      void ctx.resume().then(() => setSoundBlocked(ctx.state !== "running")).catch(() => setSoundBlocked(true));
       atmosphere.current?.stop();
       atmosphere.current = createRealityAtmosphere(ctx);
     }
@@ -1236,6 +1243,7 @@ export function Engage() {
           initialMode={reality.mode}
           soundEnabled={soundEnabled}
           onToggleSound={toggleSound}
+          soundBlocked={soundBlocked}
           onDive={() => sound("open")}
           onClose={closeReality}
           onNewObjective={newObjective}
@@ -1262,7 +1270,7 @@ export function Engage() {
             aria-pressed={soundEnabled}
             onClick={toggleSound}
           >
-            {soundEnabled ? "SOUND ON" : "SOUND OFF"}
+            {soundEnabled ? (soundBlocked ? "SOUND BLOCKED · TAP" : "SOUND ON") : "SOUND OFF"}
           </button>
 
           <label

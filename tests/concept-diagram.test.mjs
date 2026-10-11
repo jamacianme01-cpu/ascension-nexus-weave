@@ -45,7 +45,7 @@ try {
     for (const detail of ['Purpose', 'How it works', 'Connections', 'Design limits']) assert.ok(viewer.includes(detail));
   });
   check('Generated picture hides the original assembly without removing the preserved 3D editor', () => {
-    assert.match(viewer, /visibility:dissected && dissection \? "hidden" : "visible"/);
+    assert.match(viewer, /visibility:\(dissected && dissection\) \|\| \(simulate && interpretiveDemo\) \? "hidden" : "visible"/);
     assert.match(viewer, /if \(conceptual && ready\) api\.current\?\.explode\(false\)/);
     assert.match(viewer, /!dissected && <div className="reality-component-workbench"/);
     assert.match(readFileSync('src/components/ascension/reality-viewer.css','utf8'), /\.reality-dissection-label\[aria-pressed="true"\]/);
@@ -65,5 +65,8 @@ try {
   check('image navigation has native wheel pinch drag fit focus and accessible labels',()=>{const image=readFileSync('src/components/ascension/RealityDissection.tsx','utf8');for(const marker of ['passive:false','setPointerCapture','onPointerMove','Focus selected part','Fit illustration','part.purpose','data-x','data-y'])assert.ok(image.includes(marker));});
   check('demonstration exposes playback scrub and causal mesh cues without mutating transforms',()=>{for(const marker of ['CONCEPTUAL DEMONSTRATION · UNVERIFIED','Operational animation unavailable','Demonstration timeline','REPLAY','demoCue.position','demoMaterials.clear()'])assert.ok(viewer.includes(marker));});
   check('sound remains sustained and bounded with feedback and volume control',()=>{const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8');assert.doesNotMatch(audio,/graph.scheduleDim\(12_000\)/);assert.match(audio,/setRealityVolume/);assert.match(audio,/tone.onended/);assert.match(viewer,/Ambient volume/);});
+  check('muted feedback cannot resume context or bypass zero volume',()=>{const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8');assert.match(audio,/ctx.state !== 'running'/);assert.match(audio,/realityVolume === 0/);assert.doesNotMatch(audio,/ctx.resume\(/);assert.match(audio,/realityContext = null/);});
+  check('nonphysical demonstrations show actual pathway storyboard instead of unrelated physical geometry',()=>{assert.match(viewer,/simulate && interpretiveDemo && !dissected/);assert.match(viewer,/Animated pathway storyboard/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
+  check('image navigation avoids lower inspector overlap and desktop inspector leaves image room',()=>{const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');assert.match(css,/\.reality-image-tools \{[^}]*top:8px; bottom:auto/);assert.match(css,/\.reality-screen:has\(\.reality-parts\) \.reality-dissection \{ right:414px/);});
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

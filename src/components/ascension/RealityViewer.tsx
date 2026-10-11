@@ -1804,10 +1804,11 @@ export function RealityViewer({
         {simulate && <section className="reality-demonstration" aria-label="Conceptual demonstration">
           <strong>CONCEPTUAL DEMONSTRATION · UNVERIFIED</strong>
           {!phases.length ? <p role="status">Operational animation unavailable</p> : <>
+            <div className="reality-demo-actions"><Button variant="outline" onClick={()=>{if(seconds>=DEMONSTRATION_SECONDS)setSeconds(0);setPlaying(value=>!value);}}>{playing?'PAUSE':'PLAY'}</Button><Button variant="outline" onClick={()=>{setSeconds(0);setPlaying(true);}}>REPLAY</Button><input aria-label="Demonstration timeline" type="range" min="0" max={DEMONSTRATION_SECONDS} step="0.05" value={seconds} onChange={event=>{setPlaying(false);setSeconds(Number(event.target.value));}}/><output>{seconds.toFixed(1)} / 12s</output></div>
             <div className="reality-demo-flow" aria-label="Pathway process">{phases.map((phase,index)=><span key={index} aria-current={index===frame.index?'step':undefined}>{phase.caption}</span>)}<i style={{left:`${seconds/DEMONSTRATION_SECONDS*100}%`}} aria-hidden="true"/></div>
             <p aria-live="polite">{phases[frame.index]?.caption}</p>
             {phases[frame.index]?.operation && <p>{phases[frame.index]?.operation}</p>}
-            <div className="reality-demo-actions"><Button variant="outline" onClick={()=>{if(seconds>=DEMONSTRATION_SECONDS)setSeconds(0);setPlaying(value=>!value);}}>{playing?'PAUSE':'PLAY'}</Button><Button variant="outline" onClick={()=>{setSeconds(0);setPlaying(true);}}>REPLAY</Button><input aria-label="Demonstration timeline" type="range" min="0" max={DEMONSTRATION_SECONDS} step="0.05" value={seconds} onChange={event=>{setPlaying(false);setSeconds(Number(event.target.value));}}/><output>{seconds.toFixed(1)} / 12s</output></div>
+
           </>}
         </section>}
         {dissected && (dissectionLoading || dissectionError) && <div className="reality-status" role={dissectionError?"alert":"status"}>

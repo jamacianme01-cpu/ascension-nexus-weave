@@ -55,8 +55,9 @@ try {
     assert.match(toggle,/atmosphere\.current = null;/); assert.match(toggle,/createRealityAtmosphere\(ctx\)/); assert.match(toggle,/setSoundBlocked\(ctx\.state !== "running"\)/);
   });
   check('DISSECTED keeps an editable 3D pane beside the picture and stays in dissected mode', () => {
-    assert.match(viewer, /visibility:simulate && interpretiveDemo && !dissected \? "hidden" : "visible"/);
-    assert.match(viewer, /data-split=\{dissected && dissection \? "true" : undefined\}/);
+    assert.match(viewer, /<div ref=\{host\} className="reality-viewport"[^>]*aria-label="Editable 3D model/);
+    assert.match(viewer, /const splitReference = Boolean\(sourceReference \|\| \(dissected && dissection\)\)/);
+    assert.match(viewer, /data-split=\{splitReference \? "true" : undefined\}/);
     assert.doesNotMatch(viewer.slice(viewer.indexOf('const editIllustratedPart'), viewer.indexOf('const dive = useRef')), /setDissected\(false\)/);
     assert.match(viewer, /<div className="reality-component-workbench">/);
     assert.match(viewer, />ISOLATE</);

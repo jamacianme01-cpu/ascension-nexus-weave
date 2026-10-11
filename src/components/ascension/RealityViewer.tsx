@@ -169,7 +169,7 @@ export function RealityViewer({
     return () => window.clearInterval(timer);
   }, [simulate, playing]);
   useEffect(() => { if (simulate && playing && soundEnabled) realityFeedback(frame.index); }, [frame.index, simulate, playing, soundEnabled]);
-  useEffect(() => {setRealityVolume(volume);}, [volume, soundEnabled]);
+  useEffect(() => {setRealityVolume(soundEnabled ? volume : 0);}, [volume, soundEnabled]);
   const [parts, setParts] = useState<DesignPart[]>([]);
   const [partIndex, setPartIndex] = useState<number | null>(null);
   const [partsLoading, setPartsLoading] = useState(false);

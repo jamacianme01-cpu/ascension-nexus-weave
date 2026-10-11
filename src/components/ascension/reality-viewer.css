@@ -703,7 +703,10 @@
 .reality-semantic-sequence { position:absolute; inset:12% 8% 44%; display:flex; flex-direction:column; justify-content:center; gap:12px; color:var(--foreground); }
 .reality-semantic-sequence > span { color:var(--gold); font-size:12px; }
 .reality-semantic-sequence h2 { font-family:var(--font-sans); font-size:28px; letter-spacing:0; margin:0; overflow-wrap:anywhere; }
-.reality-semantic-sequence progress { width:100%; height:12px; accent-color:var(--photon); }
+.reality-semantic-sequence progress { width:100%; height:12px; accent-color:var(--photon); appearance:none; border:0; background:var(--secondary); }
+.reality-semantic-sequence progress::-webkit-progress-bar { background:var(--secondary); }
+.reality-semantic-sequence progress::-webkit-progress-value { background:var(--photon); }
+.reality-semantic-sequence progress::-moz-progress-bar { background:var(--photon); }
 .reality-sequence-next { color:var(--muted-foreground); }
 @media (max-width:760px) {
  .reality-header { padding:6px 8px; }

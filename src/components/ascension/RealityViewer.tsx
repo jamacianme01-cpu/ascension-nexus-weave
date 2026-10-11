@@ -1842,7 +1842,7 @@ export function RealityViewer({
         </div>
         </div>
         <div className="reality-view-controls" role="group" aria-label="Drawing views and parts">
-        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cutaway"} onClick={()=>{setDissected(false);setMode("cutaway");setSection(100);api.current?.section(100);}}>
+        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cutaway" && section===100} onClick={()=>{setDissected(false);setMode("cutaway");setSection(100);api.current?.section(100);}}>
           ASSEMBLED
         </Button>
         <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="cutaway" && section < 100} onClick={()=>{setDissected(false);setMode("cutaway");setSection(50);api.current?.section(50);}}>

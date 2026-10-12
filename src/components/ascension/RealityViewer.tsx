@@ -205,7 +205,7 @@ export function RealityViewer({
     if (!dissected || !ready || !api.current || dissection) return;
     let active = true;
     setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
-    getDissectedDesign({data:{view:"dissected",requestId:requestId ?? undefined,pathwayId:pathway.id,referenceImageUrl:referenceImageUrl ?? undefined,objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual}})
+    getDissectedDesign({data:{view:"dissected",...(requestId ? {requestId} : {}),pathwayId:pathway.id,...(referenceImageUrl ? {referenceImageUrl} : {}),objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual}})
       .then(result => {
         if (!active) return;
         setDissection(result);

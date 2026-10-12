@@ -110,6 +110,10 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         if (referenceReadError) return json({ error: "model_queue_read_failed" }, 500);
         let pending = referenced;
         if (!pending?.length) {
+          // Never claim a source-less job merely to initiate a paid image request.
+          // Hunyuan can still process jobs with a previously saved approved image.
+          const { imageProvider } = await import("@/lib/ascension/engine/image.server");
+          if (!imageProvider()) return json({ item: null, reason: "awaiting_saved_approved_source_image" });
           const fallback = await table
             .select(columns)
             .eq("status", "queued")

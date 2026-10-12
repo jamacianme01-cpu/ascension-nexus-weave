@@ -2,7 +2,7 @@
  * Server-only INTERNAL reference-image generation for ENVISION image-to-3D.
  *
  * The image is never the user-facing ENVISION result. It is generated through
- * Lovable AI's native image endpoint, persisted to ASCENSION storage, and its
+ * an explicitly authorized image provider, persisted to ASCENSION storage, and its
  * durable URL becomes the Hunyuan3D model job's source_image_url. Failures are
  * returned verbatim; nothing here substitutes placeholder geometry.
  */
@@ -16,8 +16,10 @@ export interface ImageProviderInfo {
   model: string;
 }
 
+/** Never bill image generation implicitly when a visitor opens a pathway. */
 export function imageProvider(): ImageProviderInfo | null {
-  return process.env["LOVABLE_API_KEY"]?.trim()
+  return process.env["ASCENSION_ALLOW_PAID_IMAGES"] === "true" &&
+    process.env["LOVABLE_API_KEY"]?.trim()
     ? { provider: "lovable", model: IMAGE_MODEL }
     : null;
 }
@@ -42,6 +44,8 @@ async function persist(path: string, bytes: Uint8Array): Promise<string> {
 
 /** Generate and persist one reference image. Throws the real provider/storage error. */
 export async function generateConceptImage(prompt: string, storagePath: string): Promise<string> {
+  if (!imageProvider())
+    throw new Error("Automatic paid image generation is disabled. Use an existing approved ASCENSION source image instead.");
   const key = process.env["LOVABLE_API_KEY"]?.trim();
   if (!key)
     throw new Error("Lovable AI is not available to this deployment (LOVABLE_API_KEY missing).");
@@ -97,7 +101,7 @@ export async function generatePathwayImages(
   const errors: string[] = [];
   if (!pathways.length) return { urls, errors };
   if (!imageProvider()) {
-    errors.push("Lovable AI is not available to this deployment (LOVABLE_API_KEY missing).");
+    errors.push("Automatic paid image generation is disabled. Existing approved images can still be used.");
     return { urls, errors };
   }
   const queue = [...pathways];

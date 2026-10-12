@@ -48,7 +48,7 @@ export const getDissectedDesign = createServerFn({ method: 'POST' })
     if (previous) return previous;
     const pending = (async () => {
       const {callZai} = await import('./engine/zai.server');
-      const {generateConceptImage,conceptImagePrompt} = await import('./engine/image.server');
+      const {generateConceptImage,conceptImagePrompt,imageProvider} = await import('./engine/image.server');
       const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(key));
       const hash=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
       if(data.view==='assembled') {
@@ -62,6 +62,9 @@ export const getDissectedDesign = createServerFn({ method: 'POST' })
         if((stored.data??[]).some(item=>item.name===`${hash}.png`)) {
           return {imageUrl:supabaseAdmin.storage.from('ascension-models').getPublicUrl(`assembled/${hash}.png`).data.publicUrl,parts:[] as DesignPart[]};
         }
+        // A saved source remains available without billing. A missing one must
+        // not trigger image generation without explicit owner opt-in.
+        if (!imageProvider()) throw new Error('No approved assembled image is saved for this pathway. Automatic paid image generation is disabled.');
         const prompt=[
           conceptImagePrompt(data.objective,{label:data.label,summary:data.summary}),
           'Show the COMPLETE FULLY ASSEMBLED invention in one clear three-quarter view, not a disassembly or a collection of parts.',
@@ -72,6 +75,7 @@ export const getDissectedDesign = createServerFn({ method: 'POST' })
         ].join(' ');
         return {imageUrl:await generateConceptImage(prompt,`assembled/${hash}.png`),parts:[] as DesignPart[]};
       }
+      if (!imageProvider()) throw new Error('Automatic paid dissection image generation is disabled. No credits were used.');
       let referenceDataUrl:string|null=null;
       if(data.referenceImageUrl) {
         // Never fetch arbitrary URLs supplied by the client. Only a saved image

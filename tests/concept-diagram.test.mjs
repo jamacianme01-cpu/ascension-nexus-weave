@@ -34,7 +34,8 @@ try {
   check('ASSEMBLED automatically generates the primary picture, DISSECTED remains optional', () => {
     assert.match(viewer, /view:"assembled",requestId,pathwayId:pathway\.id/);
     assert.match(viewer, /if \(!dissected \|\| !ready \|\| !api\.current \|\| dissection\) return/);
-    assert.match(viewer, /view:"dissected",requestId:requestId \?\? undefined/);
+    assert.match(viewer, /view:"dissected",\.\.\.\(requestId \? \{requestId\} : \{\}\)/);
+    assert.match(viewer, /\.\.\.\(referenceImageUrl \? \{referenceImageUrl\} : \{\}\)/);
     assert.match(viewer, /const referenceImageUrl = sourceReference \?\? assembledImage/);
     assert.match(viewer, /const displayedImageUrl = dissected && dissection \? dissection\.imageUrl : referenceImageUrl/);
     assert.match(viewer, /displayedImageUrl && <RealityDissection imageUrl=\{displayedImageUrl\}/);

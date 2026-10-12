@@ -345,7 +345,29 @@ function statusText(run: ObjectiveRun, produced: boolean | null) {
   return run.status;
 }
 
-export function ResultContent({
+export /** Preview only imagery already present in the pathway result. Never invent a source image or charge for one on card render. */
+function PathwayPreview({ pathway }: { pathway: ObjectiveDelivery["pathways"][number] }) {
+  const saved = pathway.generated_image_url;
+  const sketch = pathway.visual_svg;
+  const src = saved ?? (sketch ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sketch)}` : null);
+  return (
+    <div className="relative mb-3 flex h-44 items-center justify-center overflow-hidden rounded-lg border border-primary/20 bg-void/55" aria-label={`Preview for ${pathway.label}`}>
+      {src ? (
+        <img src={src} alt={`Preview of ${pathway.label}`} loading="lazy"
+          className="h-full w-full object-contain" />
+      ) : (
+        <p className="px-4 text-center text-xs text-muted-foreground">
+          Image preview not yet available. No paid image request was made.
+        </p>
+      )}
+      <span className="absolute bottom-2 left-2 rounded bg-void/85 px-2 py-1 text-[0.6rem] font-medium tracking-wide text-foreground/85">
+        {saved ? "SAVED SOURCE IMAGE" : sketch ? "CONCEPT PREVIEW · UNVERIFIED" : "IMAGE PENDING"}
+      </span>
+    </div>
+  );
+}
+
+function ResultContent({
   delivery,
   source,
   onInspect,
@@ -508,6 +530,7 @@ export function ResultContent({
                     onChange={() => onToggleBlend(pathway)} aria-label={`Use ${pathway.label} in a new blend`} />
                   Choose for blending
                 </label>}
+                <PathwayPreview pathway={pathway} />
                 <p className="text-[0.65rem] tracking-[0.16em] text-primary uppercase">
                   PATH {index + 1}
                   {pathway.spiral_form ? ` · ${cleanDisplayText(pathway.spiral_form)}` : ""}
@@ -551,6 +574,7 @@ export function ResultContent({
                     onChange={() => onToggleBlend(delivery.blend!)} aria-label={`Use ${delivery.blend.label} in a new blend`} />
                   Choose for blending
                 </label>}
+                <PathwayPreview pathway={delivery.blend} />
                 <p className="text-[0.65rem] tracking-[0.16em] text-gold uppercase">BLEND</p>
                 <h3 className="mt-1 font-display text-xl text-foreground">
                   {cleanDisplayText(delivery.blend.label)}

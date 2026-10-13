@@ -2,7 +2,7 @@ name: Verify ASCENSION
 
 on:
   push:
-    branches: [main]
+    branches: [main, independent-hosting]
   workflow_dispatch:
 
 permissions:

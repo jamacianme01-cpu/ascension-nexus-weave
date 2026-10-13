@@ -771,7 +771,7 @@ export async function resolveDelivery(args: {
       // Historical text-only creation drafts must not suppress the real Spiral
       // synthesis when the objective is reopened. Keep ordinary answers intact.
       const creationMissingSpiral = requestedKind(run.objective) === "design" &&
-        Array.isArray(record(draft.response_payload)["pathways"]) &&
+        saved.pathways.length === 0 && Array.isArray(record(draft.response_payload)["pathways"]) &&
         needsSpiralExpansionRepair(run.objective, run.evidence, [], saved);
       if (!creationMissingSpiral && saved.kind !== "not_produced" && (assessment.produced || hasEnvisionPreparation(run.objective, saved)))
         return { ...base, created_at: draft.created_at, engine_label: DRAFT_LABEL,

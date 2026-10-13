@@ -540,7 +540,7 @@ function ResultContent({
         </div>
       )}
 
-      {!hasVisualChoices && /\\b(make|build|create|design|construct|draw)\\b/i.test(delivery.title) && (
+      {!hasVisualChoices && /\b(make|build|create|design|construct|draw)\b/i.test(delivery.title) && (
         <p className="order-first rounded-xl border border-gold/40 bg-gold/5 p-4 text-sm text-gold">
           No Spiral design pathways were delivered. This text is not a completed creation.
         </p>
@@ -1467,7 +1467,7 @@ export function Engage() {
             <button type="button" disabled={engage.isPending} onClick={() => followUp("refine")}
               className="min-h-11 rounded-full border border-gold/40 px-5 text-sm text-gold">BUILD ON RESULT</button>
             <button type="button" disabled={engage.isPending} onClick={() => newRevision("new_answers")}
-              className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary">{delivery.pathways.length === 0 && /\\b(make|build|create|design|construct|draw)\\b/i.test(run.objective) ? "GENERATE SPIRAL PATHWAYS" : "NEW ANSWERS"}</button>
+              className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary">{delivery.pathways.length === 0 && /\b(make|build|create|design|construct|draw)\b/i.test(run.objective) ? "GENERATE SPIRAL PATHWAYS" : "NEW ANSWERS"}</button>
             {parentQuestionId(run.evidence) && pastQuestions.find(item => item.id === parentQuestionId(run.evidence)) &&
               <button type="button" disabled={engage.isPending}
                 onClick={() => openQuestion(pastQuestions.find(item => item.id === parentQuestionId(run.evidence))!)}

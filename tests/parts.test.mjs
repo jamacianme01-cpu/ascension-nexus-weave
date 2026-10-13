@@ -20,13 +20,13 @@ try {
   const nextRay=new THREE.Raycaster();nextRay.setFromCamera(new THREE.Vector2(screen.x,screen.y),camera);
   assert.ok(nextRay.ray.distanceToPoint(mesh.localToWorld(anchor.clone()))<1e-6);
   const {callZai}=await server.ssrLoadModule('/src/lib/ascension/engine/zai.server.ts');
-  const prior=process.env.LOVABLE_API_KEY;process.env.LOVABLE_API_KEY='test-only';const original=globalThis.fetch;
+  const prior=process.env.LOVABLE_API_KEY;const priorOptIn=process.env.ASCENSION_ALLOW_LOVABLE_AI;process.env.LOVABLE_API_KEY='test-only';process.env.ASCENSION_ALLOW_LOVABLE_AI='true';const original=globalThis.fetch;
   let sent;
   globalThis.fetch=async(url,init)=>{
     if(String(url).includes('/chat/completions')){sent=JSON.parse(init.body);return new Response('data: '+JSON.stringify({choices:[{delta:{content:JSON.stringify({parts:[part]})}}]})+'\n\ndata: [DONE]\n\n');}
     throw new Error('No internal retrieval in isolated test');
   };
   try {await callZai({system:'Describe visible parts.',user:'Housing',imageDataUrl:'data:image/jpeg;base64,AAAA'});assert.equal(sent.messages[1].content[1].image_url.url,'data:image/jpeg;base64,AAAA');}
-  finally{globalThis.fetch=original;if(prior===undefined)delete process.env.LOVABLE_API_KEY;else process.env.LOVABLE_API_KEY=prior;}
+  finally{globalThis.fetch=original;if(prior===undefined)delete process.env.LOVABLE_API_KEY;else process.env.LOVABLE_API_KEY=prior;if(priorOptIn===undefined)delete process.env.ASCENSION_ALLOW_LOVABLE_AI;else process.env.ASCENSION_ALLOW_LOVABLE_AI=priorOptIn;}
   console.log('PASS part validation, picture grounding, and anchors after camera movement');
 }finally{await server.close();}

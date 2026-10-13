@@ -54,11 +54,14 @@ try {
     assert.match(viewer, /api\.current\?\.selectComponent\(matching\.id\)/);
     for (const detail of ['Purpose', 'How it works', 'Connections', 'Design limits']) assert.ok(viewer.includes(detail));
   });
-  check('sound OFF clears the atmosphere and ON rebuilds an audible midrange graph', () => {
-    const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8'); const engage=readFileSync('src/components/ascension/engage.tsx','utf8');
-    assert.match(audio,/atmosphereGraph\(ctx, true\)/); assert.match(audio,/\[220, 277\.18, 329\.63, 440\]/); assert.doesNotMatch(audio,/scheduleDim\(12_000\)/);
+  check('only ENGAGE and ANSWER play cues; viewer has no continuous ambience', () => {
+    const engage=readFileSync('src/components/ascension/engage.tsx','utf8');
+    assert.match(engage,/cue !== "engage" && cue !== "eruption"/);
+    assert.match(engage,/ctx\.resume\(\)\.then\(emit\)/);
+    assert.doesNotMatch(engage,/createRealityAtmosphere\(ctx\)/);
+    assert.doesNotMatch(viewer,/realityFeedback\(frame\.index\)/);
     const toggle=engage.slice(engage.indexOf('const toggleSound'),engage.indexOf('const runQuery'));
-    assert.match(toggle,/atmosphere\.current = null;/); assert.match(toggle,/createRealityAtmosphere\(ctx\)/); assert.match(toggle,/setSoundBlocked\(ctx\.state !== "running"\)/);
+    assert.match(toggle,/setSoundBlocked\(ctx\.state !== "running"\)/);
   });
   check('Reference image persists beside CAD and Blueprint while 3D editing remains available', () => {
     assert.match(viewer, /<div ref=\{host\} className="reality-viewport"[^>]*aria-label="Editable 3D model/);

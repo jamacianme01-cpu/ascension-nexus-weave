@@ -13,7 +13,9 @@ const server = await createServer({ configFile: false, server: { middlewareMode:
   } }] });
 const originalFetch = globalThis.fetch;
 const priorKey = process.env.LOVABLE_API_KEY;
+const priorHostedOptIn = process.env.ASCENSION_ALLOW_LOVABLE_AI;
 process.env.LOVABLE_API_KEY = "test-only";
+process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
 let passed = 0;
 function pass(name) { passed++; console.log(`PASS ${name}`); }
 function gateway(responses) {
@@ -170,6 +172,7 @@ try {
 } finally {
   globalThis.fetch = originalFetch;
   if (priorKey === undefined) delete process.env.LOVABLE_API_KEY; else process.env.LOVABLE_API_KEY = priorKey;
+  if (priorHostedOptIn === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI; else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptIn;
   await server.close();
 }
 

@@ -46,6 +46,10 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    // Hosting smoke probe: no database, secrets, or paid model calls.
+    if (request.method === "GET" && new URL(request.url).pathname === "/__ascension/health") {
+      return Response.json({ service: "ASCENSION", status: "alive" }, { headers: { "cache-control": "no-store" } });
+    }
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

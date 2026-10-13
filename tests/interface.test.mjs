@@ -558,9 +558,11 @@ try {
   const priorKey = process.env.ZAI_API_KEY;
   const priorLovableKey = process.env.LOVABLE_API_KEY;
   const priorZaiOptIn = process.env.ASCENSION_ALLOW_PAID_DRAFTS;
+  const priorZaiModel = process.env.ZAI_MODEL;
   delete process.env.LOVABLE_API_KEY;
   process.env.ZAI_API_KEY = "test-only";
   process.env.ASCENSION_ALLOW_PAID_DRAFTS = "true";
+  process.env.ZAI_MODEL = "glm-4.6"; // A historically configured paid model must not be selected.
   try {
     const payload = JSON.stringify(valid);
     const bytes = new TextEncoder().encode(
@@ -568,6 +570,9 @@ try {
     );
     globalThis.fetch = async (_url, init) => {
       assert.ok(init.signal instanceof AbortSignal);
+      assert.equal(String(_url), "https://api.z.ai/api/paas/v4/chat/completions");
+      assert.equal(JSON.parse(String(init.body)).model, "glm-4.7-flash");
+      assert.equal(init.headers.Authorization, "Bearer test-only");
       return new Response(
         new ReadableStream({
           start(c) {
@@ -579,9 +584,10 @@ try {
       );
     };
     const response = await callZai({ system: "test", user: "test" });
-    check("stream chunks and final frame without newline are preserved", () =>
-      assert.deepEqual(response.json, valid),
-    );
+    check("zero-charge Z.AI Flash streams and overrides the old paid model", () => {
+      assert.deepEqual(response.json, valid);
+      assert.equal(response.model, "glm-4.7-flash");
+    });
     globalThis.fetch = async () => new Response('data: {"error":{"message":"engine failed"}}\n');
     await assert.rejects(() => callZai({ system: "test", user: "test" }), /engine failed/);
     passed++;
@@ -703,6 +709,8 @@ try {
     else process.env.LOVABLE_API_KEY = priorLovableKey;
     if (priorZaiOptIn === undefined) delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
     else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorZaiOptIn;
+    if (priorZaiModel === undefined) delete process.env.ZAI_MODEL;
+    else process.env.ZAI_MODEL = priorZaiModel;
   }
 
   // Free cloud inference must remain server-side, zero-price, and privacy-gated.

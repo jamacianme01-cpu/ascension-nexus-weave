@@ -462,7 +462,7 @@ try {
       assert.equal(waitingLocal.source, null);
       assert.equal(waitingLocal.response_payload, null);
       assert.equal(waitingLocal.error, null);
-      assert.match(waitingLocal.note, /Awaiting the ASCENSION runtime/);
+      assert.match(waitingLocal.note, /Awaiting a connected ASCENSION answer provider/);
     });
   // Hosting Lovable must not hide a real delivered local result.
   process.env.LOVABLE_API_KEY = "host-key-does-not-override-local";

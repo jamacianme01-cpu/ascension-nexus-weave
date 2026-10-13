@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
+import { createRealityAtmosphere } from "./reality-audio";
 
 import {
   getObjectiveStatus,

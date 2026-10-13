@@ -19,6 +19,9 @@ const LOVABLE_MODEL = "google/gemini-3.1-flash-lite";
 // A hosted, zero-price preview route. Never select a paid model here.
 const FREE_BASE_URL = "https://openrouter.ai/api/v1";
 const FREE_MODEL = "openrouter/free";
+// Officially zero-token-cost Z.AI models; never replace with a billed GLM model.
+const ZAI_FREE_TEXT_MODEL = "glm-4.7-flash";
+const ZAI_FREE_VISION_MODEL = "glm-4.6v-flash";
 // Local answer engine takes priority when explicitly configured.
 // Lovable AI is optional and requires explicit owner opt-in.
 const DEFAULT_LOCAL_MODEL = "qwen3:4b";
@@ -67,14 +70,11 @@ export class ZaiEngineError extends Error {
 
 export function zaiModel(): string {
   if (process.env["OPENROUTER_API_KEY"]?.trim()) return FREE_MODEL;
-  if (localLlmConfig()) return localLlmConfig()!.model;
   if (process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true" &&
       process.env["LOVABLE_API_KEY"]?.trim())
     return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
-  if (process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true" &&
-      process.env["ZAI_API_KEY"]?.trim())
-    return process.env["ZAI_MODEL"]?.trim() || DEFAULT_MODEL;
-  return DEFAULT_LOCAL_MODEL;
+  if (process.env["ZAI_API_KEY"]?.trim()) return ZAI_FREE_TEXT_MODEL;
+  return localLlmConfig()?.model || DEFAULT_LOCAL_MODEL;
 }
 
 function zaiBaseUrl(): string {
@@ -173,11 +173,10 @@ export async function callZai(input: {
   const freeCloudKey = process.env["OPENROUTER_API_KEY"]?.trim();
   const lovableKey = process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true"
     ? process.env["LOVABLE_API_KEY"]?.trim() : null;
-  const zaiKey = process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true"
-    ? process.env["ZAI_API_KEY"]?.trim() : null;
+  const zaiKey = process.env["ZAI_API_KEY"]?.trim();
   // A configured public cloud route wins over localhost, even if a local
   // desktop development URL accidentally remains in server settings.
-  const provider = freeCloudKey ? "free_cloud" : local ? "local" : lovableKey ? "lovable" : zaiKey ? "zai" : null;
+  const provider = freeCloudKey ? "free_cloud" : lovableKey ? "lovable" : zaiKey ? "zai_free" : local ? "local" : null;
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",
@@ -211,11 +210,13 @@ export async function callZai(input: {
     ? input.user
     : `${input.user}\n\nASCENSION INTERNAL KNOWLEDGE:\n${knowledgeForPrompt}`;
 
-  const model = zaiModel();
+  const model = provider === "zai_free"
+    ? (input.imageDataUrl ? ZAI_FREE_VISION_MODEL : ZAI_FREE_TEXT_MODEL)
+    : zaiModel();
   const started = Date.now();
   const baseUrl =
-    provider === "free_cloud" ? FREE_BASE_URL : provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai" ? zaiBaseUrl() : local!.baseUrl;
-  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "lovable" ? lovableKey : provider === "zai" ? zaiKey : null;
+    provider === "free_cloud" ? FREE_BASE_URL : provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai_free" ? DEFAULT_BASE_URL : local!.baseUrl;
+  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "lovable" ? lovableKey : provider === "zai_free" ? zaiKey : null;
   const nativeUrl = provider === "local" ? ollamaChatUrl(baseUrl) : null;
   let response: Response;
   try {

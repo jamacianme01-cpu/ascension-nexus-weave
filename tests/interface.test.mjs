@@ -721,8 +721,8 @@ try {
       sentHeaders = init.headers;
       sentPayload = JSON.parse(String(init.body));
       return new Response(
-        'data: ' + JSON.stringify({ choices: [{ delta: { content: "Three possible designs." } }] }) + '\\n\\n' +
-        'data: [DONE]\\n\\n'
+        'data: ' + JSON.stringify({ choices: [{ delta: { content: "Three possible designs." } }] }) + '\n\n' +
+        'data: [DONE]\n\n'
       );
     };
     const freeResult = await callZai({ system: "ASCENSION", user: "Create three pathways.", includeInternalKnowledge: false });
@@ -743,7 +743,7 @@ try {
       /HTTP 429/
     );
     passed++;
-    process.stdout.write("PASS free quota exhaustion fails without paid fallback\\n");
+    process.stdout.write("PASS free quota exhaustion fails without paid fallback\n");
   } finally {
     globalThis.fetch = original;
     if (priorFreeCloudKey === undefined) delete process.env.OPENROUTER_API_KEY;

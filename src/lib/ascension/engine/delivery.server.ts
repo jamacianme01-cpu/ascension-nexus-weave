@@ -737,7 +737,11 @@ export async function resolveDelivery(args: {
       const saved = parseDelivery(draft.response_payload);
       const assessment = assessResult(run.objective, saved.body, saved.files,
         [...saved.pathways, ...(saved.blend ? [saved.blend] : [])].flatMap(pathway => pathway.visual_svg ? [pathway.visual_svg] : []));
-      if (saved.kind !== "not_produced" && (assessment.produced || hasEnvisionPreparation(run.objective, saved)))
+      // Historical text-only creation drafts must not suppress the real Spiral
+      // synthesis when the objective is reopened. Keep ordinary answers intact.
+      const creationMissingSpiral = requestedKind(run.objective) === "design" &&
+        needsSpiralExpansionRepair(run.objective, run.evidence, [], saved);
+      if (!creationMissingSpiral && saved.kind !== "not_produced" && (assessment.produced || hasEnvisionPreparation(run.objective, saved)))
         return { ...base, created_at: draft.created_at, engine_label: DRAFT_LABEL,
           engine_model: draft.engine_model, status: "completed", response_payload: saved,
           note: null, source: "external_draft" };
@@ -762,7 +766,11 @@ export async function resolveDelivery(args: {
         error: `The objective meaning check failed: ${cause instanceof Error ? cause.message : String(cause)}` };
     }
   }
-  if (governed && governed.kind !== "not_produced") {
+  // A plain-text runtime receipt does not fulfill a request to create a
+  // multi-path design. Continue into synthesis without falsifying governance.
+  if (governed && governed.kind !== "not_produced" &&
+      !(requestedKind(run.objective) === "design" &&
+        needsSpiralExpansionRepair(run.objective, run.evidence, [], governed))) {
     return {
       ...base,
       status: "completed",

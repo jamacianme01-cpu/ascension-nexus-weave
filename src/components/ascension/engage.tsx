@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
-import { createRealityAtmosphere, playSpatialSwell } from "./reality-audio";
+
 import {
   getObjectiveStatus,
   listMyObjectives,
@@ -126,10 +126,30 @@ function audioContextFor(ref: { current: AudioContext | null }) {
 function playAscensionSound(ref: { current: AudioContext | null }, cue: AscensionSoundCue) {
   const ctx = audioContextFor(ref);
   if (!ctx) return;
-  void ctx.resume().catch(() => {});
-  // Broad, low, breathing textures; no melodic UI chimes.
-  if (["engage", "eruption", "open"].includes(cue))
-    playSpatialSwell(ctx, cue === "open" ? 1 : 0.45);
+  // iPad Safari requires the context to be resumed by a user gesture before
+  // playback. ENGAGE makes that gesture; ANSWER reuses the running context.
+  if (cue !== "engage" && cue !== "eruption") return;
+  const emit = () => {
+    if (ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    const notes = cue === "engage" ? [392, 523.25] : [523.25, 659.25, 783.99];
+    notes.forEach((frequency, index) => {
+      const oscillator = ctx.createOscillator();
+      const volume = ctx.createGain();
+      const start = now + index * 0.105;
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, start);
+      volume.gain.setValueAtTime(0.0001, start);
+      volume.gain.exponentialRampToValueAtTime(0.18, start + 0.035);
+      volume.gain.exponentialRampToValueAtTime(0.0001, start + 0.36);
+      oscillator.connect(volume).connect(ctx.destination);
+      oscillator.start(start);
+      oscillator.stop(start + 0.38);
+      oscillator.onended = () => { oscillator.disconnect(); volume.disconnect(); };
+    });
+  };
+  if (ctx.state === "running") emit();
+  else void ctx.resume().then(emit).catch(() => {});
 }
 
 function cleanDisplayText(value: string) {

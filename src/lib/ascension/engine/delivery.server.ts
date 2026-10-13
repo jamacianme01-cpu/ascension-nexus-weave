@@ -519,7 +519,7 @@ export async function externalProductDraft(
       repairedCandidate["kind"] = "answer";
     parsed = parseDelivery(repairedCandidate);
     if (missingSpiralExpansion && requestedKind(run.objective) === "design" &&
-        needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
+        parsed.pathways.length === 0 && needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
       // Retry with a narrow pathway-only synthesis. Small free cloud models
       // often return prose when asked for the full ASCENSION delivery schema.
       // This retry never invents proof, media URLs, or executed artifacts.

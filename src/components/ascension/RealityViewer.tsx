@@ -16,7 +16,7 @@ import { RealityDissection } from './RealityDissection';
 import { RealityEngineeringSimulation } from './RealityEngineeringSimulation';
 import { bindViewerReference, bindGuestViewerReference } from "@/lib/ascension/viewer-reference.functions";
 import { demonstrationPhases, demonstrationFrame, DEMONSTRATION_SECONDS, groundedComponent } from './reality-demonstration';
-import { realityFeedback, setRealityVolume } from './reality-audio';
+import { setRealityVolume } from './reality-audio';
 
 export type RealityMode = "cutaway" | "blueprint" | "environment" | "cad";
 type View = "perspective" | "top" | "front" | "side";
@@ -238,7 +238,7 @@ export function RealityViewer({
     const timer = window.setInterval(() => {const now=performance.now();const delta=(now-previous)/1000;previous=now;setSeconds(value=>{const next=Math.min(DEMONSTRATION_SECONDS,value+delta);if(next===DEMONSTRATION_SECONDS)setPlaying(false);return next;});},50);
     return () => window.clearInterval(timer);
   }, [simulate, playing]);
-  useEffect(() => { if (simulate && playing && soundEnabled) realityFeedback(frame.index); }, [frame.index, simulate, playing, soundEnabled]);
+
   useEffect(() => {setRealityVolume(soundEnabled ? volume : 0);}, [volume, soundEnabled]);
   const [parts, setParts] = useState<DesignPart[]>([]);
   const [partIndex, setPartIndex] = useState<number | null>(null);
@@ -1869,7 +1869,7 @@ export function RealityViewer({
         <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
           PARTS
         </Button>
-        <Button variant="outline" className="reality-sound" aria-pressed={soundEnabled && !soundBlocked} onClick={()=>{onToggleSound();if(!soundEnabled)window.setTimeout(()=>realityFeedback(),150);}}>
+        <Button variant="outline" className="reality-sound" aria-pressed={soundEnabled && !soundBlocked} onClick={onToggleSound}>
           {soundEnabled ? (soundBlocked ? "SOUND BLOCKED · TAP" : "SOUND ON") : "SOUND OFF"}
         </Button>
         </div>

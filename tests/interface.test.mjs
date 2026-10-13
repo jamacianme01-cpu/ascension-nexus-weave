@@ -457,12 +457,15 @@ try {
       store: noStore,
       retry: false,
     });
-    check("missing engine reports a blocker instead of claiming an answer is being prepared", () => {
-      assert.equal(waitingLocal.status, "completed");
+    check("no paid engine waits for ASCENSION runtime without invoking Lovable", () => {
+      assert.equal(waitingLocal.status, "running");
       assert.equal(waitingLocal.source, null);
       assert.equal(waitingLocal.response_payload, null);
-      assert.match(waitingLocal.error, /no answer engine connected/);
+      assert.equal(waitingLocal.error, null);
+      assert.match(waitingLocal.note, /Awaiting the ASCENSION runtime/);
     });
+  // Hosting Lovable must not hide a real delivered local result.
+  process.env.LOVABLE_API_KEY = "host-key-does-not-override-local";
   const localDraft = await deliveryEngine.resolveDelivery({
     run: runShoe,
     artifactStage: null,
@@ -477,7 +480,7 @@ try {
     store: noStore,
     retry: false,
   });
-  check("a local model draft appears while the governed run is still running", () => {
+  check("a local model draft appears even with a Lovable hosting key", () => {
     assert.equal(localDraft.status, "completed");
     assert.equal(localDraft.source, "external_draft");
     assert.match(localDraft.response_payload.body, /heel pod/);
@@ -554,8 +557,10 @@ try {
   const original = globalThis.fetch;
   const priorKey = process.env.ZAI_API_KEY;
   const priorLovableKey = process.env.LOVABLE_API_KEY;
+  const priorZaiOptIn = process.env.ASCENSION_ALLOW_PAID_DRAFTS;
   delete process.env.LOVABLE_API_KEY;
   process.env.ZAI_API_KEY = "test-only";
+  process.env.ASCENSION_ALLOW_PAID_DRAFTS = "true";
   try {
     const payload = JSON.stringify(valid);
     const bytes = new TextEncoder().encode(
@@ -696,11 +701,15 @@ try {
     else process.env.ZAI_API_KEY = priorKey;
     if (priorLovableKey === undefined) delete process.env.LOVABLE_API_KEY;
     else process.env.LOVABLE_API_KEY = priorLovableKey;
+    if (priorZaiOptIn === undefined) delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
+    else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorZaiOptIn;
   }
 
-  // Production hosted path: Lovable AI is preferred even when a stale Z.AI
+  // Explicitly opted-in hosted path: Lovable is available only when authorized,
   // credential exists, and it never calls localhost.
   const priorLovableModel = process.env.LOVABLE_AI_MODEL;
+  const priorHostedOptIn = process.env.ASCENSION_ALLOW_LOVABLE_AI;
+  process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
   process.env.LOVABLE_API_KEY = "lovable-test-only";
   process.env.ZAI_API_KEY = "stale-zai-key";
   delete process.env.LOCAL_LLM_BASE_URL;
@@ -722,7 +731,7 @@ try {
       );
     };
     const hosted = await callZai({ system: "test", user: "test" });
-    check("Lovable AI is the hosted ENGAGE path and does not use localhost", () => {
+    check("explicit Lovable opt-in uses hosted inference and not localhost", () => {
       assert.equal(sentUrl, "https://ai.gateway.lovable.dev/v1/chat/completions");
       assert.equal(sentAuth, "Bearer lovable-test-only");
       assert.equal(sentLovableKey, "lovable-test-only");
@@ -736,6 +745,8 @@ try {
     else process.env.LOVABLE_API_KEY = priorLovableKey;
     if (priorLovableModel === undefined) delete process.env.LOVABLE_AI_MODEL;
     else process.env.LOVABLE_AI_MODEL = priorLovableModel;
+    if (priorHostedOptIn === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI;
+    else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptIn;
     if (priorKey === undefined) delete process.env.ZAI_API_KEY;
     else process.env.ZAI_API_KEY = priorKey;
   }

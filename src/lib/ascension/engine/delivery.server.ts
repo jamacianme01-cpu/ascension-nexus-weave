@@ -519,10 +519,9 @@ export async function externalProductDraft(
       repairedCandidate["kind"] = "answer";
     parsed = parseDelivery(repairedCandidate);
     if (missingSpiralExpansion && needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
-      // Keep the substantive answer visible, but do not pretend the missing
-      // paths or blend were generated. A later NEW ANSWERS run can try again.
-      parsed = { ...parsed, limitations: [...parsed.limitations,
-        "Spiral expansion remained incomplete after one repair attempt; some distinct pathways or the blend are missing."] };
+      // Fail closed: an invention/design answer with zero pathways is not a
+      // completed ASCENSION creation. Never persist it as a successful draft.
+      throw new Error("Spiral failed to deliver three distinct pathways and a blend after repair. No completed design was recorded.");
     }
   }
 

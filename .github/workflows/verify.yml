@@ -20,4 +20,25 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bunx tsc --noEmit
-      - run: bun run test:interface
+      - name: Legacy Vite SSR integration tests (production branch)
+        if: github.ref_name == 'main'
+        run: bun run test:interface
+      - name: Independent Node HTTP smoke test
+        if: github.ref_name == 'independent-hosting'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PORT=4179 HOST=127.0.0.1
+          node .output/server/index.mjs > /tmp/ascension-node.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 25); do
+            if curl -fsS "http://127.0.0.1:4179/__ascension/health" > /tmp/ascension-health.json; then
+              grep -q '"status":"alive"' /tmp/ascension-health.json
+              cat /tmp/ascension-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/ascension-node.log
+          exit 1

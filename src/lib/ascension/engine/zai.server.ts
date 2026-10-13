@@ -16,6 +16,9 @@ const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_MODEL = "glm-4.6";
 const LOVABLE_BASE_URL = "https://ai.gateway.lovable.dev/v1";
 const LOVABLE_MODEL = "google/gemini-3.1-flash-lite";
+// A hosted, zero-price preview route. Never select a paid model here.
+const FREE_BASE_URL = "https://openrouter.ai/api/v1";
+const FREE_MODEL = "openrouter/free";
 // Local answer engine takes priority when explicitly configured.
 // Lovable AI is optional and requires explicit owner opt-in.
 const DEFAULT_LOCAL_MODEL = "qwen3:4b";
@@ -64,6 +67,7 @@ export class ZaiEngineError extends Error {
 
 export function zaiModel(): string {
   if (localLlmConfig()) return localLlmConfig()!.model;
+  if (process.env["OPENROUTER_API_KEY"]?.trim()) return FREE_MODEL;
   if (process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true" &&
       process.env["LOVABLE_API_KEY"]?.trim())
     return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
@@ -166,11 +170,12 @@ export async function callZai(input: {
   temperature?: number;
 }): Promise<ZaiCallResult> {
   const local = localLlmConfig();
+  const freeCloudKey = process.env["OPENROUTER_API_KEY"]?.trim();
   const lovableKey = process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true"
     ? process.env["LOVABLE_API_KEY"]?.trim() : null;
   const zaiKey = process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true"
     ? process.env["ZAI_API_KEY"]?.trim() : null;
-  const provider = local ? "local" : lovableKey ? "lovable" : zaiKey ? "zai" : null;
+  const provider = local ? "local" : freeCloudKey ? "free_cloud" : lovableKey ? "lovable" : zaiKey ? "zai" : null;
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",
@@ -207,8 +212,8 @@ export async function callZai(input: {
   const model = zaiModel();
   const started = Date.now();
   const baseUrl =
-    provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai" ? zaiBaseUrl() : local!.baseUrl;
-  const apiKey = provider === "lovable" ? lovableKey : provider === "zai" ? zaiKey : null;
+    provider === "free_cloud" ? FREE_BASE_URL : provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai" ? zaiBaseUrl() : local!.baseUrl;
+  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "lovable" ? lovableKey : provider === "zai" ? zaiKey : null;
   const nativeUrl = provider === "local" ? ollamaChatUrl(baseUrl) : null;
   let response: Response;
   try {
@@ -230,6 +235,8 @@ export async function callZai(input: {
       body: JSON.stringify({
         model,
         stream: true,
+        // Fail closed if no no-retention free model is available.
+        ...(provider === "free_cloud" ? { provider: { data_collection: "deny", zdr: true, max_price: { prompt: 0, completion: 0 } } } : {}),
         ...(nativeUrl
           ? {
               // Qwen3 otherwise defaults to thinking, which can consume the

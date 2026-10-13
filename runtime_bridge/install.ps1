@@ -28,7 +28,7 @@ try {
     if (!$response) { throw 'Ollama did not start. The answer worker needs a running local model.' }
 }
 $names = @($response.models | ForEach-Object { $_.name })
-$model = @('qwen3:4b','qwen3-ascension','qwen3-ascension:latest') | Where-Object { $names -contains $_ } | Select-Object -First 1
+$model = @('qwen3-ascension:latest','qwen3-ascension','qwen3:4b') | Where-Object { $names -contains $_ } | Select-Object -First 1
 if (!$model) { $model = $names | Where-Object { $_ -match '^(qwen|llama|gemma|mistral|phi|deepseek)' -and $_ -notmatch 'embed' } | Select-Object -First 1 }
 if (!$model) { throw ('A local answer model is needed. Installed models: ' + ($names -join ', ')) }
 

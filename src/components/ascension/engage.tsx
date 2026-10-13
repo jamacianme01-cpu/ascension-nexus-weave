@@ -1217,8 +1217,6 @@ export function Engage() {
   };
   const deliveryError = deliveryQuery.data?.error ?? invalidDelivery;
   const closeReality = () => {
-    atmosphere.current?.stop();
-    atmosphere.current = null;
     setReality(null);
   };
   const newObjective = () => {

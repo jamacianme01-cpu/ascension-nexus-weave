@@ -18,6 +18,6 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
-      - run: bun run test:interface
       - run: bun run build
       - run: bunx tsc --noEmit
+      - run: bun run test:interface

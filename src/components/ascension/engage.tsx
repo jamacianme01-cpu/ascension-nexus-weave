@@ -439,7 +439,7 @@ function ResultContent({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {drawing && (
         <section className="ascension-artifact-hero overflow-hidden rounded-2xl border border-primary/40 bg-background/30 shadow-2xl">
           <div className="flex items-center justify-between gap-3 border-b border-primary/20 px-4 py-3 sm:px-5">
@@ -466,7 +466,7 @@ function ResultContent({
       )}
 
       {!canInspect && (
-        <div className="space-y-3">
+        <div className="order-first space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="label-eyebrow text-primary">
@@ -500,7 +500,7 @@ function ResultContent({
             </details>
           )}
 
-          {(body.detail || body.internal) && (
+          {(body.detail || body.internal) && !hasVisualChoices && (
             <div className="grid gap-2 sm:grid-cols-2">
               {body.detail && (
                 <details className="rounded-xl border border-border/70 bg-void/35 px-4 py-3">
@@ -527,8 +527,13 @@ function ResultContent({
         </div>
       )}
 
+      {!hasVisualChoices && /\\b(make|build|create|design|construct|draw)\\b/i.test(delivery.title) && (
+        <p className="order-first rounded-xl border border-gold/40 bg-gold/5 p-4 text-sm text-gold">
+          No Spiral design pathways were delivered. This text is not a completed creation.
+        </p>
+      )}
       {(delivery.pathways.length > 0 || delivery.blend) && (
-        <section className="ascension-pathway-cards space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.025] p-4 sm:p-5">
+        <section className="ascension-pathway-cards order-first space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.025] p-4 sm:p-5">
           <div>
             <p className="label-eyebrow text-primary">SPIRAL PATHWAYS</p>
             <p className="mt-1 text-sm text-muted-foreground">

@@ -132,20 +132,36 @@ function playAscensionSound(ref: { current: AudioContext | null }, cue: Ascensio
   const emit = () => {
     if (ctx.state !== "running") return;
     const now = ctx.currentTime;
-    const notes = cue === "engage" ? [392, 523.25] : [523.25, 659.25, 783.99];
+    // A short cinematic rise on ENGAGE and a descending resolution on ANSWER.
+    // Audible mid-range fundamentals with moving harmonics, never continuous music.
+    const notes = cue === "engage" ? [196, 294, 392] : [587.33, 440, 293.66];
     notes.forEach((frequency, index) => {
       const oscillator = ctx.createOscillator();
+      const overtone = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
       const volume = ctx.createGain();
-      const start = now + index * 0.105;
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(frequency, start);
+      const start = now + index * 0.14;
+      oscillator.type = "sawtooth";
+      overtone.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency * 0.82, start);
+      oscillator.frequency.exponentialRampToValueAtTime(frequency, start + 0.25);
+      overtone.frequency.setValueAtTime(frequency * 2.01, start);
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(620, start);
+      filter.frequency.exponentialRampToValueAtTime(1700, start + 0.23);
       volume.gain.setValueAtTime(0.0001, start);
-      volume.gain.exponentialRampToValueAtTime(0.18, start + 0.035);
-      volume.gain.exponentialRampToValueAtTime(0.0001, start + 0.36);
-      oscillator.connect(volume).connect(ctx.destination);
+      volume.gain.exponentialRampToValueAtTime(0.085, start + 0.09);
+      volume.gain.exponentialRampToValueAtTime(0.0001, start + 0.66);
+      oscillator.connect(filter);
+      overtone.connect(filter);
+      filter.connect(volume).connect(ctx.destination);
       oscillator.start(start);
-      oscillator.stop(start + 0.38);
-      oscillator.onended = () => { oscillator.disconnect(); volume.disconnect(); };
+      overtone.start(start);
+      oscillator.stop(start + 0.68);
+      overtone.stop(start + 0.68);
+      oscillator.onended = () => {
+        oscillator.disconnect(); overtone.disconnect(); filter.disconnect(); volume.disconnect();
+      };
     });
   };
   if (ctx.state === "running") emit();

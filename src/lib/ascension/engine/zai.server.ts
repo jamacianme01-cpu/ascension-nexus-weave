@@ -66,8 +66,8 @@ export class ZaiEngineError extends Error {
 }
 
 export function zaiModel(): string {
-  if (localLlmConfig()) return localLlmConfig()!.model;
   if (process.env["OPENROUTER_API_KEY"]?.trim()) return FREE_MODEL;
+  if (localLlmConfig()) return localLlmConfig()!.model;
   if (process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true" &&
       process.env["LOVABLE_API_KEY"]?.trim())
     return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
@@ -175,7 +175,9 @@ export async function callZai(input: {
     ? process.env["LOVABLE_API_KEY"]?.trim() : null;
   const zaiKey = process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true"
     ? process.env["ZAI_API_KEY"]?.trim() : null;
-  const provider = local ? "local" : freeCloudKey ? "free_cloud" : lovableKey ? "lovable" : zaiKey ? "zai" : null;
+  // A configured public cloud route wins over localhost, even if a local
+  // desktop development URL accidentally remains in server settings.
+  const provider = freeCloudKey ? "free_cloud" : local ? "local" : lovableKey ? "lovable" : zaiKey ? "zai" : null;
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",

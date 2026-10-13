@@ -551,8 +551,75 @@ export async function externalProductDraft(
           parsed = candidate;
         }
       }
+      if (needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
+        // A smaller provider may repeatedly collapse an entire pathway set to
+        // prose. Ask for one independent candidate per call, then synthesize
+        // the blend from the three accepted candidate outputs.
+        const distinct: ObjectiveDelivery["pathways"] = [];
+        const routes = [
+          "Prioritize a minimal practical prototype and rapid iteration.",
+          "Prioritize modularity, serviceability, and interchangeable subsystems.",
+          "Prioritize a substantially different mechanism or architecture with a clear tradeoff.",
+        ];
+        for (let index = 0; index < routes.length; index++) {
+          const pathResponse = await callZai({
+            includeInternalKnowledge: false,
+            temperature: 0.3,
+            system: [
+              "You are ASCENSION Spiral. Return only a JSON object with key pathway.",
+              "Provide ONE concrete, useful engineering approach to the user's exact objective.",
+              "Pathway fields: id, label, summary, steps (array of actionable strings), tradeoffs (array of strings), spiral_form.",
+              "Do not invent physical tests, CAD, generated images, or verified results.",
+              "Make this pathway materially different from the previously accepted pathways.",
+            ].join(" "),
+            user: JSON.stringify({
+              objective: run.objective, constraints: run.constraints ?? null,
+              direction: routes[index], prior_pathways: distinct.map(p => ({
+                label: p.label, summary: p.summary,
+              })),
+            }),
+          });
+          const raw = pathResponse.json?.["pathway"];
+          if (!raw || typeof raw !== "object") break;
+          try {
+            const next = parseDelivery({ ...parsed, pathways: [{
+              ...record(raw), id: `spiral_path_${index + 1}`,
+            }], blend: null }).pathways[0];
+            if (!next?.summary || !next.steps.length ||
+                distinct.some(p => `${p.label}|${p.summary}`.toLowerCase() ===
+                  `${next.label}|${next.summary}`.toLowerCase())) break;
+            distinct.push(next);
+          } catch { break; }
+        }
+        if (distinct.length === 3) {
+          const blendResponse = await callZai({
+            includeInternalKnowledge: false,
+            temperature: 0.2,
+            system: [
+              "ASCENSION blend synthesis. Return only JSON with key blend.",
+              "Combine compatible, explicitly named strengths from the provided three pathways.",
+              "Required blend fields: id, label, summary, steps (string array), tradeoffs (string array), blend_from (exact input pathway ids), blend_reason (specific compatibility rationale).",
+              "Do not claim execution, simulation, verified outcomes, or generated media.",
+            ].join(" "),
+            user: JSON.stringify({ objective: run.objective, pathways: distinct }),
+          });
+          if (blendResponse.json?.["blend"]) {
+            try {
+              const assembled = parseDelivery({
+                ...parsed, pathways: distinct, blend: {
+                  ...record(blendResponse.json["blend"]), id: "spiral_blend",
+                },
+              });
+              if (!needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, assembled) &&
+                  assembled.blend && assembled.blend.blend_from.length >= 2 &&
+                  assembled.blend.blend_from.every(id => distinct.some(p => p.id === id)))
+                parsed = assembled;
+            } catch { /* The incomplete draft remains explicitly unsuccessful. */ }
+          }
+        }
+      }
       if (needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed))
-        throw new Error("Spiral could not generate three distinct design pathways and a blend. No completed creation was recorded.");
+        throw new Error("Spiral synthesis failed: three distinct pathways and a compatible blend were not delivered.");
     }
   }
 

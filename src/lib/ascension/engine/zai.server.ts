@@ -16,8 +16,8 @@ const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_MODEL = "glm-4.6";
 const LOVABLE_BASE_URL = "https://ai.gateway.lovable.dev/v1";
 const LOVABLE_MODEL = "google/gemini-3.1-flash-lite";
-// Local answer engine remains available for local development only when an
-// explicit LOCAL_LLM_BASE_URL is configured. Production ENGAGE uses Lovable AI.
+// Local answer engine takes priority when explicitly configured.
+// Lovable AI is optional and requires explicit owner opt-in.
 const DEFAULT_LOCAL_MODEL = "qwen3:4b";
 const LOCAL_MAX_TOKENS = 4096;
 
@@ -63,13 +63,14 @@ export class ZaiEngineError extends Error {
 }
 
 export function zaiModel(): string {
-  if (process.env["LOVABLE_API_KEY"]?.trim()) {
+  if (localLlmConfig()) return localLlmConfig()!.model;
+  if (process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true" &&
+      process.env["LOVABLE_API_KEY"]?.trim())
     return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
-  }
-  const hosted = process.env["ZAI_MODEL"]?.trim();
-  if (hosted && process.env["ZAI_API_KEY"]?.trim()) return hosted;
-  if (process.env["ZAI_API_KEY"]?.trim()) return DEFAULT_MODEL;
-  return localLlmConfig()?.model || LOVABLE_MODEL;
+  if (process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true" &&
+      process.env["ZAI_API_KEY"]?.trim())
+    return process.env["ZAI_MODEL"]?.trim() || DEFAULT_MODEL;
+  return DEFAULT_LOCAL_MODEL;
 }
 
 function zaiBaseUrl(): string {
@@ -152,9 +153,8 @@ async function readStream(response: Response, nativeOllama = false) {
   return { text, finishReason, sawThinking };
 }
 
-/** One streamed engine call. Production prefers Lovable's built-in AI gateway;
- *  Z.AI is used only when explicitly configured, and a local OpenAI-compatible
- *  engine is used only when LOCAL_LLM_BASE_URL is explicitly set. */
+/** One streamed engine call. Local inference is preferred when configured;
+ * external paid gateways are used only with explicit owner opt-in. */
 export async function callZai(input: {
   system: string;
   user: string;
@@ -165,13 +165,15 @@ export async function callZai(input: {
   imageDataUrl?: string;
   temperature?: number;
 }): Promise<ZaiCallResult> {
-  const lovableKey = process.env["LOVABLE_API_KEY"]?.trim();
-  const zaiKey = process.env["ZAI_API_KEY"]?.trim();
-  const local = !lovableKey && !zaiKey ? localLlmConfig() : null;
-  const provider = lovableKey ? "lovable" : zaiKey ? "zai" : local ? "local" : null;
+  const local = localLlmConfig();
+  const lovableKey = process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true"
+    ? process.env["LOVABLE_API_KEY"]?.trim() : null;
+  const zaiKey = process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true"
+    ? process.env["ZAI_API_KEY"]?.trim() : null;
+  const provider = local ? "local" : lovableKey ? "lovable" : zaiKey ? "zai" : null;
   if (!provider) {
     throw new ZaiEngineError(
-      "No answer engine is configured. Lovable AI should provide LOVABLE_API_KEY in deployed projects.",
+      "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",
     );
   }
 

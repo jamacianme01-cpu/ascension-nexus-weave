@@ -518,7 +518,7 @@ export async function externalProductDraft(
       !repairedCandidate["pathways"].some((pathway) => record(pathway)["visual_svg"]))
       repairedCandidate["kind"] = "answer";
     parsed = parseDelivery(repairedCandidate);
-    if (missingSpiralExpansion && requestedKind(run.objective) === "design" && needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
+    if (missingSpiralExpansion && requestedKind(run.objective) === "design" && parsed.pathways.length === 0 && needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
       // Fail closed: an invention/design answer with zero pathways is not a
       // completed ASCENSION creation. Never persist it as a successful draft.
       throw new Error("Spiral failed to deliver three distinct pathways and a blend after repair. No completed design was recorded.");

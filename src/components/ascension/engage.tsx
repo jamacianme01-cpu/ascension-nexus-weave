@@ -211,12 +211,9 @@ function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: Objec
   // A BLEND is synthesis, not another Spiral pathway. Never inflate the
   // pathway count by counting BLEND as a path.
   const deliveredPathCount = delivery.pathways.length;
-  const pathCount = deliveredPathCount || planning.branches.length;
-  const spiralSignal = pathCount
-    ? `${pathCount} PATH${pathCount === 1 ? "" : "S"}${delivery.blend ? " + BLEND" : ""}`
-    : delivery.blend
-      ? "BLEND"
-      : "ACTIVE";
+  const spiralSignal = deliveredPathCount
+    ? `${deliveredPathCount} DELIVERED PATH${deliveredPathCount === 1 ? "" : "S"}${delivery.blend ? " + BLEND" : ""}`
+    : "NO PATHWAYS DELIVERED";
   const guardian = run.guardian_verdict ?? "—";
   const autosync = String(result["autosync_verdict"] ?? "—");
   const delta = governedPersisted(run)
@@ -1470,7 +1467,7 @@ export function Engage() {
             <button type="button" disabled={engage.isPending} onClick={() => followUp("refine")}
               className="min-h-11 rounded-full border border-gold/40 px-5 text-sm text-gold">BUILD ON RESULT</button>
             <button type="button" disabled={engage.isPending} onClick={() => newRevision("new_answers")}
-              className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary">NEW ANSWERS</button>
+              className="min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary">{delivery.pathways.length === 0 && /\\b(make|build|create|design|construct|draw)\\b/i.test(run.objective) ? "GENERATE SPIRAL PATHWAYS" : "NEW ANSWERS"}</button>
             {parentQuestionId(run.evidence) && pastQuestions.find(item => item.id === parentQuestionId(run.evidence)) &&
               <button type="button" disabled={engage.isPending}
                 onClick={() => openQuestion(pastQuestions.find(item => item.id === parentQuestionId(run.evidence))!)}

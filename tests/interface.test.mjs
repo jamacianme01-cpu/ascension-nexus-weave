@@ -707,9 +707,11 @@ try {
 
   // Free cloud inference must remain server-side, zero-price, and privacy-gated.
   const priorFreeCloudKey = process.env.OPENROUTER_API_KEY;
+  const priorFreeLocalBase = process.env.LOCAL_LLM_BASE_URL;
   const priorHostedOptInForFree = process.env.ASCENSION_ALLOW_LOVABLE_AI;
   const priorFreeHostedKey = process.env.LOVABLE_API_KEY;
   process.env.OPENROUTER_API_KEY = "free-cloud-test-only";
+  process.env.LOCAL_LLM_BASE_URL = "http://127.0.0.1:11434/v1";
   process.env.LOVABLE_API_KEY = "should-not-be-used";
   process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
   try {
@@ -748,6 +750,8 @@ try {
     globalThis.fetch = original;
     if (priorFreeCloudKey === undefined) delete process.env.OPENROUTER_API_KEY;
     else process.env.OPENROUTER_API_KEY = priorFreeCloudKey;
+    if (priorFreeLocalBase === undefined) delete process.env.LOCAL_LLM_BASE_URL;
+    else process.env.LOCAL_LLM_BASE_URL = priorFreeLocalBase;
     if (priorHostedOptInForFree === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI;
     else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptInForFree;
     if (priorFreeHostedKey === undefined) delete process.env.LOVABLE_API_KEY;

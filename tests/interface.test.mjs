@@ -705,6 +705,55 @@ try {
     else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorZaiOptIn;
   }
 
+  // Free cloud inference must remain server-side, zero-price, and privacy-gated.
+  const priorFreeCloudKey = process.env.OPENROUTER_API_KEY;
+  const priorHostedOptInForFree = process.env.ASCENSION_ALLOW_LOVABLE_AI;
+  const priorFreeHostedKey = process.env.LOVABLE_API_KEY;
+  process.env.OPENROUTER_API_KEY = "free-cloud-test-only";
+  process.env.LOVABLE_API_KEY = "should-not-be-used";
+  process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
+  try {
+    let sentUrl = "";
+    let sentHeaders = null;
+    let sentPayload = null;
+    globalThis.fetch = async (url, init) => {
+      sentUrl = String(url);
+      sentHeaders = init.headers;
+      sentPayload = JSON.parse(String(init.body));
+      return new Response(
+        'data: ' + JSON.stringify({ choices: [{ delta: { content: "Three possible designs." } }] }) + '\\n\\n' +
+        'data: [DONE]\\n\\n'
+      );
+    };
+    const freeResult = await callZai({ system: "ASCENSION", user: "Create three pathways.", includeInternalKnowledge: false });
+    check("free cloud route uses only no-charge inference with privacy restrictions", () => {
+      assert.equal(sentUrl, "https://openrouter.ai/api/v1/chat/completions");
+      assert.equal(sentHeaders.Authorization, "Bearer free-cloud-test-only");
+      assert.equal(sentHeaders["Lovable-API-Key"], undefined);
+      assert.equal(sentPayload.model, "openrouter/free");
+      assert.equal(sentPayload.provider.zdr, true);
+      assert.equal(sentPayload.provider.data_collection, "deny");
+      assert.deepEqual(sentPayload.provider.max_price, { prompt: 0, completion: 0 });
+      assert.equal(freeResult.model, "openrouter/free");
+      assert.equal(freeResult.text, "Three possible designs.");
+    });
+    globalThis.fetch = async () => new Response("Free model quota exhausted", { status: 429 });
+    await assert.rejects(
+      () => callZai({ system: "ASCENSION", user: "Another question", includeInternalKnowledge: false }),
+      /HTTP 429/
+    );
+    passed++;
+    process.stdout.write("PASS free quota exhaustion fails without paid fallback\\n");
+  } finally {
+    globalThis.fetch = original;
+    if (priorFreeCloudKey === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = priorFreeCloudKey;
+    if (priorHostedOptInForFree === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI;
+    else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptInForFree;
+    if (priorFreeHostedKey === undefined) delete process.env.LOVABLE_API_KEY;
+    else process.env.LOVABLE_API_KEY = priorFreeHostedKey;
+  }
+
   // Explicitly opted-in hosted path: Lovable is available only when authorized,
   // credential exists, and it never calls localhost.
   const priorLovableModel = process.env.LOVABLE_AI_MODEL;

@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
-import { createRealityAtmosphere } from "./reality-audio";
 
 import {
   getObjectiveStatus,
@@ -718,7 +717,6 @@ export function Engage() {
   const autoDrawingRun = useRef<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const atmosphere = useRef<ReturnType<typeof createRealityAtmosphere> | null>(null);
   const sequenceTimers = useRef<number[]>([]);
   const burstRun = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -763,7 +761,6 @@ export function Engage() {
   useEffect(
     () => () => {
       sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
-      atmosphere.current?.stop();
       const context = audioContextRef.current;
       if (context && context.state !== "closed") void context.close();
     },
@@ -795,12 +792,8 @@ export function Engage() {
       // Runs inside the click gesture: resume, then rebuild a fresh graph.
       const ctx = audioContextFor(audioContextRef);
       if (!ctx) { setSoundBlocked(true); return; }
-      atmosphere.current?.stop();
-      atmosphere.current = reality ? createRealityAtmosphere(ctx) : null;
       void ctx.resume().then(() => setSoundBlocked(ctx.state !== "running")).catch(() => setSoundBlocked(true));
     } else {
-      atmosphere.current?.stop();
-      atmosphere.current = null;
       setSoundBlocked(false);
       if (audioContextRef.current?.state === "running") void audioContextRef.current.suspend();
     }
@@ -1108,12 +1101,6 @@ export function Engage() {
     pathway: ObjectiveDelivery["pathways"][number],
     mode: RealityMode = "cutaway",
   ) => {
-    const ctx = audioContextFor(audioContextRef);
-    if (ctx && soundEnabled) {
-      void ctx.resume().then(() => setSoundBlocked(ctx.state !== "running")).catch(() => setSoundBlocked(true));
-      atmosphere.current?.stop();
-      atmosphere.current = createRealityAtmosphere(ctx);
-    }
     setTreeChoiceId(pathway.id);
     setReality({ id: pathway.id, mode });
   };

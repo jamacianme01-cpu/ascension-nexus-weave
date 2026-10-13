@@ -20,14 +20,25 @@ const noNetwork = async () => {
   throw new Error("unexpected request");
 };
 assert.equal(
-  await connectAnswerEngine({ LOVABLE_API_KEY: "test-only" }, { request: noNetwork }),
+  await connectAnswerEngine({ LOVABLE_API_KEY: "test-only", ASCENSION_ALLOW_LOVABLE_AI: "true" }, { request: noNetwork }),
   "configured Lovable AI",
 );
-await assert.rejects(
-  connectAnswerEngine({ ZAI_API_KEY: "test-only" }, { request: noNetwork }),
-  /paid drafts are disabled/,
+assert.equal(
+  await connectAnswerEngine({ ZAI_API_KEY: "test-only", ASCENSION_ALLOW_PAID_DRAFTS: "true" }, { request: noNetwork }),
+  "configured Z.AI",
 );
-console.log("PASS configured hosted provider is preserved and paid opt-in is respected");
+const keyOnlyEnv = { LOVABLE_API_KEY: "hosted-but-not-approved", ZAI_API_KEY: "unused-key" };
+let keyOnlyUrl = "";
+const keyOnlyEngine = await connectAnswerEngine(keyOnlyEnv, {
+  request: async url => {
+    keyOnlyUrl = String(url);
+    return Response.json({ models: [{ name: "qwen3:4b" }] });
+  },
+  start: async () => {},
+});
+assert.equal(keyOnlyUrl, "http://127.0.0.1:11434/api/tags");
+assert.equal(keyOnlyEngine, "local model qwen3:4b");
+console.log("PASS hosted keys require opt-in; local inference remains available without payment");
 
 let started = 0,
   calls = 0;
@@ -86,7 +97,9 @@ console.log("PASS missing engines and missing models stop launch with a specific
 // its canonical :latest ID. Pass the canonical ID into the Vite child process.
 const available = ["qwen3-ascension:latest", "qwen3:4b", "qwen2.5-coder:3b", "qwen2.5-coder:14b"];
 for (const configuredUrl of ["http://127.0.0.1:11434/v1", undefined]) {
-  const config = { LOCAL_LLM_MODEL: "qwen3-ascension", ...(configuredUrl ? { LOCAL_LLM_BASE_URL: configuredUrl } : {}) };
+  const config = { LOCAL_LLM_MODEL: "qwen3-ascension", LOVABLE_API_KEY: "unused-host-key",
+    ASCENSION_ALLOW_LOVABLE_AI: "true",
+    ...(configuredUrl ? { LOCAL_LLM_BASE_URL: configuredUrl } : {}) };
   const result = await connectAnswerEngine(config, {
     request: async () => Response.json(configuredUrl
       ? { data: available.map((id) => ({ id })) }

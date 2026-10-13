@@ -518,10 +518,41 @@ export async function externalProductDraft(
       !repairedCandidate["pathways"].some((pathway) => record(pathway)["visual_svg"]))
       repairedCandidate["kind"] = "answer";
     parsed = parseDelivery(repairedCandidate);
-    if (missingSpiralExpansion && requestedKind(run.objective) === "design" && parsed.pathways.length === 0 && needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
-      // Fail closed: an invention/design answer with zero pathways is not a
-      // completed ASCENSION creation. Never persist it as a successful draft.
-      throw new Error("Spiral failed to deliver three distinct pathways and a blend after repair. No completed design was recorded.");
+    if (missingSpiralExpansion && requestedKind(run.objective) === "design" &&
+        needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed)) {
+      // Retry with a narrow pathway-only synthesis. Small free cloud models
+      // often return prose when asked for the full ASCENSION delivery schema.
+      // This retry never invents proof, media URLs, or executed artifacts.
+      const spiralRetry = await callZai({
+        includeInternalKnowledge: false,
+        temperature: 0.35,
+        system: [
+          "ASCENSION Spiral pathway synthesis. Return ONLY valid JSON with keys pathways and blend.",
+          "Create THREE genuinely different objective-specific engineering approaches and ONE meaningful compatible blend.",
+          "Each pathway must have id, label, summary, steps (3-7 actionable strings), tradeoffs (strings), spiral_form, visual_svg:null, model_spec:null, outcome_score:null, outcome_reason:null.",
+          "Blend must have id, label, summary, steps, tradeoffs, spiral_form:'spiral_outcome_blend', visual_svg:null, model_spec:null, outcome_score:null, outcome_reason:null, blend_from (selected path ids), blend_reason.",
+          "Never invent photos, simulated values, working hardware, verification, or design measurements not provided. No introductory prose.",
+        ].join(" "),
+        user: JSON.stringify({
+          objective: run.objective,
+          constraints: run.constraints ?? null,
+          earlier_design: parsed.body.slice(0, 2400),
+          spiral_forms: spiralForms,
+        }),
+      });
+      const retryObject = spiralRetry.json;
+      if (retryObject && Array.isArray(retryObject["pathways"])) {
+        const candidate = parseDelivery({
+          ...parsed,
+          pathways: retryObject["pathways"],
+          blend: retryObject["blend"] ?? null,
+        });
+        if (!needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, candidate)) {
+          parsed = candidate;
+        }
+      }
+      if (needsSpiralExpansionRepair(run.objective, run.evidence, spiralForms, parsed))
+        throw new Error("Spiral could not generate three distinct design pathways and a blend. No completed creation was recorded.");
     }
   }
 

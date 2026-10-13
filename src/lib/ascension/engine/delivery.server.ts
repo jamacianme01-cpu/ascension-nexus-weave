@@ -709,7 +709,7 @@ export async function resolveDelivery(args: {
   const now = args.now ?? Date.now();
   const generate = args.generate ?? externalProductDraft;
   const review = args.review ?? reviewObjectiveFit;
-  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim());
+  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim()) && process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true";
   const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
   const hasOptInZai = Boolean(process.env["ZAI_API_KEY"]?.trim()) && process.env["ASCENSION_ALLOW_PAID_DRAFTS"] === "true";
   const canReview = hasLovableAi || hasExplicitLocal || hasOptInZai || Boolean(args.review);
@@ -780,9 +780,9 @@ export async function resolveDelivery(args: {
     engine_label: DRAFT_LABEL,
     engine_model: draft?.engine_model ?? null,
   };
-  // A Windows/local draft is only reusable when no hosted Lovable response
-  // path is available. Hosted ASCENSION must supersede stale local drafts.
-  const localSource = draft?.source_key === `local:${run.id}` && !hasLovableAi;
+  // User's own runtime is authoritative for delivering its clearly unverified
+  // local draft; the mere presence of a hosting gateway cannot disable it.
+  const localSource = draft?.source_key === `local:${run.id}`;
   const sameSource = localSource || draft?.source_key === sourceKey;
   const running = draft?.status === "running";
   const fresh = running && now - Date.parse(draft!.created_at) < DRAFT_STALE_MS;
@@ -802,21 +802,13 @@ export async function resolveDelivery(args: {
     note: null,
     source: "governed",
   });
-  // Production ENGAGE uses Lovable's built-in AI gateway when its managed
-  // project key is present. That keeps the answer path hosted and independent
-  // of the operator's Windows worker. Z.AI remains opt-in; local Ollama is only
-  // used when LOCAL_LLM_BASE_URL is explicitly configured.
+  // The website does NOT implicitly spend credits on hosted AI. The owner must
+  // explicitly opt in; otherwise allow the ASCENSION local worker to deliver.
   if (!args.generate && !hasLovableAi && !hasExplicitLocal && !hasOptInZai) {
     if (!TERMINAL_STATUSES.has(run.status))
-      return {
-        ...draftBase,
-        status: "completed",
-        response_payload: null,
-        error:
-          "The request was saved, but this server has no answer engine connected. For the local app, restart with npm run dev:local. The hosted app uses its own engine configuration.",
-        note: null,
-        source: null,
-      };
+      return pending("Awaiting the ASCENSION runtime or local answer worker. Lovable AI credits will not be used.", {
+        engine_label: "ASCENSION_LOCAL_RESULT_PENDING",
+      });
     return {
       ...base,
       status: "completed",
@@ -830,7 +822,7 @@ export async function resolveDelivery(args: {
           limitations: [],
         }),
       error:
-        draft?.error ?? "No hosted answer engine is available. Enable Lovable AI for this project.",
+        draft?.error ?? "The runtime finished without a usable result. Connect the ASCENSION local answer worker; no paid hosted AI was called.",
       note: null,
       source: "governed",
     };

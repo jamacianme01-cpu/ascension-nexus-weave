@@ -11,7 +11,7 @@ export const Route = createFileRoute("/api/public/ascension/answer-readiness")({
         return new Response(JSON.stringify({
           cloud_answer_configured: Boolean(provider),
           cloud_provider: provider,
-          requires_owner_pc: false,
+          pc_independent_answers_configured: Boolean(provider),
           live_inference_tested: false,
           note: provider
             ? "Cloud credentials detected. Submit a new objective to verify actual inference."

@@ -22,8 +22,10 @@ import { Route as PathwaysRouteImport } from './routes/pathways'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
 import { Route as AuthenticatedObjectivesRouteImport } from './routes/_authenticated/objectives'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ConsoleKnowledgeverseRouteImport } from './routes/console/knowledgeverse'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as ApiPublicAscensionAnswerReadinessRouteImport } from './routes/api/public/ascension/answer-readiness'
 import { Route as ApiPublicAscensionExecutionQueueRouteImport } from './routes/api/public/ascension/execution-queue'
 import { Route as ApiPublicAscensionModelQueueRouteImport } from './routes/api/public/ascension/model-queue'
 import { Route as ApiPublicAscensionPublishRouteImport } from './routes/api/public/ascension/publish'
@@ -95,6 +97,11 @@ const AuthenticatedObjectivesRoute = AuthenticatedObjectivesRouteImport.update({
   path: '/objectives',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConsoleKnowledgeverseRoute = ConsoleKnowledgeverseRouteImport.update({
   id: '/knowledgeverse',
   path: '/knowledgeverse',
@@ -105,6 +112,12 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAscensionAnswerReadinessRoute =
+  ApiPublicAscensionAnswerReadinessRouteImport.update({
+    id: '/api/public/ascension/answer-readiness',
+    path: '/api/public/ascension/answer-readiness',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAscensionExecutionQueueRoute =
   ApiPublicAscensionExecutionQueueRouteImport.update({
     id: '/api/public/ascension/execution-queue',
@@ -148,8 +161,10 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
   '/objectives': typeof AuthenticatedObjectivesRoute
+  '/api/health': typeof ApiHealthRoute
   '/console/knowledgeverse': typeof ConsoleKnowledgeverseRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/api/public/ascension/answer-readiness': typeof ApiPublicAscensionAnswerReadinessRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/model-queue': typeof ApiPublicAscensionModelQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -169,8 +184,10 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/live': typeof AuthenticatedLiveRoute
   '/objectives': typeof AuthenticatedObjectivesRoute
+  '/api/health': typeof ApiHealthRoute
   '/console/knowledgeverse': typeof ConsoleKnowledgeverseRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/api/public/ascension/answer-readiness': typeof ApiPublicAscensionAnswerReadinessRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/model-queue': typeof ApiPublicAscensionModelQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -192,8 +209,10 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/live': typeof AuthenticatedLiveRoute
   '/_authenticated/objectives': typeof AuthenticatedObjectivesRoute
+  '/api/health': typeof ApiHealthRoute
   '/console/knowledgeverse': typeof ConsoleKnowledgeverseRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/api/public/ascension/answer-readiness': typeof ApiPublicAscensionAnswerReadinessRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
   '/api/public/ascension/model-queue': typeof ApiPublicAscensionModelQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
@@ -215,8 +234,10 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/live'
     | '/objectives'
+    | '/api/health'
     | '/console/knowledgeverse'
     | '/.lovable/oauth/consent'
+    | '/api/public/ascension/answer-readiness'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/model-queue'
     | '/api/public/ascension/publish'
@@ -236,8 +257,10 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/live'
     | '/objectives'
+    | '/api/health'
     | '/console/knowledgeverse'
     | '/.lovable/oauth/consent'
+    | '/api/public/ascension/answer-readiness'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/model-queue'
     | '/api/public/ascension/publish'
@@ -258,8 +281,10 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/live'
     | '/_authenticated/objectives'
+    | '/api/health'
     | '/console/knowledgeverse'
     | '/.lovable/oauth/consent'
+    | '/api/public/ascension/answer-readiness'
     | '/api/public/ascension/execution-queue'
     | '/api/public/ascension/model-queue'
     | '/api/public/ascension/publish'
@@ -279,7 +304,9 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   PathwaysRoute: typeof PathwaysRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
+  ApiPublicAscensionAnswerReadinessRoute: typeof ApiPublicAscensionAnswerReadinessRoute
   ApiPublicAscensionExecutionQueueRoute: typeof ApiPublicAscensionExecutionQueueRoute
   ApiPublicAscensionModelQueueRoute: typeof ApiPublicAscensionModelQueueRoute
   ApiPublicAscensionPublishRoute: typeof ApiPublicAscensionPublishRoute
@@ -380,6 +407,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedObjectivesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/console/knowledgeverse': {
       id: '/console/knowledgeverse'
       path: '/knowledgeverse'
@@ -392,6 +426,13 @@ declare module '@tanstack/react-router' {
       path: '/.lovable/oauth/consent'
       fullPath: '/.lovable/oauth/consent'
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ascension/answer-readiness': {
+      id: '/api/public/ascension/answer-readiness'
+      path: '/api/public/ascension/answer-readiness'
+      fullPath: '/api/public/ascension/answer-readiness'
+      preLoaderRoute: typeof ApiPublicAscensionAnswerReadinessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/ascension/execution-queue': {
@@ -469,7 +510,10 @@ const rootRouteChildren: RootRouteChildren = {
   PathwaysRoute: PathwaysRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  ApiHealthRoute: ApiHealthRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
+  ApiPublicAscensionAnswerReadinessRoute:
+    ApiPublicAscensionAnswerReadinessRoute,
   ApiPublicAscensionExecutionQueueRoute: ApiPublicAscensionExecutionQueueRoute,
   ApiPublicAscensionModelQueueRoute: ApiPublicAscensionModelQueueRoute,
   ApiPublicAscensionPublishRoute: ApiPublicAscensionPublishRoute,

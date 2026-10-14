@@ -446,6 +446,10 @@ try {
   const priorPaidDrafts = process.env.ASCENSION_ALLOW_PAID_DRAFTS;
   const priorLovableAi = process.env.LOVABLE_API_KEY;
   const priorLocalBaseNoEngine = process.env.LOCAL_LLM_BASE_URL;
+  const priorZaiNoEngine = process.env.ZAI_API_KEY;
+  const priorOpenRouterNoEngine = process.env.OPENROUTER_API_KEY;
+  delete process.env.ZAI_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
   delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
   delete process.env.LOVABLE_API_KEY;
   delete process.env.LOCAL_LLM_BASE_URL;
@@ -492,6 +496,8 @@ try {
     else process.env.LOVABLE_API_KEY = priorLovableAi;
     if (priorLocalBaseNoEngine === undefined) delete process.env.LOCAL_LLM_BASE_URL;
     else process.env.LOCAL_LLM_BASE_URL = priorLocalBaseNoEngine;
+    if (priorZaiNoEngine !== undefined) process.env.ZAI_API_KEY = priorZaiNoEngine;
+    if (priorOpenRouterNoEngine !== undefined) process.env.OPENROUTER_API_KEY = priorOpenRouterNoEngine;
   }
   const verifiedShoe = { ...runShoe, status: "verified", completed_at: "2026-09-28T13:06:48Z" };
   const noFilesYet = await deliveryEngine.resolveDelivery({

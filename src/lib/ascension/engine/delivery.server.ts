@@ -834,14 +834,44 @@ export async function resolveDelivery(args: {
       },
     );
   }
-  const failed = (message: string): ResolvedDelivery => ({
-    ...draftBase,
-    status: "completed",
-    response_payload: governed,
-    error: `The external result engine failed: ${message}`,
-    note: null,
-    source: "governed",
-  });
+  const failed = (message: string): ResolvedDelivery => {
+    // When external synthesis fails, show only pathways actually recorded by
+    // the governed runtime. This does not invent a design or verification.
+    const planning = record(record(run.result)["objective_planning"]);
+    const branches = Array.isArray(planning["branches"]) ? planning["branches"].map(record) : [];
+    const recordedPaths = branches.slice(0, 8).flatMap((branch, index) => {
+      const label = String(branch["pathway"] ?? branch["name"] ?? branch["approach"] ?? branch["branch_id"] ?? branch["id"] ?? "").trim();
+      if (!label) return [];
+      const steps = Array.isArray(branch["steps"]) ? branch["steps"].filter((value): value is string => typeof value === "string") : [];
+      const risks = Array.isArray(branch["risks"]) ? branch["risks"].filter((value): value is string => typeof value === "string") : [];
+      return [{
+        id: String(branch["branch_id"] ?? branch["id"] ?? `recorded-${index + 1}`),
+        label: label.slice(0, 160),
+        summary: String(branch["summary"] ?? branch["description"] ?? branch["rationale"] ?? label).slice(0, 5000),
+        steps: steps.slice(0, 12),
+        tradeoffs: risks.slice(0, 12),
+        spiral_form: null, visual_svg: null, model_spec: null,
+        generated_image_url: null, generated_blueprint_url: null,
+        generated_environment_url: null, model_url: null,
+        outcome_score: null, outcome_reason: null,
+      }];
+    });
+    const recorded = run.status === "verified" && recordedPaths.length
+      ? parseDelivery({
+          kind: "answer", title: run.objective.slice(0, 200) || "ASCENSION pathways",
+          body: "Recorded pathways from ASCENSION's governed runtime. External synthesis is unavailable. These records do not establish that a physical build was completed.",
+          pathways: recordedPaths, blend: null, files: [],
+          limitations: ["External answer synthesis unavailable; showing recorded runtime planning only."],
+        })
+      : null;
+    const available = governed?.kind !== "not_produced" ? governed : (recorded ?? governed);
+    return {
+      ...draftBase, status: "completed", response_payload: available,
+      error: available && available.kind !== "not_produced" ? null : `The external result engine failed: ${message}`,
+      note: available && available.kind !== "not_produced" ? `External synthesis unavailable: ${message}` : null,
+      source: "governed",
+    };
+  };
   // The website does NOT implicitly spend credits on hosted AI. The owner must
   // explicitly opt in; otherwise allow the ASCENSION local worker to deliver.
   if (!args.generate && !hasFreeCloud && !hasZaiFree && !hasLovableAi && !hasExplicitLocal) {

@@ -221,7 +221,7 @@ export async function retrieveKnowledge(
     evidence,
     retrieved_at: new Date().toISOString(),
     // A mixed relay revision must not be presented as one coherent snapshot.
-    source_revision: revisions.size === 1 ? [...revisions][0] : null,
+    source_revision: revisions.size === 1 ? ([...revisions][0] ?? null) : null,
   };
 }
 

@@ -408,14 +408,11 @@ export async function externalProductDraft(
       stripModelProvenanceClaims(cleanGeneratedText(candidate["body"])),
       generated.externalKnowledge,
     );
-    const attributedSources = generated.externalKnowledge
-      ? formatExternalSourceList(generated.externalKnowledge) : "";
     candidate["body"] = cleanGeneratedText(
       [
         internalConnection,
         internalConnection ? "General-knowledge explanation:" : "",
         modelBody,
-        attributedSources,
       ].filter(Boolean).join("\n\n"),
     );
   }
@@ -637,8 +634,14 @@ export async function externalProductDraft(
       throw new Error(`The repaired result did not produce the requested output${check.reason ? ` (${check.reason})` : ""}.`);
   }
 
+  // All bounded model/schema/meaning repairs finish before server attribution.
+  // This appendix is generated from the retrieval record, never model output.
+  const attributedSources = generated.externalKnowledge
+    ? formatExternalSourceList(generated.externalKnowledge) : "";
+  const finalBody = removeUnsupportedExternalCitations(parsed.body, generated.externalKnowledge);
   return stampObjectiveFit(run.objective, {
     ...parsed,
+    body: attributedSources ? `${finalBody}\n\n${attributedSources}` : finalBody,
     files: check.kind === "answer" || check.kind === "design" ? [] : check.files,
     limitations: [
       ...parsed.limitations,

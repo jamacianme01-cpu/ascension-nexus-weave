@@ -19,6 +19,8 @@ export interface KnowledgeEvidence {
     | "governance_record"
     | "knowledge_record";
   provenance_status: "recorded" | "verified_runtime_record";
+  source_classification: string | null;
+  received_at: string | null;
   relevance_score: number;
 }
 
@@ -105,10 +107,9 @@ function classifyRecord(sourcePath: string, path: string) {
               : /guardian|constraint|confidence|governance/.test(key)
                 ? "governance_record"
                 : "knowledge_record";
-  const provenance_status: KnowledgeEvidence["provenance_status"] =
-    /verified_delta|ledger|evidence|transition/.test(key)
-      ? "verified_runtime_record"
-      : "recorded";
+  // A path such as /ledger or $.verified_delta is a category, not a
+  // verification receipt. Only the governed core can assert verification.
+  const provenance_status: KnowledgeEvidence["provenance_status"] = "recorded";
   return { record_kind, provenance_status };
 }
 
@@ -141,14 +142,21 @@ export async function retrieveKnowledge(
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("ascension_relay_documents")
-    .select("path, body, http_status")
+    .select("path, body, http_status, revision, source_classification, received_at")
     .in("path", [...INTERNAL_PATHS])
     .eq("http_status", 200);
   if (error) throw new Error(`ASCENSION internal knowledge retrieval failed: ${error.message}`);
 
   const queryTokens = tokens(cleanQuery);
-  const candidates: { sourcePath: string; path: string; text: string; score: number }[] = [];
-  let sourceRevision: number | null = null;
+  const candidates: {
+    sourcePath: string;
+    path: string;
+    text: string;
+    score: number;
+    classification: string | null;
+    receivedAt: string | null;
+  }[] = [];
+  const revisions = new Set<number>();
 
   for (const row of data ?? []) {
     let doc: Record<string, unknown>;
@@ -157,13 +165,17 @@ export async function retrieveKnowledge(
     } catch {
       continue;
     }
-    const revision = doc["snapshot_revision"];
-    if (typeof revision === "number") sourceRevision = Math.max(sourceRevision ?? 0, revision);
+    const revision = row.revision ?? doc["snapshot_revision"];
+    if (typeof revision === "number" && Number.isInteger(revision)) revisions.add(revision);
+    const provenance = {
+      classification: row.source_classification ?? null,
+      receivedAt: row.received_at ?? null,
+    };
     const root = doc["data"] ?? doc;
     const flattened = flattenStrings(root);
     for (const item of flattened) {
       const s = score(queryTokens, item);
-      if (s > 0) candidates.push({ sourcePath: row.path, ...item, score: s });
+      if (s > 0) candidates.push({ sourcePath: row.path, ...item, ...provenance, score: s });
     }
 
     // Always retain a compact Knowledgeverse baseline so ASCENSION never
@@ -175,6 +187,7 @@ export async function retrieveKnowledge(
       const baseline = compactFallback(doc, row.path);
       if (baseline) candidates.push({
         sourcePath: row.path,
+        ...provenance,
         path: "$.knowledgeverse.baseline",
         text: baseline,
         score: 1,
@@ -196,6 +209,8 @@ export async function retrieveKnowledge(
       snippet: item.text.slice(0, 1800),
       source: "ascension",
       ...classification,
+      source_classification: item.classification,
+      received_at: item.receivedAt,
       relevance_score: item.score,
     });
     if (evidence.length >= Math.max(1, Math.min(limit, 24))) break;
@@ -205,7 +220,8 @@ export async function retrieveKnowledge(
     query: cleanQuery,
     evidence,
     retrieved_at: new Date().toISOString(),
-    source_revision: sourceRevision,
+    // A mixed relay revision must not be presented as one coherent snapshot.
+    source_revision: revisions.size === 1 ? ([...revisions][0] ?? null) : null,
   };
 }
 
@@ -221,7 +237,7 @@ export function formatKnowledgeEvidence(result: KnowledgeRetrievalResult): strin
         [
           `[A${index + 1}] ${item.source_path} · ${item.title}`,
           `Record type: ${item.record_kind}`,
-          `Provenance status: ${item.provenance_status}`,
+          `Provenance status: ${item.provenance_status} | publication: ${item.source_classification ?? "unknown"} | received: ${item.received_at ?? "unknown"}`,
           "Support scope: this marker supports only the exact stored record below; runtime verification of a record is not proof of a broader scientific claim.",
           `Knowledge: ${item.snippet}`,
         ].join("\n"),

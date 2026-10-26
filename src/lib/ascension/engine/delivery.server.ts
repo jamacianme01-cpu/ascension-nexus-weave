@@ -375,6 +375,8 @@ export async function externalProductDraft(
     temperature: 0.25,
   });
   const { formatInternalConnection } = await import("./knowledge.server");
+  const { formatExternalSourceList, removeUnsupportedExternalCitations } =
+    await import("./external-knowledge.server");
   const internalConnection = generated.knowledge
     ? formatInternalConnection(generated.knowledge, 3)
     : "";
@@ -402,11 +404,16 @@ export async function externalProductDraft(
     candidate["title"] = cleanGeneratedText(candidate["title"]);
   }
   if (typeof candidate["body"] === "string") {
-    const modelBody = stripModelProvenanceClaims(cleanGeneratedText(candidate["body"]));
+    const modelBody = removeUnsupportedExternalCitations(
+      stripModelProvenanceClaims(cleanGeneratedText(candidate["body"])),
+      generated.externalKnowledge,
+    );
     candidate["body"] = cleanGeneratedText(
-      internalConnection
-        ? `${internalConnection}\n\nGeneral-knowledge explanation:\n${modelBody}`
-        : modelBody,
+      [
+        internalConnection,
+        internalConnection ? "General-knowledge explanation:" : "",
+        modelBody,
+      ].filter(Boolean).join("\n\n"),
     );
   }
   if (Array.isArray(candidate["limitations"])) {
@@ -627,8 +634,14 @@ export async function externalProductDraft(
       throw new Error(`The repaired result did not produce the requested output${check.reason ? ` (${check.reason})` : ""}.`);
   }
 
+  // All bounded model/schema/meaning repairs finish before server attribution.
+  // This appendix is generated from the retrieval record, never model output.
+  const attributedSources = generated.externalKnowledge
+    ? formatExternalSourceList(generated.externalKnowledge) : "";
+  const finalBody = removeUnsupportedExternalCitations(parsed.body, generated.externalKnowledge);
   return stampObjectiveFit(run.objective, {
     ...parsed,
+    body: attributedSources ? `${finalBody}\n\n${attributedSources}` : finalBody,
     files: check.kind === "answer" || check.kind === "design" ? [] : check.files,
     limitations: [
       ...parsed.limitations,

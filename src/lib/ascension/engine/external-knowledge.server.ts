@@ -145,7 +145,7 @@ export async function retrieveExternalKnowledge(
   const combined: ExternalKnowledgeEvidence[] = [];
   outcomes.forEach((outcome, index) => {
     if (outcome.status === "fulfilled") combined.push(...outcome.value);
-    else errors.push(`${adapters[index].name}: ${outcome.reason instanceof Error ? outcome.reason.message : "unavailable"}`);
+    else errors.push(`${(adapters[index]?.name ?? "unknown")}: ${outcome.reason instanceof Error ? outcome.reason.message : "unavailable"}`);
   });
   const seen = new Set<string>();
   const evidence = combined.filter((item) => {

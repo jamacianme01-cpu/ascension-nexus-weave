@@ -375,6 +375,8 @@ export async function externalProductDraft(
     temperature: 0.25,
   });
   const { formatInternalConnection } = await import("./knowledge.server");
+  const { formatExternalSourceList, removeUnsupportedExternalCitations } =
+    await import("./external-knowledge.server");
   const internalConnection = generated.knowledge
     ? formatInternalConnection(generated.knowledge, 3)
     : "";
@@ -402,11 +404,19 @@ export async function externalProductDraft(
     candidate["title"] = cleanGeneratedText(candidate["title"]);
   }
   if (typeof candidate["body"] === "string") {
-    const modelBody = stripModelProvenanceClaims(cleanGeneratedText(candidate["body"]));
+    const modelBody = removeUnsupportedExternalCitations(
+      stripModelProvenanceClaims(cleanGeneratedText(candidate["body"])),
+      generated.externalKnowledge,
+    );
+    const attributedSources = generated.externalKnowledge
+      ? formatExternalSourceList(generated.externalKnowledge) : "";
     candidate["body"] = cleanGeneratedText(
-      internalConnection
-        ? `${internalConnection}\n\nGeneral-knowledge explanation:\n${modelBody}`
-        : modelBody,
+      [
+        internalConnection,
+        internalConnection ? "General-knowledge explanation:" : "",
+        modelBody,
+        attributedSources,
+      ].filter(Boolean).join("\n\n"),
     );
   }
   if (Array.isArray(candidate["limitations"])) {

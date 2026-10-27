@@ -90,7 +90,7 @@ class KnowledgeMemory:
             "components":components,"provenance":origin,
         }
         digest=hashlib.sha256(canonical(value).encode("utf-8")).hexdigest()
-        mid="ME:"+digest[:32]
+        mid="ME:"+hashlib.sha256((owner_id+"\\0"+digest).encode("utf-8")).hexdigest()[:32]
         self.db.execute("""
           INSERT OR IGNORE INTO memories
            (id,owner_id,source_request_id,source_hash,source_status,objective,
@@ -112,6 +112,8 @@ class KnowledgeMemory:
                                  row["steps"],row["components"]))
         if _PRIVATE.search(public_content):
             raise ValueError("Sharing blocked: potential private information")
+        if row["source_status"]!="PERSISTED":
+            raise ValueError("Only persisted governed knowledge can be approved for cross-user reuse")
         with self.db:
             self.db.execute("UPDATE memories SET sharing_state='approved',approved_at=? "
                             "WHERE id=? AND owner_id=?",(now(),memory_id,owner_id))
@@ -134,7 +136,7 @@ class KnowledgeMemory:
                 "description":row["description"],
                 "steps":json.loads(row["steps"]),
                 "components":json.loads(row["components"]),
-                "source_request_id":row["source_request_id"],
+                "source_request_id":row["source_request_id"] if row["owner_id"]==owner_id else None,
                 "source_hash":"sha256:"+row["source_hash"],
                 "source_status":row["source_status"],
                 "sharing_state":row["sharing_state"],

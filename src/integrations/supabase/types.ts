@@ -98,6 +98,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ascension_hub_connections: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          owner_user_id: string
+          revoked_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          key_hash: string
+          owner_user_id: string
+          revoked_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          owner_user_id?: string
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
+      ascension_hub_owners: {
+        Row: {
+          approved_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ascension_model_jobs: {
         Row: {
           claimed_at: string | null

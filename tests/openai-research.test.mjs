@@ -60,6 +60,17 @@ try {
     assert.deepEqual(delivery.web_sources, [{ title: "Cited", url: "https://example.org/cited" }]);
     assert.equal(delivery.objective_fit, undefined);
   });
+  const { buildGuideFallbackDelivery } = await server.ssrLoadModule(
+    "/src/lib/ascension/engine/guide-fallback.server.ts",
+  );
+  const failedApp = buildGuideFallbackDelivery("make a music app");
+  check("provider outage never produces fictitious application paths or code", () => {
+    assert.equal(failedApp.kind, "not_produced");
+    assert.equal(failedApp.pathways.length, 0);
+    assert.equal(failedApp.blend, null);
+    assert.equal(failedApp.files.length, 0);
+    assert.match(failedApp.body, /has not been created/);
+  });
   const { callZai, zaiModel } = await server.ssrLoadModule(
     "/src/lib/ascension/engine/zai.server.ts",
   );

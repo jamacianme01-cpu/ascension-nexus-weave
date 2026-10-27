@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash, timingSafeEqual } from "crypto";
+import { authorizeAscensionHub } from "@/lib/ascension/hub-auth.server";
 
 import type { Database, Json } from "@/integrations/supabase/types";
 import { assessResult, parseDelivery, type ObjectiveDelivery } from "@/lib/ascension/result-model";
@@ -51,14 +52,22 @@ function json(body: unknown, status: number) {
   });
 }
 
-function authorize(request: Request): Response | null {
+async function authorize(request: Request): Promise<Response | null> {
+  // A separately paired 48-byte device key is preferred and needs no legacy
+  // publish-token environment variable. Keep older connectors working only
+  // while they still have a valid configured legacy secret.
+  const hubKey = request.headers.get("x-ascension-hub-key");
+  const compatibleKey = request.headers.get("x-ascension-publish-token");
+  if (hubKey || (compatibleKey && /^[a-f0-9]{96}$/i.test(compatibleKey))) {
+    const checked = await authorizeAscensionHub(request);
+    if (!checked || hubKey) return checked;
+    // Compatibility: continue to legacy if it was a 96-char legacy key.
+  }
   const expected = process.env["ASCENSION_PUBLISH_TOKEN"];
-  if (!expected) return json({ error: "publish_token_not_configured" }, 503);
-  const header =
-    request.headers.get("x-ascension-publish-token") ??
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    null;
-  if (!tokenMatches(header, expected)) return json({ error: "unauthorized" }, 401);
+  if (!expected) return json({error:"hub_not_paired"},401);
+  const token = compatibleKey ??
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i,"") ?? null;
+  if (!tokenMatches(token,expected)) return json({error:"unauthorized"},401);
   return null;
 }
 
@@ -105,7 +114,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const denied = authorize(request);
+        const denied = await authorize(request);
         if (denied) return denied;
 
         const runner =
@@ -145,7 +154,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
       },
 
       POST: async ({ request }) => {
-        const denied = authorize(request);
+        const denied = await authorize(request);
         if (denied) return denied;
 
         let body: Record<string, unknown>;

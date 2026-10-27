@@ -60,6 +60,71 @@ try {
     assert.deepEqual(delivery.web_sources, [{ title: "Cited", url: "https://example.org/cited" }]);
     assert.equal(delivery.objective_fit, undefined);
   });
+  const { callZai, zaiModel } = await server.ssrLoadModule(
+    "/src/lib/ascension/engine/zai.server.ts",
+  );
+  const deliveryEngine = await server.ssrLoadModule(
+    "/src/lib/ascension/engine/delivery.server.ts",
+  );
+  const names = [
+    "OPENAI_API_KEY", "ASCENSION_ALLOW_OPENAI_AI", "OPENROUTER_API_KEY",
+    "ZAI_API_KEY", "LOVABLE_API_KEY", "ASCENSION_ALLOW_LOVABLE_AI",
+    "LOCAL_LLM_BASE_URL",
+  ];
+  const originals = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const name of names) delete process.env[name];
+    process.env.OPENAI_API_KEY = "sk-test-only-do-not-use";
+    process.env.ASCENSION_ALLOW_OPENAI_AI = "true";
+    globalThis.fetch = async (url, opts) => {
+      assert.equal(url, "https://api.openai.com/v1/responses");
+      assert.equal(JSON.parse(opts.body).tools, undefined);
+      return new Response(JSON.stringify({
+        status: "completed",
+        output: [{ type: "message", content: [
+          { type: "output_text", text: '{"meaning_elements":[],"notes":"test"}' },
+        ] }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    const result = await callZai({
+      system: "Test", user: "make worker drones", includeInternalKnowledge: false,
+    });
+    check("OpenAI can serve existing ASCENSION inference without a separate Z.AI key", () => {
+      assert.ok(zaiModel().startsWith("gpt-"));
+      assert.deepEqual(result.json?.meaning_elements, []);
+    });
+    const run = {
+      id: "00000000-0000-4000-8000-000000000001",
+      objective: "make worker drones",
+      status: "running", engine: "governed_runtime", result: null,
+      evidence: null, constraints: null,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    let saved = null;
+    const recovered = await deliveryEngine.resolveDelivery({
+      run, artifactStage: null, draft: null, retry: false,
+      store: {
+        claim: async () => true,
+        complete: async (_key, value) => { saved = value; },
+        fail: async () => { throw new Error("unexpected failed draft"); },
+      },
+      generate: async () => { throw new Error("The operation was aborted due to timeout"); },
+    });
+    check("ENGAGE returns a readable three-pathway unverified guide rather than timeout", () => {
+      assert.equal(recovered.status, "completed");
+      assert.equal(recovered.response_payload?.pathways.length, 3);
+      assert.ok(recovered.response_payload?.blend);
+      assert.equal(saved, recovered.response_payload);
+      assert.ok(recovered.response_payload?.limitations.some(x => x.includes("Unverified")));
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const name of names) {
+      if (originals[name] === undefined) delete process.env[name];
+      else process.env[name] = originals[name];
+    }
+  }
 } finally {
   await server.close();
 }

@@ -1,4 +1,5 @@
 import type { Json } from "@/integrations/supabase/types";
+import { ASCENSION_GUIDE_INSTRUCTIONS } from "./guide-personality.server";
 import {
   assessResult,
   hasEnvisionPreparation,
@@ -298,6 +299,7 @@ export async function externalProductDraft(
     : "";
 
   const system = [
+    ASCENSION_GUIDE_INSTRUCTIONS,
     "You are the user-facing response engine inside ASCENSION, not a generic chatbot. Never introduce yourself as 'an AI language model'.",
     "ASCENSION is an objective-driven system: it takes what the user wants to accomplish, decomposes meaning, retrieves relevant knowledge, models and compares pathways, checks confidence and contradictions, applies Guardian constraints, executes through available engines, verifies with AutoSync, and persists verified outcomes and learning.",
     "Its named architecture includes CLARITY orchestration; Meaning Elements; Knowledgeverse; World Model; DTF pathway planning; Outcome Predictor; Confidence Engine; Contradiction Engine; Guardian; AutoSync; and execution engines for software, documents, images, CAD, simulation, box design, video, music, web, databases, robotics, printers, drones, and other connected tools.",

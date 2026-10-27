@@ -1,0 +1,28 @@
+name: Verify Windows ASCENSION hub launcher
+on:
+  pull_request:
+    paths:
+      - "scripts/Start_ASCENSION_Hub.ps1"
+      - ".github/workflows/verify-windows-hub.yml"
+  push:
+    paths:
+      - "scripts/Start_ASCENSION_Hub.ps1"
+      - ".github/workflows/verify-windows-hub.yml"
+
+jobs:
+  parse-windows-powershell:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse launcher using Windows PowerShell
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          $script = Join-Path $env:GITHUB_WORKSPACE 'scripts\Start_ASCENSION_Hub.ps1'
+          [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.ToString() }
+            exit 1
+          }
+          Write-Host 'Windows hub launcher syntax valid'

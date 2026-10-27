@@ -168,6 +168,9 @@ export async function callZai(input: {
   includeInternalKnowledge?: boolean;
   imageDataUrl?: string;
   temperature?: number;
+  /** Internal failover; only already configured zero-price providers. */
+  fallbackProvider?: "free_cloud" | "zai_free";
+  fallbackAttempted?: boolean;
 }): Promise<ZaiCallResult> {
   const local = localLlmConfig();
   const freeCloudKey = process.env["OPENROUTER_API_KEY"]?.trim();
@@ -176,7 +179,7 @@ export async function callZai(input: {
   const zaiKey = process.env["ZAI_API_KEY"]?.trim();
   // A configured public cloud route wins over localhost, even if a local
   // desktop development URL accidentally remains in server settings.
-  const provider = freeCloudKey ? "free_cloud" : lovableKey ? "lovable" : zaiKey ? "zai_free" : local ? "local" : null;
+  const provider = input.fallbackProvider ?? (freeCloudKey ? "free_cloud" : lovableKey ? "lovable" : zaiKey ? "zai_free" : local ? "local" : null);
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",
@@ -272,6 +275,20 @@ export async function callZai(input: {
   }
 
   if (!response.ok) {
+    // An overloaded zero-price provider should not strand an objective when
+    // another independently configured free route is available.
+    // Never silently switch to a billed model or gateway.
+    if (!input.fallbackAttempted && [429, 502, 503, 504].includes(response.status)) {
+      const alternative = provider === "zai_free" && freeCloudKey
+        ? "free_cloud"
+        : provider === "free_cloud" && zaiKey
+          ? "zai_free"
+          : null;
+      if (alternative) {
+        await response.body?.cancel().catch(() => undefined);
+        return callZai({ ...input, fallbackProvider: alternative, fallbackAttempted: true });
+      }
+    }
     const detail = (await response.text().catch(() => "")).slice(0, 2000);
     throw new ZaiEngineError(
       `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : provider === "lovable" ? "Lovable AI" : "Z.AI"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,

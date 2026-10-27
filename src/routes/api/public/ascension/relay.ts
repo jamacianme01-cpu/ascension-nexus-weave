@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "crypto";
+import { authorizeAscensionHub } from "@/lib/ascension/hub-auth.server";
 
 /**
  * Secured intake for the operator's Observation Gateway relay.
@@ -37,14 +38,21 @@ export const Route = createFileRoute("/api/public/ascension/relay")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const expected = process.env["ASCENSION_PUBLISH_TOKEN"];
-        if (!expected) return json({ error: "publish_token_not_configured" }, 503);
-
-        const header =
-          request.headers.get("x-ascension-publish-token") ??
-          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-          null;
-        if (!tokenMatches(header, expected)) return json({ error: "unauthorized" }, 401);
+        const hubKey = request.headers.get("x-ascension-hub-key");
+        const compatibleKey = request.headers.get("x-ascension-publish-token");
+        let paired: Response | null | undefined;
+        if (hubKey || (compatibleKey && /^[a-f0-9]{96}$/i.test(compatibleKey))) {
+          paired = await authorizeAscensionHub(request);
+          if (!paired) { /* paired ASCENSION hub */ }
+          else if (hubKey) return paired;
+        }
+        if (paired !== null) {
+          const expected = process.env["ASCENSION_PUBLISH_TOKEN"];
+          if (!expected) return json({ error:"hub_not_paired" },401);
+          const token = compatibleKey ??
+            request.headers.get("authorization")?.replace(/^Bearer\s+/i,"") ?? null;
+          if (!tokenMatches(token, expected)) return json({ error:"unauthorized" },401);
+        }
 
         let body: RelayBody;
         try {

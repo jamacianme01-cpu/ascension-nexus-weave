@@ -908,7 +908,7 @@ export async function resolveDelivery(args: {
     // Older runs recorded before the resilient guide was deployed can retain
     // their Z.AI 429 / timeout as a sticky failed draft. Show an honest draft
     // immediately rather than leaving ENGAGE with no readable result.
-    if (/\\b429\\b|HTTP (?:502|503|504)|temporarily overloaded|operation was aborted|\\btimeout\\b|timed out/i.test(message)) {
+    if (/\b429\b|HTTP (?:502|503|504)|temporarily overloaded|operation was aborted|\btimeout\b|timed out/i.test(message)) {
       const fallback = buildGuideFallbackDelivery(run.objective);
       return {
         ...draftBase, status: "completed", response_payload: fallback,

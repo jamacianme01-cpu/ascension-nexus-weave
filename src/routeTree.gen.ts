@@ -27,6 +27,7 @@ import { Route as ConsoleKnowledgeverseRouteImport } from './routes/console/know
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicAscensionAnswerReadinessRouteImport } from './routes/api/public/ascension/answer-readiness'
 import { Route as ApiPublicAscensionExecutionQueueRouteImport } from './routes/api/public/ascension/execution-queue'
+import { Route as ApiPublicAscensionHubPairRouteImport } from './routes/api/public/ascension/hub-pair'
 import { Route as ApiPublicAscensionModelQueueRouteImport } from './routes/api/public/ascension/model-queue'
 import { Route as ApiPublicAscensionPublishRouteImport } from './routes/api/public/ascension/publish'
 import { Route as ApiPublicAscensionRelayRouteImport } from './routes/api/public/ascension/relay'
@@ -124,6 +125,12 @@ const ApiPublicAscensionExecutionQueueRoute =
     path: '/api/public/ascension/execution-queue',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAscensionHubPairRoute =
+  ApiPublicAscensionHubPairRouteImport.update({
+    id: '/api/public/ascension/hub-pair',
+    path: '/api/public/ascension/hub-pair',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAscensionModelQueueRoute =
   ApiPublicAscensionModelQueueRouteImport.update({
     id: '/api/public/ascension/model-queue',
@@ -166,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/answer-readiness': typeof ApiPublicAscensionAnswerReadinessRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
+  '/api/public/ascension/hub-pair': typeof ApiPublicAscensionHubPairRoute
   '/api/public/ascension/model-queue': typeof ApiPublicAscensionModelQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
   '/api/public/ascension/relay': typeof ApiPublicAscensionRelayRoute
@@ -189,6 +197,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/answer-readiness': typeof ApiPublicAscensionAnswerReadinessRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
+  '/api/public/ascension/hub-pair': typeof ApiPublicAscensionHubPairRoute
   '/api/public/ascension/model-queue': typeof ApiPublicAscensionModelQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
   '/api/public/ascension/relay': typeof ApiPublicAscensionRelayRoute
@@ -214,6 +223,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/api/public/ascension/answer-readiness': typeof ApiPublicAscensionAnswerReadinessRoute
   '/api/public/ascension/execution-queue': typeof ApiPublicAscensionExecutionQueueRoute
+  '/api/public/ascension/hub-pair': typeof ApiPublicAscensionHubPairRoute
   '/api/public/ascension/model-queue': typeof ApiPublicAscensionModelQueueRoute
   '/api/public/ascension/publish': typeof ApiPublicAscensionPublishRoute
   '/api/public/ascension/relay': typeof ApiPublicAscensionRelayRoute
@@ -239,6 +249,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/answer-readiness'
     | '/api/public/ascension/execution-queue'
+    | '/api/public/ascension/hub-pair'
     | '/api/public/ascension/model-queue'
     | '/api/public/ascension/publish'
     | '/api/public/ascension/relay'
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/answer-readiness'
     | '/api/public/ascension/execution-queue'
+    | '/api/public/ascension/hub-pair'
     | '/api/public/ascension/model-queue'
     | '/api/public/ascension/publish'
     | '/api/public/ascension/relay'
@@ -286,6 +298,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/api/public/ascension/answer-readiness'
     | '/api/public/ascension/execution-queue'
+    | '/api/public/ascension/hub-pair'
     | '/api/public/ascension/model-queue'
     | '/api/public/ascension/publish'
     | '/api/public/ascension/relay'
@@ -308,6 +321,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   ApiPublicAscensionAnswerReadinessRoute: typeof ApiPublicAscensionAnswerReadinessRoute
   ApiPublicAscensionExecutionQueueRoute: typeof ApiPublicAscensionExecutionQueueRoute
+  ApiPublicAscensionHubPairRoute: typeof ApiPublicAscensionHubPairRoute
   ApiPublicAscensionModelQueueRoute: typeof ApiPublicAscensionModelQueueRoute
   ApiPublicAscensionPublishRoute: typeof ApiPublicAscensionPublishRoute
   ApiPublicAscensionRelayRoute: typeof ApiPublicAscensionRelayRoute
@@ -442,6 +456,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAscensionExecutionQueueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ascension/hub-pair': {
+      id: '/api/public/ascension/hub-pair'
+      path: '/api/public/ascension/hub-pair'
+      fullPath: '/api/public/ascension/hub-pair'
+      preLoaderRoute: typeof ApiPublicAscensionHubPairRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ascension/model-queue': {
       id: '/api/public/ascension/model-queue'
       path: '/api/public/ascension/model-queue'
@@ -515,6 +536,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicAscensionAnswerReadinessRoute:
     ApiPublicAscensionAnswerReadinessRoute,
   ApiPublicAscensionExecutionQueueRoute: ApiPublicAscensionExecutionQueueRoute,
+  ApiPublicAscensionHubPairRoute: ApiPublicAscensionHubPairRoute,
   ApiPublicAscensionModelQueueRoute: ApiPublicAscensionModelQueueRoute,
   ApiPublicAscensionPublishRoute: ApiPublicAscensionPublishRoute,
   ApiPublicAscensionRelayRoute: ApiPublicAscensionRelayRoute,

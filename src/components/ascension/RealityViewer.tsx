@@ -166,7 +166,7 @@ export function RealityViewer({
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
   useEffect(() => {
     setAssembledImage(null);setAssembledError(null);setAssembledLoading(false);
-    setDissection(null);setDissected(false);setDissectionError(null);
+    setDissection(null);setDissected(true);setDissectionError(null);
   }, [pathway.id]);
   useEffect(() => {
     // Open the objective with the complete assembled object, not the exploded
@@ -1847,35 +1847,21 @@ export function RealityViewer({
           <p className="reality-pathway-label">{pathway.label}</p>
         </div>
         </div>
-        <div className="reality-view-controls" role="group" aria-label="Drawing views and parts">
-        <Button variant="outline" disabled={!ready} aria-pressed={!dissected && mode==="cutaway" && section===100} onClick={()=>{setDissected(false);setMode("cutaway");setSection(100);api.current?.section(100);}}>
-          ASSEMBLED
-        </Button>
-        <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="cutaway" && section < 100} onClick={()=>{setDissected(false);setMode("cutaway");setSection(50);api.current?.section(50);}}>
-          CUTAWAY
-        </Button>
-        <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
-          BLUEPRINT
-        </Button>
-        <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="cad"} onClick={()=>{setDissected(false);setMode("cad");setShowParts(true);setEditorOpen(true);}}>
-          CAD
-        </Button>
-        <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="environment"} onClick={()=>{setDissected(false);setMode("environment");}}>
-          ENVIRONMENT
-        </Button>
-        <Button variant="outline" disabled={!ready || !referenceImageUrl} aria-pressed={dissected} onClick={() => {const next=!dissected;setDissected(next);setPartIndex(null);setSection(next?50:100);api.current?.section(next?50:100);if(next)setShowParts(true);}}>
-          DISSECTED
-        </Button>
-        <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
-          PARTS
-        </Button>
-        <Button variant="outline" className="reality-sound" aria-pressed={soundEnabled && !soundBlocked} onClick={onToggleSound}>
-          {soundEnabled ? (soundBlocked ? "SOUND BLOCKED · TAP" : "SOUND ON") : "SOUND OFF"}
-        </Button>
-        </div>
-        <div className="reality-extra-controls">
-          <Button variant="outline" aria-pressed={simulate} onClick={()=>{const start=!simulate;setSimulate(start);setPlaying(start);setSeconds(0);if(start){setDissected(false);setShowParts(false);}}}>{simulate ? "EXIT SIMULATION" : "SIMULATE"}</Button>
-          <label>Volume <input aria-label="Ambient volume" type="range" min="0" max="0.7" step="0.05" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
+        <div className="reality-view-controls" role="group" aria-label="Dissect, exploded, blueprint and 3D views">
+          <Button variant="outline" disabled={!ready || !referenceImageUrl} aria-pressed={dissected && !exploded}
+            onClick={() => {setDissected(true);setExploded(false);setMode("cutaway");setShowParts(true);api.current?.explode(false);}}>DISSECT</Button>
+          <Button variant="outline" disabled={!ready || (!referenceImageUrl && awaitingFaithfulMesh)} aria-pressed={dissected && exploded}
+            onClick={() => {setDissected(true);setMode("cutaway");setShowParts(true);if(!awaitingFaithfulMesh){try{api.current?.explode(true);setExplosionError(null);}catch(cause){setExplosionError(cause instanceof Error?cause.message:"Exploded view unavailable");}}setExploded(true);}}>EXPLODED VIEW</Button>
+          <Button variant="outline" disabled={!ready || awaitingFaithfulMesh}
+            aria-pressed={!dissected && mode==="blueprint"}
+            onClick={() => {setDissected(false);setExploded(false);api.current?.explode(false);setMode("blueprint");}}>BLUEPRINT</Button>
+          <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="cad"}
+            onClick={() => {setDissected(false);setExploded(false);api.current?.explode(false);setMode("cad");setShowParts(true);setEditorOpen(true);}}>3D VIEW</Button>
+          <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts"
+            aria-pressed={showParts} onClick={()=>setShowParts(value=>!value)}>COMPONENTS</Button>
+          <Button variant="outline" className="reality-sound" aria-pressed={soundEnabled && !soundBlocked} onClick={onToggleSound}>
+            {soundEnabled ? (soundBlocked ? "SOUND BLOCKED · TAP" : "SOUND ON") : "SOUND OFF"}
+          </Button>
         </div>
       </header>
       <div className="reality-model-stage" data-split={splitReference ? "true" : undefined} data-image-only={imageOnly ? "true" : undefined}>
@@ -1918,10 +1904,20 @@ export function RealityViewer({
           <p>{dissectionError ?? "Creating the optional exploded view of this design…"}</p>
           {dissectionError && <Button variant="outline" onClick={()=>setDissectionAttempt(value=>value+1)}>RETRY DISSECTED VIEW</Button>}
         </div>}
-        {ready && !dissected && showParts && !awaitingFaithfulMesh && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
+        {false && ready && !dissected && showParts && !awaitingFaithfulMesh && <div ref={labelsHost} className="reality-picture-labels" aria-label="Labels on the model">
           {activeParts.map((part, index) => <Button variant="outline" key={part.name + index} title={part.name} aria-pressed={partIndex === index} aria-label={`${index + 1}. ${part.name}: ${part.purpose}`} aria-controls="reality-part-detail" onClick={() => {setPartIndex(index);setShowParts(true);api.current?.locatePart(index);}}><span aria-hidden="true">{index + 1}</span></Button>)}
         </div>}
       </div>
+      <section className="ascension-v1-view-description" aria-label="Selected pathway description">
+        <h2>{pathway.label}</h2>
+        <p>{pathway.summary}</p>
+        {pathway.steps.length > 0 && <details><summary>How this pathway works</summary>
+          <ol>{pathway.steps.map((step,index)=><li key={index}>{step}</li>)}</ol>
+        </details>}
+        <p className="reality-parts-hint">{pathway.model_url
+          ? "Source-derived model: verify physical dimensions and engineering tolerances independently."
+          : "Concept view only. A source-derived 3D model and verified measurements are not available yet."}</p>
+      </section>
       {!ready && (
         <div className="reality-status" role={error ? "alert" : "status"}>
           <p>

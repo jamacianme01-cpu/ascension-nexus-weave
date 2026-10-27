@@ -811,7 +811,9 @@ export async function resolveDelivery(args: {
   const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
   const hasFreeCloud = Boolean(process.env["OPENROUTER_API_KEY"]?.trim());
   const hasZaiFree = Boolean(process.env["ZAI_API_KEY"]?.trim());
-  const canReview = hasFreeCloud || hasZaiFree || hasLovableAi || hasExplicitLocal || Boolean(args.review);
+  const hasOpenAI = process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
+    Boolean(process.env["OPENAI_API_KEY"]?.trim());
+  const canReview = hasFreeCloud || hasZaiFree || hasLovableAi || hasExplicitLocal || hasOpenAI || Boolean(args.review);
   let rejectedFit: ObjectiveFitReview | undefined;
   const base = {
     created_at: run.completed_at ?? run.updated_at ?? run.created_at,
@@ -942,7 +944,7 @@ export async function resolveDelivery(args: {
   };
   // The website does NOT implicitly spend credits on hosted AI. The owner must
   // explicitly opt in; otherwise allow the ASCENSION local worker to deliver.
-  if (!args.generate && !hasFreeCloud && !hasZaiFree && !hasLovableAi && !hasExplicitLocal) {
+  if (!args.generate && !hasFreeCloud && !hasZaiFree && !hasLovableAi && !hasExplicitLocal && !hasOpenAI) {
     if (!TERMINAL_STATUSES.has(run.status))
       return pending("Awaiting a connected ASCENSION answer provider or governed runtime. No paid AI credits will be used.", {
         engine_label: "ASCENSION_LOCAL_RESULT_PENDING",
@@ -989,6 +991,21 @@ export async function resolveDelivery(args: {
     };
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
+    // When a configured external provider times out, keep ENGAGE readable.
+    // This is an explicitly UNVERIFIED guide draft, never a governed result.
+    if (hasOpenAI && /timed? ?out|timeout|aborted|overloaded|HTTP (?:429|502|503|504)|no completed answer|inference failed/i.test(message)) {
+      const fallback = buildGuideFallbackDelivery(run.objective);
+      const recovered = {
+        ...fallback,
+        limitations: [...fallback.limitations, `Research/synthesis recovery note: ${message.slice(0, 200)}`],
+      };
+      try {
+        await store.complete(sourceKey, recovered);
+        return { ...draftBase, created_at: new Date(now).toISOString(),
+          status: "completed", response_payload: recovered,
+          note: "Unverified guide draft; external provider could not finish.", source: "external_draft" };
+      } catch { /* Continue to the existing failure recorder. */ }
+    }
     await store.fail(sourceKey, obsoleteDrawingFailure ? `Drawing handoff repair: ${message}` : message).catch(() => undefined);
     return failed(message);
   }

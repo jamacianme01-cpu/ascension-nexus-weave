@@ -108,6 +108,8 @@ export async function callOpenAIResponse(input: {
   user: string;
   imageDataUrl?: string;
   webSearch?: boolean;
+  /** Bound research and synthesis calls so ENGAGE does not time out. */
+  timeoutMs?: number;
 }): Promise<OpenAIAnswer> {
   const apiKey = process.env["OPENAI_API_KEY"]?.trim();
   if (!apiKey || process.env["ASCENSION_ALLOW_OPENAI_AI"] !== "true")
@@ -146,7 +148,7 @@ export async function callOpenAIResponse(input: {
   try {
     response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(Math.max(5_000, Math.min(input.timeoutMs ?? (useSearch ? 18_000 : 24_000), 30_000))),
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + apiKey,

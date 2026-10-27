@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 import {
   listMyObjectives,
@@ -31,6 +32,51 @@ export const Route = createFileRoute("/_authenticated/objectives")({
 });
 
 const TERMINAL = new Set(["verified", "rejected", "failed"]);
+
+function HubPairing() {
+  const [key, setKey] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function issue() {
+    setBusy(true);
+    setError(null);
+    setKey(null);
+    try {
+      const {data: {session}} = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in as the ASCENSION owner first.");
+      const response = await fetch("/api/public/ascension/hub-pair", {
+        method:"POST",
+        headers: {"authorization": "Bearer " + session.access_token},
+      });
+      const body = await response.json() as {key?:string;error?:string};
+      if (!response.ok || !body.key) throw new Error(body.error ?? "Hub pairing failed");
+      setKey(body.key);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally { setBusy(false); }
+  }
+  return <section className="rounded-lg border border-primary/25 bg-background/40 p-4">
+    <h2 className="text-sm font-semibold text-foreground">Old computer · ASCENSION hub pairing</h2>
+    <p className="mt-2 text-sm text-muted-foreground">
+      Create a private one-time connection key for the existing ASCENSION hub. Only the configured owner may pair.
+      Creating a new key revokes the old hub key.
+    </p>
+    <button type="button" onClick={() => void issue()} disabled={busy}
+      className="mt-3 rounded border border-primary/50 px-4 py-2 text-sm text-primary disabled:opacity-50">
+      {busy ? "Preparing…" : "Generate hub pairing key"}
+    </button>
+    {key ? <div className="mt-3">
+      <p className="text-xs text-muted-foreground">Copy this key once to the old computer. Never post it in a chat.</p>
+      <textarea readOnly aria-label="ASCENSION hub pairing key" rows={3} value={key}
+        className="mt-2 w-full rounded border border-primary/20 bg-background p-2 font-mono text-xs" />
+      <p className="mt-2 text-xs text-muted-foreground">
+        On the old computer, run Start_ASCENSION_Hub.ps1 and paste this key when prompted.
+      </p>
+    </div> : null}
+    {error ? <p className="mt-3 text-xs text-destructive">{error}</p> : null}
+  </section>;
+}
+
 
 function Field({ label, value }: { label: string; value: string | number | null }) {
   return (
@@ -158,6 +204,7 @@ function ObjectivesPage() {
 
   return (
     <div className="space-y-8">
+      <HubPairing />
       <section>
         <h1 className="text-xl font-semibold tracking-wide text-foreground">
           Objective intake · governed execution

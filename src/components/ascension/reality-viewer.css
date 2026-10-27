@@ -919,3 +919,29 @@
     left:auto;right:8px;top:auto;bottom:8px;max-height:55px;max-width:230px;
   }
 }
+
+
+/* ASCENSION V1: pathway descriptions belong BELOW the design picture,
+   technical details remain in the existing RIGHT inspector. */
+.reality-screen[open] { grid-template-rows:auto minmax(52dvh,1fr) auto auto auto; }
+.reality-screen .ascension-v1-view-description {
+  grid-row:3; min-width:0; padding:14px 20px; margin:0;
+  border-top:1px solid var(--border);
+  background:var(--popover); text-align:left;
+  max-height:30dvh; overflow-y:auto;
+}
+.reality-screen .ascension-v1-view-description h2 {
+  font-family:var(--font-display,Georgia,serif); font-size:21px;
+  color:var(--gold); margin:0 0 6px;
+}
+.reality-screen .ascension-v1-view-description p { max-width:95ch; margin:0 0 7px; line-height:1.55; }
+.reality-screen .ascension-v1-view-description details { font-size:13px; }
+.reality-screen .ascension-v1-view-description summary { cursor:pointer; color:var(--gold); }
+.reality-screen .ascension-v1-view-description ol { padding-left:25px; margin:8px 0 12px; }
+.reality-screen .reality-view-controls { display:flex; gap:6px; flex-wrap:wrap; }
+.reality-screen .reality-picture-labels { display:none!important; }
+@media(max-width:760px) {
+  .reality-screen[open] { grid-template-rows:auto minmax(43dvh,1fr) auto auto auto; }
+  .reality-screen .ascension-v1-view-description { max-height:40dvh; padding:12px; }
+  .reality-screen .reality-view-controls button { min-width:85px; font-size:10px; }
+}

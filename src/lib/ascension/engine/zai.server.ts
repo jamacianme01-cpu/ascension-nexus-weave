@@ -11,6 +11,7 @@ import {
   retrieveKnowledge,
   type KnowledgeRetrievalResult,
 } from "./knowledge.server";
+import { callOpenAIResponse } from "./openai.server";
 
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_MODEL = "glm-4.6";
@@ -74,7 +75,10 @@ export function zaiModel(): string {
       process.env["LOVABLE_API_KEY"]?.trim())
     return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
   if (process.env["ZAI_API_KEY"]?.trim()) return ZAI_FREE_TEXT_MODEL;
-  return localLlmConfig()?.model || DEFAULT_LOCAL_MODEL;
+  if (localLlmConfig()) return localLlmConfig()!.model;
+  if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" && process.env["OPENAI_API_KEY"]?.trim())
+    return process.env["ASCENSION_OPENAI_MODEL"]?.trim() || "gpt-4.1-mini";
+  return DEFAULT_LOCAL_MODEL;
 }
 
 function zaiBaseUrl(): string {
@@ -177,9 +181,11 @@ export async function callZai(input: {
   const lovableKey = process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true"
     ? process.env["LOVABLE_API_KEY"]?.trim() : null;
   const zaiKey = process.env["ZAI_API_KEY"]?.trim();
+  const openaiEnabled = process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
+    Boolean(process.env["OPENAI_API_KEY"]?.trim());
   // A configured public cloud route wins over localhost, even if a local
   // desktop development URL accidentally remains in server settings.
-  const provider = input.fallbackProvider ?? (freeCloudKey ? "free_cloud" : lovableKey ? "lovable" : zaiKey ? "zai_free" : local ? "local" : null);
+  const provider = input.fallbackProvider ?? (freeCloudKey ? "free_cloud" : lovableKey ? "lovable" : zaiKey ? "zai_free" : local ? "local" : openaiEnabled ? "openai" : null);
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",
@@ -212,6 +218,33 @@ export async function callZai(input: {
   const user = input.includeInternalKnowledge === false
     ? input.user
     : `${input.user}\n\nASCENSION INTERNAL KNOWLEDGE:\n${knowledgeForPrompt}`;
+
+  // OpenAI is a bounded inference adapter for the existing ASCENSION stages.
+  // It does not become Guardian, Outcome Predictor, or the source of truth.
+  // Web search occurs separately for the initial cited research answer.
+  if (provider === "openai") {
+    const started = Date.now();
+    try {
+      const result = await callOpenAIResponse({
+        system,
+        user,
+        imageDataUrl: input.imageDataUrl,
+        webSearch: false,
+        timeoutMs: 24_000,
+      });
+      return {
+        model: result.model,
+        text: result.text,
+        json: extractJson(result.text),
+        duration_ms: Date.now() - started,
+        knowledge: knowledgeResult,
+      };
+    } catch (cause) {
+      throw new ZaiEngineError(
+        "OpenAI answer inference failed: " + (cause instanceof Error ? cause.message : String(cause)),
+      );
+    }
+  }
 
   const model = provider === "zai_free"
     ? (input.imageDataUrl ? ZAI_FREE_VISION_MODEL : ZAI_FREE_TEXT_MODEL)

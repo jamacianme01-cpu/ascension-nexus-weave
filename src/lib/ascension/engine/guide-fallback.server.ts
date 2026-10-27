@@ -3,7 +3,7 @@
  * Presentation only — never claims governed verification, physical execution,
  * or that a simulation/test occurred.
  */
-import { parseDelivery, type ObjectiveDelivery } from "../result-model";
+import { parseDelivery, requestedKind, type ObjectiveDelivery } from "../result-model";
 
 function isDesignStyle(objective: string): boolean {
   const o = objective.toLowerCase();
@@ -25,6 +25,29 @@ function subjectHint(objective: string): string {
 export function buildGuideFallbackDelivery(objective: string): ObjectiveDelivery {
   const subject = subjectHint(objective);
   const design = isDesignStyle(objective);
+
+  // A software build request is an artifact request. Never substitute the
+  // canned physical-drone guide pathways for missing runnable app code.
+  if (requestedKind(objective) === "app") {
+    return parseDelivery({
+      kind: "not_produced",
+      title: objective.slice(0, 200) || "ASCENSION app result",
+      body: [
+        "The requested app has not been created.",
+        `Objective: ${objective.trim()}`,
+        "No runnable source files, application package, or live app were returned.",
+        "The connected answer provider is unavailable and the governed builder has not supplied an app artifact.",
+        "The objective remains unfinished. A retry can be made after the active answer provider or builder is restored.",
+      ].join("\n\n"),
+      pathways: [],
+      blend: null,
+      files: [],
+      limitations: [
+        "No application source code or runnable artifact was produced.",
+        "This is a failure status, not an ASCENSION-generated application.",
+      ],
+    });
+  }
 
   if (!design) {
     return parseDelivery({

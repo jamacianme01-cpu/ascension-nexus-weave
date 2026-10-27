@@ -22,7 +22,7 @@ PORT = 4175
 INTAKE = "http://127.0.0.1:8790/api/ascension/intake/v1"
 GATEWAY = "http://127.0.0.1:8765/api/ascension/v1"
 
-PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ASCENSION · Independent Hub</title><style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;color:#e9e6db;font-family:Segoe UI,Arial,sans-serif;background:radial-gradient(ellipse at 50% 15%,#183e48,#081018 65%);}
 main{max-width:850px;margin:auto;padding:70px 22px 90px;}header{text-align:center;margin-bottom:55px}

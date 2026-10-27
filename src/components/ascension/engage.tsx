@@ -1464,7 +1464,12 @@ export function Engage() {
         selectedId={treeChoiceId}
         disabled={engage.isPending}
         onInspect={inspectPathwayReality}
-        onBuild={() => followUp("refine")}
+        onBuild={() => {
+          const pathways = delivery ? [...delivery.pathways, ...(delivery.blend ? [delivery.blend] : [])] : [];
+          const selectedPathway = pathways.find(pathway => pathway.id === treeChoiceId);
+          if (selectedPathway) choosePathway(selectedPathway);
+          else followUp("refine");
+        }}
       />
 
       {run && revealed && (detailsOpen || !delivery) && (

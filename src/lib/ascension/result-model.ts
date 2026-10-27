@@ -149,6 +149,8 @@ export interface ObjectiveDelivery {
   blend: ObjectiveBlend | null;
   files: { name: string; content: string }[];
   limitations: string[];
+  /** Cited external OpenAI research, not governed ASCENSION verification. */
+  web_sources?: { title: string; url: string }[];
   /** A model-based meaning check, separate from scientific/runtime verification. */
   objective_fit?: { objective: string; interpretation: string; content_key: string };
 }
@@ -376,6 +378,25 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     blend,
     files,
     limitations: v["limitations"] as string[],
+    ...(Array.isArray(v["web_sources"])
+      ? {
+          web_sources: v["web_sources"].slice(0, 8).flatMap((raw) => {
+            const source = record(raw);
+            const rawUrl = source["url"];
+            if (typeof rawUrl !== "string" || rawUrl.length > 2000) return [];
+            try {
+              const url = new URL(rawUrl);
+              if (url.protocol !== "https:") return [];
+              const title = typeof source["title"] === "string" && source["title"].trim()
+                ? source["title"].trim().slice(0, 160)
+                : url.hostname;
+              return [{ title, url: url.href }];
+            } catch {
+              return [];
+            }
+          }),
+        }
+      : {}),
     ...(objectiveFit ? { objective_fit: objectiveFit } : {}),
   };
 }

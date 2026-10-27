@@ -26,3 +26,21 @@ jobs:
             exit 1
           }
           Write-Host 'Windows hub launcher syntax valid'
+      - name: Verify DPAPI key save and reload on Windows
+        shell: powershell
+        run: |
+          $sample = '0123456789abcdef' * 6
+          $secret = ConvertTo-SecureString -String $sample -AsPlainText -Force
+          $keyfile = Join-Path $env:RUNNER_TEMP 'hub-key.dpapi'
+          $secret | ConvertFrom-SecureString | Set-Content -LiteralPath $keyfile -Encoding UTF8
+          $loaded = ConvertTo-SecureString -String ((Get-Content -LiteralPath $keyfile -Raw).Trim()) -ErrorAction Stop
+          $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($loaded)
+          try {
+            $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+          } finally {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+            $loaded.Dispose()
+            $secret.Dispose()
+          }
+          if ($plain -cne $sample) { throw 'DPAPI ciphertext roundtrip failed' }
+          Write-Host 'Windows DPAPI key roundtrip valid'

@@ -44,6 +44,46 @@ function LivePage() {
   const queryClient = useQueryClient();
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
+  const [hubKey, setHubKey] = useState<string | null>(null);
+  const [hubError, setHubError] = useState<string | null>(null);
+  const [pairing, setPairing] = useState(false);
+
+  const issueHubKey = async () => {
+    if (!window.confirm("Generate a new hub pairing key? This revokes any earlier paired hub key.")) return;
+    setHubKey(null);
+    setHubError(null);
+    setPairing(true);
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session?.access_token) {
+        throw new Error("Sign in to ASCENSION before pairing your hub.");
+      }
+      const response = await fetch("/api/public/ascension/hub-pair", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+        cache: "no-store",
+      });
+      const result = await response.json() as { key?: string; error?: string };
+      if (!response.ok || !/^[a-f0-9]{96}$/.test(result.key ?? "")) {
+        throw new Error(result.error ?? "Hub pairing could not be completed.");
+      }
+      setHubKey(result.key!);
+    } catch (error) {
+      setHubError(error instanceof Error ? error.message : "Hub pairing failed.");
+    } finally {
+      setPairing(false);
+    }
+  };
+
+  const copyHubKey = async () => {
+    if (!hubKey) return;
+    try {
+      await navigator.clipboard.writeText(hubKey);
+      setHubError(null);
+    } catch {
+      setHubError("Clipboard unavailable. Select and copy the key from the field instead.");
+    }
+  };
 
   const publication = useQuery({
     queryKey: ["ascension", "governed-publication"],
@@ -119,6 +159,37 @@ function LivePage() {
             </dd>
           </div>
         </dl>
+      </section>
+
+      <section className="glass-inset rounded-md border border-primary/30 p-4 sm:p-6" aria-label="Secure Windows hub pairing">
+        <p className="label-eyebrow">Trusted Windows hub</p>
+        <h2 className="mt-1 font-display text-lg text-gold">Pair your ASCENSION computer</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Pair only the PC running your governed ASCENSION runtime. This generates a device key once;
+          it does not change the governed publication, expose your PC to incoming internet traffic,
+          or verify that the bridge is already connected.
+        </p>
+        <button type="button" onClick={() => void issueHubKey()} disabled={pairing}
+          className="mt-4 min-h-11 rounded border border-gold/50 px-4 text-sm text-gold disabled:opacity-50">
+          {pairing ? "Creating secure key…" : "GENERATE HUB PAIRING KEY"}
+        </button>
+        {hubError && <p role="alert" className="mt-3 text-sm text-destructive">{hubError}</p>}
+        {hubKey && <div className="mt-4 space-y-2">
+          <label htmlFor="hub-once-key" className="block text-sm font-medium text-gold">
+            One-time device key · do not share or paste into chat
+          </label>
+          <input id="hub-once-key" type="password" value={hubKey} readOnly autoComplete="off"
+            className="w-full rounded border border-border bg-void/65 px-3 py-2 font-mono text-sm text-foreground" />
+          <button type="button" onClick={() => void copyHubKey()}
+            className="min-h-11 rounded border border-primary/50 px-4 text-sm text-primary">
+            COPY KEY FOR WINDOWS POWERSHELL
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Run the existing Start_ASCENSION_Hub.ps1 script on your Windows PC.
+            Paste the key into its hidden prompt; it is encrypted for that Windows account.
+            Creating another key will revoke this one.
+          </p>
+        </div>}
       </section>
 
       <section>

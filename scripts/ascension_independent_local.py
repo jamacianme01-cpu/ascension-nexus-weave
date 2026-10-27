@@ -39,14 +39,18 @@ button:disabled{opacity:.5}.info{text-align:center;color:#aec5c9;font-size:12px;
 <footer>LOCAL ASCENSION CORE · NO LOVABLE · NO Z.AI<br>Governed verification is never assumed or invented.</footer></main><script>
 const csrf="__CSRF__",el=id=>document.getElementById(id);let poller=null;const done=new Set(["PERSISTED","FAILED","REJECTED","VERIFIED_UNPUBLISHED","BLOCKED_TRANSACTION_RECOVERY"]);
 async function get(path,init){let r=await fetch(path,{cache:"no-store",...init});let d=await r.json();if(!r.ok)throw Error(d.error||"HTTP "+r.status);return d}
-async function health(){try{let d=await get("/api/health");el("health").textContent=(d.intake?"REAL OBJECTIVE INTAKE READY":"Starting the objective intake")+" · "+(d.gateway?"GOVERNED SNAPSHOT AVAILABLE":"Observation gateway unavailable");}catch(e){el("health").textContent=e.message}}health();setInterval(health,12000)
+async function health(){try{let d=await get("/api/health");el("health").textContent=(d.intake?"REAL OBJECTIVE INTAKE READY":"Starting the objective intake")+" · "+(d.gateway?"GOVERNED SNAPSHOT AVAILABLE":"Observation gateway unavailable")+(d.clarity_engine_package?" · CLARITY ENGINES FOUND":" · ENGINE DEPENDENCY MISSING: clarity");}catch(e){el("health").textContent=e.message}}health();setInterval(health,12000)
 function show(d){el("result").style.display="block";el("status").textContent="REAL ASCENSION STATUS: "+d.status+" · "+d.request_id;
 let p=d.result?.objective_planning;let b=p?.branches;el("pathways").replaceChildren();if(Array.isArray(b))for(const branch of b){let item=document.createElement("div");item.className="path";item.textContent=branch.title||branch.label||branch.branch_id||JSON.stringify(branch);el("pathways").append(item)}
-el("output").textContent=d.result?JSON.stringify(d.result,null,2):"Processing with the existing governed engines; no verified result reported yet."}
-async function status(id){try{let d=await get("/api/run-status/"+encodeURIComponent(id));show(d);if(done.has(d.status)){clearInterval(poller);poller=null;el("go").disabled=false;el("go").textContent="ENGAGE ASCENSION"}}catch(e){el("status").textContent=e.message}}
+const history=Array.isArray(d.history)?d.history:[];const note=[...history].reverse().find(x=>x&&typeof x.note==="string"&&x.note.trim())?.note;
+if(d.result)el("output").textContent=(note?"Last runtime note: "+note+"\n\n":"")+JSON.stringify(d.result,null,2);
+else if(done.has(d.status))el("output").textContent="The actual ASCENSION runtime STOPPED. No verified result was produced.\n\n"+(note||"No failure reason was recorded.")+"\n\n"+JSON.stringify(history,null,2);
+else el("output").textContent="Processing with the existing governed engines.\n"+(note||"No verified result reported yet.");}
+async function status(id){try{let d=await get("/api/run-status/"+encodeURIComponent(id));show(d);if(done.has(d.status)){clearInterval(poller);poller=null;el("go").disabled=false;el("go").textContent="ENGAGE ASCENSION";return true}return false}catch(e){el("status").textContent=e.message;return false}}
 el("go").onclick=async()=>{let objective=el("objective").value.trim();if(!objective)return;el("go").disabled=true;el("go").textContent="ENGAGING…";if(poller)clearInterval(poller);
-try{let d=await get("/api/engage",{method:"POST",headers:{"content-type":"application/json","x-ascension-ui-csrf":csrf},body:JSON.stringify({objective})});el("objective").value="";await status(d.request_id);if(!poller)poller=setInterval(()=>status(d.request_id),2500)}
+try{let d=await get("/api/engage",{method:"POST",headers:{"content-type":"application/json","x-ascension-ui-csrf":csrf},body:JSON.stringify({objective})});el("objective").value="";const finished=await status(d.request_id);if(!finished)poller=setInterval(()=>status(d.request_id),2500)}
 catch(e){el("go").disabled=false;el("go").textContent="ENGAGE ASCENSION";el("result").style.display="block";el("status").textContent="NOT SUBMITTED: "+e.message;el("output").textContent="No result was produced."}};
+get("/api/last-run").then(show).catch(()=>{});
 </script></body></html>"""
 
 def json_get(url, timeout=3):
@@ -105,7 +109,18 @@ def serve(repo, port, browser=True):
                 except (OSError,URLError,HTTPError,TimeoutError,ValueError):intake=False
                 try:gateway=json_get(GATEWAY+"/snapshot",3).get("availability") in ("available","last_verified")
                 except (OSError,URLError,HTTPError,TimeoutError,ValueError):gateway=False
-                self.send_json(200,{"intake":intake,"gateway":gateway})
+                try:
+                    import importlib.util
+                    clarity=importlib.util.find_spec("clarity") is not None
+                except (ImportError,ValueError):
+                    clarity=False
+                self.send_json(200,{"intake":intake,"gateway":gateway,"clarity_engine_package":clarity})
+            elif path=="/api/last-run":
+                from ASCENSION_CORE.objective_intake import IntakeStore
+                records=IntakeStore(root).all_requests()
+                if not records: return self.send_json(404,{"error":"no earlier requests"})
+                latest=max(records,key=lambda r:r.get("updated_at",""))
+                self.send_json(200,{k:latest.get(k) for k in ("request_id","status","history","result")})
             elif path.startswith("/api/run-status/"):
                 rid=unquote(path.removeprefix("/api/run-status/"))
                 if not rid.startswith("REQ:") or len(rid)>70:return self.send_json(400,{"error":"Invalid run ID"})

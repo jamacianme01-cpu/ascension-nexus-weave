@@ -228,8 +228,8 @@ export async function callZai(input: {
       const result = await callOpenAIResponse({
         system,
         user,
-        imageDataUrl: input.imageDataUrl,
-        webSearch: false,
+        ...(input.imageDataUrl ? { imageDataUrl: input.imageDataUrl } : {}),
+        webSearch: false;
         timeoutMs: 24_000,
       });
       return {

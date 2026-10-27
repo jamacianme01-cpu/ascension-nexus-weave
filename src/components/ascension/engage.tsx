@@ -537,6 +537,22 @@ function ResultContent({
               )}
             </div>
           )}
+          {!!delivery.web_sources?.length && (
+            <section className="rounded-xl border border-primary/25 bg-background/20 p-4" aria-label="OpenAI web research sources">
+              <h3 className="text-sm font-semibold text-primary">RESEARCH SOURCES · OPENAI</h3>
+              <p className="mt-1 text-xs text-muted-foreground">External references for ASCENSION to independently assess — not governed verification.</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                {delivery.web_sources.map((source, index) => (
+                  <li key={source.url}>
+                    <a className="break-words text-gold underline underline-offset-2 hover:text-primary" href={source.url}
+                      target="_blank" rel="noopener noreferrer">
+                      {index + 1}. {source.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
       )}
 

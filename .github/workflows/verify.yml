@@ -19,6 +19,7 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun run test:interface
+      - run: node tests/v1-tree-and-guide.test.mjs
       - run: bun run build
       - run: bunx tsc --noEmit
       - run: python -m unittest discover -s tests -p 'test_ascension_knowledge_memory.py' -v

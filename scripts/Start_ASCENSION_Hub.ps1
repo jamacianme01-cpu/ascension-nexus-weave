@@ -1,4 +1,4 @@
-param([switch]$Pair,[switch]$Once)
+param([switch]$Pair,[switch]$Once,[switch]$ObservationsOnly)
 $ErrorActionPreference = 'Stop'
 $repo = Join-Path $env:USERPROFILE 'Projects\clarity'
 $dir = Join-Path $env:APPDATA 'ASCENSION'
@@ -43,11 +43,10 @@ try {
   New-Item -ItemType Directory -Path $workerDir -Force | Out-Null
   $worker = Join-Path $workerDir 'ascension_hub_worker.py'
   Invoke-WebRequest 'https://raw.githubusercontent.com/jamacianme01-cpu/ascension-nexus-weave/main/scripts/ascension_hub_worker.py' -OutFile $worker -UseBasicParsing -ErrorAction Stop
-  if ($Once) {
-    python -B $worker --root $repo --once
-  } else {
-    python -B $worker --root $repo
-  }
+  $hubArgs = @($worker, '--root', $repo)
+  if ($Once) { $hubArgs += '--once' }
+  if ($ObservationsOnly) { $hubArgs += '--observations-only' }
+  python -B @hubArgs
 } finally {
   Remove-Item Env:\ASCENSION_HUB_KEY -ErrorAction SilentlyContinue
 }

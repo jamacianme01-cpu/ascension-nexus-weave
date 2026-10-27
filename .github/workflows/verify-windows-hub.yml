@@ -3,10 +3,14 @@ on:
   pull_request:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/ascension_hub_worker.py"
+      - "tests/test_ascension_hub_worker.py"
       - ".github/workflows/verify-windows-hub.yml"
   push:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/ascension_hub_worker.py"
+      - "tests/test_ascension_hub_worker.py"
       - ".github/workflows/verify-windows-hub.yml"
 
 jobs:
@@ -44,3 +48,8 @@ jobs:
           }
           if ($plain -cne $sample) { throw 'DPAPI ciphertext roundtrip failed' }
           Write-Host 'Windows DPAPI key roundtrip valid'
+      - name: Check hub Python syntax and fail-closed relay behavior
+        shell: powershell
+        run: |
+          python -m py_compile scripts/ascension_hub_worker.py
+          python -m unittest discover -s tests -p test_ascension_hub_worker.py -v

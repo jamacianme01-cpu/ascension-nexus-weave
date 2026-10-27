@@ -229,7 +229,7 @@ export async function callZai(input: {
         system,
         user,
         ...(input.imageDataUrl ? { imageDataUrl: input.imageDataUrl } : {}),
-        webSearch: false;
+        webSearch: false,
         timeoutMs: 24_000,
       });
       return {

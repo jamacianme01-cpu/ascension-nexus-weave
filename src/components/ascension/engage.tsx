@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
+import { AscensionGuide } from "@/components/ascension/AscensionGuide";
 
 import {
   getObjectiveStatus,
@@ -595,7 +596,7 @@ function ResultContent({
                 {canInspect && (
                   <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(pathway); }}
                     className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-primary uppercase">
-                    {pathway.model_url ? "DIVE INTO REALITY" : "DIVE INTO REALITY · CONCEPT / UNVERIFIED"}
+                    {pathway.model_url ? "EXPLORE THIS PATHWAY" : "EXPLORE CONCEPT · UNVERIFIED"}
                   </button>
                 )}
               </article>
@@ -636,7 +637,7 @@ function ResultContent({
                 {canInspect && (
                   <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(delivery.blend!); }}
                     className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-gold uppercase">
-                    {delivery.blend.model_url ? "DIVE INTO BLENDED REALITY" : "DIVE INTO BLENDED REALITY · CONCEPT / UNVERIFIED"}
+                    {delivery.blend.model_url ? "EXPLORE BLEND" : "EXPLORE BLEND CONCEPT · UNVERIFIED"}
                   </button>
                 )}
               </article>
@@ -1455,6 +1456,16 @@ export function Engage() {
           )}
         </div>
       </section>
+
+      <AscensionGuide
+        objective={run?.objective ?? objective}
+        status={run?.status ?? null}
+        delivery={delivery ?? null}
+        selectedId={treeChoiceId}
+        disabled={engage.isPending}
+        onInspect={inspectPathwayReality}
+        onBuild={() => followUp("refine")}
+      />
 
       {run && revealed && (detailsOpen || !delivery) && (
         <section

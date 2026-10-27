@@ -94,6 +94,14 @@ try {
       assert.ok(zaiModel().startsWith("gpt-"));
       assert.deepEqual(result.json?.meaning_elements, []);
     });
+    process.env.ZAI_API_KEY = "test-stale-zai-key";
+    const stillOpenAI = await callZai({
+      system: "Test", user: "make worker drones", includeInternalKnowledge: false,
+    });
+    check("explicit OpenAI opt-in takes priority over a leftover Z.AI key", () => {
+      assert.equal(stillOpenAI.model, zaiModel());
+      assert.ok(stillOpenAI.model.startsWith("gpt-"));
+    });
     const run = {
       id: "00000000-0000-4000-8000-000000000001",
       objective: "make worker drones",
@@ -110,6 +118,22 @@ try {
         fail: async () => { throw new Error("unexpected failed draft"); },
       },
       generate: async () => { throw new Error("The operation was aborted due to timeout"); },
+    });
+    const oldFailed = await deliveryEngine.resolveDelivery({
+      run, artifactStage: null, retry: false,
+      draft: { status: "failed", source_key: deliveryEngine.artifactSourceKey(run.id, []),
+        error: 'Z.AI returned HTTP 429: {"error":{"code":"1305"}}',
+        created_at: new Date().toISOString(), engine_model: "glm-4.7-flash" },
+      store: {
+        claim: async () => { throw new Error("should not retry failed row automatically"); },
+        complete: async () => { throw new Error("should not write this historical row"); },
+        fail: async () => { throw new Error("should not fail this historical row"); },
+      },
+    });
+    check("a recorded Z.AI 429 failure displays honest pathways instead of no result", () => {
+      assert.equal(oldFailed.error, null);
+      assert.equal(oldFailed.response_payload?.pathways.length, 3);
+      assert.ok(oldFailed.response_payload?.blend);
     });
     check("ENGAGE returns a readable three-pathway unverified guide rather than timeout", () => {
       assert.equal(recovered.status, "completed");

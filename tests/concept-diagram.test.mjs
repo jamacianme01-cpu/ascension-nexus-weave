@@ -29,30 +29,37 @@ try {
   check('GLB path still parses actual downloaded models', () => { assert.match(viewer,/fetch\(loadedUrl/); assert.match(viewer,/GLTFLoader\(\)\.parseAsync/); assert.match(viewer,/model = gltf.scene/); });
   check('concept controls are no longer blocked by absent model_url', () => { assert.doesNotMatch(viewer,/if \(!pathway.model_url\)/); assert.match(viewer,/setReady\(true\)/); assert.match(viewer,/api\.current\?\.explode\(false\)/); });
   check('model arrival protects edited assemblies', () => { assert.match(viewer,/if \(!edited.current && pathway.model_url\)/); assert.match(viewer,/REPLACE EDITED CONCEPT WITH HUNYUAN MODEL/); });
-  check('all approved views are visible in full-screen editor on mobile', () => { const css=readFileSync('src/components/ascension/reality-viewer.css','utf8'); assert.match(css,/\.reality-view-controls[\s\S]*repeat\(6, minmax\(0, 1fr\)\)/); assert.match(css,/\.reality-view-controls \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/); for (const control of ['CUTAWAY','BLUEPRINT','ENVIRONMENT','DISSECTED','PARTS']) assert.ok(viewer.includes(control)); assert.match(viewer,/setMode\("environment"\)/); });
-  check('part labels are clickable on the model picture for concepts and real GLBs', () => { assert.match(viewer,/ready && !dissected && showParts/); assert.match(viewer,/aria-label="Labels on the model"/); assert.match(viewer,/api.current\?\.locatePart\(index\)/); });
-  check('ASSEMBLED automatically generates the primary picture, DISSECTED remains optional', () => {
-    assert.match(viewer, /view:"assembled",requestId,pathwayId:pathway\.id/);
-    assert.match(viewer, /if \(!dissected \|\| !ready \|\| !api\.current \|\| dissection\) return/);
-    assert.match(viewer, /view:"dissected",\.\.\.\(requestId \? \{requestId\} : \{\}\)/);
-    assert.match(viewer, /\.\.\.\(referenceImageUrl \? \{referenceImageUrl\} : \{\}\)/);
-    assert.match(viewer, /const referenceImageUrl = sourceReference \?\? assembledImage/);
-    assert.match(viewer, /const displayedImageUrl = dissected && dissection \? dissection\.imageUrl : referenceImageUrl/);
-    assert.match(viewer, /displayedImageUrl && <RealityDissection imageUrl=\{displayedImageUrl\}/);
-    const extras = viewer.slice(viewer.indexOf('view:"dissected"'),viewer.indexOf('const [showParts,'));
-    assert.doesNotMatch(extras,/bindViewerReference\(/);
-    const imageFn=readFileSync('src/lib/ascension/parts.functions.ts','utf8');
-    assert.match(imageFn, /data\.view==='assembled'/);
-    assert.match(imageFn, /assembled\/\$\{hash\}\.png/);
-    assert.match(imageFn, /NO exploded view/);
+  check('V1 shows the approved Dissect, Exploded, Blueprint and 3D modes on mobile',()=>{
+    const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');
+    for(const control of ['DISSECT','EXPLODED VIEW','BLUEPRINT','3D VIEW','COMPONENTS'])
+      assert.ok(viewer.includes(control), 'missing '+control);
+    assert.match(css,/\.reality-screen \.reality-view-controls \{ display:flex/);
+    assert.match(css,/@media\(max-width:760px\)/);
+    assert.doesNotMatch(viewer,/>\s*CUTAWAY\s*<\/Button>/);
+    assert.doesNotMatch(viewer,/>\s*ENVIRONMENT\s*<\/Button>/);
   });
-  check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
-    assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);/);
-    assert.match(readFileSync('src/components/ascension/RealityDissection.tsx','utf8'), /reality-dissection-target/);
-    assert.match(viewer, /MANIPULATE THIS PART IN 3D/);
-    assert.match(viewer, /setEditorOpen\(true\)/);
-    assert.match(viewer, /api\.current\?\.selectComponent\(matching\.id\)/);
-    for (const detail of ['Purpose', 'How it works', 'Connections', 'Design limits']) assert.ok(viewer.includes(detail));
+  check('V1 pictures are not cluttered with part markers',()=>{
+    const dissection=readFileSync('src/components/ascension/RealityDissection.tsx','utf8');
+    assert.doesNotMatch(dissection,/<Button variant="outline" className="reality-dissection-label"/);
+    assert.match(viewer,/false && ready && !dissected && showParts/);
+    assert.match(viewer,/reality-named-parts/);
+    assert.match(viewer,/aria-label="Design parts"/);
+  });
+  check('assembled reference and source-derived dissection retain honest provenance',()=>{
+    assert.match(viewer,/view:"assembled",requestId,pathwayId:pathway\.id/);
+    assert.match(viewer,/view:"dissected",\.\.\.\(requestId \? \{requestId\} : \{\}\)/);
+    assert.match(viewer,/const referenceImageUrl = sourceReference \?\? assembledImage/);
+    assert.match(viewer,/const displayedImageUrl = dissected && dissection \? dissection\.imageUrl : referenceImageUrl/);
+    assert.match(viewer,/AWAITING SOURCE-DERIVED 3D MODEL/);
+  });
+  check('component inspector shows named parts and side descriptions',()=>{
+    assert.match(viewer,/reality-named-parts/);
+    assert.match(viewer,/setPartIndex\(index\)/);
+    assert.match(viewer,/MANIPULATE THIS PART IN 3D/);
+    assert.match(viewer,/setEditorOpen\(true\)/);
+    for(const detail of ['Purpose','How it works','Connections','Design limits'])assert.ok(viewer.includes(detail));
+    assert.match(viewer,/ascension-v1-view-description/);
+    assert.match(viewer,/pathway\.summary/);
   });
   check('only ENGAGE and ANSWER play cues; viewer has no continuous ambience', () => {
     const engage=readFileSync('src/components/ascension/engage.tsx','utf8');

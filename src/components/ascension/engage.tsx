@@ -1323,6 +1323,10 @@ export function Engage() {
             {soundEnabled ? (soundBlocked ? "SOUND BLOCKED · TAP" : "SOUND ON") : "SOUND OFF"}
           </button>
 
+          <p role="status" className="relative z-[30] mx-auto mb-4 max-w-2xl text-center text-sm leading-6 text-foreground/90">
+            Welcome to ASCENSION. I'm your guide through the Knowledgeverse. Tell me what you want to create or discover, and we'll explore the possibilities together.
+          </p>
+
           <label
             htmlFor="objective"
             className="relative z-[30] block text-center font-display text-lg tracking-wide text-foreground/95"
@@ -1485,7 +1489,7 @@ export function Engage() {
                       ? "Your design is ready. The 3D visual is still pending."
                       : "Your result is below."
                     : deliveryQuery.data?.note && produced === null
-                      ? deliveryQuery.data.note
+                      ? "I'm exploring ways to accomplish your objective. The design pathways aren't ready yet; I'll show them when they're actually available."
                       : statusText(run, produced)}
               </p>
             </div>

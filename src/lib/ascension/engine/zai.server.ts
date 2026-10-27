@@ -70,14 +70,14 @@ export class ZaiEngineError extends Error {
 }
 
 export function zaiModel(): string {
+  if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" && process.env["OPENAI_API_KEY"]?.trim())
+    return process.env["ASCENSION_OPENAI_MODEL"]?.trim() || "gpt-4.1-mini";
   if (process.env["OPENROUTER_API_KEY"]?.trim()) return FREE_MODEL;
   if (process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true" &&
       process.env["LOVABLE_API_KEY"]?.trim())
     return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
   if (process.env["ZAI_API_KEY"]?.trim()) return ZAI_FREE_TEXT_MODEL;
   if (localLlmConfig()) return localLlmConfig()!.model;
-  if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" && process.env["OPENAI_API_KEY"]?.trim())
-    return process.env["ASCENSION_OPENAI_MODEL"]?.trim() || "gpt-4.1-mini";
   return DEFAULT_LOCAL_MODEL;
 }
 
@@ -185,7 +185,11 @@ export async function callZai(input: {
     Boolean(process.env["OPENAI_API_KEY"]?.trim());
   // A configured public cloud route wins over localhost, even if a local
   // desktop development URL accidentally remains in server settings.
-  const provider = input.fallbackProvider ?? (freeCloudKey ? "free_cloud" : lovableKey ? "lovable" : zaiKey ? "zai_free" : local ? "local" : openaiEnabled ? "openai" : null);
+  // Explicitly opted-in OpenAI wins for user-facing inference even when
+  // stale ZAI_API_KEY remains in Lovable's environment.
+  const provider = input.fallbackProvider ??
+    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" : lovableKey ? "lovable" :
+      zaiKey ? "zai_free" : local ? "local" : null);
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",

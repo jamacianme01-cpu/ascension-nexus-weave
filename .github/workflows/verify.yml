@@ -2,7 +2,7 @@ name: Verify ASCENSION
 
 on:
   push:
-    branches: [main]
+    branches: [main, independent-hub-no-lovable-zai]
   workflow_dispatch:
 
 permissions:
@@ -21,3 +21,4 @@ jobs:
       - run: bun run test:interface
       - run: bun run build
       - run: bunx tsc --noEmit
+      - run: python -m unittest discover -s tests -p 'test_ascension_knowledge_memory.py' -v

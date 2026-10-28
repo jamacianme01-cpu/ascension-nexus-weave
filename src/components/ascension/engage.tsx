@@ -209,12 +209,16 @@ function splitResultBody(value: string) {
 function AscensionSignal({ run, delivery }: { run: ObjectiveRun; delivery: ObjectiveDelivery }) {
   const planning = planningFor(run.result);
   const result = record(run.result);
-  // A BLEND is synthesis, not another Spiral pathway. Never inflate the
-  // pathway count by counting BLEND as a path.
+  // For actual created output versions, display generated source count.
+  // The conventional Spiral pathways below refer to design planning models,
+  // not to four independently created application/CAD artifacts.
+  const createdVersions = assessCreatedOutputVersions(run.objective, delivery);
   const deliveredPathCount = delivery.pathways.length;
-  const spiralSignal = deliveredPathCount
-    ? `${deliveredPathCount} DELIVERED PATH${deliveredPathCount === 1 ? "" : "S"}${delivery.blend ? " + BLEND" : ""}`
-    : "NO PATHWAYS DELIVERED";
+  const spiralSignal = createdVersions.length
+    ? `${createdVersions.length} CREATED VERSIONS${createdVersions.some((v) => v.kind === "blend") ? " · INCLUDES BLEND" : ""}`
+    : deliveredPathCount
+      ? `${deliveredPathCount} DELIVERED PATH${deliveredPathCount === 1 ? "" : "S"}${delivery.blend ? " + BLEND" : ""}`
+      : "NO PATHWAYS DELIVERED";
   const guardian = run.guardian_verdict ?? "—";
   const autosync = String(result["autosync_verdict"] ?? "—");
   const delta = governedPersisted(run)

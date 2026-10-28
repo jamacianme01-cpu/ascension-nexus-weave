@@ -432,6 +432,8 @@ function ResultContent({
   const otherFiles = delivery.files.filter(
     (file) => file !== drawing && !(/\.svg$/i.test(file.name) && hasVisualChoices),
   );
+  const actualVersions = delivery.versions ?? [];
+  const producedVersions = actualVersions.filter((version) => version.status === "created").length;
   const variablesFor = (pathway: ObjectiveDelivery["pathways"][number]) => onToggleVariable && variableKey && (
     <details className="ascension-variable-picker mt-3" onClick={event => event.stopPropagation()}
       onKeyDown={event => event.stopPropagation()}>
@@ -554,6 +556,56 @@ function ResultContent({
             </section>
           )}
         </div>
+      )}
+
+      {actualVersions.length === 4 && (
+        <section className="order-first space-y-4 rounded-2xl border border-primary/30 p-4 sm:p-5" aria-label="Four distinct output versions">
+          <div>
+            <p className="label-eyebrow text-primary">FOUR DISTINCT OUTPUT VERSIONS</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {producedVersions} of 4 versions have actual created files. Each version is independently downloadable; no missing version is counted as produced.
+            </p>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {actualVersions.map((version, index) => (
+              <article key={version.id} className="space-y-3 rounded-xl border border-primary/20 bg-background/25 p-4">
+                <p className="text-xs tracking-wide text-primary">
+                  VERSION {index + 1}{version.kind === "blend" ? " · BLEND" : " · PATHWAY"}
+                </p>
+                <h3 className="font-display text-xl text-foreground">{cleanDisplayText(version.label)}</h3>
+                <p className="text-sm leading-6 text-foreground/85">{cleanDisplayText(version.summary)}</p>
+                {version.files.find((file) => /\.html?$/i.test(file.name)) && (
+                  <iframe
+                    title={`Isolated source preview: ${version.label}`}
+                    sandbox="allow-scripts"
+                    referrerPolicy="no-referrer"
+                    srcDoc={version.files.find((file) => /\.html?$/i.test(file.name))!.content}
+                    className="h-64 w-full rounded-lg border border-primary/20 bg-white"
+                  />
+                )}
+                {!version.files.some((file) => /\.html?$/i.test(file.name)) &&
+                  version.files.find((file) => /\.svg$/i.test(file.name)) && (
+                    <img
+                      alt={`Source preview: ${version.label}`}
+                      src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(version.files.find((file) => /\.svg$/i.test(file.name))!.content)}`}
+                      className="h-64 w-full rounded-lg border border-primary/20 object-contain"
+                    />
+                  )}
+                <p className="text-xs text-muted-foreground">
+                  {version.status === "created" ? "SOURCE CREATED · FUNCTIONAL RESULT NOT YET VERIFIED" : "NOT CREATED"}
+                </p>
+                {version.files.map((file) => (
+                  <button key={file.name} type="button"
+                    onClick={() => download(file.name, file.content)}
+                    className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-gold/35 px-4 py-2 text-left text-sm text-gold">
+                    <span className="break-all">{file.name}</span><span className="shrink-0">DOWNLOAD</span>
+                  </button>
+                ))}
+                <p className="text-xs text-muted-foreground">{cleanDisplayText(version.verification_scope)}</p>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
 
       {!hasVisualChoices && /\b(make|build|create|design|construct|draw)\b/i.test(delivery.title) && (
@@ -867,6 +919,13 @@ export function Engage() {
       if (!active) return false;
       const delivery = q.state.data;
       if (delivery?.status !== "completed") return 2500;
+      // A pre-generated external failure is not final: actual output versions
+      // can arrive afterward from the operator's governed capability adapters.
+      const finishedAt = Date.parse(runQuery.data?.completed_at ?? "");
+      const versions = delivery.response_payload?.versions ?? [];
+      if (runQuery.data?.status === "verified" &&
+          versions.length !== 4 && Number.isFinite(finishedAt) &&
+          Date.now() - finishedAt < 15 * 60_000) return 5000;
 
       const modelChoices = delivery.response_payload
         ? delivery.response_payload.blend
@@ -879,7 +938,6 @@ export function Engage() {
       if (waitingForHunyuan) return 3000;
 
       if (delivery.source !== "external_draft") return false;
-      const finishedAt = Date.parse(runQuery.data?.completed_at ?? "");
       return runQuery.data?.status === "verified" &&
         Number.isFinite(finishedAt) &&
         Date.now() - finishedAt < 90_000
@@ -1547,10 +1605,10 @@ export function Engage() {
               <button
                 type="button"
                 disabled={prepare.isPending}
-                onClick={() => prepare.mutate({ id: run.id, retry: true })}
+                onClick={() => { void runQuery.refetch(); void deliveryQuery.refetch(); }}
                 className="mt-4 min-h-11 rounded-full border border-primary/40 px-5 text-sm text-primary"
               >
-                {deliveryQuery.data?.error ? "RETRY DRAFT" : "CHECK FOR RESULT"}
+                CHECK FOR RESULT
               </button>
             </div>
           ) : deliveryError ? (

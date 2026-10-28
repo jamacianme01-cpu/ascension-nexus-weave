@@ -153,9 +153,9 @@ export function governedDelivery(
   const answerFile = assessment.files.find((file) => /\.(md|txt)$/i.test(file.name));
   const body =
     assessment.kind === "app"
-      ? "Your runnable app is ready below. Download the HTML file and open it in your browser."
+      ? "ASCENSION produced software source files. Download and test them. Recorded source and syntax checks do not establish that the app works."
       : assessment.kind === "drawing"
-        ? "Your drawing is shown below. Download the SVG to keep or edit it."
+        ? "ASCENSION produced a drawing file. Download and inspect it; the contents may still require validation."
         : primaryOk && /\.(md|txt)$/i.test(primary.name)
           ? primary.content.trim()
           : answerFile
@@ -168,12 +168,20 @@ export function governedDelivery(
     return basename && basename !== "governed_objective.json" && !transportedNames.has(basename);
   });
 
-  const answerLimitations =
-    requestedOutput["truth_status"] === "UNVERIFIED_MODEL_DRAFT"
-      ? [
-          "A local model drafted this answer. Its factual claims have not been independently checked.",
-        ]
-      : [];
+  // Execution receipts record exactly what was checked. A PERSISTED core
+  // run is not the same as producing every feature of the user-requested result.
+  const incompleteReceipts = Array.isArray(result["execution_receipts"])
+    ? result["execution_receipts"].map(record).filter((receipt) => receipt["requested_result_produced"] === false)
+    : [];
+  const answerLimitations = [
+    ...(requestedOutput["truth_status"] === "UNVERIFIED_MODEL_DRAFT"
+      ? ["A local model drafted this answer. Its factual claims have not been independently checked."]
+      : []),
+    ...incompleteReceipts.map((receipt) =>
+      typeof receipt["verification_scope"] === "string" && receipt["verification_scope"].trim()
+        ? "Source/artifact verification only: " + receipt["verification_scope"].trim().slice(0, 400)
+        : "ASCENSION persisted an intermediate artifact, but the complete requested result was not verified."),
+  ];
 
   return parseDelivery({
     kind: assessment.kind === "answer" || assessment.kind === "design" ? "answer" : "artifact",
@@ -796,6 +804,7 @@ type DraftGenerator = typeof externalProductDraft;
 export async function resolveDelivery(args: {
   run: DeliveryRun;
   artifactStage: { status: string; response_payload: unknown } | null;
+  versionsStage?: { status: string; response_payload: unknown } | null;
   draft: DraftRow | null;
   store: DraftStore;
   retry: boolean;
@@ -830,6 +839,46 @@ export async function resolveDelivery(args: {
     ...extra,
   });
 
+  // Version production is independent of external answer providers.
+  // When genuine generated output files arrive after a failed/old draft,
+  // they take precedence. Four slots are required, but incomplete slots do
+  // not masquerade as completed deliverables.
+  const variantData = record(args.versionsStage?.status === "completed"
+    ? args.versionsStage?.response_payload : null);
+  const versionRecords = Array.isArray(variantData["versions"]) ? variantData["versions"] : [];
+  if (run.status === "verified" && versionRecords.length === 4) {
+    const created = versionRecords.map(record).filter((v) => v["status"] === "created" &&
+      Array.isArray(v["files"]) && v["files"].length > 0);
+    if (created.length) {
+      const transported = artifactStage?.status === "completed"
+        ? artifactFiles(artifactStage.response_payload) : [];
+      const prior = governedDelivery(run, transported);
+      const baseDelivery = prior && prior.kind !== "not_produced" ? prior : parseDelivery({
+        kind: "answer",
+        title: run.objective.slice(0, 200) || "ASCENSION output versions",
+        body: "ASCENSION produced source artifacts through its connected capabilities. Each version has separate files and verification limitations.",
+        pathways: [], blend: null, files: [], limitations: [],
+      });
+      const combined = parseDelivery({
+        ...baseDelivery,
+        versions: versionRecords,
+        limitations: [
+          ...baseDelivery.limitations,
+          `${created.length} of 4 distinct output versions contain real generated files. The remaining slots are unavailable until their capability succeeds.`,
+          "Output files and syntax checks do not independently verify requested features, physical behavior, or deployment.",
+        ],
+      });
+      return {
+        ...base,
+        engine_label: "ASCENSION_OUTPUT_VERSIONS",
+        status: "completed",
+        response_payload: combined,
+        note: created.length === 4 ? null : `Created ${created.length} of 4 output versions; remaining versions not yet created.`,
+        source: "governed",
+      };
+    }
+  }
+
   // A delivered version is a saved result. Reopening it, model completion,
   // and later runtime transport must not rewrite its answer or drawings.
   // New answers and user-selected blends submit a linked, separate request.
@@ -863,9 +912,20 @@ export async function resolveDelivery(args: {
         error: `A detail is needed to preserve your meaning: ${fit.question}`, source: null };
       if (fit.matches) governed = await stampObjectiveFit(run.objective, governed, fit.interpretation);
       else { rejectedFit = fit; governed = null; }
-    } catch (cause) {
-      return { ...base, status: "completed", response_payload: null, note: null, source: null,
-        error: `The objective meaning check failed: ${cause instanceof Error ? cause.message : String(cause)}` };
+    } catch {
+      // The external meaning reviewer may be unconfigured, rate-limited or
+      // unauthorized. Never hide REAL transported artifacts solely because
+      // an unrelated answer provider is offline. Do NOT stamp objective fit
+      // or claim feature-complete execution when review did not run.
+      if (governed) {
+        governed = parseDelivery({
+          ...governed,
+          limitations: [
+            ...governed.limitations,
+            "Automated objective-fit review was unavailable. The delivered files are source evidence only; whether they accomplish the full objective remains unverified.",
+          ],
+        });
+      }
     }
   }
   // A plain-text runtime receipt does not fulfill a request to create a

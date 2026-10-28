@@ -141,6 +141,17 @@ export interface ObjectiveBlend extends ObjectivePathway {
   blend_reason: string;
 }
 
+export interface ObjectiveOutputVersion {
+  id: string;
+  kind: "pathway" | "blend";
+  label: string;
+  summary: string;
+  status: "created" | "unavailable";
+  files: { name: string; content: string }[];
+  verification_scope: string;
+  blend_from: string[];
+}
+
 export interface ObjectiveDelivery {
   kind: "answer" | "recommendation" | "artifact" | "not_produced";
   title: string;
@@ -148,6 +159,7 @@ export interface ObjectiveDelivery {
   pathways: ObjectivePathway[];
   blend: ObjectiveBlend | null;
   files: { name: string; content: string }[];
+  versions?: ObjectiveOutputVersion[];
   limitations: string[];
   /** Cited external OpenAI research, not governed ASCENSION verification. */
   web_sources?: { title: string; url: string }[];
@@ -357,6 +369,39 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     names.add(f["name"].toLowerCase());
     return { name: f["name"], content: f["content"] };
   });
+  const versions: ObjectiveOutputVersion[] = (Array.isArray(v["versions"]) ? v["versions"] : [])
+    .slice(0, 4).map((raw): ObjectiveOutputVersion => {
+      const entry = record(raw);
+      const id = typeof entry["id"] === "string" ? entry["id"].trim().slice(0, 200) : "";
+      const kind = entry["kind"];
+      const status = entry["status"];
+      const label = typeof entry["label"] === "string" ? entry["label"].trim().slice(0, 160) : "";
+      const summary = typeof entry["summary"] === "string" ? entry["summary"].trim().slice(0, 3000) : "";
+      const verificationScope = typeof entry["verification_scope"] === "string"
+        ? entry["verification_scope"].trim().slice(0, 1000) : "";
+      if (!id || !label || !summary || !verificationScope ||
+          (kind !== "pathway" && kind !== "blend") ||
+          (status !== "created" && status !== "unavailable"))
+        throw new Error("Invalid output version.");
+      const rawFiles = Array.isArray(entry["files"]) ? entry["files"] : [];
+      if (rawFiles.length > 8 || (status === "created" && !rawFiles.length) ||
+          (status === "unavailable" && !!rawFiles.length))
+        throw new Error("Incomplete output version files.");
+      const files = rawFiles.map((file) => {
+        const f = record(file);
+        const name = typeof f["name"] === "string" ? f["name"].trim() : "";
+        const content = f["content"];
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(name) || name.includes("..") ||
+            typeof content !== "string" || !content.trim() || content.length > 100_000)
+          throw new Error("Invalid version file content.");
+        return { name, content };
+      });
+      return {
+        id, kind, status, label, summary, files,
+        verification_scope: verificationScope,
+        blend_from: strings(entry["blend_from"]).slice(0, 3),
+      };
+    });
   const hasVisualPathway =
     pathways.some((pathway) => Boolean(pathway.visual_svg)) || Boolean(blend?.visual_svg);
   if (v["kind"] === "not_produced" && (files.length || hasVisualPathway))
@@ -377,6 +422,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     pathways,
     blend,
     files,
+    ...(versions.length ? { versions } : {}),
     limitations: v["limitations"] as string[],
     ...(Array.isArray(v["web_sources"])
       ? {

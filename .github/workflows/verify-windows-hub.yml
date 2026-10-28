@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/ascension_version_worker.py"
+      - "tests/test_ascension_version_worker.py"
       - "scripts/Start_ASCENSION_ENGAGE.ps1"
       - "scripts/ascension_engage_preflight.py"
       - "tests/test_ascension_engage_preflight.py"
@@ -16,6 +18,8 @@ on:
   push:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/ascension_version_worker.py"
+      - "tests/test_ascension_version_worker.py"
       - "scripts/Start_ASCENSION_ENGAGE.ps1"
       - "scripts/ascension_engage_preflight.py"
       - "tests/test_ascension_engage_preflight.py"
@@ -80,3 +84,8 @@ jobs:
         run: |
           python -m py_compile scripts/ascension_engage_preflight.py
           python -m unittest discover -s tests -p test_ascension_engage_preflight.py -v
+      - name: Verify capability-dispatched four-version creation
+        shell: powershell
+        run: |
+          python -m py_compile scripts/ascension_version_worker.py
+          python -m unittest discover -s tests -p test_ascension_version_worker.py -v

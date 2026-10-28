@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
 import sys
 import time
 from urllib.error import HTTPError, URLError
@@ -123,6 +124,24 @@ def main():
             result = worker.run_once()
             if result is not None:
                 print("GOVERNED OBJECTIVE:", json.dumps(result, sort_keys=True), flush=True)
+                # Versions are produced only after a real governed completion,
+                # using the three published branch identities. Never invent
+                # versions for rejected or unavailable objectives.
+                if result.get("cloud_status") == "verified" and result.get("local_status") == "PERSISTED":
+                    request_id = result.get("cloud_request_id")
+                    script = Path(__file__).resolve().with_name("ascension_version_worker.py")
+                    if request_id and script.is_file():
+                        print("GENERATING FOUR DISTINCT OUTPUT VERSIONS:", request_id, flush=True)
+                        try:
+                            outcome = subprocess.run(
+                                [sys.executable, "-B", str(script), "--root", str(root),
+                                 "--request-id", str(request_id)],
+                                timeout=780, check=False,
+                            )
+                            if outcome.returncode != 0:
+                                print("OUTPUT VERSIONS NOT COMPLETE: see messages above", flush=True)
+                        except (OSError, subprocess.TimeoutExpired) as exc:
+                            print("OUTPUT VERSION ADAPTER FAILED:", type(exc).__name__, flush=True)
             elif args.once:
                 print("HUB IDLE: no queued objective", flush=True)
         except (RuntimeError, ValueError, HTTPError, URLError, OSError) as exc:

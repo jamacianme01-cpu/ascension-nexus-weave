@@ -22,6 +22,7 @@ import {
 } from "@/lib/ascension/guest.functions";
 import {
   assessResult,
+  assessCreatedOutputVersions,
   hasEnvisionPreparation,
   requestedKind,
   governedPersisted,
@@ -422,6 +423,8 @@ function ResultContent({
   variableKey?: (pathway: ObjectiveDelivery["pathways"][number], variable: ReturnType<typeof pathwayVariables>[number]) => string;
 }) {
   const hasVisualChoices = delivery.pathways.length > 0 || Boolean(delivery.blend);
+  const hasVersionOutputs = (delivery.versions ?? []).some((version) =>
+    version.status === "created" && version.files.length > 0);
   // ENVISION's interactive 3D scene is the primary visual whenever pathways exist.
   // Keep legacy SVG artifacts out of the main presentation so the experience
   // cannot fall back to a flat drawing after a holographic reality is selected.
@@ -608,7 +611,7 @@ function ResultContent({
         </section>
       )}
 
-      {!hasVisualChoices && /\b(make|build|create|design|construct|draw)\b/i.test(delivery.title) && (
+      {!hasVisualChoices && !hasVersionOutputs && /\b(make|build|create|design|construct|draw)\b/i.test(delivery.title) && (
         <p className="order-first rounded-xl border border-gold/40 bg-gold/5 p-4 text-sm text-gold">
           No Spiral design pathways were delivered. This text is not a completed creation.
         </p>
@@ -1107,7 +1110,23 @@ export function Engage() {
           ...(parsed.blend?.visual_svg ? [parsed.blend.visual_svg] : []),
         ];
         const check = assessResult(run.objective, parsed.body, parsed.files, visualSvgs);
-        if (parsed.kind === "not_produced" || (!check.produced && !hasEnvisionPreparation(run.objective, parsed))) {
+        const createdVersions = assessCreatedOutputVersions(run.objective, parsed);
+        // The user's requested result can be four separate real outputs even
+        // when an earlier single-answer draft was "not produced". Assess the
+        // version files independently rather than throwing them away.
+        if (createdVersions.length > 0) {
+          parsedDelivery = {
+            ...parsed,
+            kind: "artifact",
+            files: check.produced ? check.files : [],
+            limitations: [
+              ...parsed.limitations,
+              ...((parsed.versions?.length ?? 0) > createdVersions.length
+                ? ["Not every version has the requested output type; incomplete source remains unverified."]
+                : []),
+            ],
+          };
+        } else if (parsed.kind === "not_produced" || (!check.produced && !hasEnvisionPreparation(run.objective, parsed))) {
           unproduced =
             parsed.kind === "not_produced"
               ? parsed.body

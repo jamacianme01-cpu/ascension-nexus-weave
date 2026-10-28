@@ -13,8 +13,9 @@ import subprocess
 import sys
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
+import re
 
 SURFACES = ("/snapshot", "/status", "/knowledgeverse", "/pathways",
             "/governance", "/outcomes", "/galaxy-bridges", "/manifestation",
@@ -82,6 +83,30 @@ def relay_observations(gateway, key):
     return content.get("snapshot_revision")
 
 
+def pending_output_request(key: str, runner: str) -> str | None:
+    """Discover a real persisted, verified run on the paired operator's PC
+    without relying on the core worker's return-dict implementation details.
+    """
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", runner):
+        raise ValueError("Invalid paired runner name")
+    req = Request(
+        SITE + "/api/public/ascension/output-versions?" +
+        urlencode({"pending": "1", "runner": runner}),
+        headers={"accept": "application/json", "x-ascension-hub-key": key},
+    )
+    with urlopen(req, timeout=30) as response:
+        data = json.load(response)
+    item = data.get("item") if isinstance(data, dict) else None
+    if item is None:
+        return None
+    request_id = item.get("request_id") if isinstance(item, dict) else None
+    if not isinstance(request_id, str) or not re.fullmatch(
+        r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", request_id
+    ):
+        raise ValueError("Pending output response contains an invalid objective ID")
+    return request_id
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True)
@@ -105,6 +130,9 @@ def main():
         worker = CloudQueueWorker(root / "ASCENSION_CORE" / "state" / "live", client)
 
     next_push = 0.0
+    next_output_poll = 0.0
+    attempted: dict[str, float] = {}
+    runner = socket.gethostname()
     while True:
         if time.monotonic() >= next_push:
             try:
@@ -124,30 +152,39 @@ def main():
             result = worker.run_once()
             if result is not None:
                 print("GOVERNED OBJECTIVE:", json.dumps(result, sort_keys=True), flush=True)
-                # Versions are produced only after a real governed completion,
-                # using the three published branch identities. Never invent
-                # versions for rejected or unavailable objectives.
-                if result.get("cloud_status") == "verified" and result.get("local_status") == "PERSISTED":
-                    request_id = result.get("cloud_request_id")
-                    script = Path(__file__).resolve().with_name("ascension_version_worker.py")
-                    if request_id and script.is_file():
-                        print("GENERATING FOUR DISTINCT OUTPUT VERSIONS:", request_id, flush=True)
-                        try:
-                            outcome = subprocess.run(
-                                [sys.executable, "-B", str(script), "--root", str(root),
-                                 "--request-id", str(request_id)],
-                                timeout=780, check=False,
-                            )
-                            if outcome.returncode != 0:
-                                print("OUTPUT VERSIONS NOT COMPLETE: see messages above", flush=True)
-                        except (OSError, subprocess.TimeoutExpired) as exc:
-                            print("OUTPUT VERSION ADAPTER FAILED:", type(exc).__name__, flush=True)
             elif args.once:
                 print("HUB IDLE: no queued objective", flush=True)
         except (RuntimeError, ValueError, HTTPError, URLError, OSError) as exc:
             print("Objective queue unavailable:", str(exc)[:300], flush=True)
             if args.once:
                 return 1
+
+        # Every active paired-hub cycle can recover missing four-version
+        # outputs from genuine, already-verified core runs. This also works
+        # when a different authorized local core entrypoint processed ENGAGE,
+        # or when the hub started AFTER the objective was persisted.
+        now = time.monotonic()
+        if now >= next_output_poll:
+            next_output_poll = now + 30
+            try:
+                request_id = pending_output_request(key, runner)
+                if request_id and attempted.get(request_id, 0) <= now:
+                    script = Path(__file__).resolve().with_name("ascension_version_worker.py")
+                    if script.is_file():
+                        attempted[request_id] = now + 600
+                        print("COMPLETING FOUR VERSIONS FOR VERIFIED OBJECTIVE:", request_id, flush=True)
+                        try:
+                            outcome = subprocess.run(
+                                [sys.executable, "-B", str(script), "--root", str(root),
+                                 "--request-id", request_id],
+                                timeout=1100, check=False,
+                            )
+                            if outcome.returncode != 0:
+                                print("OUTPUT VERSION COMPLETION BLOCKED; saved successful files preserved", flush=True)
+                        except (OSError, subprocess.TimeoutExpired) as exc:
+                            print("OUTPUT VERSION ADAPTER FAILED:", type(exc).__name__, flush=True)
+            except (RuntimeError, ValueError, HTTPError, URLError, OSError) as exc:
+                print("Version recovery availability:", str(exc)[:300], flush=True)
         if args.once:
             return 0
         time.sleep(3)

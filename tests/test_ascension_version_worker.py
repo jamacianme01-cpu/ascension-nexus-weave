@@ -32,8 +32,10 @@ class VersionDispatchTests(unittest.TestCase):
         created = []
         def adapter(_root, objective, branch, _previous):
             created.append((objective, branch["id"], branch["direction"]["label"]))
-            return {"index.html": "<html><body><script>const a = " + branch["id"] +
-                                  ";</script></body></html>",
+            markers = {"one": "alpha", "two": "bravo", "three": "charlie", "blend": "delta"}
+            marker = markers[branch["id"]]
+            return {"index.html": "<html><body><script>const implementation = '" + marker * 40 +
+                                  "';function start(){return implementation;}</script></body></html>",
                     "verification.json": '{"functional_browser_tested":false}'}
         with mock.patch.object(mod, "plan_distinct_directions", return_value=self.directions), \
              mock.patch.dict(mod.ADAPTERS, {"software_project": adapter}):

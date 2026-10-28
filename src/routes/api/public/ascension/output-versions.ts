@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { authorizeAscensionHub } from "@/lib/ascension/hub-auth.server";
-import { normalizeOutputVersions } from "@/lib/ascension/output-versions.server";
+import { normalizeOutputVersions, needsVersionCompletion } from "@/lib/ascension/output-versions.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -52,7 +52,45 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
       GET: async ({ request }) => {
         const denied = await authorizeAscensionHub(request);
         if (denied) return denied;
-        const id = new URL(request.url).searchParams.get("request_id");
+        const url = new URL(request.url);
+        if (url.searchParams.get("pending") === "1") {
+          // The paired machine can discover a previously verified objective
+          // whose independent versions are absent, even if its core queue was
+          // processed using a different local entrypoint.
+          const runner = url.searchParams.get("runner");
+          if (!runner || !/^[A-Za-z0-9_.-]{1,120}$/.test(runner))
+            return json({ error: "invalid_runner" }, 400);
+          const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+          const { data: candidates, error: candidateError } = await supabaseAdmin
+            .from("ascension_execution_requests")
+            .select("id,objective,result,completed_at")
+            .eq("engine", "governed_runtime")
+            .eq("status", "verified")
+            .eq("stage", "persisted")
+            .eq("claimed_by", runner)
+            .gte("completed_at", since)
+            .order("completed_at", { ascending: false })
+            .limit(20);
+          if (candidateError) return json({ error: "pending_objectives_unavailable" }, 503);
+          const eligible = (candidates ?? []).filter((row) => {
+            const branches = planning(row.result);
+            return branches.length === 3 &&
+              new Set(branches.map((branch) => branch.id)).size === 3;
+          });
+          if (!eligible.length) return json({ item: null });
+          const { data: stages, error: stagesError } = await supabaseAdmin
+            .from("ascension_run_stages")
+            .select("request_id,status,response_payload")
+            .in("request_id", eligible.map((row) => row.id))
+            .eq("ordinal", 103);
+          if (stagesError) return json({ error: "pending_versions_unavailable" }, 503);
+          const next = eligible.find((row) => {
+            const stage = (stages ?? []).find((s) => s.request_id === row.id);
+            return !stage || stage.status !== "completed" || needsVersionCompletion(stage.response_payload);
+          });
+          return json({ item: next ? { request_id: next.id, objective: next.objective } : null });
+        }
+        const id = url.searchParams.get("request_id");
         if (!uuid(id)) return json({ error: "invalid_request_id" }, 400);
         const row = await target(id!);
         if (!row) return json({ error: "unknown_request_id" }, 404);

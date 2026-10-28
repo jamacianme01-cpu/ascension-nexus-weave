@@ -8,9 +8,11 @@ Guardian/AutoSync core results and never invents four created outputs.
 from __future__ import annotations
 
 import argparse
+from difflib import SequenceMatcher
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -52,6 +54,7 @@ def create_software(root: Path, objective: str, branch: dict, previous: list[dic
         "strategy": branch.get("approach"),
         "actions": branch.get("actions", []),
         "risks": branch.get("risks", []),
+        "original_design_direction": branch.get("direction"),
         "required_differentiation": "A distinct implementation and interaction approach, not a changed title",
         "avoid_repeating": [v["id"] for v in previous if v.get("status") == "created"],
         "is_blend": branch["kind"] == "blend",
@@ -65,6 +68,76 @@ ADAPTERS = {
 }
 
 
+def plan_distinct_directions(objective: str, branches: list[dict]) -> list[dict]:
+    """Ask the available local model for differentiated actual result concepts.
+
+    This is EXTERNAL unverified ideation using the governed branch IDs as
+    correlation only; never relabel it as Spiral proof or invent missing plans.
+    """
+    import os
+    from urllib.request import Request, urlopen
+    model = os.environ.get("ASCENSION_SOFTWARE_MODEL", "qwen2.5-coder:3b").strip()
+    system = (
+        "You are an objective-divergence planner for the ASCENSION creation engine. "
+        "Keep the ORIGINAL objective unchanged. Return JSON only: "
+        '{"directions":[{"label":"short distinct title","summary":"what the version does",'
+        '"distinctive_interaction":"specific interaction or operating mechanism",'
+        '"features":["implemented feature 1","implemented feature 2","implemented feature 3"]},'
+        '{"label":"...","summary":"...","distinctive_interaction":"...","features":["..."]},'
+        '{"label":"...","summary":"...","distinctive_interaction":"...","features":["..."]}],'
+        '"blend":{"label":"...","summary":"...","distinctive_interaction":"...",'
+        '"features":["feature from direction 1","feature from direction 2","feature from direction 3"]}}. '
+        "All three directions MUST be materially different working implementations "
+        "of the user's requested thing, not different documentation styles. "
+        "The fourth must combine useful working features from all three."
+    )
+    req = Request(
+        "http://127.0.0.1:11434/api/chat",
+        data=json.dumps({
+            "model": model, "format": "json", "stream": False,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps({"objective": objective, "governed_branches": branches})},
+            ],
+            "options": {"temperature": 0.55, "num_predict": 3200},
+        }).encode("utf-8"),
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=150) as response:
+            response_data = json.load(response)
+        plan = json.loads(response_data["message"]["content"])
+    except (OSError, HTTPError, URLError, ValueError, KeyError, TypeError) as exc:
+        raise RuntimeError("Local variation planner did not return usable options") from exc
+    directions = plan.get("directions")
+    blend = plan.get("blend")
+    if not isinstance(directions, list) or len(directions) != 3 or not isinstance(blend, dict):
+        raise ValueError("Local planner did not produce exactly three directions and one blend")
+    all_directions = directions + [blend]
+    signatures = set()
+    for direction in all_directions:
+        if not isinstance(direction, dict) or any(not isinstance(direction.get(k), str) or
+          not direction.get(k).strip() for k in ("label", "summary", "distinctive_interaction")):
+            raise ValueError("Local model returned incomplete version directions")
+        features = direction.get("features")
+        if not isinstance(features, list) or len(features) < 2 or not all(
+            isinstance(f, str) and f.strip() for f in features
+        ):
+            raise ValueError("Local planner omitted implementation requirements")
+        signature = re.sub(r"[^a-z0-9]", "", direction["label"].lower() + direction["distinctive_interaction"].lower())
+        if signature in signatures:
+            raise ValueError("Local planner repeated a version direction")
+        signatures.add(signature)
+    return all_directions
+
+
+def _normalized_code(content: str) -> str:
+    # Only an approximation of implementation similarity; browser feature
+    # tests are still required and must never be claimed by this checker.
+    return re.sub(r"[^a-z0-9]", "", content.lower())[:6000]
+
+
 def make_version(root: Path, objective: str, branch: dict, previous: list[dict]) -> dict:
     cap = safe_text(branch.get("capability"), 120)
     kind = branch["kind"]
@@ -73,6 +146,10 @@ def make_version(root: Path, objective: str, branch: dict, previous: list[dict])
     if kind == "blend":
         label = "Blend of three approaches"
         summary = "Combine complementary strengths of the three governed pathways; retain independent verification."
+    direction = branch.get("direction")
+    if isinstance(direction, dict):
+        label = safe_text(direction.get("label"), 160) or label
+        summary = safe_text(direction.get("summary"), 3000) or summary
     basic = {
         "id": branch["id"], "kind": kind,
         "label": label or branch["id"], "summary": summary,
@@ -111,6 +188,15 @@ def make_version(root: Path, objective: str, branch: dict, previous: list[dict])
         }
         if primary["sha256"] in old_hashes:
             raise ValueError("Model repeated an earlier artifact instead of generating a distinct version")
+        this_code = _normalized_code(primary["content"])
+        for earlier in previous:
+            for earlier_file in earlier.get("files", []):
+                if earlier_file.get("name") == primary["name"]:
+                    other_code = _normalized_code(earlier_file["content"])
+                    if other_code and this_code and SequenceMatcher(
+                        None, this_code, other_code, autojunk=True
+                    ).ratio() > 0.94:
+                        raise ValueError("Output is too similar to another version")
         return {
             **basic,
             "status": "created", "files": collected,
@@ -145,6 +231,19 @@ def generate_versions(root: Path, objective: str, branches: list[dict]) -> list[
         "blend_from": [branch["id"] for branch in branches],
     }
     stages = [{**branch, "kind": "pathway", "blend_from": []} for branch in branches] + [blend]
+    if blend_cap == "software_project":
+        try:
+            directions = plan_distinct_directions(objective, branches)
+            for stage, direction in zip(stages, directions):
+                stage["direction"] = direction
+        except (RuntimeError, ValueError, OSError) as exc:
+            reason = "Distinct-version planning unavailable: " + safe_text(str(exc), 200)
+            return [{
+                "id": stage["id"], "kind": stage["kind"],
+                "label": safe_text(stage.get("approach"), 160) or stage["id"],
+                "summary": reason, "status": "unavailable", "files": [],
+                "verification_scope": reason, "blend_from": stage.get("blend_from", []),
+            } for stage in stages]
     versions: list[dict] = []
     for index, branch in enumerate(stages, 1):
         result = make_version(root, objective, branch, versions)

@@ -155,6 +155,16 @@ async function projectGuestDelivery(
   if (!bundle?.run) return null;
 
   const engine = await import("./engine/delivery.server");
+  // Guest access is established first by the token-checked bundle RPC.
+  // Fetch only this guest-authorized run's supplemental source outputs.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: guestVersionStage, error: versionStageError } = await supabaseAdmin
+    .from("ascension_run_stages")
+    .select("status,response_payload")
+    .eq("request_id", requestId)
+    .eq("ordinal", 103)
+    .maybeSingle();
+  if (versionStageError) throw new Error("Guest output versions are unavailable.");
   const draftRpc = (action: string, sourceKey: string, extra: Record<string, unknown> = {}) =>
     rpc<boolean>("ascension_guest_draft", {
       p_request_id: requestId,
@@ -169,6 +179,7 @@ async function projectGuestDelivery(
   const state = await engine.resolveDelivery({
     run: bundle.run,
     artifactStage: bundle.artifact_stage,
+    versionsStage: guestVersionStage,
     draft: engine.draftFromStage(bundle.draft_stage),
     retry,
     store: {

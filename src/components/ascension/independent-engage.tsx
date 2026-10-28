@@ -45,7 +45,7 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, onBuild }: { path: Pathway & { blend_reason?: string }; onBuild: (p: Pathway) => void }) {
+function PathwayView({ path }: { path: Pathway & { blend_reason?: string } }) {
   const [part, setPart] = useState<Part | null>(null);
   useEffect(() => setPart(null), [path.id]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
@@ -74,9 +74,6 @@ function PathwayView({ path, onBuild }: { path: Pathway & { blend_reason?: strin
       <summary className="cursor-pointer text-gold">Limits and tradeoffs</summary>
       <ul className="mt-2 list-disc space-y-1 pl-5">{path.tradeoffs.map((v, i) => <li key={i}>{v}</li>)}</ul>
     </details>}
-    <button type="button" onClick={() => onBuild(path)} className="rounded-full border border-gold/70 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold">
-      BUILD ON THIS PATH
-    </button>
   </section>;
 }
 
@@ -133,7 +130,8 @@ export function IndependentEngage() {
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
     stopVoice();
-    setObjective(text);
+    // Keep private refinement context out of the visible objective field.
+    if (!override) setObjective(text);
     setRequested(text);
     setLoading(true);
     setError("");
@@ -180,11 +178,11 @@ export function IndependentEngage() {
   }
 
   function buildOn(path: Pathway, changes = "") {
-    const next = (requested + "\nBuild on the selected pathway: " + path.title +
+    const originalObjective = requested.split("\nBuild on the selected pathway:")[0] ?? requested;
+    const next = (originalObjective + "\nBuild on the selected pathway: " + path.title +
       "\nPreserve these features: " + path.summary +
       (changes.trim() ? "\nChange or improve: " + changes.trim() : "\nImprove and extend it without starting over."))
       .slice(0, 2400);
-    setObjective(next);
     void engage(next);
   }
 
@@ -253,7 +251,7 @@ export function IndependentEngage() {
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
         </div>
       </div>
-      <p className="text-sm text-foreground/80">{requested}</p>
+      <p className="text-sm text-foreground/80">{requested.split("\nBuild on the selected pathway:")[0]}</p>
       <div role="tablist" aria-label="Choose a pathway" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {choices.map((p, index) => <button type="button" role="tab" aria-selected={choice === index}
           key={p.id} className={"min-h-40 rounded-xl border p-4 text-left transition-colors " +
@@ -270,7 +268,7 @@ export function IndependentEngage() {
         </button>)}
       </div>
       {selected && <>
-        <PathwayView key={selected.id} path={selected} onBuild={p => buildOn(p)} />
+        <PathwayView key={selected.id} path={selected} />
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>
           <textarea id="pathway-refinement" rows={2} maxLength={900} value={refinement}

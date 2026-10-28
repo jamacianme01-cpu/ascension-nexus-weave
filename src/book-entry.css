@@ -2173,9 +2173,9 @@ body:has(.ascension-world > .ascension-command) main {
   100% { transform: scale(1); filter: brightness(.82) saturate(.94) blur(0); }
 }
 @keyframes knowledgeverse-arrival-message {
-  0%, 8% { opacity: 0; transform: translateY(16px) scale(.965); filter: blur(9px); }
-  27%, 62% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-  100% { opacity: 0; transform: translateY(-12px) scale(1.025); filter: blur(5px); }
+  0%, 8% { opacity: 0; transform: translate(-50%, 16px) scale(.965); filter: blur(9px); }
+  27%, 62% { opacity: 1; transform: translate(-50%, 0) scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: translate(-50%, -12px) scale(1.025); filter: blur(5px); }
 }
 @keyframes knowledgeverse-arrival-ring {
   0% { opacity: 0; transform: translate(-50%,-50%) scale(.55) rotate(-12deg); }

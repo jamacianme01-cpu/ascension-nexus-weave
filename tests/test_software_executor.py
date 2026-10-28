@@ -99,7 +99,9 @@ class SoftwareInstallerTests(unittest.TestCase):
             + install.OBJ_WRITE +
             'def objective_artifact_writer(selected_branch, receipt):\n'
             + install.OBJ_WORKBENCH +
-            '    return receipt\n',
+            '            return receipt\n'
+            '        except Exception:\n'
+            '            raise\n',
             encoding="utf-8",
         )
 

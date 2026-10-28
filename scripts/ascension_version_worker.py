@@ -56,7 +56,12 @@ def create_software(root: Path, objective: str, branch: dict, previous: list[dic
         "risks": branch.get("risks", []),
         "original_design_direction": branch.get("direction"),
         "required_differentiation": "A distinct implementation and interaction approach, not a changed title",
-        "avoid_repeating": [v["id"] for v in previous if v.get("status") == "created"],
+        "avoid_repeating": [
+            {"version": v["id"], "implementation": safe_text(v.get("summary"), 600),
+             "sha256": next((f["sha256"] for f in v.get("files", [])
+                             if f.get("name") == "index.html"), "")}
+            for v in previous if v.get("status") == "created"
+        ],
         "is_blend": branch["kind"] == "blend",
         "blend_from": branch.get("blend_from", []),
     }, ensure_ascii=False)
@@ -162,7 +167,16 @@ def make_version(root: Path, objective: str, branch: dict, previous: list[dict])
             "verification_scope": "No real output-producing executor registered for capability " + cap,
         }
     try:
-        files = adapter(root, objective, branch, previous)
+        try:
+            files = adapter(root, objective, branch, previous)
+        except RuntimeError as exc:
+            # The first recorded failure was a transient local model request,
+            # while the next three generated successfully. Try this slot once
+            # more; never restart already-produced versions.
+            if "Local coding model request failed" not in str(exc):
+                raise
+            print("RETRYING LOCAL CODING MODEL FOR:", branch["id"], flush=True)
+            files = adapter(root, objective, branch, previous)
         if not isinstance(files, dict) or not files:
             raise ValueError("Executor returned no created output")
         collected = []
@@ -209,7 +223,8 @@ def make_version(root: Path, objective: str, branch: dict, previous: list[dict])
         }
 
 
-def generate_versions(root: Path, objective: str, branches: list[dict]) -> list[dict]:
+def generate_versions(root: Path, objective: str, branches: list[dict],
+                      existing_versions: list[dict] | None = None) -> list[dict]:
     if len(branches) != 3 or len({x.get("id") for x in branches}) != 3:
         raise ValueError("Exactly three distinct governed pathways required")
     cap = {x.get("capability") for x in branches}
@@ -231,7 +246,26 @@ def generate_versions(root: Path, objective: str, branches: list[dict]) -> list[
         "blend_from": [branch["id"] for branch in branches],
     }
     stages = [{**branch, "kind": "pathway", "blend_from": []} for branch in branches] + [blend]
-    if blend_cap == "software_project":
+    prior = existing_versions if isinstance(existing_versions, list) else []
+    if prior:
+        if len(prior) != 4 or any(
+            not isinstance(v, dict) or v.get("id") != stage["id"] or
+            v.get("kind") != stage["kind"] or v.get("status") not in ("created", "unavailable")
+            for v, stage in zip(prior, stages)
+        ):
+            raise ValueError("Saved output version slots do not match the current governed branches")
+        if all(v["status"] == "created" for v in prior):
+            print("ALL FOUR OUTPUT VERSIONS ALREADY CREATED; no regeneration", flush=True)
+            return prior
+        for stage, old in zip(stages, prior):
+            if old["status"] == "unavailable":
+                stage["direction"] = {
+                    "label": old.get("label", stage["approach"]),
+                    "summary": old.get("summary", ""),
+                    "distinctive_interaction": "Follow this original branch's approach, avoiding duplication of other versions.",
+                    "features": stage.get("actions") or ["Implement the exact user objective"],
+                }
+    elif blend_cap == "software_project":
         try:
             directions = plan_distinct_directions(objective, branches)
             for stage, direction in zip(stages, directions):
@@ -244,14 +278,21 @@ def generate_versions(root: Path, objective: str, branches: list[dict]) -> list[
                 "summary": reason, "status": "unavailable", "files": [],
                 "verification_scope": reason, "blend_from": stage.get("blend_from", []),
             } for stage in stages]
+
+    kept = [v for v in prior if v["status"] == "created"]
     versions: list[dict] = []
     for index, branch in enumerate(stages, 1):
-        result = make_version(root, objective, branch, versions)
+        old = prior[index - 1] if prior else None
+        if old is not None and old["status"] == "created":
+            result = old
+            print("OUTPUT VERSION", index, "PRESERVED", branch["id"], flush=True)
+        else:
+            result = make_version(root, objective, branch, kept + [
+                v for v in versions if v["status"] == "created"
+            ])
+            print("OUTPUT VERSION", index, result["status"].upper(), branch["id"], flush=True)
         versions.append(result)
-        print("OUTPUT VERSION", index, result["status"].upper(), branch["id"], flush=True)
         if result["status"] != "created":
-            # Never hide the real executor failure behind a generic UNAVAILABLE.
-            # This message contains no model secrets or paired hub credential.
             reason = safe_text(result.get("verification_scope"), 350)
             print("OUTPUT VERSION FAILURE REASON:", reason, flush=True)
     return versions
@@ -267,7 +308,7 @@ def publish(root: Path, request_id: str, key: str) -> dict:
     objective = detail.get("objective")
     if not isinstance(objective, str) or not objective.strip() or not isinstance(branches, list):
         raise ValueError("Hosted output version input incomplete")
-    versions = generate_versions(root, objective, branches)
+    versions = generate_versions(root, objective, branches, detail.get("existing_versions"))
     ack = request_json(SITE, key, {"request_id": request_id, "versions": versions})
     if ack.get("ok") is not True:
         raise RuntimeError("Output versions were not acknowledged by hosting")

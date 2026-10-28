@@ -60,7 +60,19 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
         const branches = planning(row.result);
         if (branches.length !== 3 || new Set(branches.map((b) => b.id)).size !== 3)
           return json({ error: "three_distinct_governed_branches_required" }, 422);
-        return json({ request_id: id, objective: row.objective, branches });
+        // Hub-key access only: recover existing generated source files so a
+        // retry does not waste compute or overwrite three successful versions.
+        const { data: versionStage, error: versionError } = await supabaseAdmin
+          .from("ascension_run_stages")
+          .select("status,response_payload")
+          .eq("request_id", id!)
+          .eq("ordinal", 103)
+          .maybeSingle();
+        if (versionError) return json({ error: "version_recovery_unavailable" }, 503);
+        const existing = versionStage?.status === "completed" ? versionStage.response_payload : null;
+        return json({ request_id: id, objective: row.objective, branches,
+          existing_versions: existing && typeof existing === "object" && !Array.isArray(existing)
+            ? (existing as Record<string, unknown>)["versions"] ?? null : null });
       },
       POST: async ({ request }) => {
         const denied = await authorizeAscensionHub(request);
@@ -80,6 +92,32 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
         let normalized;
         try { normalized = normalizeOutputVersions(body, branches.map((b) => b.id)); }
         catch (e) { return json({ error: "invalid_output_versions", reason: e instanceof Error ? e.message : String(e) }, 422); }
+        // Fail closed: a recovery may fill unavailable slots, but must never
+        // silently erase or replace a previously saved created version.
+        const { data: existingStage, error: existingError } = await supabaseAdmin
+          .from("ascension_run_stages")
+          .select("status,response_payload")
+          .eq("request_id", id)
+          .eq("ordinal", 103)
+          .maybeSingle();
+        if (existingError) return json({ error: "version_recovery_unavailable" }, 503);
+        if (existingStage?.status === "completed" && existingStage.response_payload) {
+          try {
+            const prior = normalizeOutputVersions(existingStage.response_payload, branches.map((b) => b.id));
+            for (let index = 0; index < prior.versions.length; index++) {
+              const oldVersion = prior.versions[index]!;
+              const newVersion = normalized.versions[index]!;
+              if (oldVersion.status !== "created") continue;
+              if (newVersion.status !== "created" ||
+                  oldVersion.id !== newVersion.id ||
+                  JSON.stringify(oldVersion.files.map((f) => [f.name, f.sha256, f.bytes])) !==
+                  JSON.stringify(newVersion.files.map((f) => [f.name, f.sha256, f.bytes])))
+                return json({ error: "existing_created_version_must_be_preserved" }, 409);
+            }
+          } catch {
+            return json({ error: "invalid_stored_output_versions" }, 409);
+          }
+        }
         const now = new Date().toISOString();
         const { error } = await supabaseAdmin.from("ascension_run_stages").upsert({
           request_id: id,

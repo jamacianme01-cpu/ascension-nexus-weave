@@ -49,6 +49,49 @@ class VersionDispatchTests(unittest.TestCase):
         self.assertEqual(len(set(v["files"][0]["sha256"] for v in versions)), 4)
         self.assertEqual(len(created), 4)
 
+    def test_partial_recovery_preserves_three_accepted_outputs_without_regeneration(self):
+        created = []
+        def adapter(_root, objective, branch, _previous):
+            created.append(branch["id"])
+            markers = {"one": "alpha", "two": "bravo", "three": "charlie", "blend": "delta"}
+            marker = markers[branch["id"]]
+            return {
+                "index.html": "<html><body><script>const implementation = '" +
+                              marker * 40 + "';</script></body></html>",
+                "verification.json": '{"functional_browser_tested":false}',
+            }
+        with mock.patch.object(mod, "plan_distinct_directions", return_value=self.directions), \
+             mock.patch.dict(mod.ADAPTERS, {"software_project": adapter}):
+            versions = mod.generate_versions(Path("."), "make an app", self.branches)
+            created.clear()
+            old_one = {
+                **versions[0], "status": "unavailable", "files": [],
+                "verification_scope": "Executor failed to create verified source: Local coding model request failed",
+            }
+            saved = [old_one, *versions[1:]]
+            with mock.patch.object(mod, "plan_distinct_directions", side_effect=AssertionError("Do not call planner again")):
+                output = StringIO()
+                with redirect_stdout(output):
+                    recovered = mod.generate_versions(Path("."), "make an app", self.branches, saved)
+        self.assertEqual(created, ["one"])
+        self.assertEqual([v["status"] for v in recovered], ["created"] * 4)
+        self.assertEqual(recovered[1:], saved[1:])
+        self.assertIn("OUTPUT VERSION 2 PRESERVED", output.getvalue())
+        self.assertIn("OUTPUT VERSION 4 PRESERVED", output.getvalue())
+
+    def test_full_recovery_runs_no_generators(self):
+        saved = [
+            {"id": bid, "kind": "blend" if i == 3 else "pathway",
+             "status": "created", "files": [{"name": "index.html", "content": bid}],
+             "label": bid, "summary": bid, "blend_from": self.branches and
+             [b["id"] for b in self.branches] if i == 3 else [],
+             "verification_scope": "syntax only"}
+            for i, bid in enumerate(["one", "two", "three", "blend"])
+        ]
+        with mock.patch.object(mod, "plan_distinct_directions", side_effect=AssertionError("Should not plan")):
+            returned = mod.generate_versions(Path("."), "make an app", self.branches, saved)
+        self.assertEqual(returned, saved)
+
     def test_duplicate_output_cannot_count_as_four_versions(self):
         def same(*args):
             return {"index.html": "<html><body>repeated implementation</body></html>"}

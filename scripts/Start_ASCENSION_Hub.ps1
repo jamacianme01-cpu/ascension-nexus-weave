@@ -1,4 +1,9 @@
-param([switch]$Pair,[switch]$Once,[switch]$ObservationsOnly,[string]$VersionRequestId)
+param(
+  [switch]$Pair,
+  [switch]$Once,
+  [switch]$ObservationsOnly,
+  [string]$VersionRequestId
+)
 $ErrorActionPreference = 'Stop'
 $repo = Join-Path $env:USERPROFILE 'Projects\clarity'
 $dir = Join-Path $env:APPDATA 'ASCENSION'
@@ -15,7 +20,6 @@ if ($Pair -or -not (Test-Path -LiteralPath $target)) {
   }
 }
 
-# Set-Content adds a newline. ConvertTo-SecureString requires only DPAPI ciphertext.
 $cipherText = (Get-Content -LiteralPath $target -Raw -ErrorAction Stop).Trim()
 if (-not $cipherText) {
   throw 'The saved hub key file is empty. Re-run with -Pair to save your existing key.'
@@ -47,18 +51,13 @@ try {
   Invoke-WebRequest ($baseUrl + 'ascension_hub_worker.py') -OutFile $worker -UseBasicParsing -ErrorAction Stop
   Invoke-WebRequest ($baseUrl + 'ascension_version_worker.py') -OutFile $versions -UseBasicParsing -ErrorAction Stop
   if ($VersionRequestId) {
-    if ($VersionRequestId -notmatch '^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}
-  if ($Once) { $hubArgs += '--once' }
-  if ($ObservationsOnly) { $hubArgs += '--observations-only' }
-  python -B @hubArgs
-} finally {
-  Remove-Item Env:\ASCENSION_HUB_KEY -ErrorAction SilentlyContinue
-}
-) {
+    if ($VersionRequestId -notmatch '^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$') {
       throw 'VersionRequestId must be a UUID.'
     }
     python -B $versions --root $repo --request-id $VersionRequestId
-    if ($LASTEXITCODE -ne 0) { throw 'Version backfill failed. See the output above.' }
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Version backfill failed. See the output above.'
+    }
     return
   }
   $hubArgs = @($worker, '--root', $repo)

@@ -37,6 +37,12 @@ function parseText(text: string): Output {
   const first = stripped.indexOf("{"), last = stripped.lastIndexOf("}");
   if (first < 0 || last <= first) throw new Error("The answer engine did not return structured pathways.");
   const top = obj(JSON.parse(stripped.slice(first, last + 1)));
+  // The response schema has three mandatory, explicitly named approaches.
+  // Convert them to the existing UI contract without fabricating content.
+  const fixed = ["path_one", "path_two", "path_three"] as const;
+  if (!Array.isArray(top["pathways"]) && fixed.every(key => Object.keys(obj(top[key])).length > 0)) {
+    top["pathways"] = fixed.map((key, index) => ({ ...obj(top[key]), id: "p" + (index + 1) }));
+  }
   const parsePath = (input: unknown): Path => {
     const p = obj(input);
     const strings = (key: string) => Array.isArray(p[key])
@@ -110,6 +116,43 @@ async function firstAnswer(objective: string) {
   if (answer.length < 45) throw new Error("The provider returned an incomplete initial answer.");
   return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: "OpenAI", verified: false };
 }
+/** Exact structural contract: the model cannot silently return two pathways instead of three. */
+const componentSchema = {
+  type: "object",
+  properties: { name: { type: "string" }, purpose: { type: "string" }, location: { type: "string" } },
+  required: ["name", "purpose", "location"],
+  additionalProperties: false,
+};
+const pathwaySchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    title: { type: "string" },
+    summary: { type: "string" },
+    steps: { type: "array", items: { type: "string" } },
+    tradeoffs: { type: "array", items: { type: "string" } },
+    parts: { type: "array", items: componentSchema },
+  },
+  required: ["id", "title", "summary", "steps", "tradeoffs", "parts"],
+  additionalProperties: false,
+};
+const outputSchema = {
+  type: "object",
+  properties: {
+    introduction: { type: "string" },
+    path_one: pathwaySchema,
+    path_two: pathwaySchema,
+    path_three: pathwaySchema,
+    blend: {
+      type: "object",
+      properties: { ...pathwaySchema.properties, blend_reason: { type: "string" } },
+      required: [...pathwaySchema.required, "blend_reason"],
+      additionalProperties: false,
+    },
+  },
+  required: ["introduction", "path_one", "path_two", "path_three", "blend"],
+  additionalProperties: false,
+};
 async function build(objective: string, firstAnswerText = "") {
   const providerStatus = configured();
   if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
@@ -126,13 +169,14 @@ async function build(objective: string, firstAnswerText = "") {
   const allConnected = sources.length === 2;
   const response = await callOpenAIResponse({
     timeoutMs: 28500,
+    structuredOutput: { name: "ascension_four_pathways", schema: outputSchema },
     system: [
       "You are drafting an ASCENSION creation result, not reporting execution or verification.",
       allConnected
         ? "Use the independently supplied Claude and Grok proposals as evidence; create your own OpenAI contribution, then compare all three using meaning, feasibility, contradictions, tradeoffs, and confidence. The comparison is preliminary, NOT a claim that the local governed engines ran."
         : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
-      "Return EXACTLY one JSON object. No markdown. Keys: introduction, pathways, blend.",
-      "pathways is exactly three different objects with id p1,p2,p3, title, summary, steps array (3-6 concrete implementation steps), tradeoffs array (at least one), parts array (3-10 objects with name, purpose, location when the objective has components; otherwise empty).",
+      "Return exactly one JSON object with required keys: introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
+      "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",
       "Provide substance specific to the objective. Do not just describe an app interface or repeat the same concept three times.",
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",
@@ -155,7 +199,7 @@ async function build(objective: string, firstAnswerText = "") {
 }
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
-    GET: async () => json({ providers: configured(), supabase_required: false,
+    GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
       governed_runtime_connected: false, note: "Only configured providers can contribute. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");

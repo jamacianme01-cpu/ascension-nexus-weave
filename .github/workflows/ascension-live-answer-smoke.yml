@@ -1,0 +1,81 @@
+name: ASCENSION live answer smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/routes/api/public/ascension/independent.ts'
+      - 'src/lib/ascension/engine/openai.server.ts'
+      - '.github/workflows/ascension-live-answer-smoke.yml'
+  workflow_dispatch:
+jobs:
+  live-answer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Wait for the repaired Railway version to serve traffic
+        shell: bash
+        run: |
+          ready=0
+          for i in $(seq 1 85); do
+            body=$(curl -fsS --max-time 8 'https://ascension-nexus-weave-production.up.railway.app/api/public/ascension/independent' || true)
+            if [[ "$body" == *'"answer_contract_version":"structured-four-20261028"'* ]]; then
+              echo 'New four-pathway contract is live'
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$ready" != '1' ]]; then
+            echo 'Railway never served the repaired contract'
+            exit 1
+          fi
+      - name: Probe hosted initial answer, not merely server uptime
+        shell: bash
+        run: |
+          set -uo pipefail
+          status=$(curl -sS --max-time 75 -o /tmp/ascension-result.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' -X POST \
+            --data '{"objective":"Make worker drones","phase":"initial"}' \
+            'https://ascension-nexus-weave-production.up.railway.app/api/public/ascension/independent')
+          echo "HTTP status: $status"
+          node - <<'NODE'
+          const fs = require('fs');
+          let parsed;
+          try { parsed = JSON.parse(fs.readFileSync('/tmp/ascension-result.json', 'utf8')); }
+          catch (err) { console.error('Unexpected non-JSON response', err.message); process.exit(1); }
+          if (parsed.phase === 'initial' && typeof parsed.answer === 'string' && parsed.answer.length > 60) {
+            console.log('FIRST ANSWER OK, character length:', parsed.answer.length);
+            console.log('First 220 characters:', parsed.answer.slice(0, 220));
+          } else {
+            console.error('FIRST ANSWER FAILED:', String(parsed.error || parsed.message || JSON.stringify(parsed)).slice(0, 850));
+            process.exit(1);
+          }
+          NODE
+      - name: Require three real pathways and a fourth blend
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const initial = JSON.parse(fs.readFileSync('/tmp/ascension-result.json', 'utf8'));
+          const body = { objective: 'Make worker drones', phase: 'pathways', firstAnswer: initial.answer.slice(0, 6000) };
+          fs.writeFileSync('/tmp/ascension-pathways-request.json', JSON.stringify(body));
+          NODE
+          status=$(curl -sS --max-time 95 -o /tmp/ascension-pathways-result.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' -X POST \
+            --data-binary @/tmp/ascension-pathways-request.json \
+            'https://ascension-nexus-weave-production.up.railway.app/api/public/ascension/independent')
+          echo "Pathways HTTP status: $status"
+          node - <<'NODE'
+          const fs = require('fs');
+          let parsed;
+          try { parsed = JSON.parse(fs.readFileSync('/tmp/ascension-pathways-result.json', 'utf8')); }
+          catch (err) { console.error('Pathways returned invalid JSON', err.message); process.exit(1); }
+          if (Array.isArray(parsed.pathways) && parsed.pathways.length === 3 && parsed.blend?.title &&
+              parsed.pathways.every(p => p.title && p.summary && p.steps?.length >= 2)) {
+            console.log('FOUR REAL PATHWAYS OK:', parsed.pathways.map(p => p.title).concat(parsed.blend.title).join(' | '));
+            console.log('Mode:', parsed.mode, '| Model contributors:', parsed.contributors?.join(', '));
+          } else {
+            console.error('PATHWAYS FAILED:', String(parsed.error || parsed.message || JSON.stringify(parsed)).slice(0, 950));
+            process.exit(1);
+          }
+          NODE

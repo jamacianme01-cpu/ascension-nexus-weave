@@ -110,6 +110,8 @@ export async function callOpenAIResponse(input: {
   webSearch?: boolean;
   /** Bound research and synthesis calls so ENGAGE does not time out. */
   timeoutMs?: number;
+  /** Enforce actual schema-shaped results instead of prompting the model for loosely formatted JSON. */
+  structuredOutput?: { name: string; schema: Record<string, unknown> };
 }): Promise<OpenAIAnswer> {
   const apiKey = process.env["OPENAI_API_KEY"]?.trim();
   if (!apiKey || process.env["ASCENSION_ALLOW_OPENAI_AI"] !== "true")
@@ -135,6 +137,10 @@ export async function callOpenAIResponse(input: {
     }],
     store: false,
     max_output_tokens: 6000,
+    ...(input.structuredOutput ? { text: { format: {
+      type: "json_schema", name: input.structuredOutput.name,
+      strict: true, schema: input.structuredOutput.schema,
+    } } } : {}),
     ...(useSearch
       ? {
           tools: [{ type: "web_search", search_context_size: "medium" }],

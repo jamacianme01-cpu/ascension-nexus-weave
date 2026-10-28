@@ -18,7 +18,7 @@ export interface TreeVoiceController {
 export function createTreeVoice(options: {
   speech?: Pick<SpeechSynthesis, "speak" | "cancel">;
   Utterance?: new (text: string) => SpeechSynthesisUtterance;
-  Recognition?: new () => TreeRecognition;
+  Recognition?: (new () => TreeRecognition) | undefined;
   onTranscript(text: string): void;
   onState?(state: TreeVoiceState): void;
   onError?(message: string): void;

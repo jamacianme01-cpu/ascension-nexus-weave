@@ -84,10 +84,22 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
             .in("request_id", eligible.map((row) => row.id))
             .eq("ordinal", 103);
           if (stagesError) return json({ error: "pending_versions_unavailable" }, 503);
-          const next = eligible.find((row) => {
+          // Attempt untouched verified runs first. Don't let a historical
+          // permanently unsupported capability monopolize the whole queue.
+          const fresh = eligible.find((row) =>
+            !(stages ?? []).some((stage) => stage.request_id === row.id));
+          const recoverable = eligible.find((row) => {
             const stage = (stages ?? []).find((s) => s.request_id === row.id);
-            return !stage || stage.status !== "completed" || needsVersionCompletion(stage.response_payload);
+            if (!stage || stage.status !== "completed" ||
+                !needsVersionCompletion(stage.response_payload)) return false;
+            const payload = stage.response_payload;
+            if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+            const variants = (payload as Record<string, unknown>)["versions"];
+            return Array.isArray(variants) && variants.some((v) =>
+              v && typeof v === "object" && !Array.isArray(v) &&
+              (v as Record<string, unknown>)["status"] === "created");
           });
+          const next = fresh ?? recoverable;
           return json({ item: next ? { request_id: next.id, objective: next.objective } : null });
         }
         const id = url.searchParams.get("request_id");

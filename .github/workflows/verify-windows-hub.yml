@@ -3,12 +3,18 @@ on:
   pull_request:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/ascension_software_executor.py"
+      - "scripts/install_software_executor.py"
+      - "tests/test_software_executor.py"
       - "scripts/ascension_hub_worker.py"
       - "tests/test_ascension_hub_worker.py"
       - ".github/workflows/verify-windows-hub.yml"
   push:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/ascension_software_executor.py"
+      - "scripts/install_software_executor.py"
+      - "tests/test_software_executor.py"
       - "scripts/ascension_hub_worker.py"
       - "tests/test_ascension_hub_worker.py"
       - ".github/workflows/verify-windows-hub.yml"
@@ -53,3 +59,8 @@ jobs:
         run: |
           python -m py_compile scripts/ascension_hub_worker.py
           python -m unittest discover -s tests -p test_ascension_hub_worker.py -v
+      - name: Check optional software executor and guarded installer
+        shell: powershell
+        run: |
+          python -m py_compile scripts/ascension_software_executor.py scripts/install_software_executor.py
+          python -m unittest discover -s tests -p test_software_executor.py -v

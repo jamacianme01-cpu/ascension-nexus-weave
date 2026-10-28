@@ -917,13 +917,15 @@ export async function resolveDelivery(args: {
       // unauthorized. Never hide REAL transported artifacts solely because
       // an unrelated answer provider is offline. Do NOT stamp objective fit
       // or claim feature-complete execution when review did not run.
-      governed = parseDelivery({
-        ...governed,
-        limitations: [
-          ...governed.limitations,
-          "Automated objective-fit review was unavailable. The delivered files are source evidence only; whether they accomplish the full objective remains unverified.",
-        ],
-      });
+      if (governed) {
+        governed = parseDelivery({
+          ...governed,
+          limitations: [
+            ...governed.limitations,
+            "Automated objective-fit review was unavailable. The delivered files are source evidence only; whether they accomplish the full objective remains unverified.",
+          ],
+        });
+      }
     }
   }
   // A plain-text runtime receipt does not fulfill a request to create a

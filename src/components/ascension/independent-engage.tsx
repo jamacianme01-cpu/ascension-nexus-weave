@@ -264,7 +264,7 @@ export function IndependentEngage() {
             (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
           onClick={() => {
             setChoice(index); setRefinement("");
-            if (talking) say(p.title + ". " + p.summary);
+            if (talking) say("Let’s explore " + p.title + ".");
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>

@@ -1,29 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { ObjectivePathway } from "@/lib/ascension/result-model";
-import type { DesignPart } from "@/lib/ascension/parts-model";
-import type { RealityMode } from "./RealityViewer";
-
-const RealityWorkbench = lazy(() => import("./RealityViewer").then(module => ({ default: module.RealityViewer })));
-type ExploreView = "blueprint" | "dissect";
-type RealitySelection = { path: Pathway; mode: RealityMode; action: "dissect" | null };
-function asViewerPathway(path: Pathway): ObjectivePathway {
-  return {
-    id: path.id, label: path.title, summary: path.summary, steps: path.steps,
-    tradeoffs: path.tradeoffs, spiral_form: null, visual_svg: null, model_spec: null,
-    generated_image_url: null, generated_blueprint_url: null,
-    generated_environment_url: null, model_url: null,
-    outcome_score: null, outcome_reason: null,
-  };
-}
-function asNamedParts(path: Pathway): DesignPart[] {
-  return path.parts.map(part => ({
-    name: part.name, purpose: part.purpose, location: part.location,
-    operation: "Detailed operation has not been specified for this component.",
-    connections: "Physical connections have not been established.",
-    limitations: "Concept only. Coordinates and mechanical dimensions are not verified.",
-    x: -1, y: -1, // Metadata-only labels: NEVER projected onto unrelated mesh geometry.
-  }));
-}
+import { useEffect, useRef, useState } from "react";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -70,51 +45,35 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, onView }: { path: Pathway & { blend_reason?: string }; onView: (mode: ExploreView) => void }) {
-  const [section, setSection] = useState<"description" | "labels">("description");
-  const [partIndex, setPartIndex] = useState<number | null>(null);
-  useEffect(() => { setPartIndex(null); setSection("description"); }, [path.id]);
-  const part = partIndex === null ? null : path.parts[partIndex];
-  return <section className="ascension-pathway-detail rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7" aria-label={path.title}>
+function PathwayView({ path }: { path: Pathway & { blend_reason?: string } }) {
+  const [part, setPart] = useState<Part | null>(null);
+  useEffect(() => setPart(null), [path.id]);
+  return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
-    <div className="ascension-view-switch" role="group" aria-label="Explore this pathway">
-      {(["description","labels"] as const).map(mode => <button type="button" key={mode}
-        aria-pressed={section === mode} onClick={() => setSection(mode)}
-        className="ascension-view-choice">{mode.toUpperCase()}</button>)}
-      {(["blueprint","dissect"] as const).map(mode => <button
-        type="button" key={mode} onClick={() => onView(mode)}
-        className="ascension-view-choice" aria-label={"Open " + mode + " view of " + path.title}>
-        {mode.toUpperCase()}</button>)}
-    </div>
-    {section === "description" ? <div className="ascension-description-panel">
-      <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
-      {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
-      <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>
-      <ol className="mb-5 list-decimal space-y-2 pl-5 text-sm leading-6">
-        {path.steps.map((step, i) => <li key={i}>{step}</li>)}
-      </ol>
-      {path.tradeoffs.length > 0 && <details className="text-sm text-muted-foreground">
-        <summary className="cursor-pointer text-gold">Limits and tradeoffs</summary>
-        <ul className="mt-2 list-disc space-y-1 pl-5">{path.tradeoffs.map((v, i) => <li key={i}>{v}</li>)}</ul>
-      </details>}
-    </div> : <div className="ascension-labels-panel">
-      {path.parts.length > 0 ? <div className="grid gap-4 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
-        <div className="ascension-label-buttons" aria-label="Select a named part">
-          {path.parts.map((p, index) => <button type="button" key={p.name + index}
-            aria-pressed={partIndex === index} onClick={() => setPartIndex(index)}
-            className="block w-full rounded-lg border border-gold/30 bg-black/25 p-3 text-left text-sm hover:border-gold">
-            {index + 1}. {p.name}</button>)}
-        </div>
-        <div className="min-h-40 rounded-xl border border-primary/25 bg-[#08192a] p-5" aria-live="polite">
-          {part ? <>
-            <h4 className="mb-3 text-gold">{part.name}</h4>
-            <p className="mb-3 text-sm"><strong>What it does:</strong> {part.purpose}</p>
-            <p className="text-sm"><strong>Where it belongs:</strong> {part.location || "Not yet determined."}</p>
-          </> : <p className="text-sm text-muted-foreground">Choose a label to inspect the part's purpose and place in the proposed design.</p>}
-        </div>
-      </div> : <p className="text-sm text-muted-foreground">No named components were returned for this pathway.</p>}
-      <p className="mt-4 text-xs text-muted-foreground">Component descriptions are conceptual; physical positions have not been measured.</p>
+    <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
+    {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
+    <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>
+    <ol className="mb-5 list-decimal space-y-2 pl-5 text-sm leading-6">
+      {path.steps.map((step, i) => <li key={i}>{step}</li>)}
+    </ol>
+    {path.parts.length > 0 && <div className="mb-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+      <div className="space-y-2" aria-label="Select components">
+        <h4 className="text-sm font-semibold text-primary">Components — select to inspect</h4>
+        {path.parts.map((p, i) => <button type="button" key={i} onClick={() => setPart(p)}
+          className="block w-full rounded-lg border border-gold/30 bg-black/25 p-3 text-left text-sm hover:border-gold">
+          {p.name}</button>)}
+      </div>
+      <div className="min-h-40 rounded-xl border border-primary/25 bg-[#08192a] p-5">
+        {part ? <><h4 className="mb-2 text-gold">{part.name}</h4><p className="mb-3 text-sm">{part.purpose}</p>
+          {part.location && <p className="text-xs text-muted-foreground">Location / relationship: {part.location}</p>}</>
+          : <p className="text-sm text-muted-foreground">Select a component to see what it does and where it belongs.</p>}
+        <p className="mt-4 text-xs text-muted-foreground">Concept description — not an interactive CAD model.</p>
+      </div>
     </div>}
+    {path.tradeoffs.length > 0 && <details className="mb-5 text-sm text-muted-foreground">
+      <summary className="cursor-pointer text-gold">Limits and tradeoffs</summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5">{path.tradeoffs.map((v, i) => <li key={i}>{v}</li>)}</ul>
+    </details>}
   </section>;
 }
 
@@ -131,9 +90,6 @@ export function IndependentEngage() {
   const [choice, setChoice] = useState<number | null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
-  const [reality, setReality] = useState<RealitySelection | null>(null);
-  const [realitySound, setRealitySound] = useState(false);
-  const [selectedParts, setSelectedParts] = useState<string[]>([]);
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
@@ -184,8 +140,6 @@ export function IndependentEngage() {
     setFirstAnswer("");
     setRefinement("");
     setChoice(null);
-    setReality(null);
-    setSelectedParts([]);
     setStage("processing");
     if (talking) say("Exploring your objective.");
     try {
@@ -239,22 +193,11 @@ export function IndependentEngage() {
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);
-    setReality(null); setSelectedParts([]);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   const choices = result ? [...result.pathways, result.blend] : [];
   const selected = choice === null ? null : choices[choice];
-  const openReality = (path: Pathway, view: ExploreView) => {
-    stopVoice();
-    const mode: RealityMode = view === "blueprint" ? "blueprint" : "cutaway";
-    const action = view === "dissect" ? "dissect" : null;
-    setReality({ path, mode, action });
-  };
-  const togglePart = (part: DesignPart, field?: string) => {
-    const key = part.name + "::" + (field ?? "whole");
-    setSelectedParts(list => list.includes(key) ? list.filter(x => x !== key) : [...list, key]);
-  };
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}>
@@ -262,14 +205,6 @@ export function IndependentEngage() {
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
-        </div>
-        <div className="ascension-arrival" aria-hidden="true">
-          <div className="ascension-arrival-ring" />
-          <div className="ascension-arrival-message">
-            <span>ASCENSION</span>
-            <h1>WELCOME TO THE KNOWLEDGEVERSE</h1>
-            <p>EVERYTHING IS CONNECTED</p>
-          </div>
         </div>
         <label htmlFor="objective">What do you want to accomplish?</label>
         <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
@@ -333,7 +268,7 @@ export function IndependentEngage() {
         </button>)}
       </div>
       {selected && <>
-        <PathwayView key={selected.id} path={selected} onView={mode => openReality(selected, mode)} />
+        <PathwayView key={selected.id} path={selected} />
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>
           <textarea id="pathway-refinement" rows={2} maxLength={900} value={refinement}
@@ -347,35 +282,5 @@ export function IndependentEngage() {
         </div>
       </>}
     </section>}
-    {reality && <Suspense fallback={<div className="ascension-workbench-loading" role="status">Opening reality views…</div>}>
-      <RealityWorkbench
-        key={reality.path.id + reality.mode + (reality.action ?? "")}
-        pathway={asViewerPathway(reality.path)}
-        objective={requested.split("\nBuild on the selected pathway:")[0] ?? requested}
-        requestId={null}
-        initialMode={reality.mode}
-        initialAction={reality.action}
-        providedParts={asNamedParts(reality.path)}
-        v1BasicViews
-        onClose={() => setReality(null)}
-        onNewObjective={reset}
-        newObjectiveDisabled={loading}
-        soundEnabled={realitySound}
-        onToggleSound={() => setRealitySound(value => !value)}
-        onDive={() => {}}
-        onBuildOn={() => { const path = reality.path; setReality(null); buildOn(path); }}
-        onNewAnswers={() => { setReality(null); void engage(objective); }}
-        isPartSelected={(part, field) => selectedParts.includes(part.name + "::" + (field ?? "whole"))}
-        onTogglePart={togglePart}
-        blendControls={selectedParts.length >= 2 ? <div className="reality-revision-actions">
-          <button type="button" onClick={() => {
-            const path = reality.path;
-            const names = selectedParts.map(value => value.split("::")[0]).filter((name, i, a) => a.indexOf(name) === i);
-            setReality(null);
-            buildOn(path, "Combine these selected parts in the next design: " + names.join(", "));
-          }}>BLEND SELECTED PARTS</button>
-        </div> : null}
-      />
-    </Suspense>}
   </div>;
 }

@@ -156,7 +156,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       const answer = data.answer.trim();
       setFirstAnswer(answer);
-      if (talking) say(answer);
+      // The Tree must not narrate the full written answer.
       await generatePathways(text, answer, controller, token);
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
@@ -234,7 +234,6 @@ export function IndependentEngage() {
     {firstAnswer && <section className="mx-auto mt-5 max-w-3xl rounded-xl border border-gold/35 bg-[#05101de8] p-5" aria-label="Initial answer">
       <h2 className="mb-3 text-lg text-gold">INITIAL ANSWER</h2>
       <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
-      <button type="button" onClick={() => say(firstAnswer)} className="mt-3 rounded-full border border-gold/40 px-4 py-2 text-sm text-gold">Hear Tree answer</button>
     </section>}
 
     {!loading && pathwayError && <section className="mx-auto mt-4 max-w-3xl rounded-xl border border-gold/35 p-5" role="alert">

@@ -574,6 +574,23 @@ function ResultContent({
                 </p>
                 <h3 className="font-display text-xl text-foreground">{cleanDisplayText(version.label)}</h3>
                 <p className="text-sm leading-6 text-foreground/85">{cleanDisplayText(version.summary)}</p>
+                {version.files.find((file) => /\.html?$/i.test(file.name)) && (
+                  <iframe
+                    title={`Isolated source preview: ${version.label}`}
+                    sandbox="allow-scripts"
+                    referrerPolicy="no-referrer"
+                    srcDoc={version.files.find((file) => /\.html?$/i.test(file.name))!.content}
+                    className="h-64 w-full rounded-lg border border-primary/20 bg-white"
+                  />
+                )}
+                {!version.files.some((file) => /\.html?$/i.test(file.name)) &&
+                  version.files.find((file) => /\.svg$/i.test(file.name)) && (
+                    <img
+                      alt={`Source preview: ${version.label}`}
+                      src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(version.files.find((file) => /\.svg$/i.test(file.name))!.content)}`}
+                      className="h-64 w-full rounded-lg border border-primary/20 object-contain"
+                    />
+                  )}
                 <p className="text-xs text-muted-foreground">
                   {version.status === "created" ? "SOURCE CREATED · FUNCTIONAL RESULT NOT YET VERIFIED" : "NOT CREATED"}
                 </p>

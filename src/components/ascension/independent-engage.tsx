@@ -263,6 +263,14 @@ export function IndependentEngage() {
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
         </div>
+        <div className="ascension-arrival" aria-hidden="true">
+          <div className="ascension-arrival-ring" />
+          <div className="ascension-arrival-message">
+            <span>ASCENSION</span>
+            <h1>WELCOME TO THE KNOWLEDGEVERSE</h1>
+            <p>EVERYTHING IS CONNECTED</p>
+          </div>
+        </div>
         <label htmlFor="objective">What do you want to accomplish?</label>
         <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
           aria-label="What do you want to accomplish?" placeholder="What do you want to accomplish?"

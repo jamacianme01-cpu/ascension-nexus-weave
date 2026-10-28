@@ -111,7 +111,7 @@ export function IndependentEngage() {
       setResult(data);
       setChoice(null);
       setStage("eruption");
-      if (talking) say("I found three approaches and a fourth blend. Choose a pathway to explore.");
+      // Do not interrupt the Tree reading the initial answer when pathways arrive.
       window.setTimeout(() => {
         if (generation.current === token) view.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 120);
@@ -156,6 +156,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       const answer = data.answer.trim();
       setFirstAnswer(answer);
+      // The Tree must not narrate the full written answer.
       await generatePathways(text, answer, controller, token);
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
@@ -230,6 +231,11 @@ export function IndependentEngage() {
       }}>Stop</button>
     </section>}
 
+    {firstAnswer && <section className="mx-auto mt-5 max-w-3xl rounded-xl border border-gold/35 bg-[#05101de8] p-5" aria-label="Initial answer">
+      <h2 className="mb-3 text-lg text-gold">INITIAL ANSWER</h2>
+      <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
+    </section>}
+
     {!loading && pathwayError && <section className="mx-auto mt-4 max-w-3xl rounded-xl border border-gold/35 p-5" role="alert">
       <p>Pathways could not be completed: {pathwayError}</p>
       <button type="button" onClick={retryPathways} className="mt-3 rounded-full border border-gold/50 px-4 py-2 text-gold">
@@ -258,7 +264,7 @@ export function IndependentEngage() {
             (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
           onClick={() => {
             setChoice(index); setRefinement("");
-            if (talking) say(p.title + ". " + p.summary);
+            if (talking) say("Let’s explore " + p.title + ".");
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>

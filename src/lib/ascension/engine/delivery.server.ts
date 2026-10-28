@@ -153,9 +153,9 @@ export function governedDelivery(
   const answerFile = assessment.files.find((file) => /\.(md|txt)$/i.test(file.name));
   const body =
     assessment.kind === "app"
-      ? "Your runnable app is ready below. Download the HTML file and open it in your browser."
+      ? "ASCENSION produced software source files. Download and test them. Recorded source and syntax checks do not establish that the app works."
       : assessment.kind === "drawing"
-        ? "Your drawing is shown below. Download the SVG to keep or edit it."
+        ? "ASCENSION produced a drawing file. Download and inspect it; the contents may still require validation."
         : primaryOk && /\.(md|txt)$/i.test(primary.name)
           ? primary.content.trim()
           : answerFile
@@ -168,12 +168,20 @@ export function governedDelivery(
     return basename && basename !== "governed_objective.json" && !transportedNames.has(basename);
   });
 
-  const answerLimitations =
-    requestedOutput["truth_status"] === "UNVERIFIED_MODEL_DRAFT"
-      ? [
-          "A local model drafted this answer. Its factual claims have not been independently checked.",
-        ]
-      : [];
+  // Execution receipts record exactly what was checked. A PERSISTED core
+  // run is not the same as producing every feature of the user-requested result.
+  const incompleteReceipts = Array.isArray(result["execution_receipts"])
+    ? result["execution_receipts"].map(record).filter((receipt) => receipt["requested_result_produced"] === false)
+    : [];
+  const answerLimitations = [
+    ...(requestedOutput["truth_status"] === "UNVERIFIED_MODEL_DRAFT"
+      ? ["A local model drafted this answer. Its factual claims have not been independently checked."]
+      : []),
+    ...incompleteReceipts.map((receipt) =>
+      typeof receipt["verification_scope"] === "string" && receipt["verification_scope"].trim()
+        ? "Source/artifact verification only: " + receipt["verification_scope"].trim().slice(0, 400)
+        : "ASCENSION persisted an intermediate artifact, but the complete requested result was not verified."),
+  ];
 
   return parseDelivery({
     kind: assessment.kind === "answer" || assessment.kind === "design" ? "answer" : "artifact",
@@ -863,9 +871,18 @@ export async function resolveDelivery(args: {
         error: `A detail is needed to preserve your meaning: ${fit.question}`, source: null };
       if (fit.matches) governed = await stampObjectiveFit(run.objective, governed, fit.interpretation);
       else { rejectedFit = fit; governed = null; }
-    } catch (cause) {
-      return { ...base, status: "completed", response_payload: null, note: null, source: null,
-        error: `The objective meaning check failed: ${cause instanceof Error ? cause.message : String(cause)}` };
+    } catch {
+      // The external meaning reviewer may be unconfigured, rate-limited or
+      // unauthorized. Never hide REAL transported artifacts solely because
+      // an unrelated answer provider is offline. Do NOT stamp objective fit
+      // or claim feature-complete execution when review did not run.
+      governed = parseDelivery({
+        ...governed,
+        limitations: [
+          ...governed.limitations,
+          "Automated objective-fit review was unavailable. The delivered files are source evidence only; whether they accomplish the full objective remains unverified.",
+        ],
+      });
     }
   }
   // A plain-text runtime receipt does not fulfill a request to create a

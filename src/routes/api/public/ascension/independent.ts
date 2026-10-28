@@ -141,7 +141,8 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");
-      if (fetchSite === "cross-site" || (origin && new URL(origin).hostname !== new URL(request.url).hostname))
+      const publicHost = (request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host).split(",")[0]!.trim().split(":")[0];
+      if (fetchSite === "cross-site" || (origin && new URL(origin).hostname !== publicHost))
         return json({ error: "Cross-site requests are not permitted." }, 403);
       const address = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0]?.trim() || "unknown";
       if (!limit("global", 24) || !limit("ip:" + address, 5)) return json({ error: "Too many objectives. Try again later." }, 429);

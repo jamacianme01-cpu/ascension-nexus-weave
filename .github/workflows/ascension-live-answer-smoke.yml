@@ -1,11 +1,7 @@
 name: ASCENSION live answer smoke
+# Run after Railway finishes deploying, not as a prerequisite for that deploy.
+# Railway's checkSuites gate must not wait on a test that waits on Railway.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/routes/api/public/ascension/independent.ts'
-      - 'src/lib/ascension/engine/openai.server.ts'
-      - '.github/workflows/ascension-live-answer-smoke.yml'
   workflow_dispatch:
 jobs:
   live-answer:

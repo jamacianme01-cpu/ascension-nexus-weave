@@ -1,3 +1,18 @@
+/** A version slot stays pending until all four source-backed outputs exist.
+ * This never interprets Guardian PASS or a persisted run as created artifacts. */
+export function needsVersionCompletion(stage: unknown): boolean {
+  if (!stage || typeof stage !== "object" || Array.isArray(stage)) return true;
+  const record = stage as Record<string, unknown>;
+  const versions = record["versions"];
+  if (!Array.isArray(versions) || versions.length !== 4) return true;
+  return versions.some((raw) =>
+    !raw || typeof raw !== "object" || Array.isArray(raw) ||
+    (raw as Record<string, unknown>)["status"] !== "created" ||
+    !Array.isArray((raw as Record<string, unknown>)["files"]) ||
+    ((raw as Record<string, unknown>)["files"] as unknown[]).length === 0
+  );
+}
+
 import { createHash } from "node:crypto";
 
 export type OutputVersion = {

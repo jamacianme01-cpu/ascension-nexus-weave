@@ -79,6 +79,35 @@ class HubObservationTests(TestCase):
                 hub.relay_observations("http://localhost:8765", "a" * 96)
             remote.assert_not_called()
 
+    def test_verified_objective_missing_versions_is_discovered_by_paired_runner(self):
+        request_id = "12345678-1234-1234-1234-1234567890ab"
+        observed = []
+        def remote(req, timeout):
+            observed.append((req.full_url, req.get_header("X-ascension-hub-key") or
+                             req.get_header("X-Ascension-hub-key")))
+            return FakeResponse(json.dumps({"item": {"request_id": request_id}}))
+        with mock.patch.object(hub, "urlopen", side_effect=remote):
+            self.assertEqual(hub.pending_output_request("a" * 96, "Gordons"), request_id)
+        self.assertEqual(len(observed), 1)
+        self.assertIn("pending=1", observed[0][0])
+        self.assertIn("runner=Gordons", observed[0][0])
+        self.assertEqual(observed[0][1], "a" * 96)
+
+    def test_no_missing_versions_does_not_claim_or_create(self):
+        with mock.patch.object(hub, "urlopen", return_value=FakeResponse('{"item":null}')):
+            self.assertIsNone(hub.pending_output_request("a" * 96, "Gordons"))
+
+    def test_invalid_server_objective_id_is_rejected(self):
+        with mock.patch.object(hub, "urlopen", return_value=FakeResponse('{"item":{"request_id":"../../bad"}}')):
+            with self.assertRaisesRegex(ValueError, "invalid objective ID"):
+                hub.pending_output_request("a" * 96, "Gordons")
+
+    def test_runner_name_cannot_escape_query_or_bypass_pairing(self):
+        with mock.patch.object(hub, "urlopen") as remote:
+            with self.assertRaisesRegex(ValueError, "runner name"):
+                hub.pending_output_request("a" * 96, "Gordons&pending=0")
+            remote.assert_not_called()
+
     def test_observations_only_does_not_import_core_or_claim_queue(self):
         with mock.patch.dict(os.environ, {"ASCENSION_HUB_KEY": "a" * 96}), \
              mock.patch("sys.argv", ["ascension_hub_worker.py", "--root", "C:/unused", "--once", "--observations-only"]), \

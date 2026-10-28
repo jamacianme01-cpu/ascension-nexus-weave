@@ -94,15 +94,14 @@ export function IndependentEngage() {
       if (generation.current === token) setPathwaysLoading(false);
     }
   }
-  async function engage() {
-    const text = objective.trim();
-    if (text.length < 3 || loading || pathwaysLoading) return;
+  async function engage(override?: string) {
+    const text = (override ?? objective).trim();
+    if (text.length < 3 || loading) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
-    setRequested(text); setLoading(true); setError(""); setPathwayError("");
+    setObjective(text); setRequested(text); setLoading(true); setError(""); setPathwayError("");
     setResult(null); setFirstAnswer(""); setRefinement(""); setStage("processing");
-    if (talking) say("I am exploring your objective. I'll start with a direct answer.");
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
@@ -137,12 +136,11 @@ export function IndependentEngage() {
     void generatePathways(requested, firstAnswer, controller, token);
   }
   function buildOn(path: Pathway) {
-    setObjective(requested + "\nBuild on the selected pathway: " + path.title +
+    const next = (requested + "\nBuild on the selected pathway: " + path.title +
       "\nPreserve these features: " + path.summary +
-      "\nImprove and extend it without starting over.");
-    generation.current += 1; abort.current?.abort(); stopVoice();
-    setResult(null); setFirstAnswer(""); setPathwaysLoading(false); setPathwayError(""); setStage("idle"); setChoice(0);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+      "\nImprove and extend it without starting over.").slice(0, 2400);
+    setObjective(next);
+    void engage(next);
   }
   function reset() {
     generation.current += 1; abort.current?.abort(); setObjective(""); setRequested(""); setError(""); setResult(null);
@@ -195,11 +193,10 @@ export function IndependentEngage() {
           placeholder="What should ASCENSION change or improve?"
           className="w-full rounded-lg border border-gold/30 bg-black/30 p-3 text-sm text-foreground" />
         <button type="button" disabled={!refinement.trim()} onClick={() => {
-          generation.current += 1; abort.current?.abort(); stopVoice();
-          setObjective((requested + "\nRefine the answer with these changes: " + refinement.trim() +
-            "\nPrior answer context: " + firstAnswer.slice(0, 500)).slice(0, 2400));
-          setResult(null); setFirstAnswer(""); setPathwaysLoading(false); setPathwayError("");
-          setStage("idle"); window.scrollTo({ top: 0, behavior: "smooth" });
+          const next = (requested + "\nRefine the answer with these changes: " + refinement.trim() +
+            "\nPrior answer context: " + firstAnswer.slice(0, 1000)).slice(0, 2400);
+          setObjective(next);
+          void engage(next);
         }} className="mt-3 rounded-full border border-primary/50 px-4 py-2 text-sm text-primary disabled:opacity-40">
           BUILD ON INITIAL ANSWER
         </button>

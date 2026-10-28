@@ -1,0 +1,36 @@
+name: ASCENSION live answer smoke
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/routes/api/public/ascension/independent.ts'
+      - 'src/lib/ascension/engine/openai.server.ts'
+      - '.github/workflows/ascension-live-answer-smoke.yml'
+  workflow_dispatch:
+jobs:
+  live-answer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe hosted initial answer, not merely server uptime
+        shell: bash
+        run: |
+          set -uo pipefail
+          status=$(curl -sS --max-time 75 -o /tmp/ascension-result.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' -X POST \
+            --data '{"objective":"Make worker drones","phase":"initial"}' \
+            'https://ascension-nexus-weave-production.up.railway.app/api/public/ascension/independent')
+          echo "HTTP status: $status"
+          node - <<'NODE'
+          const fs = require('fs');
+          let parsed;
+          try { parsed = JSON.parse(fs.readFileSync('/tmp/ascension-result.json', 'utf8')); }
+          catch (err) { console.error('Unexpected non-JSON response', err.message); process.exit(1); }
+          if (parsed.phase === 'initial' && typeof parsed.answer === 'string' && parsed.answer.length > 60) {
+            console.log('FIRST ANSWER OK, character length:', parsed.answer.length);
+            console.log('First 220 characters:', parsed.answer.slice(0, 220));
+          } else {
+            console.error('FIRST ANSWER FAILED:', String(parsed.error || parsed.message || JSON.stringify(parsed)).slice(0, 850));
+            process.exit(1);
+          }
+          NODE

@@ -441,6 +441,14 @@ function ResultContent({
   );
   const actualVersions = delivery.versions ?? [];
   const producedVersions = actualVersions.filter((version) => version.status === "created").length;
+  // Generated app source is untrusted. Only mount one preview after an
+  // explicit user action. Unmounting ends its audio/video browsing context.
+  const [openPreviewId, setOpenPreviewId] = useState<string | null>(null);
+  useEffect(() => {
+    const closeOnHidden = () => { if (document.hidden) setOpenPreviewId(null); };
+    document.addEventListener("visibilitychange", closeOnHidden);
+    return () => document.removeEventListener("visibilitychange", closeOnHidden);
+  }, []);
   const variablesFor = (pathway: ObjectiveDelivery["pathways"][number]) => onToggleVariable && variableKey && (
     <details className="ascension-variable-picker mt-3" onClick={event => event.stopPropagation()}
       onKeyDown={event => event.stopPropagation()}>
@@ -582,13 +590,30 @@ function ResultContent({
                 <h3 className="font-display text-xl text-foreground">{cleanDisplayText(version.label)}</h3>
                 <p className="text-sm leading-6 text-foreground/85">{cleanDisplayText(version.summary)}</p>
                 {version.files.find((file) => /\.html?$/i.test(file.name)) && (
-                  <iframe
-                    title={`Isolated source preview: ${version.label}`}
-                    sandbox="allow-scripts"
-                    referrerPolicy="no-referrer"
-                    srcDoc={version.files.find((file) => /\.html?$/i.test(file.name))!.content}
-                    className="h-64 w-full rounded-lg border border-primary/20 bg-white"
-                  />
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button"
+                        aria-label={openPreviewId === version.id ? `Stop and close ${version.label}` : `Open interactive preview of ${version.label}`}
+                        onClick={() => setOpenPreviewId(current => current === version.id ? null : version.id)}
+                        className={`min-h-11 rounded-lg border px-4 text-sm font-medium ${openPreviewId === version.id
+                          ? "border-red-400 bg-red-900/25 text-red-200"
+                          : "border-gold/50 text-gold"}`}>
+                        {openPreviewId === version.id ? "STOP AUDIO · CLOSE PREVIEW" : "OPEN & INTERACT"}
+                      </button>
+                    </div>
+                    {openPreviewId === version.id && (
+                      <iframe key={version.id}
+                        title={`Isolated source preview: ${version.label}`}
+                        sandbox="allow-scripts"
+                        referrerPolicy="no-referrer"
+                        srcDoc={version.files.find((file) => /\.html?$/i.test(file.name))!.content}
+                        className="h-[420px] w-full rounded-lg border border-primary/20 bg-white"
+                      />
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Preview is experimental. Stop closes the entire preview even when generated playback controls fail.
+                    </p>
+                  </div>
                 )}
                 {!version.files.some((file) => /\.html?$/i.test(file.name)) &&
                   version.files.find((file) => /\.svg$/i.test(file.name)) && (

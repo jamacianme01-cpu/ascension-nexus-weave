@@ -78,7 +78,7 @@ export function IndependentEngage() {
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: answer }),
+        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: answer.slice(0, 6000) }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();

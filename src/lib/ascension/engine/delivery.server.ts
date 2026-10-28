@@ -804,6 +804,7 @@ type DraftGenerator = typeof externalProductDraft;
 export async function resolveDelivery(args: {
   run: DeliveryRun;
   artifactStage: { status: string; response_payload: unknown } | null;
+  versionsStage?: { status: string; response_payload: unknown } | null;
   draft: DraftRow | null;
   store: DraftStore;
   retry: boolean;
@@ -837,6 +838,46 @@ export async function resolveDelivery(args: {
     note,
     ...extra,
   });
+
+  // Version production is independent of external answer providers.
+  // When genuine generated output files arrive after a failed/old draft,
+  // they take precedence. Four slots are required, but incomplete slots do
+  // not masquerade as completed deliverables.
+  const variantData = record(args.versionsStage?.status === "completed"
+    ? args.versionsStage?.response_payload : null);
+  const versionRecords = Array.isArray(variantData["versions"]) ? variantData["versions"] : [];
+  if (run.status === "verified" && versionRecords.length === 4) {
+    const created = versionRecords.map(record).filter((v) => v["status"] === "created" &&
+      Array.isArray(v["files"]) && v["files"].length > 0);
+    if (created.length) {
+      const transported = artifactStage?.status === "completed"
+        ? artifactFiles(artifactStage.response_payload) : [];
+      const prior = governedDelivery(run, transported);
+      const baseDelivery = prior && prior.kind !== "not_produced" ? prior : parseDelivery({
+        kind: "answer",
+        title: run.objective.slice(0, 200) || "ASCENSION output versions",
+        body: "ASCENSION produced source artifacts through its connected capabilities. Each version has separate files and verification limitations.",
+        pathways: [], blend: null, files: [], limitations: [],
+      });
+      const combined = parseDelivery({
+        ...baseDelivery,
+        versions: versionRecords,
+        limitations: [
+          ...baseDelivery.limitations,
+          `${created.length} of 4 distinct output versions contain real generated files. The remaining slots are unavailable until their capability succeeds.`,
+          "Output files and syntax checks do not independently verify requested features, physical behavior, or deployment.",
+        ],
+      });
+      return {
+        ...base,
+        engine_label: "ASCENSION_OUTPUT_VERSIONS",
+        status: "completed",
+        response_payload: combined,
+        note: created.length === 4 ? null : `Created ${created.length} of 4 output versions; remaining versions not yet created.`,
+        source: "governed",
+      };
+    }
+  }
 
   // A delivered version is a saved result. Reopening it, model completion,
   // and later runtime transport must not rewrite its answer or drawings.

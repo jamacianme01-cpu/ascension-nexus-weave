@@ -199,7 +199,7 @@ async function build(objective: string, firstAnswerText = "") {
 }
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
-    GET: async () => json({ providers: configured(), supabase_required: false,
+    GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
       governed_runtime_connected: false, note: "Only configured providers can contribute. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");

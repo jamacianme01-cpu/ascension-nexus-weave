@@ -1,4 +1,4 @@
-param([switch]$Pair,[switch]$Once,[switch]$ObservationsOnly)
+param([switch]$Pair,[switch]$Once,[switch]$ObservationsOnly,[string]$VersionRequestId)
 $ErrorActionPreference = 'Stop'
 $repo = Join-Path $env:USERPROFILE 'Projects\clarity'
 $dir = Join-Path $env:APPDATA 'ASCENSION'
@@ -42,7 +42,25 @@ try {
   $workerDir = Join-Path $env:LOCALAPPDATA 'ASCENSION'
   New-Item -ItemType Directory -Path $workerDir -Force | Out-Null
   $worker = Join-Path $workerDir 'ascension_hub_worker.py'
-  Invoke-WebRequest 'https://raw.githubusercontent.com/jamacianme01-cpu/ascension-nexus-weave/main/scripts/ascension_hub_worker.py' -OutFile $worker -UseBasicParsing -ErrorAction Stop
+  $versions = Join-Path $workerDir 'ascension_version_worker.py'
+  $baseUrl = 'https://raw.githubusercontent.com/jamacianme01-cpu/ascension-nexus-weave/main/scripts/'
+  Invoke-WebRequest ($baseUrl + 'ascension_hub_worker.py') -OutFile $worker -UseBasicParsing -ErrorAction Stop
+  Invoke-WebRequest ($baseUrl + 'ascension_version_worker.py') -OutFile $versions -UseBasicParsing -ErrorAction Stop
+  if ($VersionRequestId) {
+    if ($VersionRequestId -notmatch '^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}
+  if ($Once) { $hubArgs += '--once' }
+  if ($ObservationsOnly) { $hubArgs += '--observations-only' }
+  python -B @hubArgs
+} finally {
+  Remove-Item Env:\ASCENSION_HUB_KEY -ErrorAction SilentlyContinue
+}
+) {
+      throw 'VersionRequestId must be a UUID.'
+    }
+    python -B $versions --root $repo --request-id $VersionRequestId
+    if ($LASTEXITCODE -ne 0) { throw 'Version backfill failed. See the output above.' }
+    return
+  }
   $hubArgs = @($worker, '--root', $repo)
   if ($Once) { $hubArgs += '--once' }
   if ($ObservationsOnly) { $hubArgs += '--observations-only' }

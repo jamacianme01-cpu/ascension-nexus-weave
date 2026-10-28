@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { Engage } from "@/components/ascension/engage";
 import { LibraryCardGate } from "@/components/ascension/library-card-gate";
+import { TreeVoiceSurface } from "@/components/ascension/tree-voice-surface";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,5 +29,5 @@ export const Route = createFileRoute("/")({
 
 function EngagePage() {
   const library = typeof window !== "undefined" && new URL(window.location.href).searchParams.get("library") === "1";
-  return library ? <LibraryCardGate /> : <Engage />;
+  return library ? <LibraryCardGate /> : <TreeVoiceSurface><Engage /></TreeVoiceSurface>;
 }

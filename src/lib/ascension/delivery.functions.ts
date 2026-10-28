@@ -40,7 +40,7 @@ async function resolveForOwner(
     .from("ascension_run_stages")
     .select("ordinal, status, response_payload, error, engine_model, created_at, request_payload")
     .eq("request_id", requestId)
-    .in("ordinal", [101, 102]);
+    .in("ordinal", [101, 102, 103]);
   if (stageError) throw new Error(stageError.message);
   const byOrdinal = (n: number) =>
     (stages as { ordinal: number }[] | null)?.find((s) => s.ordinal === n) ?? null;
@@ -48,6 +48,10 @@ async function resolveForOwner(
   const state = await engine.resolveDelivery({
     run,
     artifactStage: byOrdinal(101) as {
+      status: string;
+      response_payload: unknown;
+    } | null,
+    versionsStage: byOrdinal(103) as {
       status: string;
       response_payload: unknown;
     } | null,

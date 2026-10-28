@@ -100,6 +100,10 @@ def replace_once(source: str, find: str, replacement: str, label: str) -> str:
 
 
 def patched_sources(cap_source: str, obj_source: str) -> tuple[str, str]:
+    # Windows checkouts may use CRLF. Match exact structural anchors on LF,
+    # retaining an untouched byte-for-byte backup before any replacement.
+    cap_source = cap_source.replace("\r\n", "\n")
+    obj_source = obj_source.replace("\r\n", "\n")
     if "class SoftwareProjectCapability:" in cap_source or \
        'selected_branch.capability == "software_project"' in obj_source:
         raise RuntimeError("Software executor is already installed or partially installed; no overwrite")

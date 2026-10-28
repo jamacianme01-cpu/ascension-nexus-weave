@@ -16,7 +16,7 @@ try {
     id, kind, label: id, summary: "Distinct approach for the same objective",
     status: "created", blend_from: kind === "blend" ? [...idArray] : [],
     verification_scope: "Syntax and file-hash verified; behavior not checked",
-    files: [{ name: "index.html", content: "<html><script>" + source + "</script></html>" }],
+    files: [{ name: "index.html", content: `<html><body><button id="action" aria-label="Perform an action">Act</button><main id="output">Interactive workspace ready for testing</main><script>document.getElementById("action").addEventListener("click",()=>{document.getElementById("output").textContent="Executed ${source} distinct implementation";});</script></body></html>` }],
   });
   const idArray = [...id];
   const raw = { versions: [

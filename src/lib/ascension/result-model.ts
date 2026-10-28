@@ -422,7 +422,7 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
     pathways,
     blend,
     files,
-    versions,
+    ...(versions.length ? { versions } : {}),
     limitations: v["limitations"] as string[],
     ...(Array.isArray(v["web_sources"])
       ? {

@@ -61,48 +61,92 @@ export function IndependentEngage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  const [firstAnswer, setFirstAnswer] = useState("");
+  const [pathwaysLoading, setPathwaysLoading] = useState(false);
+  const [pathwayError, setPathwayError] = useState("");
+  const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState(0);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
-  useEffect(() => () => { abort.current?.abort(); stopVoice(); }, []);
+  const generation = useRef(0);
+  useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
 
-  async function engage() {
-    if (!objective.trim() || loading) return;
-    const text = objective.trim();
-    setRequested(text); setLoading(true); setError(""); setResult(null); setStage("processing");
-    if (talking) say("I am exploring your objective and comparing possible pathways.");
-    const controller = new AbortController(); abort.current = controller;
+  async function generatePathways(text: string, answer: string, controller: AbortController, token: number) {
+    setPathwaysLoading(true); setPathwayError("");
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text }), signal: controller.signal,
+        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: answer }),
+        signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();
-      if (!response.ok) throw new Error(data.error || "The answer service could not complete this request.");
+      if (!response.ok) throw new Error(data.error || "Pathway synthesis did not complete.");
       if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend)
-        throw new Error("The engine did not deliver three approaches and a blend.");
-      setResult(data); setChoice(0); setStage("eruption");
-      if (talking) say("I found three different approaches and a fourth blended design. " + data.introduction);
-      window.setTimeout(() => view.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 180);
+        throw new Error("The answer engine did not deliver three approaches and a blend.");
+      if (generation.current !== token) return;
+      setResult(data); setChoice(0);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && generation.current === token)
+        setPathwayError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (generation.current === token) setPathwaysLoading(false);
+    }
+  }
+  async function engage() {
+    const text = objective.trim();
+    if (text.length < 3 || loading || pathwaysLoading) return;
+    const token = ++generation.current;
+    abort.current?.abort();
+    const controller = new AbortController(); abort.current = controller;
+    setRequested(text); setLoading(true); setError(""); setPathwayError("");
+    setResult(null); setFirstAnswer(""); setRefinement(""); setStage("processing");
+    if (talking) say("I am exploring your objective. I'll start with a direct answer.");
+    try {
+      const response = await fetch("/api/public/ascension/independent", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ objective: text, phase: "initial" }),
+        signal: controller.signal,
+      });
+      const data: { phase?: string; answer?: string; error?: string } = await response.json();
+      if (!response.ok) throw new Error(data.error || "The initial answer did not complete.");
+      if (data.phase !== "initial" || !data.answer?.trim())
+        throw new Error("The initial answer was not readable.");
+      if (generation.current !== token) return;
+      const answer = data.answer.trim();
+      setFirstAnswer(answer);
+      setLoading(false); setStage("eruption");
+      if (talking) say(answer);
+      window.setTimeout(() => view.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+      await generatePathways(text, answer, controller, token);
+    } catch (cause) {
+      if (!controller.signal.aborted && generation.current === token) {
         setError(cause instanceof Error ? cause.message : String(cause));
         setStage("idle");
-        if (talking) say("That objective could not be completed. The error is shown in the Book.");
       }
-    } finally { setLoading(false); }
+    } finally {
+      if (generation.current === token) setLoading(false);
+    }
+  }
+  function retryPathways() {
+    if (pathwaysLoading || !firstAnswer || !requested) return;
+    abort.current?.abort();
+    const controller = new AbortController(); abort.current = controller;
+    const token = ++generation.current;
+    void generatePathways(requested, firstAnswer, controller, token);
   }
   function buildOn(path: Pathway) {
     setObjective(requested + "\nBuild on the selected pathway: " + path.title +
       "\nPreserve these features: " + path.summary +
       "\nImprove and extend it without starting over.");
-    setResult(null); setStage("idle"); setChoice(0);
+    generation.current += 1; abort.current?.abort(); stopVoice();
+    setResult(null); setFirstAnswer(""); setPathwaysLoading(false); setPathwayError(""); setStage("idle"); setChoice(0);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function reset() {
-    abort.current?.abort(); setObjective(""); setRequested(""); setError(""); setResult(null);
+    generation.current += 1; abort.current?.abort(); setObjective(""); setRequested(""); setError(""); setResult(null);
+    setFirstAnswer(""); setRefinement(""); setPathwayError(""); setPathwaysLoading(false);
     setStage("idle"); stopVoice(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
   const choices = result ? [...result.pathways, result.blend] : [];

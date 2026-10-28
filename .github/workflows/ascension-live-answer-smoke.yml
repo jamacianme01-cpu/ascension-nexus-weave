@@ -1,6 +1,6 @@
 name: ASCENSION live answer smoke
 on:
-  pull_request:
+  push:
     branches: [main]
     paths:
       - 'src/routes/api/public/ascension/independent.ts'
@@ -10,8 +10,25 @@ on:
 jobs:
   live-answer:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 12
     steps:
+      - name: Wait for the repaired Railway version to serve traffic
+        shell: bash
+        run: |
+          ready=0
+          for i in $(seq 1 85); do
+            body=$(curl -fsS --max-time 8 'https://ascension-nexus-weave-production.up.railway.app/api/public/ascension/independent' || true)
+            if [[ "$body" == *'"answer_contract_version":"structured-four-20261028"'* ]]; then
+              echo 'New four-pathway contract is live'
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$ready" != '1' ]]; then
+            echo 'Railway never served the repaired contract'
+            exit 1
+          fi
       - name: Probe hosted initial answer, not merely server uptime
         shell: bash
         run: |

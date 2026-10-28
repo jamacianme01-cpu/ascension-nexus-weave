@@ -1,5 +1,7 @@
 """Executable version-dispatch proof, with mocked model transport, no fake hosted claims."""
 import importlib.util
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 import sys
 import unittest
@@ -59,10 +61,14 @@ class VersionDispatchTests(unittest.TestCase):
 
     def test_missing_executor_is_not_represented_as_a_finished_invention(self):
         branches = [{**b, "capability": "real_cad_executor"} for b in self.branches]
-        versions = mod.generate_versions(Path("."), "make a physical design", branches)
+        output = StringIO()
+        with redirect_stdout(output):
+            versions = mod.generate_versions(Path("."), "make a physical design", branches)
         self.assertEqual(len(versions), 4)
         self.assertTrue(all(v["status"] == "unavailable" for v in versions))
         self.assertFalse(any(v["files"] for v in versions))
+        self.assertEqual(output.getvalue().count("OUTPUT VERSION FAILURE REASON:"), 4)
+        self.assertIn("No real output-producing executor registered", output.getvalue())
 
     def test_failed_design_divergence_does_not_make_up_versions(self):
         with mock.patch.object(mod, "plan_distinct_directions", side_effect=ValueError("no real plan")):

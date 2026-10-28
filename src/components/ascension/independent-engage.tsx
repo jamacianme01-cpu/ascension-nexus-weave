@@ -47,32 +47,64 @@ function stopVoice() {
 }
 function PathwayView({ path }: { path: Pathway & { blend_reason?: string } }) {
   const [part, setPart] = useState<Part | null>(null);
-  useEffect(() => setPart(null), [path.id]);
-  return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
-    <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
-    <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
-    {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
-    <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>
-    <ol className="mb-5 list-decimal space-y-2 pl-5 text-sm leading-6">
-      {path.steps.map((step, i) => <li key={i}>{step}</li>)}
-    </ol>
-    {path.parts.length > 0 && <div className="mb-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-      <div className="space-y-2" aria-label="Select components">
-        <h4 className="text-sm font-semibold text-primary">Components — select to inspect</h4>
-        {path.parts.map((p, i) => <button type="button" key={i} onClick={() => setPart(p)}
-          className="block w-full rounded-lg border border-gold/30 bg-black/25 p-3 text-left text-sm hover:border-gold">
-          {p.name}</button>)}
+  const [mode, setMode] = useState<"picture" | "blueprint" | "dissect" | "exploded" | "imploded">("picture");
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  useEffect(() => { setPart(null); setMode("picture"); setZoom(1); setRotation(0); }, [path.id]);
+  const parts = path.parts.slice(0, 8);
+  const exploded = mode === "exploded" || mode === "dissect";
+  const blueprint = mode === "blueprint";
+  const slots = parts.map((p, index) => {
+    const angle = (index * Math.PI * 2) / Math.max(parts.length, 1) - Math.PI / 2;
+    const radius = exploded ? 160 : 105;
+    return { p, x: 300 + Math.cos(angle) * radius, y: 205 + Math.sin(angle) * radius, index };
+  });
+  return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-4 sm:p-7">
+    <h3 className="mb-2 text-lg text-gold">{path.title}</h3>
+    <p className="mb-4 max-w-3xl text-sm leading-6 text-foreground">{path.summary}</p>
+    <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Inspect selected pathway">
+      {(["picture","blueprint","dissect","exploded","imploded"] as const).map(view => <button key={view} type="button"
+        aria-pressed={mode === view} onClick={() => { setMode(view); setPart(null); }}
+        className={"rounded-full border px-3 py-2 text-sm capitalize " + (mode === view ? "border-primary bg-primary/20 text-primary" : "border-gold/30 text-gold")}>{view}</button>)}
+    </div>
+    <div className="overflow-hidden rounded-xl border border-gold/25 bg-[#071321]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-3">
+        <span className="text-xs text-foreground/75">{blueprint ? "Concept blueprint — dimensions not verified" : "Component concept illustration — not a generated product picture"}</span>
+        <div className="flex gap-2">
+          <button type="button" className="rounded border border-gold/35 px-3 py-2 text-sm text-gold" onClick={() => setZoom(z => Math.min(2.5,z+.25))} aria-label="Zoom in">+</button>
+          <button type="button" className="rounded border border-gold/35 px-3 py-2 text-sm text-gold" onClick={() => setZoom(z => Math.max(.65,z-.25))} aria-label="Zoom out">−</button>
+          <button type="button" className="rounded border border-gold/35 px-3 py-2 text-sm text-gold" onClick={() => setRotation(deg => (deg+45)%360)}>Rotate</button>
+          <button type="button" className="rounded border border-gold/35 px-3 py-2 text-sm text-gold" onClick={() => {setZoom(1);setRotation(0);}}>Reset</button>
+        </div>
       </div>
-      <div className="min-h-40 rounded-xl border border-primary/25 bg-[#08192a] p-5">
-        {part ? <><h4 className="mb-2 text-gold">{part.name}</h4><p className="mb-3 text-sm">{part.purpose}</p>
-          {part.location && <p className="text-xs text-muted-foreground">Location / relationship: {part.location}</p>}</>
-          : <p className="text-sm text-muted-foreground">Select a component to see what it does and where it belongs.</p>}
-        <p className="mt-4 text-xs text-muted-foreground">Concept description — not an interactive CAD model.</p>
-      </div>
+      {parts.length ? <svg viewBox="0 0 600 420" role="img" aria-label={mode + " conceptual arrangement of " + path.title}
+        className="block h-auto w-full" style={{ touchAction: "pan-y" }}>
+        {blueprint && <defs><pattern id="ascension-blueprint-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#3f7890" strokeWidth=".5"/></pattern></defs>}
+        {blueprint && <rect width="600" height="420" fill="url(#ascension-blueprint-grid)" />}
+        <g transform={`translate(300 205) rotate(${rotation}) scale(${zoom}) translate(-300 -205)`}>
+          {!exploded && <ellipse cx="300" cy="205" rx="180" ry="138" fill="none" stroke="#8d9eaf" strokeDasharray="5 7" />}
+          {slots.map(({p,x,y,index}) => <g key={index} onClick={() => setPart(p)} role="button" tabIndex={0}
+            onKeyDown={event => {if(event.key === "Enter" || event.key === " "){event.preventDefault();setPart(p);}}}
+            aria-label={"Inspect "+p.name} className="cursor-pointer">
+            {exploded && <path d={`M300 205 L${x} ${y}`} stroke="#788da3" strokeDasharray="5 5" />}
+            <rect x={x-62} y={y-27} width="124" height="54" rx={blueprint?2:12}
+              stroke={part?.name===p.name?"#ffffff":"#c6a86e"} strokeWidth={part?.name===p.name?3:1.5} fill="#173044"/>
+            <text x={x} y={y+4} fontSize="12" fill="#ffffff" textAnchor="middle">{p.name.length>19?p.name.slice(0,17)+"…":p.name}</text>
+          </g>)}
+        </g>
+      </svg> : <div className="p-6 text-sm text-foreground/80">No component illustration is available for this pathway.</div>}
+    </div>
+    {part && <div className="mt-3 rounded-lg border border-primary/30 p-3 text-sm">
+      <strong className="text-gold">{part.name}</strong><p className="mt-1">{part.purpose}</p>
+      {part.location && <p className="mt-1 text-foreground/70">Location: {part.location}</p>}
+      <button type="button" className="mt-2 text-xs text-gold underline" onClick={() => setPart(null)}>Close description</button>
     </div>}
-    {path.tradeoffs.length > 0 && <details className="mb-5 text-sm text-muted-foreground">
-      <summary className="cursor-pointer text-gold">Limits and tradeoffs</summary>
-      <ul className="mt-2 list-disc space-y-1 pl-5">{path.tradeoffs.map((v, i) => <li key={i}>{v}</li>)}</ul>
+    <details className="mt-4"><summary className="cursor-pointer text-sm text-gold">How this pathway works</summary>
+      <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6">{path.steps.map((step,i)=><li key={i}>{step}</li>)}</ol>
+      {path.blend_reason && <p className="mt-3 text-sm">{path.blend_reason}</p>}
+    </details>
+    {path.tradeoffs.length > 0 && <details className="mt-3 text-sm"><summary className="cursor-pointer text-gold">Limits and tradeoffs</summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5">{path.tradeoffs.map((item,i)=><li key={i}>{item}</li>)}</ul>
     </details>}
   </section>;
 }

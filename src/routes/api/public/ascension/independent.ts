@@ -116,6 +116,24 @@ async function firstAnswer(objective: string) {
   if (answer.length < 45) throw new Error("The provider returned an incomplete initial answer.");
   return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: "OpenAI", verified: false };
 }
+/** Brief, context-grounded Tree dialogue, never a recital of the full answer. */
+async function treeGuide(objective: string, input: Record<string, unknown>) {
+  if (!configured().OpenAI) throw new Error("The Tree guide is unavailable.");
+  const title = String(input["pathTitle"] ?? "").slice(0, 140);
+  const summary = String(input["pathSummary"] ?? "").slice(0, 1500);
+  const parts = Array.isArray(input["parts"]) ? input["parts"].slice(0, 12).map(p => {
+    const v = obj(p);
+    return { name: String(v["name"] ?? "").slice(0, 100), purpose: String(v["purpose"] ?? "").slice(0, 350), location: String(v["location"] ?? "").slice(0, 220) };
+  }) : [];
+  const question = String(input["question"] ?? "").slice(0, 500);
+  const selectedPart = String(input["selectedPart"] ?? "").slice(0, 100);
+  const response = await callOpenAIResponse({
+    timeoutMs: 16000,
+    system: "You are the Tree of Knowledge inside ASCENSION V1, a welcoming, encouraging, creative, conversational guide. Reply directly to the visitor's question, if present. Give concrete, grounded insight from the selected pathway and its listed parts. Propose one genuinely relevant, optional creative possibility when helpful; never force a design change. Be concise: at most two short sentences, 55 words total. No lengthy introductions, generic praise, invented facts, claims of implementation, or reading the full written pathway. If detail is missing, say it is not specified. Answer using only the provided pathway facts and general conceptual reasoning.",
+    user: JSON.stringify({ objective, title, summary, parts, selectedPart, question: question || "Give a short encouraging observation about this selected pathway." }),
+  });
+  return { phase: "guide", reply: response.text.trim().slice(0, 450) };
+}
 /** Exact structural contract: the model cannot silently return two pathways instead of three. */
 const componentSchema = {
   type: "object",
@@ -215,6 +233,7 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         const input = obj(JSON.parse(raw));
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
+        if (input["phase"] === "guide") return json(await treeGuide(objective, input));
         if (input["phase"] === "initial") return json(await firstAnswer(objective));
         const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
         return json(await build(objective, prior));

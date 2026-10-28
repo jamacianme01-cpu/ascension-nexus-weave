@@ -6,17 +6,43 @@ type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { bl
   contributors: string[]; unavailable: string[]; providerErrors: string[]; mode: string; verified: false; governance: string; persistence: string };
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 
+let speechSequence = 0;
+let activeUtterance: SpeechSynthesisUtterance | null = null;
 function say(text: string) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
-  try {
-    window.speechSynthesis.cancel();
-    const words = new SpeechSynthesisUtterance(text.slice(0, 900));
+  const sequence = ++speechSequence;
+  const synth = window.speechSynthesis;
+  try { synth.cancel(); } catch { return; }
+  const chunks: string[] = [];
+  let chunk = "";
+  for (const word of text.trim().split(/\s+/)) {
+    if (chunk && chunk.length + word.length + 1 > 220) {
+      chunks.push(chunk);
+      chunk = word;
+    } else {
+      chunk += (chunk ? " " : "") + word;
+    }
+  }
+  if (chunk) chunks.push(chunk);
+  let index = 0;
+  const next = () => {
+    if (sequence !== speechSequence || index >= chunks.length) {
+      if (sequence === speechSequence) activeUtterance = null;
+      return;
+    }
+    const words = new SpeechSynthesisUtterance(chunks[index++]!);
+    activeUtterance = words;
     words.rate = 0.93;
     words.pitch = 0.98;
-    window.speechSynthesis.speak(words);
-  } catch { /* Speech is an enhancement; results remain readable. */ }
+    words.onend = next;
+    words.onerror = next;
+    try { synth.speak(words); } catch { activeUtterance = null; }
+  };
+  next();
 }
 function stopVoice() {
+  speechSequence += 1;
+  activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
 function PathwayView({ path, onBuild }: { path: Pathway & { blend_reason?: string }; onBuild: (p: Pathway) => void }) {
@@ -102,6 +128,7 @@ export function IndependentEngage() {
     const controller = new AbortController(); abort.current = controller;
     setObjective(text); setRequested(text); setLoading(true); setError(""); setPathwayError("");
     setResult(null); setFirstAnswer(""); setRefinement(""); setStage("processing");
+    if (talking) say("Exploring your objective.");
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },

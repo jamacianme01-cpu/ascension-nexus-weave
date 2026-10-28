@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/Start_ASCENSION_ENGAGE.ps1"
+      - "scripts/ascension_engage_preflight.py"
+      - "tests/test_ascension_engage_preflight.py"
       - "scripts/Start_ASCENSION_Software.ps1"
       - "scripts/ascension_software_executor.py"
       - "scripts/install_software_executor.py"
@@ -13,6 +16,9 @@ on:
   push:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/Start_ASCENSION_ENGAGE.ps1"
+      - "scripts/ascension_engage_preflight.py"
+      - "tests/test_ascension_engage_preflight.py"
       - "scripts/Start_ASCENSION_Software.ps1"
       - "scripts/ascension_software_executor.py"
       - "scripts/install_software_executor.py"
@@ -31,7 +37,7 @@ jobs:
         run: |
           $tokens = $null
           $errors = $null
-          foreach ($file in @('Start_ASCENSION_Hub.ps1','Start_ASCENSION_Software.ps1')) {
+          foreach ($file in @('Start_ASCENSION_Hub.ps1','Start_ASCENSION_Software.ps1','Start_ASCENSION_ENGAGE.ps1')) {
             $script = Join-Path $env:GITHUB_WORKSPACE "scripts\$file"
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors) | Out-Null
@@ -69,3 +75,8 @@ jobs:
         run: |
           python -m py_compile scripts/ascension_software_executor.py scripts/install_software_executor.py
           python -m unittest discover -s tests -p test_software_executor.py -v
+      - name: Verify controlled ENGAGE preflight never starts queue on failure
+        shell: powershell
+        run: |
+          python -m py_compile scripts/ascension_engage_preflight.py
+          python -m unittest discover -s tests -p test_ascension_engage_preflight.py -v

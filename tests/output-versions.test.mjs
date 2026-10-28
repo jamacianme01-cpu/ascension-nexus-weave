@@ -8,7 +8,7 @@ const server = await createServer({
   resolve: { alias: { "@": resolve("src") } },
 });
 try {
-  const { normalizeOutputVersions } = await server.ssrLoadModule(
+  const { normalizeOutputVersions, needsVersionCompletion } = await server.ssrLoadModule(
     "/src/lib/ascension/output-versions.server.ts");
   const { parseDelivery, assessCreatedOutputVersions } = await server.ssrLoadModule("/src/lib/ascension/result-model.ts");
   const id = ["branch-one", "branch-two", "branch-three"];
@@ -26,6 +26,13 @@ try {
     version("blend", "blend", "const combined=123"),
   ] };
   const normalized = normalizeOutputVersions(raw, id);
+  assert.equal(needsVersionCompletion(null), true);
+  assert.equal(needsVersionCompletion({ versions: [] }), true);
+  assert.equal(needsVersionCompletion(normalized), false);
+  assert.equal(needsVersionCompletion({ versions: [
+    ...normalized.versions.slice(0, 3),
+    { ...normalized.versions[3], status: "unavailable", files: [] },
+  ] }), true);
   assert.equal(normalized.versions.length, 4);
   assert.equal(new Set(normalized.versions.flatMap(x => x.files.map(y => y.sha256))).size, 4);
   assert.equal(normalized.versions[3].kind, "blend");

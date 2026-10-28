@@ -34,3 +34,31 @@ jobs:
             process.exit(1);
           }
           NODE
+      - name: Require three real pathways and a fourth blend
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const initial = JSON.parse(fs.readFileSync('/tmp/ascension-result.json', 'utf8'));
+          const body = { objective: 'Make worker drones', phase: 'pathways', firstAnswer: initial.answer.slice(0, 6000) };
+          fs.writeFileSync('/tmp/ascension-pathways-request.json', JSON.stringify(body));
+          NODE
+          status=$(curl -sS --max-time 95 -o /tmp/ascension-pathways-result.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' -X POST \
+            --data-binary @/tmp/ascension-pathways-request.json \
+            'https://ascension-nexus-weave-production.up.railway.app/api/public/ascension/independent')
+          echo "Pathways HTTP status: $status"
+          node - <<'NODE'
+          const fs = require('fs');
+          let parsed;
+          try { parsed = JSON.parse(fs.readFileSync('/tmp/ascension-pathways-result.json', 'utf8')); }
+          catch (err) { console.error('Pathways returned invalid JSON', err.message); process.exit(1); }
+          if (Array.isArray(parsed.pathways) && parsed.pathways.length === 3 && parsed.blend?.title &&
+              parsed.pathways.every(p => p.title && p.summary && p.steps?.length >= 2)) {
+            console.log('FOUR REAL PATHWAYS OK:', parsed.pathways.map(p => p.title).concat(parsed.blend.title).join(' | '));
+            console.log('Mode:', parsed.mode, '| Model contributors:', parsed.contributors?.join(', '));
+          } else {
+            console.error('PATHWAYS FAILED:', String(parsed.error || parsed.message || JSON.stringify(parsed)).slice(0, 950));
+            process.exit(1);
+          }
+          NODE

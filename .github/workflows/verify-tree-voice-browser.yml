@@ -1,0 +1,116 @@
+name: Verify Tree voice in browser
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  voice-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Install browser testing tools in disposable runner only
+        run: |
+          bun add --no-save playwright
+          bunx playwright install --with-deps chromium
+      - name: Test real React voice controls with simulated browser speech
+        shell: bash
+        run: |
+          cat > tree-voice-ci.html <<'HTML'
+          <!doctype html><html><head><meta charset="utf-8"><title>Tree voice CI fixture</title></head><body><div id="root"></div><script type="module" src="/tree-voice-ci.tsx"></script></body></html>
+          HTML
+          cat > tree-voice-ci.tsx <<'TSX'
+          import React, { useState } from "react";
+          import { createRoot } from "react-dom/client";
+          import { TreeVoiceSurface } from "@/components/ascension/tree-voice-surface";
+          function Fixture() {
+            const [value, setValue] = useState("Build ");
+            const [submissions, setSubmissions] = useState(0);
+            return <TreeVoiceSurface><form onSubmit={event => { event.preventDefault(); setSubmissions(count => count + 1); }}>
+              <label>Book objective<textarea value={value} onChange={event => setValue(event.target.value)} /></label>
+              <output id="book-state">{value}</output><output id="submissions">{submissions}</output>
+              <p id="narrative">A pathway is a proposal, not verified execution.</p>
+              <button type="submit">ENGAGE</button>
+            </form></TreeVoiceSurface>;
+          }
+          createRoot(document.getElementById("root")!).render(<Fixture />);
+          TSX
+          cat > tree-voice-ci.vite.mjs <<'CONFIG'
+          import { defineConfig } from "vite";
+          import react from "@vitejs/plugin-react";
+          import path from "node:path";
+          export default defineConfig({ envDir: false, plugins: [react()], resolve: { alias: { "@": path.resolve("src") } }, server: { host: "127.0.0.1", port: 4178, strictPort: true } });
+          CONFIG
+          cat > tree-voice-ci.browser.mjs <<'TEST'
+          import assert from "node:assert/strict";
+          import { chromium } from "playwright";
+          const browser = await chromium.launch();
+          try {
+            const page = await browser.newPage({ viewport: { width: 820, height: 1180 } });
+            await page.addInitScript(() => {
+              window.__spoken = []; window.__starts = 0; window.__aborts = 0;
+              Object.defineProperty(window, "speechSynthesis", { configurable: true, value: { speak(message) { window.__spoken.push(message.text); }, cancel() {} } });
+              window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+              window.SpeechRecognition = class {
+                constructor() { window.__recognition = this; }
+                start() { window.__starts++; if (window.__deny) this.onerror({ error: "not-allowed" }); }
+                abort() { window.__aborts++; }
+              };
+            });
+            await page.goto("http://127.0.0.1:4178/tree-voice-ci.html");
+            await page.getByText("TREE VOICE", { exact: true }).click();
+            assert.equal(await page.evaluate(() => window.__starts), 0);
+            assert.deepEqual(await page.evaluate(() => window.__spoken), []);
+            const field = page.getByLabel("Book objective");
+            await field.focus();
+            await field.evaluate(element => element.setSelectionRange(element.value.length, element.value.length));
+            await page.getByRole("button", { name: "Speak", exact: true }).click();
+            await page.evaluate(() => {
+              const result = [{ transcript: "a telescope" }]; result.isFinal = true;
+              window.__recognition.onresult({ results: [result] });
+            });
+            await page.waitForFunction(() => document.querySelector("textarea[maxlength='4000']")?.value === "a telescope");
+            assert.equal(await field.inputValue(), "Build ");
+            await page.getByRole("button", { name: "Insert into selected Book field" }).click();
+            await page.waitForFunction(() => document.querySelector("#book-state")?.textContent === "Build a telescope");
+            assert.equal(await field.inputValue(), "Build a telescope");
+            assert.equal(await page.locator("#submissions").textContent(), "0");
+            await page.locator("#narrative").evaluate(element => {
+              const range = document.createRange(); range.selectNodeContents(element);
+              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              document.dispatchEvent(new Event("selectionchange"));
+            });
+            await page.getByRole("button", { name: "Read selected text" }).click();
+            assert.deepEqual(await page.evaluate(() => window.__spoken), ["A pathway is a proposal, not verified execution."]);
+            await page.getByRole("button", { name: "Stop", exact: true }).click();
+            await page.getByRole("button", { name: "Speak", exact: true }).click();
+            const aborts = await page.evaluate(() => window.__aborts);
+            await page.getByText("TREE VOICE", { exact: true }).click();
+            await page.waitForFunction(previous => window.__aborts > previous, aborts);
+            await page.getByText("TREE VOICE", { exact: true }).click();
+            await page.evaluate(() => { window.__deny = true; });
+            await page.getByRole("button", { name: "Speak", exact: true }).click();
+            await page.getByText("Microphone access was denied. You can still type to the Tree.", { exact: true }).waitFor();
+            assert.equal(await page.locator("#submissions").textContent(), "0");
+            console.log("Browser passed: opt-in, dictation review, React-controlled insertion, no automatic submission, selected-text narration, Stop, close cleanup, denied microphone.");
+          } finally { await browser.close(); }
+          TEST
+          bunx vite --config tree-voice-ci.vite.mjs > "$RUNNER_TEMP/tree-voice-vite.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4178/tree-voice-ci.html > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then cat "$RUNNER_TEMP/tree-voice-vite.log"; exit 1; fi
+          node tree-voice-ci.browser.mjs

@@ -243,7 +243,7 @@ export function IndependentEngage() {
         {choices.map((p, index) => <button type="button" role="tab" aria-selected={choice === index} key={p.id}
           className={"min-h-16 rounded-lg border p-3 text-left text-sm " + (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
           onClick={() => { setChoice(index); if (talking) say(p.title + ". " + p.summary); }}>
-          {index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}
+          {index === 3 ? "FOURTH · BLEND" : (result.mode === "three-provider-synthesis" ? ["OPENAI", "CLAUDE", "GROK"][index] + " · PATHWAY " : "OPENAI · PROVISIONAL PATHWAY ") + (index + 1)}
           <span className="mt-1 block text-xs text-foreground/85">{p.title}</span>
         </button>)}
       </div>

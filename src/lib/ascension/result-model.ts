@@ -636,6 +636,19 @@ export function assessResult(
   };
 }
 
+/** A created output version must contain the actual requested artifact type.
+ * Source-file presence does not establish feature, browser, or physical success. */
+export function assessCreatedOutputVersions(
+  objective: string,
+  delivery: Pick<ObjectiveDelivery, "versions">,
+): ObjectiveOutputVersion[] {
+  return (delivery.versions ?? []).filter((version) => {
+    if (version.status !== "created" || !version.files.length) return false;
+    const result = assessResult(objective, "", version.files);
+    return result.produced && result.files.length > 0;
+  });
+}
+
 export function notProducedMessage(kind: RequestedKind) {
   return kind === "drawing"
     ? "The requested drawing has not been produced."

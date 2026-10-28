@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/Start_ASCENSION_Software.ps1"
       - "scripts/ascension_software_executor.py"
       - "scripts/install_software_executor.py"
       - "tests/test_software_executor.py"
@@ -12,6 +13,7 @@ on:
   push:
     paths:
       - "scripts/Start_ASCENSION_Hub.ps1"
+      - "scripts/Start_ASCENSION_Software.ps1"
       - "scripts/ascension_software_executor.py"
       - "scripts/install_software_executor.py"
       - "tests/test_software_executor.py"
@@ -29,13 +31,16 @@ jobs:
         run: |
           $tokens = $null
           $errors = $null
-          $script = Join-Path $env:GITHUB_WORKSPACE 'scripts\Start_ASCENSION_Hub.ps1'
-          [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_.ToString() }
-            exit 1
+          foreach ($file in @('Start_ASCENSION_Hub.ps1','Start_ASCENSION_Software.ps1')) {
+            $script = Join-Path $env:GITHUB_WORKSPACE "scripts\$file"
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.ToString() }
+              exit 1
+            }
+            Write-Host "$file syntax valid"
           }
-          Write-Host 'Windows hub launcher syntax valid'
       - name: Verify DPAPI key save and reload on Windows
         shell: powershell
         run: |

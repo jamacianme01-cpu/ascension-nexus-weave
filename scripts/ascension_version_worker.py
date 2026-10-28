@@ -249,6 +249,11 @@ def generate_versions(root: Path, objective: str, branches: list[dict]) -> list[
         result = make_version(root, objective, branch, versions)
         versions.append(result)
         print("OUTPUT VERSION", index, result["status"].upper(), branch["id"], flush=True)
+        if result["status"] != "created":
+            # Never hide the real executor failure behind a generic UNAVAILABLE.
+            # This message contains no model secrets or paired hub credential.
+            reason = safe_text(result.get("verification_scope"), 350)
+            print("OUTPUT VERSION FAILURE REASON:", reason, flush=True)
     return versions
 
 

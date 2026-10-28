@@ -92,7 +92,25 @@ async function grok(objective: string): Promise<Contributor> {
   if (!text) throw new Error("Grok returned no answer.");
   return { provider: "Grok", answer: text.slice(0, 9000) };
 }
-async function build(objective: string) {
+/** A useful, readable first answer is independent of pathway JSON parsing. */
+async function firstAnswer(objective: string) {
+  if (!configured().OpenAI) throw new Error("OpenAI is not configured for the first answer.");
+  const response = await callOpenAIResponse({
+    timeoutMs: 26000,
+    system: [
+      "Give a substantive direct answer to the user's objective now.",
+      "Focus on accomplishing the objective with specific useful details, a practical structure and key requirements.",
+      "Do not return JSON or pathways yet. A separate stage will compare possible implementations.",
+      "Keep the original user's terms and meaning. Do not substitute an unrelated topic.",
+      "Never claim anything is built, tested, connected, or governed without evidence."
+    ].join(" "),
+    user: objective,
+  });
+  const answer = response.text.trim();
+  if (answer.length < 45) throw new Error("The provider returned an incomplete initial answer.");
+  return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: "OpenAI", verified: false };
+}
+async function build(objective: string, firstAnswerText = "") {
   const providerStatus = configured();
   if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
   const external = await Promise.allSettled([
@@ -120,6 +138,7 @@ async function build(objective: string) {
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",
     ].join(" "),
     user: "OBJECTIVE (user wording is authoritative):\n" + objective +
+      (firstAnswerText ? "\nINITIAL USER-FACING ANSWER TO BUILD ON (unverified):\n" + firstAnswerText.slice(0, 9000) : "") +
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
   });
   const result = parseText(response.text);
@@ -145,16 +164,19 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
       if (fetchSite === "cross-site" || (origin && new URL(origin).hostname !== publicHost))
         return json({ error: "Cross-site requests are not permitted." }, 403);
       const address = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0]?.trim() || "unknown";
-      if (!limit("global", 24) || !limit("ip:" + address, 5)) return json({ error: "Too many objectives. Try again later." }, 429);
+      if (!limit("global", 48) || !limit("ip:" + address, 12)) return json({ error: "Too many objectives. Try again later." }, 429);
       try {
         const raw = await request.text();
-        if (raw.length > 4500) return json({ error: "Objective too long." }, 413);
+        if (raw.length > 15000) return json({ error: "Objective too long." }, 413);
         const input = obj(JSON.parse(raw));
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
-        return json(await build(objective));
+        if (input["phase"] === "initial") return json(await firstAnswer(objective));
+        const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
+        return json(await build(objective, prior));
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unable to generate pathways.";
+        const message = error instanceof Error ? error.message : "Unable to generate a response.";
+        console.error("[ASCENSION answer] " + message.slice(0, 600));
         return json({ error: message.slice(0, 400) }, 503);
       }
     },

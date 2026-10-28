@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:interface": "node tests/interface.test.mjs && node tests/openai-research.test.mjs && node tests/model-jobs.test.mjs && node tests/objective-fit.test.mjs && node tests/iteration.test.mjs && node tests/concept-diagram.test.mjs && node tests/component-workbench.test.mjs && node tests/engineering-simulation.test.mjs",
+    "test:interface": "node tests/interface.test.mjs && node tests/openai-research.test.mjs && node tests/model-jobs.test.mjs && node tests/objective-fit.test.mjs && node tests/iteration.test.mjs && node tests/concept-diagram.test.mjs && node tests/component-workbench.test.mjs && node tests/engineering-simulation.test.mjs && node tests/queue-claim.test.mjs",
     "start": "node .output/server/index.mjs"
   },
   "overrides": {

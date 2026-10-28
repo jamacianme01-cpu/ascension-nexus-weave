@@ -4,8 +4,8 @@ import type { DesignPart } from "@/lib/ascension/parts-model";
 import type { RealityMode } from "./RealityViewer";
 
 const RealityWorkbench = lazy(() => import("./RealityViewer").then(module => ({ default: module.RealityViewer })));
-type ExploreView = "blueprint" | "dissect" | "cad" | "environment" | "simulation";
-type RealitySelection = { path: Pathway; mode: RealityMode; action: "dissect" | "simulate" | null };
+type ExploreView = "blueprint" | "dissect";
+type RealitySelection = { path: Pathway; mode: RealityMode; action: "dissect" | null };
 function asViewerPathway(path: Pathway): ObjectivePathway {
   return {
     id: path.id, label: path.title, summary: path.summary, steps: path.steps,
@@ -81,7 +81,7 @@ function PathwayView({ path, onView }: { path: Pathway & { blend_reason?: string
       {(["description","labels"] as const).map(mode => <button type="button" key={mode}
         aria-pressed={section === mode} onClick={() => setSection(mode)}
         className="ascension-view-choice">{mode.toUpperCase()}</button>)}
-      {(["blueprint","dissect","cad","environment","simulation"] as const).map(mode => <button
+      {(["blueprint","dissect"] as const).map(mode => <button
         type="button" key={mode} onClick={() => onView(mode)}
         className="ascension-view-choice" aria-label={"Open " + mode + " view of " + path.title}>
         {mode.toUpperCase()}</button>)}
@@ -247,8 +247,8 @@ export function IndependentEngage() {
   const selected = choice === null ? null : choices[choice];
   const openReality = (path: Pathway, view: ExploreView) => {
     stopVoice();
-    const mode: RealityMode = view === "blueprint" ? "blueprint" : view === "environment" || view === "simulation" ? "environment" : "cad";
-    const action = view === "dissect" ? "dissect" : view === "simulation" ? "simulate" : null;
+    const mode: RealityMode = view === "blueprint" ? "blueprint" : "cutaway";
+    const action = view === "dissect" ? "dissect" : null;
     setReality({ path, mode, action });
   };
   const togglePart = (part: DesignPart, field?: string) => {
@@ -356,6 +356,7 @@ export function IndependentEngage() {
         initialMode={reality.mode}
         initialAction={reality.action}
         providedParts={asNamedParts(reality.path)}
+        v1BasicViews
         onClose={() => setReality(null)}
         onNewObjective={reset}
         newObjectiveDisabled={loading}

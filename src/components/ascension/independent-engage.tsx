@@ -61,52 +61,96 @@ export function IndependentEngage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  const [firstAnswer, setFirstAnswer] = useState("");
+  const [pathwaysLoading, setPathwaysLoading] = useState(false);
+  const [pathwayError, setPathwayError] = useState("");
+  const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState(0);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
-  useEffect(() => () => { abort.current?.abort(); stopVoice(); }, []);
+  const generation = useRef(0);
+  useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
 
-  async function engage() {
-    if (!objective.trim() || loading) return;
-    const text = objective.trim();
-    setRequested(text); setLoading(true); setError(""); setResult(null); setStage("processing");
-    if (talking) say("I am exploring your objective and comparing possible pathways.");
-    const controller = new AbortController(); abort.current = controller;
+  async function generatePathways(text: string, answer: string, controller: AbortController, token: number) {
+    setPathwaysLoading(true); setPathwayError("");
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text }), signal: controller.signal,
+        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: answer.slice(0, 6000) }),
+        signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();
-      if (!response.ok) throw new Error(data.error || "The answer service could not complete this request.");
+      if (!response.ok) throw new Error(data.error || "Pathway synthesis did not complete.");
       if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend)
-        throw new Error("The engine did not deliver three approaches and a blend.");
-      setResult(data); setChoice(0); setStage("eruption");
-      if (talking) say("I found three different approaches and a fourth blended design. " + data.introduction);
-      window.setTimeout(() => view.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 180);
+        throw new Error("The answer engine did not deliver three approaches and a blend.");
+      if (generation.current !== token) return;
+      setResult(data); setChoice(0);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && generation.current === token)
+        setPathwayError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (generation.current === token) setPathwaysLoading(false);
+    }
+  }
+  async function engage() {
+    const text = objective.trim();
+    if (text.length < 3 || loading || pathwaysLoading) return;
+    const token = ++generation.current;
+    abort.current?.abort();
+    const controller = new AbortController(); abort.current = controller;
+    setRequested(text); setLoading(true); setError(""); setPathwayError("");
+    setResult(null); setFirstAnswer(""); setRefinement(""); setStage("processing");
+    if (talking) say("I am exploring your objective. I'll start with a direct answer.");
+    try {
+      const response = await fetch("/api/public/ascension/independent", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ objective: text, phase: "initial" }),
+        signal: controller.signal,
+      });
+      const data: { phase?: string; answer?: string; error?: string } = await response.json();
+      if (!response.ok) throw new Error(data.error || "The initial answer did not complete.");
+      if (data.phase !== "initial" || !data.answer?.trim())
+        throw new Error("The initial answer was not readable.");
+      if (generation.current !== token) return;
+      const answer = data.answer.trim();
+      setFirstAnswer(answer);
+      setLoading(false); setStage("eruption");
+      if (talking) say(answer);
+      window.setTimeout(() => view.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+      await generatePathways(text, answer, controller, token);
+    } catch (cause) {
+      if (!controller.signal.aborted && generation.current === token) {
         setError(cause instanceof Error ? cause.message : String(cause));
         setStage("idle");
-        if (talking) say("That objective could not be completed. The error is shown in the Book.");
       }
-    } finally { setLoading(false); }
+    } finally {
+      if (generation.current === token) setLoading(false);
+    }
+  }
+  function retryPathways() {
+    if (pathwaysLoading || !firstAnswer || !requested) return;
+    abort.current?.abort();
+    const controller = new AbortController(); abort.current = controller;
+    const token = ++generation.current;
+    void generatePathways(requested, firstAnswer, controller, token);
   }
   function buildOn(path: Pathway) {
     setObjective(requested + "\nBuild on the selected pathway: " + path.title +
       "\nPreserve these features: " + path.summary +
       "\nImprove and extend it without starting over.");
-    setResult(null); setStage("idle"); setChoice(0);
+    generation.current += 1; abort.current?.abort(); stopVoice();
+    setResult(null); setFirstAnswer(""); setPathwaysLoading(false); setPathwayError(""); setStage("idle"); setChoice(0);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function reset() {
-    abort.current?.abort(); setObjective(""); setRequested(""); setError(""); setResult(null);
+    generation.current += 1; abort.current?.abort(); setObjective(""); setRequested(""); setError(""); setResult(null);
+    setFirstAnswer(""); setRefinement(""); setPathwayError(""); setPathwaysLoading(false);
     setStage("idle"); stopVoice(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
   const choices = result ? [...result.pathways, result.blend] : [];
-  return <div className="ascension-world relative isolate mx-auto w-full max-w-none" data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}>
+  return <div className="ascension-world relative isolate mx-auto w-full max-w-none" data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={firstAnswer ? "true" : undefined}>
     <section aria-label="Engage ASCENSION" className="ascension-command">
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
@@ -119,7 +163,7 @@ export function IndependentEngage() {
           onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !loading) { event.preventDefault(); void engage(); } }}
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" disabled={loading || objective.trim().length < 3} onClick={() => void engage()}
+          <button type="button" disabled={loading || pathwaysLoading || objective.trim().length < 3} onClick={() => void engage()}
             className="min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
             {loading ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
           </button>
@@ -129,20 +173,44 @@ export function IndependentEngage() {
     </section>
     {loading && <section className="mx-auto mt-4 max-w-3xl p-5 text-center text-gold" role="status">
       Exploring your objective. Waiting for actual model answers…
-      <button type="button" className="ml-4 underline" onClick={() => { abort.current?.abort(); setLoading(false); setStage("idle"); stopVoice(); }}>Stop</button>
+      <button type="button" className="ml-4 underline" onClick={() => { generation.current += 1; abort.current?.abort(); setLoading(false); setStage("idle"); stopVoice(); }}>Stop</button>
     </section>}
-    {result && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION result">
+    {firstAnswer && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION result">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gold">ASCENSION · YOUR RESULT</p>
+        <p className="text-sm text-gold">ASCENSION · INITIAL ANSWER</p>
         <div className="flex flex-wrap gap-3 text-xs">
-          <button type="button" onClick={() => { setTalking(!talking); if (talking) stopVoice(); else say(result.introduction); }} className="rounded-full border border-gold/40 px-4 py-2 text-gold">
+          <button type="button" onClick={() => { setTalking(!talking); if (talking) stopVoice(); else say(firstAnswer); }} className="rounded-full border border-gold/40 px-4 py-2 text-gold">
             {talking ? "Mute Tree" : "Hear Tree"}
           </button>
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
         </div>
       </div>
       <p className="text-sm text-foreground/80">{requested}</p>
-      <p className="text-base leading-7">{result.introduction}</p>
+      <p className="whitespace-pre-wrap text-base leading-7">{firstAnswer}</p>
+      <p className="text-xs text-muted-foreground">Initial response by OpenAI; not a verified local-engine result.</p>
+      <div className="rounded-xl border border-primary/25 p-4">
+        <label htmlFor="initial-refinement" className="mb-2 block text-sm text-primary">Fine-tune the initial answer</label>
+        <textarea id="initial-refinement" rows={2} maxLength={900} value={refinement}
+          onChange={event => setRefinement(event.target.value)}
+          placeholder="What should ASCENSION change or improve?"
+          className="w-full rounded-lg border border-gold/30 bg-black/30 p-3 text-sm text-foreground" />
+        <button type="button" disabled={!refinement.trim()} onClick={() => {
+          generation.current += 1; abort.current?.abort(); stopVoice();
+          setObjective((requested + "\nRefine the answer with these changes: " + refinement.trim() +
+            "\nPrior answer context: " + firstAnswer.slice(0, 500)).slice(0, 2400));
+          setResult(null); setFirstAnswer(""); setPathwaysLoading(false); setPathwayError("");
+          setStage("idle"); window.scrollTo({ top: 0, behavior: "smooth" });
+        }} className="mt-3 rounded-full border border-primary/50 px-4 py-2 text-sm text-primary disabled:opacity-40">
+          BUILD ON INITIAL ANSWER
+        </button>
+      </div>
+      <h2 className="border-t border-gold/25 pt-5 text-lg text-gold">THREE PATHWAYS + FOURTH BLEND</h2>
+      {pathwaysLoading && <p role="status" className="text-sm text-foreground/75">Developing different approaches now. Your initial answer stays available.</p>}
+      {pathwayError && <div role="alert" className="rounded-xl border border-gold/40 p-4 text-sm">
+        <p>The initial answer remains available, but pathway generation failed: {pathwayError}</p>
+        <button type="button" disabled={pathwaysLoading} onClick={retryPathways} className="mt-3 rounded-full border border-gold/40 px-4 py-2 text-gold">Retry pathways</button>
+      </div>}
+      {result && <>
       <p className="text-sm text-muted-foreground">Contributing models: {result.contributors.join(", ")}.
         {result.unavailable.length > 0 ? " Not connected: " + result.unavailable.join(", ") + "." : ""}
         {result.mode !== "three-provider-synthesis" ? " These are provisional OpenAI pathways, not three independent model answers." : ""}
@@ -156,6 +224,7 @@ export function IndependentEngage() {
         </button>)}
       </div>
       <PathwayView key={choices[choice]?.id} path={choices[choice]!} onBuild={buildOn} />
+      </>}
       <p className="border-t border-border/50 pt-4 text-xs leading-6 text-muted-foreground">
         Proposed designs only. Local Meaning Elements, Spiral, Guardian, Outcome Predictor and AutoSync have not verified this hosted result.
         Earlier records are unchanged. This Supabase-free route does not yet save results across devices.

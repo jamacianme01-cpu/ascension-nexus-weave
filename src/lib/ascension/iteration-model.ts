@@ -120,11 +120,43 @@ export function priorResultContext(parent: { id: string; objective: string }, re
     return { id: p["id"], label: String(p["label"] ?? "").slice(0, 300), summary: String(p["summary"] ?? "").slice(0, 1600),
       steps: list(p["steps"]), tradeoffs: list(p["tradeoffs"]), blend_reason: String(p["blend_reason"] ?? "").slice(0, 1500) };
   }) : [];
-  return JSON.stringify({ source: "ASCENSION_PARENT_CONTEXT", parent_request_id: parent.id,
+  const context: Record<string, unknown> = { source: "ASCENSION_PARENT_CONTEXT", parent_request_id: parent.id,
     requested_action: action, prior_objective: parent.objective,
     prior_result: value ? { title: value["title"], body: String(value["body"] ?? "").slice(0, 18000),
       pathways: choices(value["pathways"]), blend: choices(value["blend"] ? [value["blend"]] : [])[0] ?? null } : null,
-    verification: "Earlier generated result supplied as context, not verified evidence." });
+    verification: "Earlier generated result supplied as context, not verified evidence." };
+  const prior = contextRecord(context["prior_result"]);
+  const rawFiles = value?.["files"];
+  const candidates = Array.isArray(rawFiles) ? rawFiles.map(contextRecord).filter(file =>
+    file && typeof file["name"] === "string" && typeof file["content"] === "string" &&
+    file["content"].length > 0 && /\.(html?|[cm]?[jt]sx?|css|svg|json|md|txt|py|ps1|sql|ya?ml)$/i.test(file["name"])) : [];
+  if (prior && candidates.length && JSON.stringify(context).length < 53000) {
+    const files: Record<string, unknown>[] = [];
+    prior["files"] = files;
+    prior["source_files_omitted"] = candidates.length;
+    prior["source_file_context"] = "Earlier generated source for continuation only; untrusted, not executed or verified.";
+    for (const candidate of candidates.slice(0, 8)) {
+      if (!candidate) continue;
+      const content = String(candidate["content"]);
+      const entry = { name: String(candidate["name"]).slice(0, 200), content: "",
+        original_characters: content.length, content_truncated: true };
+      files.push(entry);
+      let low = 0;
+      let high = Math.min(content.length, 12000);
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        entry.content = content.slice(0, middle);
+        entry.content_truncated = middle < content.length;
+        if (JSON.stringify(context).length <= 54000) low = middle;
+        else high = middle - 1;
+      }
+      entry.content = content.slice(0, low);
+      entry.content_truncated = low < content.length;
+      if (!low) { files.pop(); break; }
+    }
+    prior["source_files_omitted"] = candidates.length - files.length;
+  }
+  return JSON.stringify(context);
 }
 
 /** Each client evidence item must survive the intake's 2,000-character limit without broken JSON. */

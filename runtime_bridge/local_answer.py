@@ -31,7 +31,7 @@ def _kind(objective: str) -> str:
 
 
 def _visible(text: str) -> str:
-    text = re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.I).strip()
+    text = re.sub(r"<think>[\s\S]*?(?:</think>|$)", "", text, flags=re.I).strip()
     match = re.fullmatch(r"```(?:html|svg|markdown|md|text)?\s*([\s\S]*?)\s*```", text, flags=re.I)
     return (match.group(1) if match else text).strip()
 
@@ -78,6 +78,8 @@ def _model_response(objective: str, kind: str, evidence: list[str], constraints:
     choices = payload.get("choices") or []
     if not choices or not isinstance(choices[0], dict):
         raise RuntimeError("local model returned no answer")
+    if choices[0].get("finish_reason") == "length":
+        raise RuntimeError("local model output was cut off before completion")
     content = choices[0].get("message", {}).get("content")
     if not isinstance(content, str) or not _visible(content):
         raise RuntimeError("local model returned empty visible content")
@@ -92,16 +94,22 @@ def generate_local_draft(objective: str, evidence: list[str] | None = None,
     kind = _kind(objective)
     content = _model_response(objective, kind, evidence or [], constraints or [])
     files: list[dict[str, str]] = []
+    if kind in {"app", "drawing"} and len(content) > 100000:
+        raise RuntimeError("local artifact exceeds the source limit; refusing to truncate it")
     if kind == "app":
         if not re.search(r"<!doctype html|<html[\s>]", content, flags=re.I) or not re.search(r"<script[\s>]", content, flags=re.I):
             raise RuntimeError("model did not produce a functional HTML app")
-        files = [{"name": "index.html", "content": content[:100000]}]
+        if not re.search(r"</script\s*>", content, flags=re.I) or not re.search(r"</html\s*>", content, flags=re.I):
+            raise RuntimeError("model returned incomplete HTML source")
+        files = [{"name": "index.html", "content": content}]
         body = "A browser app draft is ready. Download index.html and open it to try the requested feature. Its behavior has not been independently tested."
         delivery_kind = "artifact"
     elif kind == "drawing":
         if not re.search(r"<svg[\s>]", content, flags=re.I) or not re.search(r"<(path|line|rect|circle|polyline|polygon|ellipse)\b", content, flags=re.I):
             raise RuntimeError("model did not produce a drawing")
-        files = [{"name": "drawing.svg", "content": content[:100000]}]
+        if not re.search(r"</svg\s*>", content, flags=re.I):
+            raise RuntimeError("model returned incomplete SVG source")
+        files = [{"name": "drawing.svg", "content": content}]
         body = "A draft drawing is ready below. It has not been independently checked against the requested dimensions or design constraints."
         delivery_kind = "artifact"
     else:

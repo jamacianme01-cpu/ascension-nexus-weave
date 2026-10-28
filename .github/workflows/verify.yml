@@ -21,5 +21,24 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun run test:interface
+      - run: bun tests/tree-voice.test.mjs
       - run: bun run build
-      - run: bunx tsc --noEmit
+      - name: TypeScript checks with file annotations
+        shell: bash
+        run: |
+          set +e
+          bunx tsc --noEmit --pretty false > "$RUNNER_TEMP/ascension-typescript.log" 2>&1
+          result=$?
+          cat "$RUNNER_TEMP/ascension-typescript.log"
+          node --input-type=module -e '
+          import { readFileSync } from "node:fs";
+          const escape = value => value.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+          const property = value => escape(value).replaceAll(":", "%3A").replaceAll(",", "%2C");
+          const lines = readFileSync(process.env.RUNNER_TEMP + "/ascension-typescript.log", "utf8").split(/\r?\n/);
+          for (const line of lines) {
+            const match = line.match(/^(.+)\((\d+),(\d+)\): error (TS\d+): (.*)$/);
+            if (match) console.log(`::error file=${property(match[1])},line=${match[2]},col=${match[3]}::${escape(match[4] + ": " + match[5])}`);
+            else if (/^error TS\d+:/.test(line)) console.log(`::error::${escape(line)}`);
+          }
+          '
+          exit "$result"

@@ -38,6 +38,15 @@ try {
   assert.equal(new Set(normalized.versions.flatMap(x => x.files.map(y => y.sha256))).size, 4);
   assert.equal(normalized.versions[3].kind, "blend");
   assert.equal(normalized.versions[3].blend_from.length, 3);
+  const blendWithSources = sources => ({ versions: [
+    ...raw.versions.slice(0, 3), { ...raw.versions[3], blend_from: sources },
+  ] });
+  for (const repeatedSources of [[id[0], id[0]], [id[0], id[1], id[1]], [id[0], id[0], id[0]]]) {
+    assert.throws(() => normalizeOutputVersions(blendWithSources(repeatedSources), id), /distinct actual governed pathways/);
+  }
+  assert.deepEqual(normalizeOutputVersions(blendWithSources([id[0], id[1]]), id).versions[3].blend_from, [id[0], id[1]]);
+  assert.deepEqual(normalizeOutputVersions(blendWithSources([...id]), id).versions[3].blend_from, id);
+  assert.throws(() => normalizeOutputVersions(blendWithSources([id[0], "not-a-governed-branch"]), id), /actual governed pathways/);
   assert.deepEqual(normalizeOutputVersions({ versions: [
     raw.versions[0], raw.versions[1],
     {...raw.versions[2], status: "unavailable", files: [], verification_scope: "CAD executor unavailable"},

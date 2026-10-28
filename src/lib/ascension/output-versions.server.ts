@@ -65,8 +65,10 @@ export function normalizeOutputVersions(
     const blendFrom = Array.isArray(v["blend_from"]) &&
       v["blend_from"].every((item) => typeof item === "string")
       ? v["blend_from"] as string[] : [];
-    if (kind === "blend" && (blendFrom.length < 2 || !blendFrom.every((x) => branches.has(x))))
-      throw new Error("Blend must cite at least two actual governed pathways");
+    const distinctBlendSources = new Set(blendFrom);
+    if (kind === "blend" && (distinctBlendSources.size < 2 ||
+        distinctBlendSources.size !== blendFrom.length || !blendFrom.every((x) => branches.has(x))))
+      throw new Error("Blend must cite at least two distinct actual governed pathways without duplicates");
     if (kind === "pathway" && blendFrom.length)
       throw new Error("Only blend can have blend_from");
     const rawFiles = v["files"];

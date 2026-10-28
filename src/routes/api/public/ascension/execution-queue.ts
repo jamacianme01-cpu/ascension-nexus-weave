@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash, timingSafeEqual } from "crypto";
 import { authorizeAscensionHub } from "@/lib/ascension/hub-auth.server";
+import { normalizeQueueClaim } from "@/lib/ascension/queue-claim";
 
 import type { Database, Json } from "@/integrations/supabase/types";
 import { assessResult, parseDelivery, type ObjectiveDelivery } from "@/lib/ascension/result-model";
@@ -132,6 +133,13 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
 
         const next = pending?.[0];
         if (!next) return json({ item: null }, 200);
+        // Validate before updating queue status: a malformed persisted submission
+        // must not be claimed and stranded by the worker.
+        try {
+          normalizeQueueClaim(next);
+        } catch {
+          return json({ error: "invalid_queued_context", message: "Evidence and constraints must be string arrays or null." }, 422);
+        }
 
         // Conditional claim so two runtime pollers cannot take the same item.
         const { data: claimed, error: claimError } = await supabaseAdmin
@@ -150,7 +158,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         if (claimError) return json({ error: "claim_failed" }, 500);
         if (!claimed) return json({ item: null }, 200);
 
-        return json({ item: claimed }, 200);
+        return json({ item: normalizeQueueClaim(claimed) }, 200);
       },
 
       POST: async ({ request }) => {

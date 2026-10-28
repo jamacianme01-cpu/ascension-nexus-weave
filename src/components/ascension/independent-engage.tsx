@@ -173,7 +173,7 @@ export function IndependentEngage() {
     setRefinement("");
     setChoice(null);
     setStage("processing");
-    if (talking) say("Exploring your objective.");
+    if (talking) say("Welcome. Let’s explore what’s possible.");
     try {
       // Internal reasoning only: never narrate or render this essay to the user.
       const response = await fetch("/api/public/ascension/independent", {
@@ -281,7 +281,7 @@ export function IndependentEngage() {
         <div className="flex flex-wrap gap-3 text-xs">
           <button type="button" onClick={() => {
             if (talking) stopVoice();
-            else say(selected ? selected.title + ". " + selected.summary : "Three pathways and a blend are ready.");
+            else say(selected ? "Let’s take a closer look at " + selected.title + "." : "Your pathways are ready. Choose one to explore.");
             setTalking(!talking);
           }} className="rounded-full border border-gold/40 px-4 py-2 text-gold">
             {talking ? "Mute Tree" : "Hear Tree"}
@@ -296,7 +296,7 @@ export function IndependentEngage() {
             (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
           onClick={() => {
             setChoice(index); setRefinement("");
-            if (talking) say("Let’s explore " + p.title + ".");
+            if (talking) say("There’s potential here. Let’s explore " + p.title + ".");
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>

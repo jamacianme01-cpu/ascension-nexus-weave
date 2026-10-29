@@ -14,14 +14,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
+          node-version: 22
+          cache: npm
+      - run: npm install
       - name: Install browser testing tools in disposable runner only
         run: |
-          bun add --no-save playwright
-          bunx playwright install --with-deps chromium
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
       - name: Test real React voice controls with simulated browser speech
         shell: bash
         run: |
@@ -75,7 +76,7 @@ jobs:
             await field.evaluate(element => element.setSelectionRange(element.value.length, element.value.length));
             await page.getByRole("button", { name: "Speak", exact: true }).click();
             await page.evaluate(() => {
-              const result = [{ transcript: "a telescope" }]; result.isFinal = true;
+              const result = [{ transcript: "a telescope" }); result.isFinal = true;
               window.__recognition.onresult({ results: [result] });
             });
             await page.waitForFunction(() => document.querySelector("textarea[maxlength='4000']")?.value === "a telescope");
@@ -104,7 +105,7 @@ jobs:
             console.log("Browser passed: opt-in, dictation review, React-controlled insertion, no automatic submission, selected-text narration, Stop, close cleanup, denied microphone.");
           } finally { await browser.close(); }
           TEST
-          bunx vite --config tree-voice-ci.vite.mjs > "$RUNNER_TEMP/tree-voice-vite.log" 2>&1 &
+          npx vite --config tree-voice-ci.vite.mjs > "$RUNNER_TEMP/tree-voice-vite.log" 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
           ready=0

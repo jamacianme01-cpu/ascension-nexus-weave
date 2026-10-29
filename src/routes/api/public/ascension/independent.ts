@@ -197,10 +197,58 @@ async function build(objective: string, firstAnswerText = "") {
     persistence: "This hosted route does not use Supabase and does not persist objectives on the server.",
   };
 }
+
+/** Produce a real image for the selected pathway, never substitute diagram boxes.
+ * A separate owner-controlled switch prevents surprise image-generation charges.
+ */
+async function picture(objective: string, value: Record<string, unknown>) {
+  if (process.env["ASCENSION_ALLOW_PAID_IMAGES"] !== "true")
+    throw new Error("Real invention image generation is not enabled by the owner. No image credits were charged.");
+  const apiKey = process.env["OPENAI_API_KEY"]?.trim();
+  if (!apiKey || !configured().OpenAI)
+    throw new Error("The configured image provider is unavailable.");
+  const title = String(value["title"] ?? "").trim().slice(0, 140);
+  const summary = String(value["summary"] ?? "").trim().slice(0, 1500);
+  const parts = Array.isArray(value["parts"]) ? value["parts"].slice(0, 12).map(raw => {
+    const p = obj(raw);
+    return [p["name"], p["purpose"], p["location"]].filter(x => typeof x === "string").join(": ").slice(0, 250);
+  }) : [];
+  if (title.length < 3 || summary.length < 35) throw new Error("A complete selected pathway is required.");
+  const prompt = [
+    "Create an accurate high-quality conceptual product illustration of the ACTUAL invention described below.",
+    "One complete, fully assembled invention as a coherent object, shown clearly from a three-quarter view.",
+    "The depicted subject must match the user's actual objective and selected approach, not generic boxes, a CORE diagram, or an abstract flowchart.",
+    "For non-physical objectives, make an accurate, recognizable domain-specific illustration; do not fabricate hardware.",
+    "No text, labels, numbers, watermarks, interfaces, exploded pieces or unrelated objects. Neutral background.",
+    "User objective: " + objective.slice(0, 800),
+    "Selected pathway: " + title,
+    "Description: " + summary,
+    "Required components and relationships: " + parts.join("; ").slice(0, 1700),
+    "This is illustrative conceptual artwork, not a verified physical design or CAD model."
+  ].join("\n");
+  const response = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    signal: AbortSignal.timeout(115000),
+    headers: { "content-type": "application/json", authorization: "Bearer " + apiKey },
+    body: JSON.stringify({
+      model: process.env["ASCENSION_OPENAI_IMAGE_MODEL"]?.trim() || "gpt-image-1-mini",
+      size: "1024x1024", quality: "low", n: 1, output_format: "png", prompt,
+    }),
+  });
+  if (!response.ok) throw new Error("Invention image service returned HTTP " + response.status);
+  const payload = obj(await response.json());
+  const images = Array.isArray(payload["data"]) ? payload["data"] : [];
+  const image = obj(images[0])["b64_json"];
+  if (typeof image !== "string" || image.length < 1000)
+    throw new Error("The image provider did not return an invention picture.");
+  return { phase: "picture", image_url: "data:image/png;base64," + image, verified: false,
+    description: "Concept illustration only; no physical model or CAD verification." };
+}
+
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false, note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+      governed_runtime_connected: false, picture_generation_enabled: process.env["ASCENSION_ALLOW_PAID_IMAGES"] === "true", note: "Only configured providers can contribute. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");
@@ -216,6 +264,11 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
         if (input["phase"] === "initial") return json(await firstAnswer(objective));
+        if (input["phase"] === "picture") {
+          if (!limit("image-ip:" + address, 4) || !limit("image-global", 24))
+            return json({ error: "Image generation limit reached. No credits charged." }, 429);
+          return json(await picture(objective, obj(input["pathway"])));
+        }
         const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
         return json(await build(objective, prior));
       } catch (error) {

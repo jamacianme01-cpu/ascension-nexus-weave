@@ -1,0 +1,52 @@
+.reality-operation-stage--with-model .reality-operation-node strong {font-size:12px;}
+@media (max-width:760px) {
+ .reality-operation-stage,.reality-operation-stage--with-model {
+  left:8px;right:8px;top:8px;bottom:43%;width:auto;max-height:none;
+  gap:5px;padding:9px;
+ }
+ .reality-operation-flow {grid-template-columns:minmax(0,1fr) 20px minmax(0,1.2fr);gap:4px;}
+ .reality-operation-node {padding:6px;}
+ .reality-operation-node strong,.reality-operation-stage--with-model .reality-operation-node strong {font-size:11px;}
+ .reality-operation-eyebrow {font-size:9px;}
+ .reality-operation-stage p {font-size:10px;}
+}
+@media (prefers-reduced-motion:reduce) {
+ .reality-operation-pulse {transition:none;}
+}
+
+/* Keep playback transport visible at the top of the simulation, not beneath
+   long phase descriptions or the external zoom / revision toolbars. */
+.reality-demonstration .reality-demo-actions {
+  position:sticky; top:0; z-index:7;
+  background:var(--popover);
+  padding:5px 0 8px;
+  border-bottom:1px solid var(--border);
+}
+@media (max-width:760px) {
+  .reality-demonstration {
+    bottom:4px; max-height:56%;
+    left:8px;right:8px; overflow-y:auto;
+  }
+  .reality-operation-stage,
+  .reality-operation-stage--with-model { bottom:59%; }
+  .reality-demonstration .reality-demo-actions {
+    grid-template-columns:auto auto minmax(60px,1fr);
+    gap:4px; align-items:center;
+  }
+  .reality-demonstration .reality-demo-actions button {
+    min-height:38px; padding:4px 7px;
+  }
+  .reality-demonstration .reality-demo-actions input {min-width:60px;}
+  .reality-demonstration .reality-demo-actions output {
+    grid-column:1/-1; font-size:10px;
+  }
+}
+
+/* Physics readout uses the existing SIMULATE workspace, not a fake result panel. */
+.reality-physics { display:grid; gap:7px; padding:8px; border:1px solid var(--border); border-radius:8px; background:var(--void); }
+.reality-physics > strong { color:var(--gold); font-size:11px; letter-spacing:.04em; }
+.reality-physics p, .reality-physics small { font-size:11px; line-height:1.4; margin:0; }
+.reality-physics-inputs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
+.reality-physics-inputs label { display:grid; gap:3px; font-size:11px; min-width:0; }
+.reality-physics-inputs input { min-width:0; width:100%; font-size:13px; padding:6px; color:var(--foreground); background:var(--background); border:1px solid var(--border); border-radius:5px; }
+.reality-physics-results { display:grid; gap:4px; font-size:12px; }

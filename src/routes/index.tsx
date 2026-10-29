@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Engage } from "@/components/ascension/engage";
+import { IndependentEngage } from "@/components/ascension/independent-engage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/")({
     ],
   }),
   ssr: false,
-  component: Engage,
+  component: IndependentEngage,
 });

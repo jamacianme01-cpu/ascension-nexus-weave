@@ -24,4 +24,3 @@
  .reality-navigation { grid-template-columns:minmax(0,1fr) auto; }
  .reality-navigation .reality-title { grid-column:1/-1;grid-row:1; }
  .reality-navigation .reality-back { grid-row:2; }
-}

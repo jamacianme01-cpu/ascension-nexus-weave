@@ -45,52 +45,9 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-
-/** V1 component diagram: indicative arrangement only; no fabricated measured geometry. */
-function ComponentDiagram({ parts, mode, selected, onSelect }: {
-  parts: Part[]; mode: "blueprint" | "dissect" | "exploded"; selected: string | null; onSelect: (part: Part) => void;
-}) {
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  useEffect(() => { setZoom(1); setRotation(0); }, [parts, mode]);
-  const count = Math.min(parts.length, 12);
-  const nodes = parts.slice(0, count).map((part, index) => {
-    const angle = (index * Math.PI * 2) / Math.max(count, 1) - Math.PI / 2;
-    const radius = mode === "exploded" ? 170 : mode === "dissect" ? 130 : 112;
-    return { part, x: 250 + Math.cos(angle) * radius, y: 210 + Math.sin(angle) * radius };
-  });
-  return <div className="rounded-xl border border-gold/30 bg-[#08192a] p-3" aria-label="Interactive conceptual component diagram">
-    <div className="mb-2 flex flex-wrap gap-2">
-      <button type="button" onClick={() => setZoom(v => Math.min(2.5, +(v + .25).toFixed(2)))} className="rounded border border-gold/40 px-3 py-1" aria-label="Zoom in">Zoom +</button>
-      <button type="button" onClick={() => setZoom(v => Math.max(.5, +(v - .25).toFixed(2)))} className="rounded border border-gold/40 px-3 py-1" aria-label="Zoom out">Zoom −</button>
-      <button type="button" onClick={() => setRotation(v => v - 30)} className="rounded border border-gold/40 px-3 py-1">Rotate left</button>
-      <button type="button" onClick={() => setRotation(v => v + 30)} className="rounded border border-gold/40 px-3 py-1">Rotate right</button>
-      <button type="button" onClick={() => { setZoom(1); setRotation(0); }} className="rounded border border-gold/40 px-3 py-1">Reset view</button>
-    </div>
-    <svg viewBox="0 0 500 420" className="h-auto w-full" role="img" aria-label={mode + " view of " + count + " conceptual components"}>
-      <defs><pattern id="ascension-v1-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#54738b" strokeOpacity=".25" strokeWidth="1"/></pattern></defs>
-      <rect width="500" height="420" fill="url(#ascension-v1-grid)"/>
-      <g transform={`translate(250 210) rotate(${rotation}) scale(${zoom}) translate(-250 -210)`}>
-        {nodes.map(({part,x,y},i) => <g key={i}>
-          <line x1="250" y1="210" x2={x} y2={y} stroke="#7b9fb1" strokeDasharray={mode === "exploded" ? "5 5" : undefined} opacity=".65" />
-          <g onClick={() => onSelect(part)} className="cursor-pointer" role="button" tabIndex={0} aria-label={"Inspect " + part.name}
-            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(part); } }}>
-            <rect x={x-40} y={y-22} width="80" height="44" rx="7" fill={selected === part.name ? "#84631c" : "#143b50"} stroke={selected === part.name ? "#ffdf84" : "#8ac8d5"} strokeWidth="2"/>
-            <text x={x} y={y+5} fontSize="15" fill="#fff" textAnchor="middle">{i+1}</text>
-          </g>
-        </g>)}
-        <circle cx="250" cy="210" r="31" fill="#0c2940" stroke="#e1bf68" strokeWidth="2" />
-        <text x="250" y="215" fill="#f5db9f" fontSize="12" textAnchor="middle">CORE</text>
-      </g>
-    </svg>
-    <p className="text-xs text-muted-foreground">Conceptual component layout only. Numbers correspond to the component list; positions and dimensions have not been physically verified.</p>
-  </div>;
-}
-
 function PathwayView({ path }: { path: Pathway & { blend_reason?: string } }) {
   const [part, setPart] = useState<Part | null>(null);
-  const [mode, setMode] = useState<"blueprint" | "dissect" | "exploded">("blueprint");
-  useEffect(() => { setPart(null); setMode("blueprint"); }, [path.id]);
+  useEffect(() => setPart(null), [path.id]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
@@ -99,14 +56,12 @@ function PathwayView({ path }: { path: Pathway & { blend_reason?: string } }) {
     <ol className="mb-5 list-decimal space-y-2 pl-5 text-sm leading-6">
       {path.steps.map((step, i) => <li key={i}>{step}</li>)}
     </ol>
-    {path.parts.length > 0 && <div className="mb-4 flex flex-wrap gap-2">{(["blueprint", "dissect", "exploded"] as const).map(view => <button type="button" key={view} onClick={() => setMode(view)} aria-pressed={mode === view} className={"rounded-full border px-4 py-2 text-sm " + (mode === view ? "border-gold bg-gold/15 text-gold" : "border-gold/30")}>{view === "exploded" ? "Exploded / Imploded" : view === "dissect" ? "Dissect" : "Blueprint"}</button>)}</div>}
-    {path.parts.length > 0 && <ComponentDiagram parts={path.parts} mode={mode} selected={part?.name ?? null} onSelect={setPart} />}
-    {path.parts.length > 0 && <div className="mb-5 mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    {path.parts.length > 0 && <div className="mb-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <div className="space-y-2" aria-label="Select components">
         <h4 className="text-sm font-semibold text-primary">Components — select to inspect</h4>
         {path.parts.map((p, i) => <button type="button" key={i} onClick={() => setPart(p)}
           className="block w-full rounded-lg border border-gold/30 bg-black/25 p-3 text-left text-sm hover:border-gold">
-          {i + 1}. {p.name}</button>)}
+          {p.name}</button>)}
       </div>
       <div className="min-h-40 rounded-xl border border-primary/25 bg-[#08192a] p-5">
         {part ? <><h4 className="mb-2 text-gold">{part.name}</h4><p className="mb-3 text-sm">{part.purpose}</p>

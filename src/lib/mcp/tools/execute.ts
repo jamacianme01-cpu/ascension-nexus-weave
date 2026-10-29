@@ -1,6 +1,6 @@
-import { defineTool } from "@lovable.dev/mcp-js";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
-import { supabaseForUser } from "../supabase";
+import { submitRequest } from "../execution-queue";
 
 /**
  * Objective intake. This tool does NOT execute the ASCENSION cycle and cannot:
@@ -40,22 +40,13 @@ export default defineTool({
       return { content: [{ type: "text", text: "objective must not be empty." }], isError: true };
     }
 
-    const supabase = supabaseForUser(ctx);
-    const { data, error } = await supabase
-      .from("ascension_execution_requests")
-      .insert({
-        submitted_by: ctx.getUserId(),
-        submitted_via: "mcp",
-        objective: trimmed.slice(0, 4000),
-        evidence: evidence?.length ? evidence.map((item) => item.slice(0, 2000)) : null,
-        constraints: constraints?.length ? constraints.map((item) => item.slice(0, 500)) : null,
-      })
-      .select("id, status, objective, evidence, constraints, created_at")
-      .single();
-
-    if (error) {
-      return { content: [{ type: "text", text: error.message }], isError: true };
-    }
+    const data = submitRequest({
+      submitted_by: ctx.getUserId() ?? "unknown",
+      submitted_via: "mcp",
+      objective: trimmed.slice(0, 4000),
+      evidence: evidence?.length ? evidence.map((item) => item.slice(0, 2000)) : null,
+      constraints: constraints?.length ? constraints.map((item) => item.slice(0, 500)) : null,
+    });
 
     const body = {
       accepted: true,

@@ -1,8 +1,8 @@
-import { defineTool } from "@lovable.dev/mcp-js";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { observation, published } from "../ascension-published";
 
-export default defineTool({
+export default defineTool({{
   name: "ascension_knowledgeverse",
   title: "Knowledgeverse",
   description:
@@ -15,7 +15,7 @@ export default defineTool({
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: ({ include_knowledge_forms }) =>
-    observation({
+    observation({{
       semantic: published.semantic,
       world_model: published.worldModel,
       entity_ids: Object.keys(published.entities),

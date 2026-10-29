@@ -1,4 +1,4 @@
-import { defineTool } from "@lovable.dev/mcp-js";
+import { defineTool } from "../define-tool";
 import { observation, published } from "../ascension-published";
 
 export default defineTool({

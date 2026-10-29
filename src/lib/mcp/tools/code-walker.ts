@@ -1,8 +1,8 @@
-import { defineTool } from "@lovable.dev/mcp-js";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
-import { supabaseForUser } from "../supabase";
+import { submitRequest } from "../execution-queue";
 
-const permission = z.enum(["read", "search", "write", "create", "execute", "control"]);
+const permission = z.enum(["read", "search", "write", "create", "execute", "control"]));
 
 export default defineTool({
   name: "ascension_code_walker",
@@ -61,22 +61,13 @@ export default defineTool({
       "Do not call the capability added until actual runtime evidence is observed and AutoSync/governed verification accepts it.",
     ];
 
-    const supabase = supabaseForUser(ctx);
-    const { data, error } = await supabase
-      .from("ascension_execution_requests")
-      .insert({
-        submitted_by: ctx.getUserId(),
-        submitted_via: "mcp",
-        objective: objective.slice(0, 4000),
-        evidence: submittedEvidence,
-        constraints,
-      })
-      .select("id, status, objective, evidence, constraints, created_at")
-      .single();
-
-    if (error) {
-      return { content: [{ type: "text", text: error.message }], isError: true };
-    }
+    const data = submitRequest({
+      submitted_by: ctx.getUserId() ?? "unknown",
+      submitted_via: "mcp",
+      objective: objective.slice(0, 4000),
+      evidence: submittedEvidence,
+      constraints,
+    });
 
     const body = {
       accepted: true,
@@ -88,7 +79,7 @@ export default defineTool({
       desired_capability: capabilityText,
       granted_permissions: granted,
       submission: data,
-      note: "The request is queued for the authorized ASCENSION runtime. This web layer does not access the device, modify files, launch the target, or claim verification. Follow the request with ascension_run_status.",
+      note: "The request is queued for the authorized ASCENSION runtime. This web layer does not access the device, modify files, launch the target, or claim verification. Follow the request with ascension_run_status",
     };
     const text = JSON.stringify(body, null, 2);
     return { content: [{ type: "text", text }], structuredContent: JSON.parse(text) as never };

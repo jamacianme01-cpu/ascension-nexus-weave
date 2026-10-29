@@ -1,6 +1,6 @@
-import { defineTool } from "@lovable.dev/mcp-js";
+import { defineTool } from "../define-tool";
 import { z } from "zod";
-import { supabaseForUser } from "../supabase";
+import { getRequest, listRequests } from "../execution-queue";
 
 /**
  * Read-only status of the operator's own submissions. Every field here is
@@ -32,25 +32,22 @@ export default defineTool({
       };
     }
 
-    const supabase = supabaseForUser(ctx);
-    const columns =
-      "id, objective, evidence, constraints, status, stage, claimed_at, claimed_by, completed_at, runtime_revision, transition_id, accepted_delta, guardian_verdict, outcome_status, result, error, created_at, updated_at";
-
-    const query = supabase.from("ascension_execution_requests").select(columns);
-    const { data, error } = request_id
-      ? await query.eq("id", request_id).limit(1)
-      : await query
-          .order("created_at", { ascending: false })
-          .limit(Math.min(Math.max(limit ?? 10, 1), 50));
-
-    if (error) {
-      return { content: [{ type: "text", text: error.message }], isError: true };
+    if (request_id) {
+      const data = getRequest(request_id);
+      const body = {
+        read_only: true,
+        note: "Status fields are written only by the governed ASCENSION runtime. A submission that is still 'queued' has not been seen by the runtime yet.",
+        items: data ? [data] : [],
+      };
+      const text = JSON.stringify(body, null, 2);
+      return { content: [{ type: "text", text }], structuredContent: JSON.parse(text) as never };
     }
 
+    const data = listRequests({ userId: ctx.getUserId() ?? undefined, limit });
     const body = {
       read_only: true,
       note: "Status fields are written only by the governed ASCENSION runtime. A submission that is still 'queued' has not been seen by the runtime yet.",
-      items: data ?? [],
+      items: data,
     };
     const text = JSON.stringify(body, null, 2);
     return { content: [{ type: "text", text }], structuredContent: JSON.parse(text) as never };

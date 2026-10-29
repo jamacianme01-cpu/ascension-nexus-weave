@@ -1,4 +1,4 @@
-import { defineTool, ToolError } from "@lovable.dev/mcp-js";
+import { defineTool, ToolError } from "../define-tool";
 import { z } from "zod";
 import { observation, published } from "../ascension-published";
 

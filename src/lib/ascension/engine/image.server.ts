@@ -5,23 +5,30 @@
  * an explicitly authorized image provider, persisted to ASCENSION storage, and its
  * durable URL becomes the Hunyuan3D model job's source_image_url. Failures are
  * returned verbatim; nothing here substitutes placeholder geometry.
+ *
+ * Independent of Lovable, Z.AI, and Supabase. Providers: OpenAI when
+ * ASCENSION_ALLOW_OPENAI_AI=true, otherwise ASCENSION_IMAGE_ENDPOINT.
  */
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1";
-const IMAGE_MODEL = "openai/gpt-image-2.5-sunburst";
 const BUCKET = "ascension-models";
 
 export interface ImageProviderInfo {
-  provider: "lovable";
+  provider: "openai" | "custom";
   model: string;
 }
 
 /** Never bill image generation implicitly when a visitor opens a pathway. */
 export function imageProvider(): ImageProviderInfo | null {
-  return process.env["ASCENSION_ALLOW_PAID_IMAGES"] === "true" &&
-    process.env["LOVABLE_API_KEY"]?.trim()
-    ? { provider: "lovable", model: IMAGE_MODEL }
-    : null;
+  if (process.env["ASCENSION_ALLOW_PAID_IMAGES"] !== "true") return null;
+  const openaiKey = process.env["OPENAI_API_KEY"]?.trim();
+  if (openaiKey && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true") {
+    return { provider: "openai", model: process.env["ASCENSION_IMAGE_MODEL"]?.trim() || "dall-e-3" };
+  }
+  const endpoint = process.env["ASCENSION_IMAGE_ENDPOINT"]?.trim();
+  if (endpoint) {
+    return { provider: "custom", model: process.env["ASCENSION_IMAGE_MODEL"]?.trim() || "custom" };
+  }
+  return null;
 }
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -31,62 +38,78 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-async function persist(path: string, bytes: Uint8Array): Promise<string> {
+async function persist(storagePath: string, bytes: Uint8Array): Promise<string> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  // The bucket accepts GLB and octet-stream; the Hunyuan worker validates PNG bytes.
-  const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, bytes, {
+  const { error } = await supabaseAdmin.storage.from(BUCKET).upload(storagePath, bytes, {
     contentType: "application/octet-stream",
     upsert: true,
   });
   if (error) throw new Error(`reference image storage failed: ${error.message}`);
-  return supabaseAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+  return supabaseAdmin.storage.from(BUCKET).getPublicUrl(storagePath).data.publicUrl;
 }
 
 /** Generate and persist one reference image. Throws the real provider/storage error. */
 export async function generateConceptImage(prompt: string, storagePath: string): Promise<string> {
   if (!imageProvider())
     throw new Error("Automatic paid image generation is disabled. Use an existing approved ASCENSION source image instead.");
-  const key = process.env["LOVABLE_API_KEY"]?.trim();
-  if (!key)
-    throw new Error("Lovable AI is not available to this deployment (LOVABLE_API_KEY missing).");
-  // One total deadline covers all attempts; temporary gateway failures get
-  // two retries without creating an endless or unbounded generation loop.
+  const info = imageProvider()!;
   const signal = AbortSignal.timeout(120_000);
   let response: Response | undefined;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    response = await fetch(`${GATEWAY}/images/generations`, {
-      method: "POST",
-      signal,
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: IMAGE_MODEL,
-        prompt: prompt.replace(/\s+/g, " ").trim().slice(0, 3800),
-        size: "1024x1024",
-        quality: "medium",
-      }),
-    });
-    if (response.ok) break;
-    const detail = (await response.text().catch(() => "")).slice(0, 800);
-    if (![502, 503, 504].includes(response.status) || attempt === 2) {
-      throw new Error(`Lovable AI image generation returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+
+  if (info.provider === "openai") {
+    const key = process.env["OPENAI_API_KEY"]!.trim();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        signal,
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: info.model,
+          prompt: prompt.replace(/\s+/g, " ").trim().slice(0, 3800),
+          size: "1024x1024",
+          response_format: "b64_json",
+        }),
+      });
+      if (response.ok) break;
+      const detail = (await response.text().catch(() => "")).slice(0, 800);
+      if (response.status !== 429 && response.status < 500 || attempt === 2) {
+        throw new Error(`OpenAI image generation returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+  } else {
+    const endpoint = process.env["ASCENSION_IMAGE_ENDPOINT"]!.trim();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = process.env["ASCENSION_IMAGE_TOKEN"]?.trim();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(endpoint, {
+        method: "POST",
+        signal,
+        headers,
+        body: JSON.stringify({ model: info.model, prompt: prompt.replace(/\s+/g, " ").trim().slice(0, 3800) }),
+      });
+      if (response.ok) break;
+      const detail = (await response.text().catch(() => "")).slice(0, 800);
+      if ((response.status < 500 && response.status !== 429) || attempt === 2) {
+        throw new Error(`Custom image generation returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+    }
   }
-  if (!response) throw new Error("Lovable AI image generation returned no response.");
+
+  if (!response) throw new Error("Image generation returned no response.");
 
   const payload = (await response.json().catch(() => null)) as {
     data?: Array<{ b64_json?: unknown }>;
   } | null;
   const b64 = payload?.data?.[0]?.b64_json;
   if (typeof b64 !== "string" || b64.length < 100)
-    throw new Error("Lovable AI image generation returned no image data.");
+    throw new Error("Image generation returned no image data");
   return persist(storagePath, base64ToBytes(b64));
 }
 
-/**
- * Generate reference images for pathways (bounded concurrency). Returns the
- * durable URLs plus the real error for every pathway that failed.
- */
+/** Generate reference images for pathways (bounded concurrency). */
 export async function generatePathwayImages(
   objective: string,
   pathways: Array<{
@@ -96,7 +119,7 @@ export async function generatePathwayImages(
     spiral_form?: string | null;
   }>,
   requestId = "unscoped",
-): Promise<{ urls: Map<string, string>; errors: string[] }> {
+): Promise<{ urls: Map<string, string>; errors: string[] } {
   const urls = new Map<string, string>();
   const errors: string[] = [];
   if (!pathways.length) return { urls, errors };
@@ -105,8 +128,8 @@ export async function generatePathwayImages(
     return { urls, errors };
   }
   const queue = [...pathways];
-  const worker = async (): Promise<void> => {
-    for (;;) {
+  const worker = async () => {
+    for (;;)
       const pathway = queue.shift();
       if (!pathway) return;
       const safeId = pathway.id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80);
@@ -119,9 +142,7 @@ export async function generatePathwayImages(
           ),
         );
       } catch (cause) {
-        errors.push(`${pathway.label}: ${cause instanceof Error ? cause.message : String(cause)}`);
-      }
-    }
+        errors.push(`${pathway.label}: ${cause instanceof Error ? cause.message : String(cause)}`)}
   };
   await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker));
   return { urls, errors };
@@ -155,4 +176,3 @@ export function conceptImagePrompt(
     "Plain uniform light-grey background, soft even studio lighting, no text, no labels, no watermark, no unrelated objects.",
   ].join(" ");
 }
-

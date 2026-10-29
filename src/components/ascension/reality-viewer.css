@@ -1,3 +1,15 @@
-/* Restored full stylesheet via split import — identical cascade to prior single file */
-@import "./reality-viewer-a.css";
-@import "./reality-viewer-b.css";
+/* Restored full stylesheet as ordered imports (same cascade as pre-break single file) */
+@import "./reality-viewer-part0.css";
+@import "./reality-viewer-part1.css";
+@import "./reality-viewer-part2.css";
+@import "./reality-viewer-part3.css";
+@import "./reality-viewer-part4.css";
+@import "./reality-viewer-part5.css";
+@import "./reality-viewer-part6.css";
+@import "./reality-viewer-part7.css";
+@import "./reality-viewer-part8.css";
+@import "./reality-viewer-part9.css";
+@import "./reality-viewer-part10.css";
+@import "./reality-viewer-part11.css";
+@import "./reality-viewer-part12.css";
+@import "./reality-viewer-part13.css";

@@ -1,9 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { lovable } from "@/integrations/lovable/index";
-import { supabase } from "@/integrations/supabase/client";
-
 /** Only same-origin relative paths may be used as a post-sign-in destination. */
 function safeNext(value: unknown): string {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
@@ -45,46 +42,16 @@ function AuthPage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) void navigate({ to: next });
-    });
+    // Guest path does not require external auth.
+    void navigate({ to: next });
   }, [navigate, next]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    setNotice(null);
-    if (mode === "signup") {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}${next}` },
-      });
-      setBusy(false);
-      if (signUpError) return setError(signUpError.message);
-      setNotice("Account created. If confirmation is required, check your email, then sign in.");
-      setMode("signin");
-      return;
-    }
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    setNotice("Authentication is not required for the public ASCENSION experience.");
     setBusy(false);
-    if (signInError) return setError(signInError.message);
-    void navigate({ to: next });
-  }
-
-  async function google() {
-    setBusy(true);
-    setError(null);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth?next=${encodeURIComponent(next)}`,
-    });
-    if (result.error) {
-      setBusy(false);
-      setError(result.error.message ?? "Google sign-in failed.");
-      return;
-    }
-    if (result.redirected) return;
     void navigate({ to: next });
   }
 
@@ -95,8 +62,7 @@ function AuthPage() {
         Sign in to the governed publication
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        The public surfaces show demo state. Signed-in access reads the mirrored LIVE_GOVERNED
-        publication and your own saved observations. Read-only, always.
+        The public surfaces show demo state. Signed-in access is optional.
       </p>
 
       <div className="glass-inset mt-6 rounded-md px-4 py-5 sm:px-6">
@@ -173,17 +139,6 @@ function AuthPage() {
             {busy ? "Working…" : mode === "signin" ? "Enter" : "Create account"}
           </button>
         </form>
-
-        <div className="gold-rule my-5 h-px opacity-50" />
-
-        <button
-          type="button"
-          onClick={() => void google()}
-          disabled={busy}
-          className="min-h-10 w-full rounded-sm border border-border px-4 py-2 font-mono text-[0.7rem] tracking-[0.22em] text-muted-foreground uppercase transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50"
-        >
-          Continue with Google
-        </button>
       </div>
     </section>
   );

@@ -1239,7 +1239,7 @@ export function Engage() {
 
   const openTreeReality = (
     pathway: ObjectiveDelivery["pathways"][number],
-    mode: RealityMode = "cutaway",
+    mode: RealityMode = "blueprint",
   ) => {
     setTreeChoiceId(pathway.id);
     setReality({ id: pathway.id, mode });

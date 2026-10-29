@@ -1,0 +1,44 @@
+@media (max-width: 760px) {
+  .reality-model-stage[data-split="true"] .reality-dissection { right:0; bottom:45%; }
+  .reality-model-stage[data-split="true"] .reality-viewport { left:0; top:55%; border-left:0; border-top:1px solid var(--border); }
+}
+@media (max-width: 760px) { .reality-screen[data-sidebar="open"] .reality-footer { z-index:30; } }
+
+/* Simulation stays visible above the playback transport, including on mobile.
+   A temporal, objective-derived sequence is not presented as verified physics. */
+.reality-operation-stage {
+  position:absolute; z-index:4; left:clamp(10px,3vw,36px); right:clamp(10px,3vw,36px);
+  top:clamp(8px,5%,28px); bottom:44%;
+  display:flex; flex-direction:column; justify-content:center; gap:10px;
+  min-height:0; padding:clamp(12px,2vw,24px); overflow:auto; pointer-events:none;
+  background:linear-gradient(120deg,rgba(5,22,37,.94),rgba(13,45,63,.86));
+  border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 8px 28px rgba(0,0,0,.28);
+}
+.reality-operation-eyebrow { color:var(--gold); letter-spacing:.06em; font-size:11px; }
+.reality-operation-flow {
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(28px,12%) minmax(0,1.3fr);
+  align-items:center; gap:8px;
+}
+.reality-operation-node {
+  min-width:0; border:1px solid var(--border); border-radius:8px;
+  padding:12px; background:var(--void);
+}
+.reality-operation-node small {display:block; font-size:10px; color:var(--muted-foreground); margin-bottom:5px;}
+.reality-operation-node strong {display:block; font-size:clamp(13px,1.6vw,18px); line-height:1.3; overflow-wrap:anywhere;}
+.reality-operation-node--active {border-color:var(--photon); box-shadow:0 0 18px rgba(41,210,220,.16);}
+.reality-operation-track {position:relative; height:4px; background:var(--border);}
+.reality-operation-pulse {
+ position:absolute; top:50%; transform:translate(-50%,-50%);
+ width:17px; height:17px; border-radius:50%; background:var(--photon);
+ box-shadow:0 0 0 5px rgba(41,210,220,.13),0 0 20px var(--photon);
+ transition:left 50ms linear;
+}
+.reality-operation-stage progress {height:9px; width:100%; accent-color:var(--photon);}
+.reality-operation-stage p {margin:0; font-size:12px; overflow-wrap:anywhere;}
+.reality-operation-stage--with-model {
+ left:10px; right:auto; width:min(600px,58%); top:10px;
+ bottom:auto; max-height:calc(100% - 205px); padding:12px; gap:6px;
+ background:rgba(5,22,37,.9);
+}
+.reality-operation-stage--with-model .reality-operation-node {padding:7px;}

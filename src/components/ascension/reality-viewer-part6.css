@@ -1,0 +1,52 @@
+.reality-view-controls {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.reality-view-controls button {
+  min-width: 0;
+  padding: 10px 6px;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .reality-header { padding: 8px 10px; gap: 8px; }
+  .reality-navigation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
+  }
+  .reality-navigation .reality-title {
+    order: 0;
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .reality-navigation button { padding: 8px; font-size: 10px; }
+  .reality-title h1,
+  .reality-pathway-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .reality-view-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .reality-view-controls .reality-parts-tab { grid-row: auto; grid-column: auto; }
+  .reality-view-controls button { font-size: 10px; letter-spacing: 0; overflow-wrap: anywhere; }
+}
+
+/* Full-screen presentation: the inspector floats; it never steals image height. */
+.reality-screen { background:var(--void); color:var(--foreground); }
+.reality-screen[open] { grid-template-rows:auto minmax(50dvh,1fr) auto auto; }
+.reality-screen button { background:var(--popover); color:var(--foreground); border-color:var(--border); min-height:44px; height:auto; letter-spacing:0; }
+.reality-screen button:hover { background:var(--secondary); }
+.reality-screen button[aria-pressed="true"] { background:var(--primary); color:var(--primary-foreground); border-color:var(--primary); }
+.reality-screen button:focus-visible { outline-color:var(--photon); }
+.reality-header { padding:10px 18px; gap:6px; background:var(--void); }
+.reality-navigation { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; }
+.reality-navigation .reality-title { grid-column:1; grid-row:1; order:0; }
+.reality-title h1 { font-family:var(--font-sans); font-size:24px; font-weight:600; letter-spacing:0; margin:3px 0; white-space:normal; overflow-wrap:anywhere; }
+.reality-title span,.reality-pathway-label { color:var(--muted-foreground); font-size:10px; letter-spacing:0; }
+.reality-title span { display:block; }
+.reality-pathway-label { margin:2px 0; }
+.reality-view-controls button { min-height:44px; padding:6px; }
+.reality-extra-controls { display:flex; align-items:center; gap:16px; }
+.reality-extra-controls button { padding:5px 12px; }
+.reality-extra-controls label { display:flex; align-items:center; gap:8px; font-size:11px; }

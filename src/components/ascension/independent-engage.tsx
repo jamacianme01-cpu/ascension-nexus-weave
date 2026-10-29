@@ -228,7 +228,9 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       const answer = data.answer.trim();
       setFirstAnswer(answer);
-      // The Tree must not narrate the full written answer.
+      // Keep the Tree conversational: announce a short useful finding, never read the whole analysis.
+      const firstThought = answer.split(/(?<=[.!?])\s+/)[0]?.trim().slice(0, 240);
+      if (talking && firstThought) say(firstThought);
       await generatePathways(text, answer, controller, token);
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
@@ -309,6 +311,12 @@ export function IndependentEngage() {
       <button type="button" onClick={retryPathways} className="mt-3 rounded-full border border-gold/50 px-4 py-2 text-gold">
         Retry pathways
       </button>
+    </section>}
+
+    {firstAnswer && <section className="mx-auto mt-4 max-w-3xl rounded-xl border border-gold/35 bg-[#020913ed] p-5" aria-label="Initial objective answer">
+      <h2 className="mb-2 text-lg text-gold">INITIAL ANSWER</h2>
+      <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
+      {loading && <p className="mt-3 text-xs text-gold" role="status">Developing three pathways and the fourth BLEND…</p>}
     </section>}
 
     {result && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">

@@ -1,6 +1,7 @@
 /**
- * Server-only answer-engine client (Z.AI / OpenRouter / local / OpenAI).
- * No third-party editor platform gateways.
+ * Server-only answer-engine client.
+ * Providers: OpenAI (opt-in), OpenRouter free, local.
+ * No Z.AI. No third-party editor platform gateways.
  */
 import {
   formatKnowledgeEvidence,
@@ -9,12 +10,8 @@ import {
 } from "./knowledge.server";
 import { callOpenAIResponse } from "./openai.server";
 
-const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
-const DEFAULT_MODEL = "glm-4.6";
 const FREE_BASE_URL = "https://openrouter.ai/api/v1";
 const FREE_MODEL = "openrouter/free";
-const ZAI_FREE_TEXT_MODEL = "glm-4.7-flash";
-const ZAI_FREE_VISION_MODEL = "glm-4.6v-flash";
 const DEFAULT_LOCAL_MODEL = "qwen3:4b";
 const LOCAL_MAX_TOKENS = 4096;
 
@@ -61,7 +58,6 @@ export function zaiModel(): string {
   if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" && process.env["OPENAI_API_KEY"]?.trim())
     return process.env["ASCENSION_OPENAI_MODEL"]?.trim() || "gpt-4.1-mini";
   if (process.env["OPENROUTER_API_KEY"]?.trim()) return FREE_MODEL;
-  if (process.env["ZAI_API_KEY"]?.trim()) return ZAI_FREE_TEXT_MODEL;
   if (localLlmConfig()) return localLlmConfig()!.model;
   return DEFAULT_LOCAL_MODEL;
 }
@@ -149,18 +145,17 @@ export async function callZai(input: {
   includeInternalKnowledge?: boolean;
   imageDataUrl?: string;
   temperature?: number;
-  fallbackProvider?: "free_cloud" | "zai_free";
+  fallbackProvider?: "free_cloud";
   fallbackAttempted?: boolean;
 }): Promise<ZaiCallResult> {
   const local = localLlmConfig();
   const freeCloudKey = process.env["OPENROUTER_API_KEY"]?.trim();
-  const zaiKey = process.env["ZAI_API_KEY"]?.trim();
   const openaiEnabled =
     process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
     Boolean(process.env["OPENAI_API_KEY"]?.trim());
   const provider =
     input.fallbackProvider ??
-    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" : zaiKey ? "zai_free" : local ? "local" : null);
+    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" : local ? "local" : null);
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",
@@ -217,16 +212,10 @@ export async function callZai(input: {
     }
   }
 
-  const model =
-    provider === "zai_free"
-      ? input.imageDataUrl
-        ? ZAI_FREE_VISION_MODEL
-        : ZAI_FREE_TEXT_MODEL
-      : zaiModel();
+  const model = zaiModel();
   const started = Date.now();
-  const baseUrl =
-    provider === "free_cloud" ? FREE_BASE_URL : provider === "zai_free" ? DEFAULT_BASE_URL : local!.baseUrl;
-  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "zai_free" ? zaiKey : null;
+  const baseUrl = provider === "free_cloud" ? FREE_BASE_URL : local!.baseUrl;
+  const apiKey = provider === "free_cloud" ? freeCloudKey : null;
   const nativeUrl = provider === "local" ? ollamaChatUrl(baseUrl) : null;
   let response: Response;
   try {
@@ -282,18 +271,6 @@ export async function callZai(input: {
   }
 
   if (!response.ok) {
-    if (!input.fallbackAttempted && [429, 502, 503, 504].includes(response.status)) {
-      const alternative =
-        provider === "zai_free" && freeCloudKey
-          ? "free_cloud"
-          : provider === "free_cloud" && zaiKey
-            ? "zai_free"
-            : null;
-      if (alternative) {
-        await response.body?.cancel().catch(() => undefined);
-        return callZai({ ...input, fallbackProvider: alternative, fallbackAttempted: true });
-      }
-    }
     const detail = (await response.text().catch(() => "")).slice(0, 2000);
     throw new ZaiEngineError(
       `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : "Answer engine"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,

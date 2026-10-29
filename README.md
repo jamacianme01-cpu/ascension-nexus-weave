@@ -20,7 +20,7 @@ FIRST:
 
 4. Report what can already be consumed by a web/application layer.
 
-5. Save the important ASCENSION architecture and UI rules as persistent project knowledge so a new Lovable session does not start from zero.
+5. Save the important ASCENSION architecture and UI rules as persistent project knowledge.
 
 THEN build an ASCENSION web/application interface around the EXISTING system.
 
@@ -111,18 +111,6 @@ Before changing anything, show me:
 4. exact files you intend to create or modify
 
 Do not begin implementation until you have inspected the existing system.
-
-This project was built with [Lovable](https://lovable.dev).
-
-**Live app**: https://ascension-nexus-weave.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/5f75ebb9-bfc5-4233-968a-7f07a69c2a4b).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 

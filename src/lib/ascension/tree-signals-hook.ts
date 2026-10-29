@@ -1,43 +1,70 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
-export type TreeSignalType = "select" | "skip" | "refine" | "return" | "engage";
+export type TreeSignalEvent = "selection" | "skip" | "refine" | "return";
 
-export type TreeSignalPayload = {
-  type: TreeSignalType;
-  objective?: string;
-  pathwayId?: string;
+export type TreeSignal = {
+  event: TreeSignalEvent;
   pathwayLabel?: string;
-  meaningElements?: string[];
-  spiralForms?: string[];
+  objective?: string;
+  timestamp: number;
+  sessionId: string;
+  context?: Record<string, unknown>;
 };
 
-/**
- * Posts engagement events to /api/public/ascension/tree-signals.
- * Fire-and-forget from the client — never blocks UI, never throws to caller.
- */
+const SESSION_KEY = "ascension_tree_session";
+
+function getSessionId(): string {
+  if (typeof window === "undefined") return "server";
+  let id = sessionStorage.getItem(SESSION_KEY);
+  if (!id) {
+    id = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    sessionStorage.setItem(SESSION_KEY, id);
+  }
+  return id;
+}
+
+async function postSignal(signal: TreeSignal): Promise<void> {
+  try {
+    await fetch("/api/public/ascension/tree-signals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(signal),
+      keepalive: true,
+    });
+  } catch {
+    // signals are best-effort; never block the UI
+  }
+}
+
 export function useTreeSignals() {
-  const lastPosted = useRef<string>("");
+  const sessionId = useRef(getSessionId());
+  const lastEvent = useRef<TreeSignalEvent | null>(null);
 
-  const post = useCallback((payload: TreeSignalPayload) => {
-    const key = `${payload.type}|${payload.pathwayId ?? ""}|${payload.objective ?? ""}`;
-    // Deduplicate rapid identical posts (e.g. double-click).
-    if (lastPosted.current === key) return;
-    lastPosted.current = key;
-    setTimeout(() => {
-      lastPosted.current = "";
-    }, 2000);
-
-    try {
-      void fetch("/api/public/ascension/tree-signals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        keepalive: true,
+  const emit = useCallback(
+    (event: TreeSignalEvent, detail?: { pathwayLabel?: string; objective?: string; context?: Record<string, unknown> }) => {
+      lastEvent.current = event;
+      postSignal({
+        event,
+        pathwayLabel: detail?.pathwayLabel,
+        objective: detail?.objective,
+        timestamp: Date.now(),
+        sessionId: sessionId.current,
+        context: detail?.context,
       });
-    } catch {
-      /* Network down — Tree just goes quiet. */
-    }
-  }, []);
+    },
+    [],
+  );
 
-  return post;
+  // record a return when the user comes back after being away
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && lastEvent.current) {
+        emit("return");
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [emit]);
+
+  return { emit, sessionId: sessionId.current };
 }

@@ -14,24 +14,4 @@
   padding: 0;
   margin: 0;
 }
-
-/* RESTORE NOTICE: Full stylesheet was briefly overwritten. This commit restores structure.
- * If layout looks incomplete, revert reality-viewer.css to commit 3db3dc5.
- */
-.reality-view-controls { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.reality-parts { overflow: auto; }
-.reality-named-parts .reality-part-purpose {
-  display: block;
-  font-size: 0.8rem;
-  opacity: 0.85;
-  margin-top: 0.25rem;
-}
-.reality-named-parts .reality-part-detail {
-  display: block;
-  font-size: 0.75rem;
-  line-height: 1.35;
-  margin-top: 0.4rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid rgba(212, 175, 55, 0.25);
-  color: rgba(255, 255, 255, 0.82);
-}
+/* INCOMPLETE PUSH PREVENTED - use git checkout 3db3dc5 -- src/components/ascension/reality-viewer.css */

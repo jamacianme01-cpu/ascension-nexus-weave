@@ -16,18 +16,19 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
-      - run: bun run test:interface
-      - run: bun tests/tree-voice.test.mjs
-      - run: bun run build
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm run test:interface
+      - run: node tests/tree-voice.test.mjs
+      - run: npm run build
       - name: TypeScript checks with file annotations
         shell: bash
         run: |
           set +e
-          bunx tsc --noEmit --pretty false > "$RUNNER_TEMP/ascension-typescript.log" 2>&1
+          npx tsc --noEmit --pretty false > "$RUNNER_TEMP/ascension-typescript.log" 2>&1
           result=$?
           cat "$RUNNER_TEMP/ascension-typescript.log"
           node --input-type=module -e '
@@ -38,7 +39,7 @@ jobs:
           for (const line of lines) {
             const match = line.match(/^(.+)\((\d+),(\d+)\): error (TS\d+): (.*)$/);
             if (match) console.log(`::error file=${property(match[1])},line=${match[2]},col=${match[3]}::${escape(match[4] + ": " + match[5])}`);
-            else if (/^error TS\d+:/.test(line)) console.log(`::error::${escape(line)}`);
+            else if (/^error TS\d+:/.test(line)) console.log(`::error::${escape(line)}`)
           }
           '
           exit "$result"

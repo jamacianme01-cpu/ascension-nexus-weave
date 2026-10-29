@@ -1,10 +1,6 @@
 /**
- * Server-only Z.AI client.
- *
- * Z.AI is an EXTERNAL execution engine. Nothing here is ASCENSION governed
- * state: every response returned by this module is raw external output and must
- * be labelled as such by the caller. This module never writes governed state,
- * never invents a value and never rewrites an engine error.
+ * Server-only answer-engine client (Z.AI / OpenRouter / local / OpenAI).
+ * No third-party editor platform gateways.
  */
 import {
   formatKnowledgeEvidence,
@@ -15,16 +11,10 @@ import { callOpenAIResponse } from "./openai.server";
 
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_MODEL = "glm-4.6";
-const LOVABLE_BASE_URL = "https://ai.gateway.lovable.dev/v1";
-const LOVABLE_MODEL = "google/gemini-3.1-flash-lite";
-// A hosted, zero-price preview route. Never select a paid model here.
 const FREE_BASE_URL = "https://openrouter.ai/api/v1";
 const FREE_MODEL = "openrouter/free";
-// Officially zero-token-cost Z.AI models; never replace with a billed GLM model.
 const ZAI_FREE_TEXT_MODEL = "glm-4.7-flash";
 const ZAI_FREE_VISION_MODEL = "glm-4.6v-flash";
-// Local answer engine takes priority when explicitly configured.
-// Lovable AI is optional and requires explicit owner opt-in.
 const DEFAULT_LOCAL_MODEL = "qwen3:4b";
 const LOCAL_MAX_TOKENS = 4096;
 
@@ -38,12 +28,10 @@ function localLlmConfig() {
     : null;
 }
 
-/** Strip a local model's inline reasoning block if it leaks into content. */
 function stripInlineReasoning(text: string): string {
   return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
 }
 
-/** The launcher's standard Ollama endpoint supports native thinking controls. */
 function ollamaChatUrl(baseUrl: string): string | null {
   const url = new URL(baseUrl);
   return ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
@@ -73,16 +61,9 @@ export function zaiModel(): string {
   if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" && process.env["OPENAI_API_KEY"]?.trim())
     return process.env["ASCENSION_OPENAI_MODEL"]?.trim() || "gpt-4.1-mini";
   if (process.env["OPENROUTER_API_KEY"]?.trim()) return FREE_MODEL;
-  if (process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true" &&
-      process.env["LOVABLE_API_KEY"]?.trim())
-    return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
   if (process.env["ZAI_API_KEY"]?.trim()) return ZAI_FREE_TEXT_MODEL;
   if (localLlmConfig()) return localLlmConfig()!.model;
   return DEFAULT_LOCAL_MODEL;
-}
-
-function zaiBaseUrl(): string {
-  return (process.env["ZAI_BASE_URL"]?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
 function extractJson(text: string): Record<string, unknown> | null {
@@ -99,7 +80,7 @@ function extractJson(text: string): Record<string, unknown> | null {
         return parsed as Record<string, unknown>;
       }
     } catch {
-      // Raw external text is still returned verbatim.
+      /* raw text still returned */
     }
   }
   return null;
@@ -107,7 +88,7 @@ function extractJson(text: string): Record<string, unknown> | null {
 
 async function readStream(response: Response, nativeOllama = false) {
   const body = response.body;
-  if (!body) throw new ZaiEngineError("Z.AI returned no response body", response.status);
+  if (!body) throw new ZaiEngineError("Answer engine returned no response body", response.status);
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -120,7 +101,7 @@ async function readStream(response: Response, nativeOllama = false) {
     if (!nativeOllama && !line.startsWith("data:")) return;
     const payload = nativeOllama ? line : line.slice(5).trim();
     if (!payload || payload === "[DONE]") return;
-    let parsed;
+    let parsed: any;
     try {
       parsed = JSON.parse(payload);
     } catch {
@@ -161,35 +142,25 @@ async function readStream(response: Response, nativeOllama = false) {
   return { text, finishReason, sawThinking };
 }
 
-/** One streamed engine call. Local inference is preferred when configured;
- * external paid gateways are used only with explicit owner opt-in. */
 export async function callZai(input: {
   system: string;
   user: string;
-  /** Short search phrase (normally the objective). Never the full stage prompt. */
   knowledgeQuery?: string;
-  /** Meaning checks compare only submitted intent with the proposed output. */
   includeInternalKnowledge?: boolean;
   imageDataUrl?: string;
   temperature?: number;
-  /** Internal failover; only already configured zero-price providers. */
   fallbackProvider?: "free_cloud" | "zai_free";
   fallbackAttempted?: boolean;
 }): Promise<ZaiCallResult> {
   const local = localLlmConfig();
   const freeCloudKey = process.env["OPENROUTER_API_KEY"]?.trim();
-  const lovableKey = process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true"
-    ? process.env["LOVABLE_API_KEY"]?.trim() : null;
   const zaiKey = process.env["ZAI_API_KEY"]?.trim();
-  const openaiEnabled = process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
+  const openaiEnabled =
+    process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
     Boolean(process.env["OPENAI_API_KEY"]?.trim());
-  // A configured public cloud route wins over localhost, even if a local
-  // desktop development URL accidentally remains in server settings.
-  // Explicitly opted-in OpenAI wins for user-facing inference even when
-  // stale ZAI_API_KEY remains in Lovable's environment.
-  const provider = input.fallbackProvider ??
-    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" : lovableKey ? "lovable" :
-      zaiKey ? "zai_free" : local ? "local" : null);
+  const provider =
+    input.fallbackProvider ??
+    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" : zaiKey ? "zai_free" : local ? "local" : null);
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",
@@ -198,34 +169,30 @@ export async function callZai(input: {
 
   let knowledgeText = "ASCENSION internal knowledge retrieval unavailable for this call.";
   let knowledgeResult: KnowledgeRetrievalResult | null = null;
-  if (input.includeInternalKnowledge !== false) try {
-    const query = (input.knowledgeQuery ?? input.user).replace(/\s+/g, " ").trim().slice(0, 300);
-    knowledgeResult = await retrieveKnowledge(query, 6);
-    knowledgeText = formatKnowledgeEvidence(knowledgeResult);
-  } catch (cause) {
-    knowledgeText = `ASCENSION internal knowledge retrieval failed: ${cause instanceof Error ? cause.message : String(cause)}`;
-  }
+  if (input.includeInternalKnowledge !== false)
+    try {
+      const query = (input.knowledgeQuery ?? input.user).replace(/\s+/g, " ").trim().slice(0, 300);
+      knowledgeResult = await retrieveKnowledge(query, 6);
+      knowledgeText = formatKnowledgeEvidence(knowledgeResult);
+    } catch (cause) {
+      knowledgeText = `ASCENSION internal knowledge retrieval failed: ${cause instanceof Error ? cause.message : String(cause)}`;
+    }
 
-  const system = input.includeInternalKnowledge === false ? input.system : [
-    input.system,
-    "The ASCENSION INTERNAL KNOWLEDGE section comes from ASCENSION's own published Knowledgeverse, pathways, governance, ledger and chamber state.",
-    "Use that internal knowledge as the primary context. Do not invent missing internal state and do not imply external web research occurred.",
-    "The application renders ASCENSION provenance separately. Do NOT emit [A#] markers, source-path citations, or phrases such as 'according to ASCENSION internal knowledge', 'ASCENSION internal knowledge confirms', or equivalent provenance claims in your response.",
-    "Use relevant internal records only as background context. Do not turn a stored Meaning Element, prior transition, evidence record, or verified Delta into proof of a broader scientific or technical proposition.",
-    "The submitted objective and the user's definitions take priority over retrieved records. Ignore unrelated records; never use them to rename the subject or substitute a different domain, object, or task.",
-    "Runtime verification means ASCENSION verified that runtime record or transition. It does not automatically verify every scientific proposition associated with the objective.",
-    "When you supply scientific, technical, historical, or other factual material that is not explicitly stated in the internal records, introduce it as general knowledge where useful and do not attribute it to ASCENSION's stored records.",
-    "A retrieved internal record is not automatically new VERIFIED Delta merely because it was read; preserve its published provenance and status.",
-  ].join(" ");
-  // Local engines run smaller context windows; keep retrieved evidence compact.
+  const system =
+    input.includeInternalKnowledge === false
+      ? input.system
+      : [
+          input.system,
+          "The ASCENSION INTERNAL KNOWLEDGE section comes from ASCENSION's own published Knowledgeverse, pathways, governance, ledger and chamber state.",
+          "Use that internal knowledge as the primary context. Do not invent missing internal state.",
+          "The application renders ASCENSION provenance separately. Do NOT emit fake source markers.",
+        ].join(" ");
   const knowledgeForPrompt = provider === "local" ? knowledgeText.slice(0, 2400) : knowledgeText;
-  const user = input.includeInternalKnowledge === false
-    ? input.user
-    : `${input.user}\n\nASCENSION INTERNAL KNOWLEDGE:\n${knowledgeForPrompt}`;
+  const user =
+    input.includeInternalKnowledge === false
+      ? input.user
+      : `${input.user}\n\nASCENSION INTERNAL KNOWLEDGE:\n${knowledgeForPrompt}`;
 
-  // OpenAI is a bounded inference adapter for the existing ASCENSION stages.
-  // It does not become Guardian, Outcome Predictor, or the source of truth.
-  // Web search occurs separately for the initial cited research answer.
   if (provider === "openai") {
     const started = Date.now();
     try {
@@ -250,13 +217,16 @@ export async function callZai(input: {
     }
   }
 
-  const model = provider === "zai_free"
-    ? (input.imageDataUrl ? ZAI_FREE_VISION_MODEL : ZAI_FREE_TEXT_MODEL)
-    : zaiModel();
+  const model =
+    provider === "zai_free"
+      ? input.imageDataUrl
+        ? ZAI_FREE_VISION_MODEL
+        : ZAI_FREE_TEXT_MODEL
+      : zaiModel();
   const started = Date.now();
   const baseUrl =
-    provider === "free_cloud" ? FREE_BASE_URL : provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai_free" ? DEFAULT_BASE_URL : local!.baseUrl;
-  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "lovable" ? lovableKey : provider === "zai_free" ? zaiKey : null;
+    provider === "free_cloud" ? FREE_BASE_URL : provider === "zai_free" ? DEFAULT_BASE_URL : local!.baseUrl;
+  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "zai_free" ? zaiKey : null;
   const nativeUrl = provider === "local" ? ollamaChatUrl(baseUrl) : null;
   let response: Response;
   try {
@@ -272,18 +242,16 @@ export async function callZai(input: {
           : {
               "Content-Type": "application/json",
               Authorization: `Bearer ${apiKey}`,
-              ...(provider === "lovable" ? { "Lovable-API-Key": apiKey! } : {}),
               Accept: "text/event-stream",
             },
       body: JSON.stringify({
         model,
         stream: true,
-        // Fail closed if no no-retention free model is available.
-        ...(provider === "free_cloud" ? { provider: { data_collection: "deny", zdr: true, max_price: { prompt: 0, completion: 0 } } } : {}),
+        ...(provider === "free_cloud"
+          ? { provider: { data_collection: "deny", zdr: true, max_price: { prompt: 0, completion: 0 } } }
+          : {}),
         ...(nativeUrl
           ? {
-              // Qwen3 otherwise defaults to thinking, which can consume the
-              // entire output budget before emitting any visible answer.
               ...(/(?:^|\/)qwen3(?:[:.-]|$)/i.test(model) ? { think: false } : {}),
               options: { temperature: input.temperature ?? 0.2, num_predict: LOCAL_MAX_TOKENS },
             }
@@ -293,34 +261,34 @@ export async function callZai(input: {
             }),
         messages: [
           { role: "system", content: system },
-          { role: "user", content: input.imageDataUrl
-            ? [{ type: "text", text: user }, { type: "image_url", image_url: { url: input.imageDataUrl } }]
-            : user },
+          {
+            role: "user",
+            content: input.imageDataUrl
+              ? [
+                  { type: "text", text: user },
+                  { type: "image_url", image_url: { url: input.imageDataUrl } },
+                ]
+              : user,
+          },
         ],
       }),
     });
   } catch (cause) {
     const detail = cause instanceof Error ? cause.message : String(cause);
     if (provider === "local") {
-      throw new ZaiEngineError(
-        `The local answer engine at ${local!.baseUrl} is unreachable (${detail}).`,
-      );
+      throw new ZaiEngineError(`The local answer engine at ${local!.baseUrl} is unreachable (${detail}).`);
     }
-    throw new ZaiEngineError(
-      `${provider === "lovable" ? "Lovable AI" : "Z.AI"} request failed: ${detail}`,
-    );
+    throw new ZaiEngineError(`Answer engine request failed: ${detail}`);
   }
 
   if (!response.ok) {
-    // An overloaded zero-price provider should not strand an objective when
-    // another independently configured free route is available.
-    // Never silently switch to a billed model or gateway.
     if (!input.fallbackAttempted && [429, 502, 503, 504].includes(response.status)) {
-      const alternative = provider === "zai_free" && freeCloudKey
-        ? "free_cloud"
-        : provider === "free_cloud" && zaiKey
-          ? "zai_free"
-          : null;
+      const alternative =
+        provider === "zai_free" && freeCloudKey
+          ? "free_cloud"
+          : provider === "free_cloud" && zaiKey
+            ? "zai_free"
+            : null;
       if (alternative) {
         await response.body?.cancel().catch(() => undefined);
         return callZai({ ...input, fallbackProvider: alternative, fallbackAttempted: true });
@@ -328,7 +296,7 @@ export async function callZai(input: {
     }
     const detail = (await response.text().catch(() => "")).slice(0, 2000);
     throw new ZaiEngineError(
-      `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : provider === "lovable" ? "Lovable AI" : "Z.AI"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
+      `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : "Answer engine"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
       response.status,
     );
   }
@@ -336,13 +304,14 @@ export async function callZai(input: {
   const result = await readStream(response, Boolean(nativeUrl));
   const text = stripInlineReasoning(result.text);
   if (!text.trim()) {
-    const detail = result.finishReason === "length"
-      ? " exhausted its output limit before producing an answer"
-      : result.sawThinking || /<think>/i.test(result.text)
-        ? " returned thinking without a final answer"
-        : " returned an empty response";
+    const detail =
+      result.finishReason === "length"
+        ? " exhausted its output limit before producing an answer"
+        : result.sawThinking || /<think>/i.test(result.text)
+          ? " returned thinking without a final answer"
+          : " returned an empty response";
     throw new ZaiEngineError(
-      `${provider === "local" ? "The local answer engine" : provider === "lovable" ? "Lovable AI" : "Z.AI"}${detail}`,
+      `${provider === "local" ? "The local answer engine" : "Answer engine"}${detail}`,
       response.status,
     );
   }
@@ -355,4 +324,3 @@ export async function callZai(input: {
     knowledge: knowledgeResult,
   };
 }
-

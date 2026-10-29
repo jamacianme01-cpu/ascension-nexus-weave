@@ -48,10 +48,11 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, objective, onDive }: {
+function PathwayView({ path, objective, onDive, imageCache }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
   onDive: (path: Pathway, imageUrl: string) => void;
+  imageCache: { current: Map<string, string> };
 }) {
   const [part, setPart] = useState<Part | null>(null);
   const [picture, setPicture] = useState<string | null>(null);
@@ -61,6 +62,12 @@ function PathwayView({ path, objective, onDive }: {
   const [rotation, setRotation] = useState(0);
   useEffect(() => setPart(null), [path.id]);
   useEffect(() => {
+    const cacheKey = JSON.stringify([objective, path.id, path.title]);
+    const stored = imageCache.current.get(cacheKey);
+    if (stored) {
+      setPicture(stored); setPictureError(""); setPictureLoading(false);
+      return;
+    }
     const controller = new AbortController();
     setPicture(null); setPictureError(""); setPictureLoading(true);
     void fetch("/api/public/ascension/independent", {
@@ -72,13 +79,16 @@ function PathwayView({ path, objective, onDive }: {
       if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
       if (!data.image_url?.startsWith("data:image/png;base64,"))
         throw new Error("The image provider did not return a usable picture.");
-      if (!controller.signal.aborted) setPicture(data.image_url);
+      if (!controller.signal.aborted) {
+        imageCache.current.set(cacheKey, data.image_url);
+        setPicture(data.image_url);
+      }
     }).catch(cause => {
       if (!controller.signal.aborted)
         setPictureError(cause instanceof Error ? cause.message : String(cause));
     }).finally(() => { if (!controller.signal.aborted) setPictureLoading(false); });
     return () => controller.abort();
-  }, [path, objective]);
+  }, [path, objective, imageCache]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
@@ -151,6 +161,7 @@ export function IndependentEngage() {
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
+  const imageCache = useRef(new Map<string, string>());
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
 
   async function generatePathways(text: string, answer: string, controller: AbortController, token: number) {
@@ -191,6 +202,7 @@ export function IndependentEngage() {
     stopVoice();
     // Keep private refinement context out of the visible objective field.
     if (!override) setObjective(text);
+    imageCache.current.clear();
     setRequested(text);
     setLoading(true);
     setError("");
@@ -251,6 +263,7 @@ export function IndependentEngage() {
     generation.current += 1;
     abort.current?.abort();
     stopVoice();
+    imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null); setDive(null);
@@ -329,7 +342,7 @@ export function IndependentEngage() {
         </button>)}
       </div>
       {selected && <>
-        <PathwayView key={selected.id} path={selected} objective={requested}
+        <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
           onDive={(pathway, imageUrl) => { stopVoice(); setDive({ pathway, imageUrl }); }} />
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>

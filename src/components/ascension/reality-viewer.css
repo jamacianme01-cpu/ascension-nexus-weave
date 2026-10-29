@@ -1,16 +1,3 @@
-.reality-screen {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  background: #05070c;
-  color: #e8eef8;
-  border: none;
-  width: 100%;
-  max-width: none;
-  height: 100%;
-  max-height: none;
-  padding: 0;
-  margin: 0;
-}
+/* Restored full stylesheet via split import — identical cascade to prior single file */
+@import "./reality-viewer-a.css";
+@import "./reality-viewer-b.css";

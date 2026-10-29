@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import type { ObjectivePathway } from "@/lib/ascension/result-model";
+
+const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -45,12 +48,66 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path }: { path: Pathway & { blend_reason?: string } }) {
+function PathwayView({ path, objective, onDive }: {
+  path: Pathway & { blend_reason?: string };
+  objective: string;
+  onDive: (path: Pathway, imageUrl: string) => void;
+}) {
   const [part, setPart] = useState<Part | null>(null);
+  const [picture, setPicture] = useState<string | null>(null);
+  const [pictureError, setPictureError] = useState("");
+  const [pictureLoading, setPictureLoading] = useState(true);
+  const [scale, setScale] = useState(1);
+  const [rotation, setRotation] = useState(0);
   useEffect(() => setPart(null), [path.id]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setPicture(null); setPictureError(""); setPictureLoading(true);
+    void fetch("/api/public/ascension/independent", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ objective, phase: "picture", pathway: path }),
+      signal: controller.signal,
+    }).then(async response => {
+      const data: { image_url?: string; error?: string } = await response.json();
+      if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
+      if (!data.image_url?.startsWith("data:image/png;base64,"))
+        throw new Error("The image provider did not return a usable picture.");
+      if (!controller.signal.aborted) setPicture(data.image_url);
+    }).catch(cause => {
+      if (!controller.signal.aborted)
+        setPictureError(cause instanceof Error ? cause.message : String(cause));
+    }).finally(() => { if (!controller.signal.aborted) setPictureLoading(false); });
+    return () => controller.abort();
+  }, [path, objective]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
+    <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
+      {picture ? <>
+        <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-black/40 sm:min-h-[440px]">
+          <img src={picture} alt={`Concept picture of ${path.title}`}
+            className="max-h-[70vh] w-full object-contain transition-transform"
+            style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
+            onClick={() => setScale(v => Math.min(4, v * 1.25))}>ZOOM IN</button>
+          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
+            onClick={() => setScale(v => Math.max(0.5, v / 1.25))}>ZOOM OUT</button>
+          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
+            onClick={() => setRotation(v => v - 15)}>ROTATE LEFT</button>
+          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
+            onClick={() => setRotation(v => v + 15)}>ROTATE RIGHT</button>
+          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
+            onClick={() => { setScale(1); setRotation(0); }}>RESET VIEW</button>
+          <button type="button" className="rounded-full border border-primary/60 px-5 py-2 text-sm text-primary"
+            onClick={() => onDive(path, picture)}>DIVE INTO REALITY</button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">Actual generated concept artwork. No verified 3D mesh is available yet; 3D editing requires a reconstructed model.</p>
+      </> : <p className="p-6 text-center text-sm text-muted-foreground" role={pictureError ? "alert" : "status"}>
+        {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
+      </p>}
+    </div>
     {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
     <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>
     <ol className="mb-5 list-decimal space-y-2 pl-5 text-sm leading-6">
@@ -88,6 +145,7 @@ export function IndependentEngage() {
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
+  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string } | null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
@@ -110,6 +168,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
+      if (talking && data.introduction?.trim()) say(data.introduction.trim().slice(0, 260));
       setStage("eruption");
       // Do not interrupt the Tree reading the initial answer when pathways arrive.
       window.setTimeout(() => {
@@ -140,6 +199,7 @@ export function IndependentEngage() {
     setFirstAnswer("");
     setRefinement("");
     setChoice(null);
+    setDive(null);
     setStage("processing");
     if (talking) say("Exploring your objective.");
     try {
@@ -193,7 +253,7 @@ export function IndependentEngage() {
     stopVoice();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
-    setStage("idle"); setChoice(null);
+    setStage("idle"); setChoice(null); setDive(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -231,11 +291,6 @@ export function IndependentEngage() {
       }}>Stop</button>
     </section>}
 
-    {firstAnswer && <section className="mx-auto mt-5 max-w-3xl rounded-xl border border-gold/35 bg-[#05101de8] p-5" aria-label="Initial answer">
-      <h2 className="mb-3 text-lg text-gold">INITIAL ANSWER</h2>
-      <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
-    </section>}
-
     {!loading && pathwayError && <section className="mx-auto mt-4 max-w-3xl rounded-xl border border-gold/35 p-5" role="alert">
       <p>Pathways could not be completed: {pathwayError}</p>
       <button type="button" onClick={retryPathways} className="mt-3 rounded-full border border-gold/50 px-4 py-2 text-gold">
@@ -264,7 +319,7 @@ export function IndependentEngage() {
             (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
           onClick={() => {
             setChoice(index); setRefinement("");
-            if (talking) say("Let’s explore " + p.title + ".");
+            if (talking) say(p.title + ". " + p.summary.slice(0, 230));
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>
@@ -274,7 +329,8 @@ export function IndependentEngage() {
         </button>)}
       </div>
       {selected && <>
-        <PathwayView key={selected.id} path={selected} />
+        <PathwayView key={selected.id} path={selected} objective={requested}
+          onDive={(pathway, imageUrl) => { stopVoice(); setDive({ pathway, imageUrl }); }} />
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>
           <textarea id="pathway-refinement" rows={2} maxLength={900} value={refinement}
@@ -288,5 +344,27 @@ export function IndependentEngage() {
         </div>
       </>}
     </section>}
+    {dive && <Suspense fallback={<p role="status" className="p-5 text-center text-gold">Opening invention view…</p>}>
+      <RealityViewer
+        pathway={{
+          id: dive.pathway.id, label: dive.pathway.title, summary: dive.pathway.summary,
+          steps: dive.pathway.steps, tradeoffs: dive.pathway.tradeoffs,
+          spiral_form: null, visual_svg: null, model_spec: null,
+          generated_image_url: dive.imageUrl, generated_blueprint_url: null,
+          generated_environment_url: null, model_url: null,
+          outcome_score: null, outcome_reason: null,
+        } satisfies ObjectivePathway}
+        objective={requested} requestId={null} initialMode="cutaway"
+        onClose={() => setDive(null)}
+        onNewObjective={reset} newObjectiveDisabled={loading}
+        soundEnabled={talking}
+        onToggleSound={() => { stopVoice(); setTalking(v => !v); }}
+        onDive={() => {}}
+        onBuildOn={() => { const selectedPath = dive.pathway; setDive(null); buildOn(selectedPath); }}
+        onNewAnswers={() => setDive(null)}
+        isPartSelected={() => false} onTogglePart={() => {}}
+        blendControls={null}
+      />
+    </Suspense>}
   </div>;
 }

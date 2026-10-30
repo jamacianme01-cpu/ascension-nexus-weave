@@ -8,6 +8,7 @@ const viewer = read("src/components/ascension/RealityViewer.tsx");
 const engine = read("src/lib/ascension/engine/zai.server.ts");
 const app = read("src/routes/index.tsx");
 const checklist = read("docs/ASCENSION_V1_OWNER_APPROVAL_CHECKLIST.md");
+const guide = read("src/components/ascension/tree-guide.tsx");
 
 const tests = [
   ["approved Tree and Book remain entry scene", () => {
@@ -66,6 +67,17 @@ const tests = [
     assert.doesNotMatch(engine, /https:\/\/api\.z\.ai\//);
     assert.doesNotMatch(engine, /https:\/\/api\.lovable\./);
     assert.match(engine, /max_price: \{ prompt: 0, completion: 0 \}/);
+  }],
+  ["Tree can answer voice or text about selected design throughout V1", () => {
+    assert.match(ui, /<TreeGuide objective={objective} pathway={path}/);
+    assert.match(ui, /treeGuide={<TreeGuide objective={requested}/);
+    assert.match(viewer, /treeGuide\?: ReactNode/);
+    assert.match(viewer, /className="reality-tree-guide/);
+    assert.match(guide, /webkitSpeechRecognition/);
+    assert.match(guide, /phase: "guide"/);
+    assert.match(route, /async function guide\(objective: string, question: string/);
+    assert.match(route, /if \(input\["phase"\] === "guide"\)/);
+    assert.match(route, /"Tree of Knowledge, the warm, knowledgeable, spoken guide/);
   }],
   ["owner signoff remains unchecked", () => {
     assert.ok(checklist.includes("- [ ]"));

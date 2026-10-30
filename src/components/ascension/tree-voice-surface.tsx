@@ -84,6 +84,8 @@ export function TreeVoiceSurface({ children }: { children: ReactNode }) {
       <div className="space-y-3 pt-2" aria-label="Tree voice controls">
         <p className="text-xs text-muted-foreground">Select Book text to hear it, or select a Book text field before dictating. Voice input may be processed by your browser's speech provider.</p>
         <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={!ready} className="min-h-11 rounded border border-gold/40 px-3 disabled:opacity-40"
+            onClick={() => { setNotice(""); voice.current?.speak("Welcome to ASCENSION. What do you want to accomplish?"); }}>Welcome</button>
           <button type="button" disabled={!ready || state === "listening"} className="min-h-11 rounded border border-gold/40 px-3 disabled:opacity-40"
             onClick={() => { setNotice(""); voice.current?.listen(); }}>Speak</button>
           <button type="button" disabled={!ready || !selected} className="min-h-11 rounded border border-gold/40 px-3 disabled:opacity-40"

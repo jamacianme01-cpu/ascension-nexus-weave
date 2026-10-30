@@ -302,14 +302,18 @@ export function RealityViewer({
   }, [pathway.id, initialMode]);
 
   useEffect(() => {
-    if (!ready) return;
-    dive.current();
+    // Do not block the pathway preview behind WebGL initialization or model downloads.
+    // The side-panel description and parts remain usable if 3D is unavailable.
     const timer = window.setTimeout(
       () => setArrived(true),
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 1800,
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 700,
     );
     return () => window.clearTimeout(timer);
-  }, [ready, pathway.id, initialMode]);
+  }, [pathway.id, initialMode]);
+
+  useEffect(() => {
+    if (ready) dive.current();
+  }, [ready, pathway.id]);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;

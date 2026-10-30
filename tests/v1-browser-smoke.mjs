@@ -64,9 +64,10 @@ try {
     else body = { error: "Unexpected test API request" };
     await route.fulfill({ status: body.error ? 503 : 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto("http://127.0.0.1:4174/", { waitUntil: "domcontentloaded" });
-  assert.ok(await page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]').isVisible());
-  assert.ok((await page.evaluate(() => window.__treeSpoken)).some(x => x.includes("Welcome to ASCENSION")));
+  const pageResponse = await page.goto("http://127.0.0.1:4174/", { waitUntil: "domcontentloaded" });
+  assert.equal(pageResponse?.status(), 200, "The app's entry URL did not return successfully.");
+  await page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]').waitFor({ state: "visible", timeout: 20000 });
+  await page.waitForFunction(() => window.__treeSpoken?.some(x => x.includes("Welcome to ASCENSION")), { timeout: 10000 });
   await page.locator("#objective").fill("make worker drones");
   await page.getByRole("button", { name: "ENGAGE ASCENSION" }).click();
   await page.getByRole("tab").first().waitFor();

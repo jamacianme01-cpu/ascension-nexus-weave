@@ -1,0 +1,21 @@
+name: ASCENSION V1 repair verification
+on:
+  push:
+    branches:
+      - repair/v1-pathway-entry-20261029
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-and-interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun tests/interface.test.mjs
+      - run: bun tests/creation-source-context.test.mjs

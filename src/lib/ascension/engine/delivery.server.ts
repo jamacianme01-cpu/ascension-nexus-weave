@@ -925,8 +925,12 @@ export async function resolveDelivery(args: {
   }
   // A plain-text runtime receipt does not fulfill a request to create a
   // multi-path design. Continue into synthesis without falsifying governance.
+  const substantiveTransportedDesign = requestedKind(run.objective) === "design" && files.some(file =>
+    !/^(?:ascension_result\.md|document\.md|README\.md|governed_objective\.json|artifact_manifest\.json|metadata\.json|verification\.json)$/i.test(file.name) &&
+    assessResult(run.objective, file.content, [file]).produced
+  );
   if (governed && governed.kind !== "not_produced" &&
-      !(requestedKind(run.objective) === "design" &&
+      !(requestedKind(run.objective) === "design" && !substantiveTransportedDesign &&
         needsSpiralExpansionRepair(run.objective, run.evidence, [], governed))) {
     return {
       ...base,

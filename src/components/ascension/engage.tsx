@@ -660,6 +660,9 @@ function ResultContent({
               <article
                 key={pathway.id}
                 onClick={canInspect && onInspect ? () => onInspect(pathway) : undefined}
+                role={canInspect ? "button" : undefined}
+                tabIndex={canInspect ? 0 : undefined}
+                onKeyDown={canInspect && onInspect ? event => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(pathway); } } : undefined}
                 className={`rounded-xl border border-primary/25 bg-background/25 p-4 ${canInspect ? "cursor-pointer transition hover:border-primary/60 hover:bg-primary/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/45" : ""}`}
               >
                 {onToggleBlend && <label className="mb-3 flex min-h-11 items-center gap-2 text-sm text-gold"
@@ -704,6 +707,9 @@ function ResultContent({
             {delivery.blend && (
               <article
                 onClick={canInspect && onInspect ? () => onInspect(delivery.blend!) : undefined}
+                role={canInspect ? "button" : undefined}
+                tabIndex={canInspect ? 0 : undefined}
+                onKeyDown={canInspect && onInspect ? event => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(delivery.blend!); } } : undefined}
                 className={`rounded-xl border border-gold/40 bg-gold/[0.04] p-4 ${canInspect ? "cursor-pointer transition hover:border-gold/70 hover:bg-gold/[0.08] focus:outline-none focus:ring-2 focus:ring-gold/45" : ""}`}
               >
                 {onToggleBlend && <label className="mb-3 flex min-h-11 items-center gap-2 text-sm text-gold"

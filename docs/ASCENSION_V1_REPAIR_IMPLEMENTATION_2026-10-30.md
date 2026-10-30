@@ -24,7 +24,7 @@ This is an implementation record, **not owner acceptance**. No checkboxes in the
 - Removed the unapproved experimental concept geometry provider, preview renderer and related test entirely. Original selected-path image generation only; no invented substitute pictures, meshes, diagrams or providers.
 - Restored the original persistent Tree background by activating the existing 'data-realities' scene logic on results and reusing the same approved artwork faintly in V1 inspection.
 - Removed the result 'eruption' trigger. The approved Tree-and-Book image is visible from entry; it only powers up while working.
-- V1 inspection no longer exposes the legacy NEW ANSWERS or ambient volume/sound controls. The Tree's spoken guidance remains accessible.
+- Existing viewer controls (Assembled, Cutaway, Blueprint, Dissected, Parts and Sound) are preserved; no replacement viewer or new controls. Tree speech continues through existing voice preference.
 - Selected-path picture requests first check the server's existing image capability. With no approved bridge connected, the screen reports this directly instead of spamming failed image-generation requests.
 - Railway production HTTP and deployment logs from October 29–30 show successful initial/pathway response requests, but selected-picture requests fail HTTP 503 because the ASCENSION image service is not configured; production variables confirm no ASCENSION_IMAGE_ENDPOINT. This blocks source-based invention artwork and 3D reconstruction.
 - No main branch modifications or owner approval marks.

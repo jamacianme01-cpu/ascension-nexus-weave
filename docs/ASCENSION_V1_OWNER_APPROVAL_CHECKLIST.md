@@ -36,3 +36,8 @@ This section preserves the owner's latest corrections. No checklist items are ap
 - Keep the existing repair branch separate; do not merge or alter main without explicit owner approval. Test build, objective-to-answer, pathway selection, actual images, views, voice and interactions end-to-end before claiming a working app. Do not check any item until the owner approves.
 - Implementation evidence: commit 9b59bf2775169a022155183275010eb5f965717d modified src/components/ascension/tree-voice-surface.tsx on repair/v1-pathway-entry-20261029 to attempt a spoken welcome on entry, retaining first-interaction fallback. NOT YET BUILD-TESTED OR OWNER-APPROVED. Other build errors and unfinished functions remain unverified.
 - User paused because tired. Resume from this handoff without requiring the user to repeat requirements. Do not conflate ASCENSION with CLARITY or Routed Path.
+
+## October 30, 2026 — latest explicit owner correction (supersedes earlier initial-answer wording)
+- The initial answer/engineering research belongs **in the backend only**. Do **not** show a long essay, a shortened initial answer, or a separate initial-answer panel. The visible result is the three selectable pathways plus fourth BLEND.
+- The Tree remains a persistent spoken, knowledgeable interactive guide through the approved Tree-and-Book entrance, pathway descriptions, component labels, and V1 views.
+- Do not treat any code change, static check, or build success as owner approval. All approval boxes above stay unchecked.

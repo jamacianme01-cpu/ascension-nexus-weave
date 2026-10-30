@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { ObjectivePathway } from "@/lib/ascension/result-model";
+import type { ObjectivePathway, ObjectiveModelSpec } from "@/lib/ascension/result-model";
 import type { DesignPart } from "@/lib/ascension/parts-model";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 
 const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
+const SelectedModelPreview = lazy(() => import("@/components/ascension/selected-model-preview").then(mod => ({ default: mod.SelectedModelPreview })));
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -51,11 +52,12 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEnabled }: {
+function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak, speakingEnabled }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
-  onDive: (path: Pathway, imageUrl: string, mode?: "cutaway" | "blueprint" | "dissect") => void;
+  onDive: (path: Pathway, imageUrl: string | null, mode?: "cutaway" | "blueprint" | "dissect", modelSpec?: ObjectiveModelSpec | null) => void;
   imageCache: { current: Map<string, string> };
+  modelCache: { current: Map<string, ObjectiveModelSpec> };
   onSpeak: (text: string) => void;
   speakingEnabled: boolean;
 }) {
@@ -64,6 +66,9 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
   const [picture, setPicture] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState("");
   const [pictureLoading, setPictureLoading] = useState(true);
+  const [conceptSpec, setConceptSpec] = useState<ObjectiveModelSpec | null>(null);
+  const [conceptLoading, setConceptLoading] = useState(true);
+  const [conceptError, setConceptError] = useState("");
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   useEffect(() => { setPart(null); setPanel("description"); }, [path.id]);
@@ -174,13 +179,14 @@ export function IndependentEngage() {
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
-  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string; mode: "cutaway" | "blueprint" | "dissect" } | null>(null);
+  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string | null; mode: "cutaway" | "blueprint" | "dissect"; modelSpec: ObjectiveModelSpec | null } | null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const imageCache = useRef(new Map<string, string>());
+  const modelCache = useRef(new Map<string, ObjectiveModelSpec>());
   const welcomeStarted = useRef(false);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
   useEffect(() => {
@@ -241,7 +247,7 @@ export function IndependentEngage() {
     stopVoice();
     // Keep private refinement context out of the visible objective field.
     if (!override) setObjective(text);
-    imageCache.current.clear();
+    imageCache.current.clear(); modelCache.current.clear();
     setRequested(text);
     setLoading(true);
     setError("");
@@ -301,7 +307,7 @@ export function IndependentEngage() {
     generation.current += 1;
     abort.current?.abort();
     stopVoice();
-    imageCache.current.clear();
+    imageCache.current.clear(); modelCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null); setDive(null);
@@ -380,8 +386,8 @@ export function IndependentEngage() {
         </button>)}
       </div>
       {selected && <>
-        <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
-          onDive={(pathway, imageUrl, mode = "cutaway") => { stopVoice(); setDive({ pathway, imageUrl, mode }); }}
+        <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache} modelCache={modelCache}
+          onDive={(pathway, imageUrl, mode = "cutaway", modelSpec = null) => { stopVoice(); setDive({ pathway, imageUrl, mode, modelSpec }); }}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />
         <div className="rounded-xl border border-primary/25 p-4">
@@ -402,7 +408,7 @@ export function IndependentEngage() {
         pathway={{
           id: dive.pathway.id, label: dive.pathway.title, summary: dive.pathway.summary,
           steps: dive.pathway.steps, tradeoffs: dive.pathway.tradeoffs,
-          spiral_form: null, visual_svg: null, model_spec: null,
+          spiral_form: null, visual_svg: null, model_spec: dive.modelSpec,
           generated_image_url: dive.imageUrl, generated_blueprint_url: null,
           generated_environment_url: null, model_url: null,
           outcome_score: null, outcome_reason: null,

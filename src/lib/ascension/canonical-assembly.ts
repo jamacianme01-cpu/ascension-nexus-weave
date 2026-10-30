@@ -205,7 +205,7 @@ export function canonicalAssembly(objective: string, path: ObjectivePathway): As
   result.push({vertices,position,rotation,scale,color,detail:detail(label,position)});
  };
  const fidelity = specFidelity(path);
- if (path.model_spec && (fidelity.status === "complete" || (path.model_spec.description.startsWith("INTERPRETIVE MODEL") && path.model_spec.parts.length >= 5))) {
+ if (path.model_spec && fidelity.status === "complete") {
   for (const p of path.model_spec.parts) model(geometry[p.primitive],p.position,p.rotation,p.scale,palette[p.material],0,1,p.name);
   return result;
  }

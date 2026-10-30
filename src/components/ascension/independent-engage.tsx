@@ -11,7 +11,7 @@ const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
-function say(text: string) {
+function say(text: string, onStarted?: () => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
   const synth = window.speechSynthesis;
@@ -37,6 +37,7 @@ function say(text: string) {
     activeUtterance = words;
     words.rate = 0.93;
     words.pitch = 0.98;
+    words.onstart = () => onStarted?.();
     words.onend = next;
     words.onerror = next;
     try { synth.speak(words); } catch { activeUtterance = null; }
@@ -48,19 +49,21 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, objective, onDive, imageCache }: {
+function PathwayView({ path, objective, onDive, imageCache, onSpeak }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
-  onDive: (path: Pathway, imageUrl: string) => void;
+  onDive: (path: Pathway, imageUrl: string, mode?: "cutaway" | "blueprint") => void;
   imageCache: { current: Map<string, string> };
+  onSpeak: (text: string) => void;
 }) {
   const [part, setPart] = useState<Part | null>(null);
+  const [panel, setPanel] = useState<"description" | "labels">("description");
   const [picture, setPicture] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState("");
   const [pictureLoading, setPictureLoading] = useState(true);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  useEffect(() => setPart(null), [path.id]);
+  useEffect(() => { setPart(null); setPanel("description"); }, [path.id]);
   useEffect(() => {
     const cacheKey = JSON.stringify([objective, path.id, path.title]);
     const stored = imageCache.current.get(cacheKey);
@@ -91,7 +94,16 @@ function PathwayView({ path, objective, onDive, imageCache }: {
   }, [path, objective, imageCache]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
-    <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
+    <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Selected pathway views">
+      {(["description", "labels"] as const).map(tab =>
+        <button key={tab} type="button" aria-pressed={panel === tab}
+          onClick={() => { setPanel(tab); onSpeak(tab === "description" ? path.summary.slice(0, 260) : "Choose a named component to learn what it does and where it belongs."); }}
+          className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold">{tab.toUpperCase()}</button>)}
+      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "blueprint")}
+        className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
+      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "cutaway")}
+        className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT / EXPLODE</button>
+    </div>
     <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
       {picture ? <>
         <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-black/40 sm:min-h-[440px]">
@@ -118,15 +130,18 @@ function PathwayView({ path, objective, onDive, imageCache }: {
         {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
       </p>}
     </div>
+    {panel === "description" && <>
+    <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
     {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
     <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>
     <ol className="mb-5 list-decimal space-y-2 pl-5 text-sm leading-6">
       {path.steps.map((step, i) => <li key={i}>{step}</li>)}
     </ol>
-    {path.parts.length > 0 && <div className="mb-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    </>}
+    {panel === "labels" && (path.parts.length > 0 ? <div className="mb-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <div className="space-y-2" aria-label="Select components">
         <h4 className="text-sm font-semibold text-primary">Components — select to inspect</h4>
-        {path.parts.map((p, i) => <button type="button" key={i} onClick={() => setPart(p)}
+        {path.parts.map((p, i) => <button type="button" key={i} onClick={() => {setPart(p); onSpeak(p.name + ". " + p.purpose + (p.location ? " Location: " + p.location : ""));}}
           className="block w-full rounded-lg border border-gold/30 bg-black/25 p-3 text-left text-sm hover:border-gold">
           {p.name}</button>)}
       </div>
@@ -134,10 +149,10 @@ function PathwayView({ path, objective, onDive, imageCache }: {
         {part ? <><h4 className="mb-2 text-gold">{part.name}</h4><p className="mb-3 text-sm">{part.purpose}</p>
           {part.location && <p className="text-xs text-muted-foreground">Location / relationship: {part.location}</p>}</>
           : <p className="text-sm text-muted-foreground">Select a component to see what it does and where it belongs.</p>}
-        <p className="mt-4 text-xs text-muted-foreground">Concept description — not an interactive CAD model.</p>
+        <p className="mt-4 text-xs text-muted-foreground">Part descriptions are conceptual; dimensions are unresolved unless independently established.</p>
       </div>
-    </div>}
-    {path.tradeoffs.length > 0 && <details className="mb-5 text-sm text-muted-foreground">
+    </div> : <p role="status" className="text-sm text-muted-foreground">This pathway did not specify named components.</p>)}
+    {panel === "description" && path.tradeoffs.length > 0 && <details className="mb-5 text-sm text-muted-foreground">
       <summary className="cursor-pointer text-gold">Limits and tradeoffs</summary>
       <ul className="mt-2 list-disc space-y-1 pl-5">{path.tradeoffs.map((v, i) => <li key={i}>{v}</li>)}</ul>
     </details>}
@@ -155,14 +170,34 @@ export function IndependentEngage() {
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
-  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string } | null>(null);
+  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string; mode: "cutaway" | "blueprint" } | null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const imageCache = useRef(new Map<string, string>());
+  const welcomeStarted = useRef(false);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
+  useEffect(() => {
+    // Tree and Book remain in place; the Tree speaks without a new entrance scene.
+    // When a browser blocks autoplay, retry in the first genuine user interaction.
+    const greeting = "Welcome to ASCENSION. You're entering a world where knowledge connects and ideas become possibilities. I'm here to explore those connections with you. What would you like to accomplish?";
+    let disposed = false;
+    const tryWelcome = () => {
+      if (disposed || welcomeStarted.current || document.hidden) return;
+      say(greeting, () => { welcomeStarted.current = true; });
+    };
+    const attempt = window.setTimeout(tryWelcome, 280);
+    window.addEventListener("pointerdown", tryWelcome, { capture: true });
+    window.addEventListener("keydown", tryWelcome, { capture: true });
+    return () => {
+      disposed = true;
+      window.clearTimeout(attempt);
+      window.removeEventListener("pointerdown", tryWelcome, { capture: true });
+      window.removeEventListener("keydown", tryWelcome, { capture: true });
+    };
+  }, []);
 
   async function generatePathways(text: string, answer: string, controller: AbortController, token: number) {
     setPathwayError("");
@@ -315,7 +350,7 @@ export function IndependentEngage() {
 
     {firstAnswer && <section className="mx-auto mt-4 max-w-3xl rounded-xl border border-gold/35 bg-[#020913ed] p-5" aria-label="Initial objective answer">
       <h2 className="mb-2 text-lg text-gold">INITIAL ANSWER</h2>
-      <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
+      <p className="text-sm leading-7 text-foreground">{firstAnswer.replace(/\s+/g, " ").split(/(?<=[.!?])\s+/).slice(0, 2).join(" ").slice(0, 350)}</p>
       {loading && <p className="mt-3 text-xs text-gold" role="status">Developing three pathways and the fourth BLEND…</p>}
     </section>}
 
@@ -351,7 +386,8 @@ export function IndependentEngage() {
       </div>
       {selected && <>
         <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
-          onDive={(pathway, imageUrl) => { stopVoice(); setDive({ pathway, imageUrl }); }} />
+          onDive={(pathway, imageUrl, mode = "cutaway") => { stopVoice(); setDive({ pathway, imageUrl, mode }); }}
+          onSpeak={text => { if (talking) say(text.slice(0, 320)); }} />
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>
           <textarea id="pathway-refinement" rows={2} maxLength={900} value={refinement}
@@ -375,7 +411,7 @@ export function IndependentEngage() {
           generated_environment_url: null, model_url: null,
           outcome_score: null, outcome_reason: null,
         } satisfies ObjectivePathway}
-        objective={requested} requestId={null} initialMode="cutaway"
+        objective={requested} requestId={null} initialMode={dive.mode}
         onClose={() => setDive(null)}
         onNewObjective={reset} newObjectiveDisabled={loading}
         soundEnabled={talking}

@@ -216,7 +216,7 @@ export function RealityViewer({
     return ()=>{active=false;};
   }, [dissected, referenceImageUrl, requestId, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(true);
-  useEffect(() => { if (window.matchMedia('(min-width: 761px)').matches) setShowParts(true); }, []);
+  useEffect(() => { setShowParts(true); }, [pathway.id]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [simulate, setSimulate] = useState(false);
   const [playing, setPlaying] = useState(false);

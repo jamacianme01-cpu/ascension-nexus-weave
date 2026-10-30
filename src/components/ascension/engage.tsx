@@ -665,12 +665,6 @@ function ResultContent({
                 onKeyDown={canInspect && onInspect ? event => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(pathway); } } : undefined}
                 className={`rounded-xl border border-primary/25 bg-background/25 p-4 ${canInspect ? "cursor-pointer transition hover:border-primary/60 hover:bg-primary/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/45" : ""}`}
               >
-                {onToggleBlend && <label className="mb-3 flex min-h-11 items-center gap-2 text-sm text-gold"
-                  onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
-                  <input type="checkbox" checked={selectedBlendIds.includes(pathway.id)}
-                    onChange={() => onToggleBlend(pathway)} aria-label={`Use ${pathway.label} in a new blend`} />
-                  Choose for blending
-                </label>}
 
                 <p className="text-[0.65rem] tracking-[0.16em] text-primary uppercase">
                   PATH {index + 1}
@@ -694,7 +688,6 @@ function ResultContent({
                     Tradeoffs: {pathway.tradeoffs.map(cleanDisplayText).join(" · ")}
                   </p>
                 )}
-                {variablesFor(pathway)}
                 {canInspect && (
                   <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(pathway); }}
                     className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-primary uppercase">
@@ -712,12 +705,6 @@ function ResultContent({
                 onKeyDown={canInspect && onInspect ? event => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(delivery.blend!); } } : undefined}
                 className={`rounded-xl border border-gold/40 bg-gold/[0.04] p-4 ${canInspect ? "cursor-pointer transition hover:border-gold/70 hover:bg-gold/[0.08] focus:outline-none focus:ring-2 focus:ring-gold/45" : ""}`}
               >
-                {onToggleBlend && <label className="mb-3 flex min-h-11 items-center gap-2 text-sm text-gold"
-                  onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
-                  <input type="checkbox" checked={selectedBlendIds.includes(delivery.blend.id)}
-                    onChange={() => onToggleBlend(delivery.blend!)} aria-label={`Use ${delivery.blend.label} in a new blend`} />
-                  Choose for blending
-                </label>}
 
                 <p className="text-[0.65rem] tracking-[0.16em] text-gold uppercase">BLEND</p>
                 <h3 className="mt-1 font-display text-xl text-foreground">
@@ -738,7 +725,6 @@ function ResultContent({
                     Why blended: {cleanDisplayText(delivery.blend.blend_reason)}
                   </p>
                 )}
-                {variablesFor(delivery.blend)}
                 {canInspect && (
                   <button type="button" onClick={event => { event.stopPropagation(); onInspect?.(delivery.blend!); }}
                     className="mt-4 min-h-11 text-left text-xs font-medium tracking-[0.14em] text-gold uppercase">

@@ -16,6 +16,8 @@ const tests = [
     assert.match(ui, /ascension-scene-hero/);
     assert.match(app, /IndependentEngage/);
     assert.doesNotMatch(ui, /ascension-arrival-message/);
+    assert.match(ui, /data-realities=\{result \? "true" : undefined\}/);
+    assert.doesNotMatch(ui, /setStage\("eruption"\)/);
   }],
   ["Tree welcomes through voice, not a new written banner", () => {
     assert.match(ui, /const greeting = "Welcome to ASCENSION/);
@@ -76,6 +78,10 @@ const tests = [
     assert.match(ui, /onV1PartSelected={part =>/);
     assert.match(viewer, /onV1PartSelected\?: \(part: DesignPart\) => void/);
     assert.match(viewer, /const activeParts = v1Parts\?\.length \? v1Parts/);
+    assert.match(viewer, /data-v1=\{v1Parts !== undefined/);
+    assert.match(viewer, /v1Parts === undefined && <Button variant="outline" className="reality-sound"/);
+    assert.match(viewer, /v1Parts === undefined && <Button variant="outline" disabled=\{newObjectiveDisabled\} onClick=\{onNewAnswers\}/);
+    assert.match(ui, /soundEnabled=\{false\}/);
 
     assert.match(guide, /webkitSpeechRecognition/);
     assert.match(guide, /phase: "guide"/);

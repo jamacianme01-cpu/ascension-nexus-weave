@@ -55,8 +55,8 @@ try {
     else if (phase === "initial") body = { phase: "initial", answer: "A useful private engineering architecture for a four-rotor material-handling worker drone, with battery, motor controllers, sensors, lightweight frame and a gripper." };
     else if (phase === "pathways") body = {
       introduction: "Here are four engineered directions.",
-      pathways: [path("p1", "Four-rotor carrier"), path("p2", "Ducted-fan carrier"), path("p3", "Ground-air hybrid")],
-      blend: {...path("blend", "Blended worker drone"), blend_reason: "Combines the stability of the first design and handling features of the others."},
+      pathways: [path("p1", "Mobility-first architecture"), path("p2", "Coordinated team architecture"), path("p3", "Modular platform architecture")],
+      blend: {...path("blend", "Adaptive modular team"), blend_reason: "Combines the mobility, team coordination, and modular platform approaches."},
       verified: false, contributors: ["OpenAI"], unavailable: ["Claude","Grok"], providerErrors: [], mode: "openai-only-provisional", governance: "not verified", persistence: "not persisted",
     };
     else if (phase === "picture") body = { image_url: png, verified: false };
@@ -72,6 +72,9 @@ try {
   await page.getByRole("button", { name: "ENGAGE ASCENSION" }).click();
   await page.getByRole("tab").first().waitFor();
   assert.equal(await page.getByRole("tab").count(), 4);
+  for (const title of ["Mobility-first architecture", "Coordinated team architecture", "Modular platform architecture", "Adaptive modular team"]) {
+    assert.equal(await page.getByRole("tab", {name: new RegExp(title)}).count(),1, "The actual pathway title must remain visible: " + title);
+  }
   assert.equal(calls.filter(x => x === "picture").length, 0, "No pictures before selection");
   assert.equal(await page.getByText("INITIAL ANSWER").count(), 0);
   assert.ok(await page.locator('.ascension-world[data-realities="true"]').count());

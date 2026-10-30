@@ -20,10 +20,10 @@ export const supabaseAdmin = {
           filePath: string,
           bytes: Uint8Array,
           options?: { contentType?: string; upsert?: boolean },
-        ): Promise<{ error: { message: string } | null } | { error: null } {
+        ): Promise<{ error: { message: string } | null }> {
           try {
             if (REMOTE_BASE) {
-              const url = `${REMOTE_BASE.replace(/\/$/, "")}/$/{bucket}/$/{filePath}`;
+              const url = `${REMOTE_BASE.replace(/\/$/, "")}/${bucket}/${filePath}`;
               const res = await fetch(url, {
                 method: "PUT",
                 headers: {
@@ -57,7 +57,7 @@ export const supabaseAdmin = {
           if (REMOTE_BASE) {
             return {
               data: {
-                publicUrl: `${REMOTE_BASE.replace(/\/$/, "")}/$/{bucket}/$/{filePath}`,
+                publicUrl: `${REMOTE_BASE.replace(/\/$/, "")}/${bucket}/${filePath}`,
               },
             };
           }
@@ -65,7 +65,7 @@ export const supabaseAdmin = {
           const base = process.env["ASCENSION_PUBLIC_BASE_URL"]?.replace(/\/$/, "") || "";
           return {
             data: {
-              publicUrl: base ? `${base}/storage/$/{rel}` : `/storage/$/{rel}`,
+              publicUrl: base ? `${base}/storage/${rel}` : `/storage/${rel}`,
             },
           };
         },

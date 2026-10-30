@@ -671,7 +671,7 @@ function ResultContent({
                     onChange={() => onToggleBlend(pathway)} aria-label={`Use ${pathway.label} in a new blend`} />
                   Choose for blending
                 </label>}
-                <PathwayPreview pathway={pathway} />
+
                 <p className="text-[0.65rem] tracking-[0.16em] text-primary uppercase">
                   PATH {index + 1}
                   {pathway.spiral_form ? ` · ${cleanDisplayText(pathway.spiral_form)}` : ""}
@@ -718,7 +718,7 @@ function ResultContent({
                     onChange={() => onToggleBlend(delivery.blend!)} aria-label={`Use ${delivery.blend.label} in a new blend`} />
                   Choose for blending
                 </label>}
-                <PathwayPreview pathway={delivery.blend} />
+
                 <p className="text-[0.65rem] tracking-[0.16em] text-gold uppercase">BLEND</p>
                 <h3 className="mt-1 font-display text-xl text-foreground">
                   {cleanDisplayText(delivery.blend.label)}

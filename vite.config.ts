@@ -21,7 +21,10 @@ export default defineConfig({
   plugins: [
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),
-    tanstackStart(),
+    // Legacy authenticated pages still import the removed third-party auth client.
+    // Keep source intact but exclude those non-V1 pages until their independent
+    // replacement is implemented. Public Tree/Book and Inspect routes stay active.
+    tanstackStart({ router: { routeFileIgnorePattern: "_authenticated" } }),
     viteReact(),
   ],
 });

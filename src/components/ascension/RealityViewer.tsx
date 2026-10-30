@@ -1856,13 +1856,13 @@ export function RealityViewer({
         <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>
           PARTS
         </Button>
-        {v1Parts === undefined && <Button variant="outline" className="reality-sound" aria-pressed={soundEnabled && !soundBlocked} onClick={onToggleSound}>
+        <Button variant="outline" className="reality-sound" aria-pressed={soundEnabled && !soundBlocked} onClick={onToggleSound}>
           {soundEnabled ? (soundBlocked ? "SOUND BLOCKED · TAP" : "SOUND ON") : "SOUND OFF"}
-        </Button>}
+        </Button>
         </div>
-        {v1Parts === undefined && <div className="reality-extra-controls">
+        <div className="reality-extra-controls">
           <label>Volume <input aria-label="Ambient volume" type="range" min="0" max="0.7" step="0.05" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
-        </div>}
+        </div>
         {treeGuide && <div className="reality-tree-guide w-full">{treeGuide}</div>}
       </header>
       <div className="reality-model-stage" data-split={splitReference ? "true" : undefined} data-image-only={imageOnly ? "true" : undefined}>
@@ -2012,7 +2012,7 @@ export function RealityViewer({
         {ready && !dissected && <p>Drag to rotate · Right-drag to pan · Scroll / pinch to zoom</p>}
         <div className="reality-revision-actions" aria-label="Work from this result">
           <Button variant="outline" disabled={newObjectiveDisabled} onClick={onBuildOn}>BUILD ON RESULT</Button>
-          {v1Parts === undefined && <Button variant="outline" disabled={newObjectiveDisabled} onClick={onNewAnswers}>NEW ANSWERS</Button>}
+          <Button variant="outline" disabled={newObjectiveDisabled} onClick={onNewAnswers}>NEW ANSWERS</Button>
         </div>
         {blendControls}
       </footer>

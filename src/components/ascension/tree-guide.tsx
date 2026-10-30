@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { TreePine } from "lucide-react";
 
 /** The same spoken Tree stays available with the selected pathway and in reality inspection.
  * The server answers from selected design context; it cannot claim a physical test.
@@ -123,7 +124,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     <div className="flex flex-wrap items-center justify-between gap-2">
       <button type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}
         className="flex items-center gap-2 rounded-full border border-amber-200/45 px-3 py-2 text-amber-100">
-        <span aria-hidden="true">♧</span> TREE OF KNOWLEDGE {open ? "▴" : "▾"}
+        <TreePine aria-hidden="true" size={18} /> TREE OF KNOWLEDGE {open ? "▴" : "▾"}
       </button>
       {open && enabled && answer && <button type="button" onClick={() => onSpeak(answer)}
         className="rounded-full border border-amber-200/45 px-3 py-2 text-amber-100">HEAR AGAIN</button>}

@@ -77,9 +77,17 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
     const controller = new AbortController();
     setPicture(null); setPictureError(""); setPictureLoading(true);
     void fetch("/api/public/ascension/independent", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ objective, phase: "picture", pathway: path }),
-      signal: controller.signal,
+      method: "GET", cache: "no-store", signal: controller.signal,
+    }).then(async response => {
+      if (!response.ok) throw new Error("ASCENSION image engine status could not be checked.");
+      const capability: { picture_generation_enabled?: boolean } = await response.json();
+      if (!capability.picture_generation_enabled)
+        throw new Error("ASCENSION's image engine is not connected.");
+      return fetch("/api/public/ascension/independent", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ objective, phase: "picture", pathway: path }),
+        signal: controller.signal,
+      });
     }).then(async response => {
       const data: { image_url?: string; error?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
@@ -423,8 +431,8 @@ export function IndependentEngage() {
         onV1PartSelected={part => { if (talking) say(part.name + '. ' + part.purpose + ' ' + part.location); }}
         onClose={() => setDive(null)}
         onNewObjective={reset} newObjectiveDisabled={loading}
-        soundEnabled={talking}
-        onToggleSound={() => { stopVoice(); setTalking(v => !v); }}
+        soundEnabled={false}
+        onToggleSound={() => { /* V1 Tree speech remains controlled by Hear Tree. */ }}
         onDive={() => {}}
         onBuildOn={() => { const selectedPath = dive.pathway; setDive(null); buildOn(selectedPath); }}
         onNewAnswers={() => setDive(null)}

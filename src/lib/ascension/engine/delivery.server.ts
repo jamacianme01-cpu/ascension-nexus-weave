@@ -894,7 +894,7 @@ export async function resolveDelivery(args: {
         return { ...base, created_at: draft.created_at, engine_label: DRAFT_LABEL,
           engine_model: draft.engine_model, status: "completed", response_payload: saved,
           note: null, source: "external_draft" };
-    } catch { /* Incomplete historical projections can still be recovered below. */ }
+    } catch (cause) { console.warn("[ASCENSION cached draft rejected]", cause instanceof Error ? cause.message : "invalid draft"); }
   }
 
   // The user-facing draft can start as soon as the objective is accepted.

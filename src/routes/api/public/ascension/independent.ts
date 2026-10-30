@@ -237,6 +237,104 @@ async function guide(objective: string, question: string, selected: Record<strin
   return { phase: "guide" as const, answer: answer.slice(0, 1400), verified: false };
 }
 
+/** Build a pathway-specific, interactive concept assembly from normalized geometry.
+ * Not a photograph, a fabrication specification, or verified dimensions.
+ * Uses the already-connected text reasoning provider rather than an image API.
+ */
+const conceptPartSchema = {
+  type: "object",
+  properties: {
+    name: { type: "string" },
+    primitive: { type: "string", enum: ["box", "cylinder", "ring", "sphere", "nozzle"] },
+    position: { type: "array", items: { type: "number" } },
+    rotation: { type: "array", items: { type: "number" } },
+    scale: { type: "array", items: { type: "number" } },
+    material: { type: "string", enum: ["gold", "gold_deep", "blue", "blue_deep", "ice", "cyan", "warm", "copper", "steel", "dark"] },
+  },
+  required: ["name", "primitive", "position", "rotation", "scale", "material"],
+  additionalProperties: false,
+};
+const conceptSchema = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    description: { type: "string" },
+    parts: { type: "array", items: conceptPartSchema },
+    hero_rotation: { type: "array", items: { type: "number" } },
+    hero_scale: { type: "number" },
+  },
+  required: ["title", "description", "parts", "hero_rotation", "hero_scale"],
+  additionalProperties: false,
+};
+function boundedTriple(input: unknown, floor: number, ceiling: number): [number, number, number] | null {
+  if (!Array.isArray(input) || input.length !== 3 ||
+      input.some(n => typeof n !== "number" || !Number.isFinite(n) || n < floor || n > ceiling)) return null;
+  return [input[0], input[1], input[2]];
+}
+async function concept(objective: string, selected: Record<string, unknown>) {
+  if (!configured().OpenAI) throw new Error("ASCENSION's concept geometry engine is not connected.");
+  const title = String(selected["title"] ?? "").trim().slice(0, 140);
+  const summary = String(selected["summary"] ?? "").trim().slice(0, 1500);
+  if (!title || summary.length < 35) throw new Error("Choose a completed pathway first.");
+  const entries = Array.isArray(selected["parts"]) ? selected["parts"].slice(0, 16).map(v => obj(v)) : [];
+  const names = entries.map(v => String(v["name"] ?? "").trim()).filter(Boolean);
+  const response = await callOpenAIResponse({
+    timeoutMs: 28000,
+    structuredOutput: { name: "ascension_concept_geometry", schema: conceptSchema },
+    system: [
+      "Create a pathway-specific concept assembly that can be rotated and dissected in ASCENSION.",
+      "Use ONLY box, cylinder, ring, sphere and nozzle primitives to represent the physical form of",
+      "the actual named components in the proposed invention. Every piece needs a meaningful physical",
+      "name; combine several primitives for one component when needed. The model must visually resemble",
+      "the real CATEGORY of the selected object rather than a generic pile of boxes.",
+      "Position, rotation and scale are RELATIVE RENDERING UNITS, NOT real dimensions. Do not claim",
+      "engineering measurements or physical feasibility. Use consistent relative positions in a compact",
+      "scene centered on the origin, and at least two different primitive shapes.",
+      "Do not invent components incompatible with the selected pathway. If this is software, a theory,",
+      "or a subject without an established physical shape, return an empty parts array so no fake physical",
+      "model is shown. Never invent measurements, flight performance, structural loads, or verified tests.",
+      "Use 6–16 named pieces for real physical inventions. Position coordinates -3..3, rotations",
+      "-6.3..6.3 radians, per-axis scale 0.03..3.0. Return schema JSON only.",
+    ].join(" "),
+    user: JSON.stringify({ objective: objective.slice(0, 550), selected_pathway: { title, summary, components: entries.slice(0, 12), steps: Array.isArray(selected["steps"]) ? selected["steps"].slice(0, 6) : [] } }),
+  });
+  const data = obj(JSON.parse(response.text));
+  const primitives = new Set(["box", "cylinder", "ring", "sphere", "nozzle"]);
+  const materials = new Set(["gold", "gold_deep", "blue", "blue_deep", "ice", "cyan", "warm", "copper", "steel", "dark"]);
+  const pieces = Array.isArray(data["parts"]) ? data["parts"] : [];
+  const parsed = pieces.slice(0, 24).map(raw => {
+    const part = obj(raw);
+    const position = boundedTriple(part["position"], -3, 3);
+    const rotation = boundedTriple(part["rotation"], -6.3, 6.3);
+    const scale = boundedTriple(part["scale"], 0.02, 3);
+    const name = String(part["name"] ?? "").trim().slice(0, 100);
+    if (!name || !primitives.has(String(part["primitive"])) || !materials.has(String(part["material"])) ||
+        !position || !rotation || !scale) return null;
+    return { name, primitive: String(part["primitive"]), position, rotation, scale, material: String(part["material"]) };
+  }).filter(p => p !== null);
+  const represented = new Set(parsed.map(p => p.primitive));
+  if (parsed.length < 5 || represented.size < 2) throw new Error(
+    "The concept geometry could not faithfully represent this pathway. The design description and labels remain available.");
+  // Check for at least one supplied semantic component. A plausible-looking
+  // but unrelated model must not replace the user's chosen invention.
+  const vocabulary = new Set(names.flatMap(v => v.toLowerCase().match(/[a-z]{4,}/g) ?? []));
+  const grounded = parsed.some(p => (p.name.toLowerCase().match(/[a-z]{4,}/g) ?? []).some(word => vocabulary.has(word)));
+  if (vocabulary.size && !grounded) throw new Error("The proposed geometry did not match the selected components.");
+  return {
+    phase: "concept" as const,
+    model_spec: {
+      title: String(data["title"] ?? title).slice(0, 140),
+      description: "INTERPRETIVE MODEL · RELATIVE UNITS ONLY. " + String(data["description"] ?? "").slice(0, 600),
+      parts: parsed,
+      hero_rotation: boundedTriple(data["hero_rotation"], -6.3, 6.3) ?? [0.25, -0.45, 0],
+      hero_scale: typeof data["hero_scale"] === "number" && Number.isFinite(data["hero_scale"])
+        ? Math.min(1.8, Math.max(0.5, data["hero_scale"])) : 1,
+    },
+    actual_image: false,
+    verified: false,
+  };
+}
+
 /** Produce a real image for the selected pathway, never substitute diagram boxes.
  * A separate owner-controlled switch prevents surprise image-generation charges.
  */
@@ -316,6 +414,11 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
             return json({ error: "Ask a question between 3 and 800 characters." }, 400);
           if (!limit("guide-ip:" + address, 12)) return json({ error: "Tree question limit reached." }, 429);
           return json(await guide(objective, question, obj(input["pathway"])));
+        }
+        if (input["phase"] === "concept") {
+          if (!limit("concept-ip:" + address, 8) || !limit("concept-global", 36))
+            return json({ error: "Concept rendering limit reached." }, 429);
+          return json(await concept(objective, obj(input["pathway"])));
         }
         if (input["phase"] === "picture") {
           if (!limit("image-ip:" + address, 4) || !limit("image-global", 24))

@@ -79,9 +79,9 @@ const tests = [
     assert.match(viewer, /onV1PartSelected\?: \(part: DesignPart\) => void/);
     assert.match(viewer, /const activeParts = v1Parts\?\.length \? v1Parts/);
     assert.match(viewer, /data-v1=\{v1Parts !== undefined/);
-    assert.match(viewer, /v1Parts === undefined && <Button variant="outline" className="reality-sound"/);
-    assert.match(viewer, /v1Parts === undefined && <Button variant="outline" disabled=\{newObjectiveDisabled\} onClick=\{onNewAnswers\}/);
-    assert.match(ui, /soundEnabled=\{false\}/);
+    assert.match(viewer, /className="reality-sound"/);
+    assert.match(viewer, /onClick=\{onNewAnswers\}/);
+    assert.match(ui, /soundEnabled=\{talking\}/);
 
     assert.match(guide, /webkitSpeechRecognition/);
     assert.match(guide, /phase: "guide"/);

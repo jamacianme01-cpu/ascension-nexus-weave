@@ -140,9 +140,9 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
         <button key={tab} type="button" aria-pressed={panel === tab}
           onClick={() => { setPanel(tab); onSpeak(tab === "description" ? path.summary.slice(0, 260) : "Choose a named component to learn what it does and where it belongs."); }}
           className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold">{tab.toUpperCase()}</button>)}
-      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "blueprint")}
+      <button type="button" disabled={!picture && !conceptSpec} onClick={() => onDive(path, picture, "blueprint", conceptSpec)}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
-      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "dissect")}
+      <button type="button" disabled={!picture && !conceptSpec} onClick={() => onDive(path, picture, "dissect", conceptSpec)}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT / EXPLODE</button>
     </div>
     <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
@@ -164,12 +164,30 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
           <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
             onClick={() => { setScale(1); setRotation(0); }}>RESET VIEW</button>
           <button type="button" className="rounded-full border border-primary/60 px-5 py-2 text-sm text-primary"
-            onClick={() => onDive(path, picture)}>DIVE INTO REALITY</button>
+            onClick={() => onDive(path, picture, "cutaway", conceptSpec)}>DIVE INTO REALITY</button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Actual generated concept artwork. No verified 3D mesh is available yet; 3D editing requires a reconstructed model.</p>
-      </> : <p className="p-6 text-center text-sm text-muted-foreground" role={pictureError ? "alert" : "status"}>
-        {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
+      </> : conceptSpec ? <>
+        <Suspense fallback={<p role="status" className="p-5 text-center text-gold">Rendering selected concept…</p>}>
+          <SelectedModelPreview
+            objective={objective}
+            spec={conceptSpec}
+            pathway={{
+              id: path.id, label: path.title, summary: path.summary,
+              steps: path.steps, tradeoffs: path.tradeoffs,
+              spiral_form: null, visual_svg: null, model_spec: conceptSpec,
+              generated_image_url: null, generated_blueprint_url: null,
+              generated_environment_url: null, model_url: null,
+              outcome_score: null, outcome_reason: null,
+            }}
+          />
+        </Suspense>
+        <button type="button" onClick={() => onDive(path, null, "cutaway", conceptSpec)}
+          className="mt-3 rounded-full border border-primary/60 px-5 py-2 text-sm text-primary">DIVE INTO REALITY</button>
+      </> : <p className="p-6 text-center text-sm text-muted-foreground" role={pictureError || conceptError ? "alert" : "status"}>
+        {conceptLoading || pictureLoading ? "Developing the selected invention view…" : conceptError || pictureError || "A source-derived invention picture is not available."}
       </p>}
+      {conceptSpec && !picture && <p className="mt-2 text-xs text-muted-foreground">Interpretive geometry · Not a finished physical model or measured blueprint.</p>}
     </div>
     {panel === "description" && <>
     <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>

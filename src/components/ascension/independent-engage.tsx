@@ -81,7 +81,7 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak }: {
     }).then(async response => {
       const data: { image_url?: string; error?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
-      if (!data.image_url?.startsWith("data:image/png;base64,"))
+      if (!data.image_url || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{4000,12000000}$/i.test(data.image_url))
         throw new Error("The image provider did not return a usable picture.");
       if (!controller.signal.aborted) {
         imageCache.current.set(cacheKey, data.image_url);

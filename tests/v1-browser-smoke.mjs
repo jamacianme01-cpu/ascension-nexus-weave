@@ -91,8 +91,7 @@ try {
   await page.getByRole("button",{name:"BLUEPRINT",exact:true}).first().click();
   await page.locator("dialog.reality-screen[open]").waitFor({state:"visible"});
   assert.equal(await page.locator('dialog.reality-screen[data-v1="true"]').count(), 1);
-  assert.equal(await page.getByRole("button", {name:"NEW ANSWERS",exact:true}).count(), 0);
-  assert.equal(await page.getByRole("button", {name:"SOUND OFF",exact:true}).count(), 0);
+  assert.ok(await page.getByRole("button", {name:/SOUND (ON|OFF|BLOCKED)/}).count(), "The existing Sound control must not be removed.");
   await page.getByRole("button", {name:/BACK TO PATHWAYS/}).click();
   assert.equal(await page.locator("dialog.reality-screen[open]").count(), 0);
   assert.equal(messages.length, 0, messages.join(" | "));

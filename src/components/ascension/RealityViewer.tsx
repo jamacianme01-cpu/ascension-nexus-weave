@@ -276,9 +276,7 @@ export function RealityViewer({
   };
   const dive = useRef(onDive);
   dive.current = onDive;
-  const [mode, setMode] = useState<RealityMode>(
-    "cutaway",
-  );
+  const [mode, setMode] = useState<RealityMode>(initialMode);
   const [selectedObject, setSelectedObject] = useState("Nothing selected");
   const [transformMode, setTransformMode] = useState<"translate" | "rotate" | "scale">("translate");
   const [addKind, setAddKind] = useState<CatalogKind>("box");

@@ -77,7 +77,7 @@ const tests = [
     assert.match(guide, /phase: "guide"/);
     assert.match(route, /async function guide\(objective: string, question: string/);
     assert.match(route, /if \(input\["phase"\] === "guide"\)/);
-    assert.match(route, /"Tree of Knowledge, the warm, knowledgeable, spoken guide/);
+    assert.match(route, /You are the Tree of Knowledge, the warm, knowledgeable, spoken guide/);
   }],
   ["owner signoff remains unchecked", () => {
     assert.ok(checklist.includes("- [ ]"));

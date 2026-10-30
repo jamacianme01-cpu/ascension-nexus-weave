@@ -104,11 +104,14 @@ async function firstAnswer(objective: string) {
   const response = await callOpenAIResponse({
     timeoutMs: 26000,
     system: [
-      "Give a substantive direct answer to the user's objective now.",
-      "Focus on accomplishing the objective with specific useful details, a practical structure and key requirements.",
-      "Do not return JSON or pathways yet. A separate stage will compare possible implementations.",
-      "Keep the original user's terms and meaning. Do not substitute an unrelated topic.",
-      "Never claim anything is built, tested, connected, or governed without evidence."
+      "Prepare an INTERNAL invention-engineering brief, not prose to display to the user.",
+      "Interpret the objective as a task to DEVELOP a concrete system or invention, not teach a generic tutorial.",
+      "Identify a workable reference architecture, key assemblies or modules, how they interact, resources and limitations.",
+      "For short objectives, state provisional engineering assumptions in the brief rather than asking the user to define the design.",
+      "Clearly distinguish established knowledge from unmeasured parameters and ideas requiring physical verification.",
+      "Do not return JSON or finished pathway cards yet. A separate stage will produce three alternative designs and a blend.",
+      "Never end by asking for more details or recommend that the user define a purpose instead of providing design substance.",
+      "Keep the user's wording and meaning. Never claim anything is built, tested, connected, or governed without evidence."
     ].join(" "),
     user: objective,
   });
@@ -178,7 +181,10 @@ async function build(objective: string, firstAnswerText = "") {
       "Return exactly one JSON object with required keys: introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",
-      "Provide substance specific to the objective. Do not just describe an app interface or repeat the same concept three times.",
+      "For a physical invention, each path must propose a coherent device architecture with actual named subsystems, functional relationships, and a feasible operating sequence.",
+      "For software, each path must propose how the actual requested product will work, not vague marketing copy or a generic productivity app.",
+      "Do not tell the user to start by defining their purpose; make explicitly labeled provisional design assumptions when the request is short.",
+      "Provide substantive, objective-specific alternatives. Do not repeat the same proposal or swap only superficial labels.",
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",
     ].join(" "),
     user: "OBJECTIVE (user wording is authoritative):\n" + objective +

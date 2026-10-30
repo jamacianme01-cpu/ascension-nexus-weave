@@ -167,7 +167,7 @@ export function RealityViewer({
   const referenceImageUrl = sourceReference ?? assembledImage;
   const displayedImageUrl = dissected && dissection ? dissection.imageUrl : referenceImageUrl;
   const splitReference = Boolean(displayedImageUrl);
-  const awaitingFaithfulMesh = Boolean(conceptual && !pathway.model_spec && (referenceImageUrl || ["queued","claimed","running"].includes(pathway.model_status ?? "")));
+  const awaitingFaithfulMesh = Boolean(conceptual && (referenceImageUrl || ["queued","claimed","running"].includes(pathway.model_status ?? "")));
   const imageOnly = Boolean(awaitingFaithfulMesh && displayedImageUrl);
   const sourceMismatch = Boolean(assembledImage && sourceReference && assembledImage !== sourceReference);
   const [dissectionLoading, setDissectionLoading] = useState(false);
@@ -211,7 +211,7 @@ export function RealityViewer({
   useEffect(() => {
     // DISSECTED is optional: a separate exploded illustration, NEVER the
     // main image-to-3D reference for the assembled invention.
-    if (!dissected || !ready || !api.current || dissection || (v1InitialDissected && pathway.model_spec && !referenceImageUrl)) return;
+    if (!dissected || !ready || !api.current || dissection) return;
     let active = true;
     setDissectionLoading(true); setDissectionError(null); setPartIndex(null);
     getDissectedDesign({data:{view:"dissected",...(requestId ? {requestId} : {}),pathwayId:pathway.id,...(referenceImageUrl ? {referenceImageUrl} : {}),objective,label:pathway.label,summary:pathway.summary,image:api.current.picture(),steps:pathway.steps,components:(pathway.model_spec?.parts.map(part=>part.name) ?? conceptPartsRef.current.map(part=>part.name)),faithful:!conceptual}})
@@ -225,16 +225,6 @@ export function RealityViewer({
     return ()=>{active=false;};
   }, [dissected, referenceImageUrl, requestId, ready, pathway.id, pathway.label, pathway.summary, objective, dissectionAttempt]);
   const [showParts, setShowParts] = useState(true);
-  useEffect(() => {
-    if (!ready || !v1InitialDissected || !pathway.model_spec || referenceImageUrl) return;
-    try {
-      api.current?.explode(true);
-      setExploded(true);
-      setShowParts(true);
-    } catch (cause) {
-      setExplosionError(cause instanceof Error ? cause.message : "Dissection could not be opened.");
-    }
-  }, [ready, v1InitialDissected, pathway.id, pathway.model_spec, referenceImageUrl]);
   useEffect(() => { setShowParts(true); }, [pathway.id]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [simulate, setSimulate] = useState(false);
@@ -1859,15 +1849,7 @@ export function RealityViewer({
         <Button variant="outline" disabled={!ready || awaitingFaithfulMesh} aria-pressed={!dissected && mode==="blueprint"} onClick={()=>{setDissected(false);setMode("blueprint");}}>
           BLUEPRINT
         </Button>
-        <Button variant="outline" disabled={!ready || (!referenceImageUrl && !pathway.model_spec)} aria-pressed={dissected} onClick={() => {
-          const next = !dissected; setDissected(next); setPartIndex(null);
-          if (v1Parts?.length && pathway.model_spec && !referenceImageUrl) {
-            api.current?.explode(next); setExploded(next);
-          } else {
-            setSection(next ? 50 : 100); api.current?.section(next ? 50 : 100);
-          }
-          if (next) setShowParts(true);
-        }}>
+        <Button variant="outline" disabled={!ready || !referenceImageUrl} aria-pressed={dissected} onClick={() => {const next=!dissected;setDissected(next);setPartIndex(null);setSection(next?50:100);api.current?.section(next?50:100);if(next)setShowParts(true);}}>
           DISSECTED
         </Button>
         <Button variant="outline" className="reality-parts-tab" aria-expanded={showParts} aria-controls="reality-parts" aria-pressed={showParts} onClick={() => setShowParts(value => !value)}>

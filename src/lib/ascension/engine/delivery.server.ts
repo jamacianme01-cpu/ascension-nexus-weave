@@ -892,7 +892,7 @@ export async function resolveDelivery(args: {
       const creationMissingSpiral = requestedKind(run.objective) === "design" &&
         saved.pathways.length === 0 && Array.isArray(record(draft.response_payload)["pathways"]) &&
         needsSpiralExpansionRepair(run.objective, run.evidence, [], saved);
-      if (!creationMissingSpiral && saved.kind !== "not_produced" && (assessment.produced || hasEnvisionPreparation(run.objective, saved)))
+      if (!creationMissingSpiral && saved.kind !== "not_produced")
         return { ...base, created_at: draft.created_at, engine_label: DRAFT_LABEL,
           engine_model: draft.engine_model, status: "completed", response_payload: saved,
           note: null, source: "external_draft" };

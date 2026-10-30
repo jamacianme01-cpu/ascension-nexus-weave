@@ -419,6 +419,7 @@ export function IndependentEngage() {
           limitations: "Unverified concept; precise mechanical dimensions and location are not supplied.",
           x: -1, y: -1,
         }))}
+        onV1PartSelected={part => { if (talking) say(part.name + '. ' + part.purpose + ' ' + part.location); }}
         onClose={() => setDive(null)}
         onNewObjective={reset} newObjectiveDisabled={loading}
         soundEnabled={talking}

@@ -4,7 +4,7 @@ This is an implementation record, **not owner acceptance**. No checkboxes in the
 
 ## Implemented on repair branch
 - Existing Tree + Book scene retained. Spoken Knowledgeverse welcome invokes browser text-to-speech on page entry, with first user-action fallback if autoplay is blocked. No emergence overlay or written welcome banner.
-- Initial objective response is concise onscreen. Its full analysis still feeds the pathway generator.
+- Initial objective analysis remains entirely in the backend as input to pathway generation. The user-facing intermediate essay or shortened initial answer is not shown.
 - Three distinct pathway choices and the fourth blend remain. Pictures are requested only when a pathway is selected, not on all four cards.
 - The chosen pathway exposes DESCRIPTION and clickable LABELS, and entry actions for BLUEPRINT and DISSECT/EXPLODE. Part labels use the selected pathway's actual names, purposes and stated locations, not fabricated mesh coordinates.
 - The existing reality viewer remains the underlying view implementation. CAD, Environment and Simulation are not added to the V1 pathway selector.

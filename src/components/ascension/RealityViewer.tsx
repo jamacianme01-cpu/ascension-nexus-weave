@@ -101,6 +101,7 @@ export function RealityViewer({
   isPartSelected,
   onTogglePart,
   blendControls,
+  v1Parts,
 }: {
   pathway: ObjectivePathway;
   objective: string;
@@ -119,6 +120,8 @@ export function RealityViewer({
   isPartSelected: (part: DesignPart, field?: "purpose" | "location" | "operation" | "connections" | "limitations") => boolean;
   onTogglePart: (part: DesignPart, field?: "purpose" | "location" | "operation" | "connections" | "limitations") => void;
   blendControls: ReactNode;
+  /** Source-authored named parts from the selected V1 pathway, not invented mesh anchors. */
+  v1Parts?: DesignPart[];
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -261,7 +264,7 @@ export function RealityViewer({
       .finally(() => { if (active) setPartsLoading(false); });
     return () => { active = false; };
   }, [showParts, objective, pathway.id, pathway.label, pathway.summary, partsStepsKey, partsAttempt, ready]);
-  const activeParts = dissected && dissection ? dissection.parts : conceptual ? conceptParts : parts;
+  const activeParts = dissected && dissection ? dissection.parts : conceptual && v1Parts?.length ? v1Parts : conceptual ? conceptParts : parts;
   // Reference image stays unchanged; 3D sectioning and explosion affect the mesh only.
   const selectedComponent = components.find(component=>component.id===componentId);
   const selectedPart = partIndex !== null ? activeParts[partIndex] : !dissected || conceptual ? selectedComponent?.detail ?? null : null;
@@ -1859,7 +1862,7 @@ export function RealityViewer({
         {!displayedImageUrl && awaitingFaithfulMesh && <div className="reality-reference-pending" role={assembledError?"alert":"status"}><strong>{assembledLoading?"CREATING COMPLETE ASSEMBLED IMAGE":"ASSEMBLED VIEW"}</strong><p>{assembledError ?? (assembledLoading?"Preparing a clear, complete view of your selected invention…":"Waiting for the complete assembled reference picture.")}</p>{assembledError && <Button variant="outline" onClick={()=>setAssembledAttempt(x=>x+1)}>RETRY ASSEMBLED IMAGE</Button>}</div>}
         {displayedImageUrl && <RealityDissection imageUrl={displayedImageUrl} view={dissected && dissection ? "dissected" : "assembled"} parts={dissected && dissection && displayedImageUrl === dissection.imageUrl ? dissection.parts : []} selected={partIndex} label={pathway.label} onSelect={index=>{setPartIndex(index);setShowParts(true);const match=groundedComponent(dissection?.parts[index]?.name??"",components);if(match)api.current?.selectComponent(match.id);}}/>}
         {sourceMismatch && <p className="reality-source-warning" role="alert">The displayed reference is different from the image used for this model. The geometry is NOT image-matched.</p>}
-        {awaitingFaithfulMesh && <div className="reality-mesh-pending" role="status"><strong>AWAITING SOURCE-DERIVED 3D MODEL</strong><p>The approved left image is preserved. Hunyuan3D must reconstruct its geometry before CAD, Dissect and Blueprint can manipulate that same subject.</p><p>Model job: {pathway.model_status ?? "not started"}{pathway.model_error ? ` · ${pathway.model_error}` : ""}</p><small>No unrelated placeholder model is substituted for your design.</small></div>}
+        {awaitingFaithfulMesh && !v1Parts && <div className="reality-mesh-pending" role="status"><strong>AWAITING SOURCE-DERIVED 3D MODEL</strong><p>The approved left image is preserved. Hunyuan3D must reconstruct its geometry before CAD, Dissect and Blueprint can manipulate that same subject.</p><p>Model job: {pathway.model_status ?? "not started"}{pathway.model_error ? ` · ${pathway.model_error}` : ""}</p><small>No unrelated placeholder model is substituted for your design.</small></div>}
         {simulate && !dissected && phases.length > 0 && <div className={`reality-operation-stage${interpretiveDemo ? "" : " reality-operation-stage--with-model"}`} aria-label="Animated objective operation" role="status">
           <span className="reality-operation-eyebrow">CONCEPTUAL OPERATION · PHASE {frame.index + 1} OF {phases.length} · UNVERIFIED</span>
           <div className="reality-operation-flow" aria-label="Objective to current operating phase">
@@ -1944,12 +1947,12 @@ export function RealityViewer({
         {showParts && (
           <section id="reality-parts" className="reality-parts" aria-label="Design parts">
             <Button variant="outline" className="reality-inspector-close" aria-label="Close part inspector" onClick={()=>setShowParts(false)}>✕</Button>
-            {conceptual && geometryStatus !== "semantic" && <p className="reality-parts-hint" role="note">{geometryStatus === "incomplete" ? fidelity.reason : "No grounded physical geometry for this subject."} The points below are interpretive pathway components, not a finished object.{fidelity.missing.length ? ` Not represented: ${fidelity.missing.slice(0,4).join(" · ")}` : ""}</p>}
+            {!v1Parts && conceptual && geometryStatus !== "semantic" && <p className="reality-parts-hint" role="note">{geometryStatus === "incomplete" ? fidelity.reason : "No grounded physical geometry for this subject."} The points below are interpretive pathway components, not a finished object.{fidelity.missing.length ? ` Not represented: ${fidelity.missing.slice(0,4).join(" · ")}` : ""}</p>}
             <div className="reality-component-workbench">
               {!partsLoading && !partsError && <div className="reality-named-parts" aria-label="Named parts and functions">
-                {activeParts.map((part,index)=><Button variant="outline" key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);if(dissected && dissection){const match=groundedComponent(part.name,components);if(match){setWorkbenchError(null);api.current?.selectComponent(match.id);}else{setComponentId(null);setWorkbenchError("Picture-to-mesh mapping unavailable for this part; choose a 3D component manually.");}}else api.current?.locatePart(index);}}><strong>{index + 1}. {part.name}</strong><span>{part.purpose}</span></Button>)}
+                {activeParts.map((part,index)=><Button variant="outline" key={part.name+index} aria-pressed={partIndex===index} onClick={()=>{setPartIndex(index);if(dissected && dissection){const match=groundedComponent(part.name,components);if(match){setWorkbenchError(null);api.current?.selectComponent(match.id);}else{setComponentId(null);setWorkbenchError("Picture-to-mesh mapping unavailable for this part; choose a 3D component manually.");}}else if (!v1Parts?.length) api.current?.locatePart(index);}}><strong>{index + 1}. {part.name}</strong><span>{part.purpose}</span></Button>)}
               </div>}
-              {!awaitingFaithfulMesh && <details className="reality-geometry-details" open={editorOpen} onToggle={event=>setEditorOpen(event.currentTarget.open)}><summary>Editable model components</summary>
+              {!v1Parts && !awaitingFaithfulMesh && <details className="reality-geometry-details" open={editorOpen} onToggle={event=>setEditorOpen(event.currentTarget.open)}><summary>Editable model components</summary>
               <div className="reality-component-list" aria-label="Editable components">
                 {components.map(component=><Button variant="outline" key={component.id} aria-pressed={componentId===component.id} onClick={()=>{setPartIndex(null);api.current?.selectComponent(component.id);}}>{component.name}</Button>)}
               </div>
@@ -1976,24 +1979,18 @@ export function RealityViewer({
               <h2>{selectedPart.name}</h2>
               {dissected && dissection && !awaitingFaithfulMesh && <Button variant="outline" className="reality-edit-illustrated-part" onClick={editIllustratedPart}>MANIPULATE THIS PART IN 3D</Button>}
               {dissected && dissection && <p className="reality-parts-hint">{componentId ? "Mapped 3D component selected — edit it in the 3D pane beside the picture." : "No grounded 3D component mapped; manipulation disabled until you pick one."}</p>}
-              <label className="reality-blend-choice">
+              {!v1Parts && <label className="reality-blend-choice">
                 <input type="checkbox" checked={isPartSelected(selectedPart)} onChange={() => onTogglePart(selectedPart)} />
                 Use {selectedPart.name} in a new blend
-              </label>
-              {!dissected && !componentId && <p>This feature is located on shared geometry. It is not yet a separate editable component.</p>}
+              </label>}
+              {!v1Parts && !dissected && !componentId && <p>This feature is located on shared geometry. It is not yet a separate editable component.</p>}
               <dl>{([
                 ["Purpose", selectedPart.purpose, "purpose"],
                 ["Location in the design", selectedPart.location, "location"],
                 ["How it works", selectedPart.operation, "operation"],
                 ["Connections", selectedPart.connections, "connections"],
                 ["Design limits", selectedPart.limitations, "limitations"],
-              ] as const).map(([label, text, field]) => <div key={label}><dt>
-                <label className="reality-blend-choice">
-                  <input type="checkbox" checked={isPartSelected(selectedPart, field)}
-                    onChange={() => onTogglePart(selectedPart, field)} aria-label={`Use ${selectedPart.name} ${label} in a new blend`} />
-                  {label}
-                </label>
-              </dt><dd>{text}</dd></div>)}</dl>
+              ] as const).map(([label, text, field]) => <div key={label}><dt>{v1Parts ? label : <label className="reality-blend-choice"><input type="checkbox" checked={isPartSelected(selectedPart, field)} onChange={() => onTogglePart(selectedPart, field)} aria-label={`Use ${selectedPart.name} ${label} in a new blend`} />{label}</label>}</dt><dd>{text}</dd></div>)}</dl>
             </article>}
           </section>
         )}

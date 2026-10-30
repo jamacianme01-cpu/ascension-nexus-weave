@@ -97,16 +97,15 @@ export async function callZai(input: CallZaiOptions | string, user?: string, opt
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
         },
         body: JSON.stringify({
-          model: model.includes('/') ? model : `openai/${model}`,
+          model: process.env["ASCENSION_OPENROUTER_FREE_MODEL"]?.trim() || "openrouter/free",
           messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: options.imageDataUrl
-              ? [{ type: "text", text: userPrompt }, { type: "image_url", image_url: { url: options.imageDataUrl } }]
-              : userPrompt },
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
           ],
+          provider: { zdr: true, data_collection: "deny", max_price: { prompt: 0, completion: 0 } },
           temperature,
           max_tokens: maxTokens,
-          response_format: options.jsonMode ? { type: 'json_object' } : undefined,
+          response_format: options.jsonMode ? { type: "json_object" } : undefined,
         }),
       });
       if (res.ok) {

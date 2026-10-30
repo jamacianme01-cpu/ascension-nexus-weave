@@ -885,8 +885,6 @@ export async function resolveDelivery(args: {
   if (draft?.status === "completed" && !retry) {
     try {
       const saved = parseDelivery(draft.response_payload);
-      const assessment = assessResult(run.objective, saved.body, saved.files,
-        [...saved.pathways, ...(saved.blend ? [saved.blend] : [])].flatMap(pathway => pathway.visual_svg ? [pathway.visual_svg] : []));
       // Historical text-only creation drafts must not suppress the real Spiral
       // synthesis when the objective is reopened. Keep ordinary answers intact.
       const creationMissingSpiral = requestedKind(run.objective) === "design" &&

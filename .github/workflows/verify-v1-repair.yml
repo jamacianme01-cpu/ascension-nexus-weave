@@ -24,3 +24,13 @@ jobs:
         continue-on-error: true
         run: bun tests/interface.test.mjs
       - run: bun tests/creation-source-context.test.mjs
+      - name: Browser acceptance against the original V1 experience
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          bun run dev -- --host 127.0.0.1 --port 4174 > /tmp/ascension-v1-dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4174/ > /dev/null; then break; fi
+            sleep 2
+          done
+          node tests/v1-browser-smoke.mjs

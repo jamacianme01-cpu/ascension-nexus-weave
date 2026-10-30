@@ -25,14 +25,32 @@ interface CallZaiOptions {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
-}
+  system?: string;
+  user?: string;
+  knowledgeQuery?: string;
+  imageDataUrl?: string;
 
-export async function callZai(
-  systemPrompt: string,
-  userPrompt: string,
-  options: CallZaiOptions = {},
-): Promise<string> {
-  const model = options.model || zaiModel('flash');
+
+type InferenceResult = { text: string; json: Record<string, unknown> | null; model: string; duration_ms: number };
+function parseResult(text: string): Record<string, unknown> | null {
+  try {
+    const cleaned = text.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\x60{3}\s*$/, "");
+    const parsed = JSON.parse(cleaned);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch { return null; }
+}
+export function callZai(input: CallZaiOptions): Promise<InferenceResult>;
+export function callZai(system: string, user: string, options?: CallZaiOptions): Promise<string>;
+export async function callZai(input: CallZaiOptions | string, user?: string, opts: CallZaiOptions = {}): Promise<InferenceResult | string> {
+  const legacy = typeof input === "string";
+  const options = legacy ? opts : input;
+  const systemPrompt = legacy ? input : (input.system ?? "");
+  const userPrompt = legacy ? (user ?? "") : (input.user ?? "");
+  const started = Date.now();
+  const model = options.model || zaiModel("flash");
+  const output = (value: string): InferenceResult | string => legacy ? value : {
+    text: value, json: parseResult(value), model, duration_ms: Date.now() - started,
+  };
   const temperature = options.temperature ?? 0.7;
   const maxTokens = options.maxTokens ?? 4096;
 
@@ -49,7 +67,9 @@ export async function callZai(
           model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
+            { role: 'user', content: options.imageDataUrl
+              ? [{ type: "text", text: userPrompt }, { type: "image_url", image_url: { url: options.imageDataUrl } }]
+              : userPrompt },
           ],
           temperature,
           max_tokens: maxTokens,
@@ -59,7 +79,7 @@ export async function callZai(
       if (res.ok) {
         const data = await res.json();
         const text = data.choices?.[0]?.message?.content;
-        if (text) return text;
+        if (text) return output(text);
       }
     } catch {
       // fall through
@@ -79,7 +99,9 @@ export async function callZai(
           model: model.includes('/') ? model : `openai/${model}`,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
+            { role: 'user', content: options.imageDataUrl
+              ? [{ type: "text", text: userPrompt }, { type: "image_url", image_url: { url: options.imageDataUrl } }]
+              : userPrompt },
           ],
           temperature,
           max_tokens: maxTokens,
@@ -89,7 +111,7 @@ export async function callZai(
       if (res.ok) {
         const data = await res.json();
         const text = data.choices?.[0]?.message?.content;
-        if (text) return text;
+        if (text) return output(text);
       }
     } catch {
       // fall through
@@ -103,21 +125,18 @@ export async function callZai(
       const res = await fetch(`${base}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ].map((m) => ({
+        body: JSON.stringify({
           model,
-          messages: [m],
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
           temperature,
           max_tokens: maxTokens,
-        }))),
+        }),
       });
       // local servers vary; try OpenAI-style first
       if (res.ok) {
         const data = await res.json();
         const text = data.choices?.[0]?.message?.content;
-        if (text) return text;
+        if (text) return output(text);
       }
     } catch {
       // fall through

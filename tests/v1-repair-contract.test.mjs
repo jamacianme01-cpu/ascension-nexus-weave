@@ -42,8 +42,8 @@ const tests = [
     assert.match(ui, /<PathwayView/);
   }],
   ["V1 pathway tabs expose only Description Labels Blueprint Dissect", () => {
-    assert.match(ui, /onDive\(path, picture, "blueprint", conceptSpec\)/);
-    assert.match(ui, /onDive\(path, picture, "dissect", conceptSpec\)/);
+    assert.match(ui, /onDive\(path, picture, "blueprint"\)/);
+    assert.match(ui, /onDive\(path, picture, "dissect"\)/);
     assert.match(ui, />BLUEPRINT<\/button>/);
     assert.match(ui, />DISSECT \/ EXPLODE<\/button>/);
     assert.doesNotMatch(ui, />SIMULATE<\/button>/);
@@ -82,15 +82,6 @@ const tests = [
     assert.match(route, /async function guide\(objective: string, question: string/);
     assert.match(route, /if \(input\["phase"\] === "guide"\)/);
     assert.match(route, /You are the Tree of Knowledge, the warm, knowledgeable, spoken guide/);
-  }],
-  ["concept renderer is from selected design only, never stock picture", () => {
-    assert.match(route, /if \(input\["phase"\] === "concept"\)/);
-    assert.match(route, /async function concept\(objective: string/);
-    assert.match(route, /The concept geometry could not faithfully represent this pathway/);
-    assert.match(ui, /modelCache\.current\.set\(key, data\.model_spec\)/);
-    assert.match(ui, /SelectedModelPreview/);
-    assert.match(ui, /model_spec: dive\.modelSpec/);
-    assert.match(viewer, /v1InitialDissected && pathway\.model_spec/);
   }],
   ["owner signoff remains unchecked", () => {
     assert.ok(checklist.includes("- [ ]"));

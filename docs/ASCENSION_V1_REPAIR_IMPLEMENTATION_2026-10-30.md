@@ -20,6 +20,13 @@ This is an implementation record, **not owner acceptance**. No checkboxes in the
 - Revised internal first-answer research to produce a substantive invention engineering brief, not a user-facing essay or instructions to ask the owner for specifications. The entire brief remains private input to the three-pathway-plus-blend generator.
 - The V1 build and focused contract regression tests have passed after the latest changes. No production deployment or owner signoff occurred.
 
+## Selected-path visualization repair
+- The previous UI disabled Blueprint and Dissect whenever the paid/owner image endpoint was not connected. That was a dead end for selected pathways.
+- The optional owner image generator is still preferred when connected. If it is not configured, selecting a **physical invention pathway** now asks the already-authorized text model for a bounded, named, relative-coordinate assembly. It is rendered locally as an orbitable/zoomable 3D concept, **not a fake photograph, source-derived 3D reconstruction, or measured engineering blueprint**.
+- The selected concept model is carried into the existing viewer; Blueprint and Dissect open its own geometry, and Dissect activates 3D explosion rather than failing the unrelated image-dissection request. Selected parts stay in the side list with their source descriptions.
+- A server integration test exercised the actual concept POST handler with a simulated selected worker drone response and verified that unrelated model geometry is rejected. No external paid image API was used.
+- This improves live functionality **only after owner-approved deployment**. The repair branch is not merged; actual image/GLB generation and browser-based acceptance remain open.
+
 ## Verification and blockers
 - GitHub Actions on the repair branch successfully built the client and server bundle, and the 10 focused V1 static contract checks passed. The final workflow check was green (commit b3703b05); these checks do not constitute live browser acceptance.
 - The legacy `tests/interface.test.mjs` suite still **fails** at the obsolete Z.AI streaming expectation. It runs as a visible non-blocking diagnostic in the green V1 workflow, not as a silently passed test. Do not re-enable Z.AI merely to satisfy that old contract. Browser acceptance and actual runtime/image-source verification remain open.

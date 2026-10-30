@@ -20,6 +20,7 @@ export function TreeVoiceSurface({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [hasField, setHasField] = useState(false);
   const welcomed = useRef(false);
+  const welcomeMessage = "Welcome to ASCENSION. Here, ideas become possibilities, and possibilities become creations. Everything is connected. Tell me, what would you like to accomplish today?";
   useEffect(() => {
     const browser = window as Window & {
       SpeechRecognition?: new () => TreeRecognition;
@@ -39,8 +40,10 @@ export function TreeVoiceSurface({ children }: { children: ReactNode }) {
     const welcome = () => {
       if (welcomed.current || document.hidden) return;
       welcomed.current = true;
-      controller.speak("Welcome to ASCENSION. What do you want to accomplish?");
+      controller.speak(welcomeMessage);
     };
+    // Attempt the spoken welcome on entry. Browser audio policy may require interaction.
+    const entryWelcome = window.setTimeout(welcome, 300);
     document.addEventListener("pointerdown", welcome, { once: true });
     document.addEventListener("keydown", welcome, { once: true });
     const select = () => {
@@ -53,6 +56,7 @@ export function TreeVoiceSurface({ children }: { children: ReactNode }) {
     document.addEventListener("selectionchange", select);
     document.addEventListener("visibilitychange", hidden);
     return () => {
+      window.clearTimeout(entryWelcome);
       document.removeEventListener("pointerdown", welcome);
       document.removeEventListener("keydown", welcome);
       document.removeEventListener("selectionchange", select);
@@ -96,7 +100,7 @@ export function TreeVoiceSurface({ children }: { children: ReactNode }) {
         <p className="text-xs text-muted-foreground">Select Book text to hear it, or select a Book text field before dictating. Voice input may be processed by your browser's speech provider.</p>
         <div className="flex flex-wrap gap-2">
           <button type="button" disabled={!ready} className="min-h-11 rounded border border-gold/40 px-3 disabled:opacity-40"
-            onClick={() => { setNotice(""); voice.current?.speak("Welcome to ASCENSION. What do you want to accomplish?"); }}>Welcome</button>
+            onClick={() => { setNotice(""); voice.current?.speak(welcomeMessage); }}>Welcome</button>
           <button type="button" disabled={!ready || state === "listening"} className="min-h-11 rounded border border-gold/40 px-3 disabled:opacity-40"
             onClick={() => { setNotice(""); voice.current?.listen(); }}>Speak</button>
           <button type="button" disabled={!ready || !selected} className="min-h-11 rounded border border-gold/40 px-3 disabled:opacity-40"

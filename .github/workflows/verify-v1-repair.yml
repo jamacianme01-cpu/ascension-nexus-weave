@@ -17,6 +17,8 @@ jobs:
           bun-version: latest
       - run: bun install --no-save
       - run: bun run build
+      - name: Ensure actual Node HTTP server exists
+        run: test -f .output/server/index.mjs
       - run: bun tests/v1-repair-contract.test.mjs
       # Historic suite still assumes the retired Z.AI paid/free stream endpoint.
       # Keep its failure visible in logs; don't re-enable that provider in V1.

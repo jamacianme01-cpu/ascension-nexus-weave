@@ -219,8 +219,8 @@ export function IndependentEngage() {
       setResult(data);
       setChoice(null);
       if (talking && data.introduction?.trim()) say(data.introduction.trim().slice(0, 260));
-      setStage("eruption");
-      // Do not interrupt the Tree reading the initial answer when pathways arrive.
+      setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
+      // The backend analysis is not read to the user.
       window.setTimeout(() => {
         if (generation.current === token) view.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 120);

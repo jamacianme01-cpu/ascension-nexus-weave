@@ -17,5 +17,6 @@ jobs:
           bun-version: latest
       - run: bun install --no-save
       - run: bun run build
+      - run: bun tests/v1-repair-contract.test.mjs
       - run: bun tests/interface.test.mjs
       - run: bun tests/creation-source-context.test.mjs

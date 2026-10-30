@@ -15,8 +15,8 @@ This is an implementation record, **not owner acceptance**. No checkboxes in the
 - The existing inference adapter now supports its prior string and structured-result call contracts. Free OpenRouter fallback is forced to zero-price and zero-data-retention settings, and no Z.AI or Lovable inference endpoint is invoked.
 
 ## Verification and blockers
-- GitHub Actions on the repair branch has successfully built the client and server bundle.
-- The legacy `tests/interface.test.mjs` suite remains **red**: after passing its objective, Spiral, draft-reuse, and real-file tests, it expects the retired Z.AI streaming endpoint. Do not re-enable Z.AI merely to satisfy that obsolete test. Current-provider contract tests and a browser-based acceptance pass still need work.
+- GitHub Actions on the repair branch successfully built the client and server bundle, and the 10 focused V1 static contract checks passed. The final workflow check was green (commit b3703b05); these checks do not constitute live browser acceptance.
+- The legacy `tests/interface.test.mjs` suite still **fails** at the obsolete Z.AI streaming expectation. It runs as a visible non-blocking diagnostic in the green V1 workflow, not as a silently passed test. Do not re-enable Z.AI merely to satisfy that old contract. Browser acceptance and actual runtime/image-source verification remain open.
 - The live Railway environment currently exposes OpenAI text keys but has no configured ASCENSION image endpoint or autonomous governed runtime bridge. Subject-specific concept pictures, technical dimensions, and source-derived 3D dissect/explode cannot be accepted as working until their actual generation/reconstruction source succeeds.
 - No false images, assumed measurements, or supposed finished 3D have been substituted. No deployment to main/production has been made.
 

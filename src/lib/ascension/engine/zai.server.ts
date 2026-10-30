@@ -29,6 +29,7 @@ interface CallZaiOptions {
   user?: string;
   knowledgeQuery?: string;
   imageDataUrl?: string;
+}
 
 
 type InferenceResult = { text: string; json: Record<string, unknown> | null; model: string; duration_ms: number };

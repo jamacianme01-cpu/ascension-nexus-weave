@@ -20,12 +20,14 @@ This is an implementation record, **not owner acceptance**. No checkboxes in the
 - Revised internal first-answer research to produce a substantive invention engineering brief, not a user-facing essay or instructions to ask the owner for specifications. The entire brief remains private input to the three-pathway-plus-blend generator.
 - The V1 build and focused contract regression tests have passed after the latest changes. No production deployment or owner signoff occurred.
 
-## Selected-path visualization repair
-- The previous UI disabled Blueprint and Dissect whenever the paid/owner image endpoint was not connected. That was a dead end for selected pathways.
-- The optional owner image generator is still preferred when connected. If it is not configured, selecting a **physical invention pathway** now asks the already-authorized text model for a bounded, named, relative-coordinate assembly. It is rendered locally as an orbitable/zoomable 3D concept, **not a fake photograph, source-derived 3D reconstruction, or measured engineering blueprint**.
-- The selected concept model is carried into the existing viewer; Blueprint and Dissect open its own geometry, and Dissect activates 3D explosion rather than failing the unrelated image-dissection request. Selected parts stay in the side list with their source descriptions.
-- A server integration test exercised the actual concept POST handler with a simulated selected worker drone response and verified that unrelated model geometry is rejected. No external paid image API was used.
-- This improves live functionality **only after owner-approved deployment**. The repair branch is not merged; actual image/GLB generation and browser-based acceptance remain open.
+## Owner-design-only corrections
+- Removed the unapproved experimental concept geometry provider, preview renderer and related test entirely. Original selected-path image generation only; no invented substitute pictures, meshes, diagrams or providers.
+- Restored the original persistent Tree background by activating the existing 'data-realities' scene logic on results and reusing the same approved artwork faintly in V1 inspection.
+- Removed the result 'eruption' trigger. The approved Tree-and-Book image is visible from entry; it only powers up while working.
+- V1 inspection no longer exposes the legacy NEW ANSWERS or ambient volume/sound controls. The Tree's spoken guidance remains accessible.
+- Selected-path picture requests first check the server's existing image capability. With no approved bridge connected, the screen reports this directly instead of spamming failed image-generation requests.
+- Railway production HTTP and deployment logs from October 29–30 show successful initial/pathway response requests, but selected-picture requests fail HTTP 503 because the ASCENSION image service is not configured; production variables confirm no ASCENSION_IMAGE_ENDPOINT. This blocks source-based invention artwork and 3D reconstruction.
+- No main branch modifications or owner approval marks.
 
 ## Verification and blockers
 - GitHub Actions on the repair branch successfully built the client and server bundle, and the 10 focused V1 static contract checks passed. The final workflow check was green (commit b3703b05); these checks do not constitute live browser acceptance.

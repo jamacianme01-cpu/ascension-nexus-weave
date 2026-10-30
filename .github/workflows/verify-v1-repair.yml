@@ -15,7 +15,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - run: bun install --frozen-lockfile
+      - run: bun install --no-save
       - run: bun run build
       - run: bun tests/interface.test.mjs
       - run: bun tests/creation-source-context.test.mjs

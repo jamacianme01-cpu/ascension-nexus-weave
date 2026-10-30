@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
+import type { DesignPart } from "@/lib/ascension/parts-model";
 
 const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
 
@@ -412,6 +413,13 @@ export function IndependentEngage() {
           outcome_score: null, outcome_reason: null,
         } satisfies ObjectivePathway}
         objective={requested} requestId={null} initialMode={dive.mode}
+        v1Parts={dive.pathway.parts.map((part): DesignPart => ({
+          name: part.name, purpose: part.purpose, location: part.location,
+          operation: part.purpose,
+          connections: "Connections have not been specified.",
+          limitations: "Unverified concept; precise mechanical dimensions and location are not supplied.",
+          x: -1, y: -1,
+        }))}
         onClose={() => setDive(null)}
         onNewObjective={reset} newObjectiveDisabled={loading}
         soundEnabled={talking}

@@ -4,6 +4,7 @@
  */
 import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { nitro } from "nitro/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
@@ -25,6 +26,7 @@ export default defineConfig({
     // Keep source intact but exclude those non-V1 pages until their independent
     // replacement is implemented. Public Tree/Book and Inspect routes stay active.
     tanstackStart({ router: { routeFileIgnorePattern: "_authenticated" } }),
+    nitro({ preset: "node-server" }),
     viteReact(),
   ],
 });

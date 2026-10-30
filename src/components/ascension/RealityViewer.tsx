@@ -103,6 +103,7 @@ export function RealityViewer({
   blendControls,
   v1Parts,
   v1InitialDissected = false,
+  treeGuide = null,
 }: {
   pathway: ObjectivePathway;
   objective: string;
@@ -125,6 +126,7 @@ export function RealityViewer({
   v1Parts?: DesignPart[];
   /** The selected DISSECT control starts in the actual dissection flow. */
   v1InitialDissected?: boolean;
+  treeGuide?: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -1859,6 +1861,7 @@ export function RealityViewer({
           
           <label>Volume <input aria-label="Ambient volume" type="range" min="0" max="0.7" step="0.05" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
         </div>
+        {treeGuide && <div className="reality-tree-guide w-full">{treeGuide}</div>}
       </header>
       <div className="reality-model-stage" data-split={splitReference ? "true" : undefined} data-image-only={imageOnly ? "true" : undefined}>
         <div ref={host} className="reality-viewport" data-ready={ready} style={{visibility:awaitingFaithfulMesh ? "hidden" : "visible"}} aria-label="Editable 3D model · select parts, rotate, zoom, section, or explode" />

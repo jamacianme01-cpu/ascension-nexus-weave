@@ -19,6 +19,7 @@ export function TreeVoiceSurface({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState("");
   const [ready, setReady] = useState(false);
   const [hasField, setHasField] = useState(false);
+  const welcomed = useRef(false);
   useEffect(() => {
     const browser = window as Window & {
       SpeechRecognition?: new () => TreeRecognition;
@@ -34,6 +35,14 @@ export function TreeVoiceSurface({ children }: { children: ReactNode }) {
     });
     voice.current = controller;
     setReady(true);
+    // A browser may block unprompted audio; retry once on the first user interaction.
+    const welcome = () => {
+      if (welcomed.current || document.hidden) return;
+      welcomed.current = true;
+      controller.speak("Welcome to ASCENSION. What do you want to accomplish?");
+    };
+    document.addEventListener("pointerdown", welcome, { once: true });
+    document.addEventListener("keydown", welcome, { once: true });
     const select = () => {
       const selection = window.getSelection();
       if (selection?.anchorNode && surface.current?.contains(selection.anchorNode)) {
@@ -44,6 +53,8 @@ export function TreeVoiceSurface({ children }: { children: ReactNode }) {
     document.addEventListener("selectionchange", select);
     document.addEventListener("visibilitychange", hidden);
     return () => {
+      document.removeEventListener("pointerdown", welcome);
+      document.removeEventListener("keydown", welcome);
       document.removeEventListener("selectionchange", select);
       document.removeEventListener("visibilitychange", hidden);
       controller.dispose();

@@ -119,15 +119,12 @@ export function governedDelivery(
       ? requestedOutput["primary_artifact"]
       : "";
   const primary =
-    transportedFiles.find((file) => file.name === primaryName) ??
+    transportedFiles.find((file) => file.name === primaryName && primaryName) ??
+    transportedFiles.find((file) =>
+      !/^(?:ascension_result\.md|document\.md|README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|acceptance_result\.json|metadata\.json|lineage\.json|knowledgeform_.*\.md)$/i.test(file.name)
+    ) ??
     transportedFiles.find((file) => /^ascension_result\.md$/i.test(file.name)) ??
     transportedFiles.find((file) => /^document\.md$/i.test(file.name)) ??
-    transportedFiles.find(
-      (file) =>
-        !/^(README\.md|governed_objective\.json|artifact_manifest\.json|verification\.json|acceptance_result\.json|metadata\.json|lineage\.json|knowledgeform_.*\.md)$/i.test(
-          file.name,
-        ),
-    ) ??
     null;
   const assessment = assessResult(run.objective, primary?.content ?? "", transportedFiles);
 

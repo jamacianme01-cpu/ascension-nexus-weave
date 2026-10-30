@@ -312,7 +312,8 @@ export function IndependentEngage() {
   const selected = choice === null ? null : choices[choice];
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
-    data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}>
+    data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}
+    data-realities={result ? "true" : undefined}>
     <section aria-label="Engage ASCENSION" className="ascension-command">
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">

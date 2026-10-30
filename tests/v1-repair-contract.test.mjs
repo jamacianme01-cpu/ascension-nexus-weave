@@ -73,6 +73,10 @@ const tests = [
     assert.match(ui, /treeGuide={<TreeGuide objective={requested}/);
     assert.match(viewer, /treeGuide\?: ReactNode/);
     assert.match(viewer, /className="reality-tree-guide/);
+    assert.match(ui, /onV1PartSelected={part =>/);
+    assert.match(viewer, /onV1PartSelected\?: \(part: DesignPart\) => void/);
+    assert.match(viewer, /const activeParts = v1Parts\?\.length \? v1Parts/);
+
     assert.match(guide, /webkitSpeechRecognition/);
     assert.match(guide, /phase: "guide"/);
     assert.match(route, /async function guide\(objective: string, question: string/);

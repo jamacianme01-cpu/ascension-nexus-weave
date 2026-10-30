@@ -140,7 +140,6 @@ export function RealityViewer({
   conceptPartsRef.current = conceptParts;
   useEffect(() => { edited.current = false; setLoadedUrl(pathway.model_url); setExploded(false); setDisplayExtents(null); }, [pathway.id]);
   useEffect(() => { if (!edited.current && pathway.model_url) setLoadedUrl(pathway.model_url); }, [pathway.model_url]);
-  const labelsHost = useRef<HTMLDivElement>(null);
   const [dissected, setDissected] = useState(false);
   const [exploded, setExploded] = useState(false);
   const [explosionError, setExplosionError] = useState<string | null>(null);
@@ -1650,20 +1649,7 @@ export function RealityViewer({
         if(first && last){const from=new THREE.Box3().setFromObject(first).getCenter(new THREE.Vector3());const to=new THREE.Box3().setFromObject(last).getCenter(new THREE.Vector3());demoCue.position.copy(from.lerp(to,demo.reduced?0:demo.progress));demoCue.scale.setScalar(demo.reduced?1:1+Math.sin(demo.progress*Math.PI)*2);demoCue.visible=true;}
       }
       renderer.render(scene, camera);
-      const occupiedLabels: DOMRect[] = [];
-      labelsHost.current?.querySelectorAll<HTMLButtonElement>("button").forEach((button, index) => {
-        const anchor = partAnchors[index];
-        if (!anchor || !model) { button.hidden = true; return; }
-        const projected = partObjects[index]!.localToWorld(anchor.clone()).project(camera);
-        button.hidden = projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1;
-        button.style.left = `${(projected.x + 1) * 50}%`;
-        button.style.top = `${(1 - projected.y) * 50}%`;
-        if (!button.hidden) {
-          const rect = button.getBoundingClientRect();
-          button.hidden = occupiedLabels.some(other => rect.left < other.right + 4 && rect.right > other.left - 4 && rect.top < other.bottom + 4 && rect.bottom > other.top - 4);
-          if (!button.hidden) occupiedLabels.push(rect);
-        }
-      });
+
     });
       void (async () => {
         try {

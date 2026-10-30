@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
 import type { DesignPart } from "@/lib/ascension/parts-model";
+import { TreeGuide } from "@/components/ascension/tree-guide";
 
 const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
 
@@ -50,12 +51,13 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, objective, onDive, imageCache, onSpeak }: {
+function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEnabled }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
   onDive: (path: Pathway, imageUrl: string, mode?: "cutaway" | "blueprint" | "dissect") => void;
   imageCache: { current: Map<string, string> };
   onSpeak: (text: string) => void;
+  speakingEnabled: boolean;
 }) {
   const [part, setPart] = useState<Part | null>(null);
   const [panel, setPanel] = useState<"description" | "labels">("description");
@@ -95,6 +97,7 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak }: {
   }, [path, objective, imageCache]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
+    <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak} />
     <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Selected pathway views">
       {(["description", "labels"] as const).map(tab =>
         <button key={tab} type="button" aria-pressed={panel === tab}
@@ -379,7 +382,8 @@ export function IndependentEngage() {
       {selected && <>
         <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
           onDive={(pathway, imageUrl, mode = "cutaway") => { stopVoice(); setDive({ pathway, imageUrl, mode }); }}
-          onSpeak={text => { if (talking) say(text.slice(0, 320)); }} />
+          speakingEnabled={talking}
+          onSpeak={text => { if (talking) say(text); }} />
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>
           <textarea id="pathway-refinement" rows={2} maxLength={900} value={refinement}
@@ -405,6 +409,9 @@ export function IndependentEngage() {
         } satisfies ObjectivePathway}
         objective={requested} requestId={null} initialMode={dive.mode === "blueprint" ? "blueprint" : "cutaway"}
         v1InitialDissected={dive.mode === "dissect"}
+        treeGuide={<TreeGuide objective={requested}
+          pathway={dive.pathway} compact enabled={talking}
+          onSpeak={text => { if (talking) say(text); }} />}
         v1Parts={dive.pathway.parts.map((part): DesignPart => ({
           name: part.name, purpose: part.purpose, location: part.location,
           operation: part.purpose,

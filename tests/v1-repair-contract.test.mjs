@@ -39,7 +39,7 @@ const tests = [
   }],
   ["V1 pathway tabs expose only Description Labels Blueprint Dissect", () => {
     assert.match(ui, /onDive\(path, picture, "blueprint"\)/);
-    assert.match(ui, /onDive\(path, picture, "cutaway"\)/);
+    assert.match(ui, /onDive\(path, picture, "dissect"\)/);
     assert.match(ui, />BLUEPRINT<\/button>/);
     assert.match(ui, />DISSECT \/ EXPLODE<\/button>/);
     assert.doesNotMatch(ui, />SIMULATE<\/button>/);

@@ -1,10 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { ObjectivePathway, ObjectiveModelSpec } from "@/lib/ascension/result-model";
+import type { ObjectivePathway } from "@/lib/ascension/result-model";
 import type { DesignPart } from "@/lib/ascension/parts-model";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 
 const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
-const SelectedModelPreview = lazy(() => import("@/components/ascension/selected-model-preview").then(mod => ({ default: mod.SelectedModelPreview })));
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -52,12 +51,11 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak, speakingEnabled }: {
+function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEnabled }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
-  onDive: (path: Pathway, imageUrl: string | null, mode?: "cutaway" | "blueprint" | "dissect", modelSpec?: ObjectiveModelSpec | null) => void;
+  onDive: (path: Pathway, imageUrl: string, mode?: "cutaway" | "blueprint" | "dissect") => void;
   imageCache: { current: Map<string, string> };
-  modelCache: { current: Map<string, ObjectiveModelSpec> };
   onSpeak: (text: string) => void;
   speakingEnabled: boolean;
 }) {
@@ -66,9 +64,6 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
   const [picture, setPicture] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState("");
   const [pictureLoading, setPictureLoading] = useState(true);
-  const [conceptSpec, setConceptSpec] = useState<ObjectiveModelSpec | null>(null);
-  const [conceptLoading, setConceptLoading] = useState(true);
-  const [conceptError, setConceptError] = useState("");
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   useEffect(() => { setPart(null); setPanel("description"); }, [path.id]);
@@ -81,17 +76,11 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
     }
     const controller = new AbortController();
     setPicture(null); setPictureError(""); setPictureLoading(true);
-    void fetch("/api/public/ascension/independent", {method: "GET", cache: "no-store", signal: controller.signal})
-      .then(async res => res.ok ? res.json() : { picture_generation_enabled: false })
-      .then((status: { picture_generation_enabled?: boolean }) => {
-        if (!status.picture_generation_enabled) return null;
-        return fetch("/api/public/ascension/independent", {
-          method: "POST", headers: { "content-type": "application/json" },
+    void fetch("/api/public/ascension/independent", {
+      method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ objective, phase: "picture", pathway: path }),
-          signal: controller.signal,
-        });
-      }).then(async response => {
-      if (!response) return;
+      signal: controller.signal,
+    }).then(async response => {
       const data: { image_url?: string; error?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
       if (!data.image_url || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{4000,12000000}$/i.test(data.image_url))
@@ -106,32 +95,6 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
     }).finally(() => { if (!controller.signal.aborted) setPictureLoading(false); });
     return () => controller.abort();
   }, [path, objective, imageCache]);
-  useEffect(() => {
-    const key = JSON.stringify([objective, path.id, path.title]);
-    const stored = modelCache.current.get(key);
-    if (stored) { setConceptSpec(stored); setConceptError(""); setConceptLoading(false); return; }
-    const controller = new AbortController();
-    setConceptSpec(null);
-    setConceptError("");
-    setConceptLoading(true);
-    void fetch("/api/public/ascension/independent", {
-      method: "POST", headers: { "content-type": "application/json" },
-      signal: controller.signal, body: JSON.stringify({ phase: "concept", objective, pathway: path }),
-    }).then(async response => {
-      const data: { model_spec?: ObjectiveModelSpec; error?: string } = await response.json();
-      if (!response.ok) throw new Error(data.error || "The concept view could not be constructed.");
-      if (!data.model_spec || !Array.isArray(data.model_spec.parts) || data.model_spec.parts.length < 5)
-        throw new Error("The selected design returned no usable concept geometry.");
-      if (!controller.signal.aborted) {
-        modelCache.current.set(key, data.model_spec);
-        setConceptSpec(data.model_spec);
-      }
-    }).catch(cause => {
-      if (!controller.signal.aborted)
-        setConceptError(cause instanceof Error ? cause.message : "Concept model unavailable.");
-    }).finally(() => { if (!controller.signal.aborted) setConceptLoading(false); });
-    return () => controller.abort();
-  }, [path, objective, modelCache]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak} />
@@ -140,9 +103,9 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
         <button key={tab} type="button" aria-pressed={panel === tab}
           onClick={() => { setPanel(tab); onSpeak(tab === "description" ? path.summary.slice(0, 260) : "Choose a named component to learn what it does and where it belongs."); }}
           className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold">{tab.toUpperCase()}</button>)}
-      <button type="button" disabled={!picture && !conceptSpec} onClick={() => onDive(path, picture, "blueprint", conceptSpec)}
+      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "blueprint")}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
-      <button type="button" disabled={!picture && !conceptSpec} onClick={() => onDive(path, picture, "dissect", conceptSpec)}
+      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "dissect")}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT / EXPLODE</button>
     </div>
     <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
@@ -164,30 +127,12 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
           <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
             onClick={() => { setScale(1); setRotation(0); }}>RESET VIEW</button>
           <button type="button" className="rounded-full border border-primary/60 px-5 py-2 text-sm text-primary"
-            onClick={() => onDive(path, picture, "cutaway", conceptSpec)}>DIVE INTO REALITY</button>
+            onClick={() => onDive(path, picture)}>DIVE INTO REALITY</button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Actual generated concept artwork. No verified 3D mesh is available yet; 3D editing requires a reconstructed model.</p>
-      </> : conceptSpec ? <>
-        <Suspense fallback={<p role="status" className="p-5 text-center text-gold">Rendering selected concept…</p>}>
-          <SelectedModelPreview
-            objective={objective}
-            spec={conceptSpec}
-            pathway={{
-              id: path.id, label: path.title, summary: path.summary,
-              steps: path.steps, tradeoffs: path.tradeoffs,
-              spiral_form: null, visual_svg: null, model_spec: conceptSpec,
-              generated_image_url: null, generated_blueprint_url: null,
-              generated_environment_url: null, model_url: null,
-              outcome_score: null, outcome_reason: null,
-            }}
-          />
-        </Suspense>
-        <button type="button" onClick={() => onDive(path, null, "cutaway", conceptSpec)}
-          className="mt-3 rounded-full border border-primary/60 px-5 py-2 text-sm text-primary">DIVE INTO REALITY</button>
-      </> : <p className="p-6 text-center text-sm text-muted-foreground" role={pictureError || conceptError ? "alert" : "status"}>
-        {conceptLoading || pictureLoading ? "Developing the selected invention view…" : conceptError || pictureError || "A source-derived invention picture is not available."}
+      </> : <p className="p-6 text-center text-sm text-muted-foreground" role={pictureError ? "alert" : "status"}>
+        {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
       </p>}
-      {conceptSpec && !picture && <p className="mt-2 text-xs text-muted-foreground">Interpretive geometry · Not a finished physical model or measured blueprint.</p>}
     </div>
     {panel === "description" && <>
     <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
@@ -229,14 +174,13 @@ export function IndependentEngage() {
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
-  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string | null; mode: "cutaway" | "blueprint" | "dissect"; modelSpec: ObjectiveModelSpec | null } | null>(null);
+  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string; mode: "cutaway" | "blueprint" | "dissect" } | null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const imageCache = useRef(new Map<string, string>());
-  const modelCache = useRef(new Map<string, ObjectiveModelSpec>());
   const welcomeStarted = useRef(false);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
   useEffect(() => {
@@ -297,7 +241,7 @@ export function IndependentEngage() {
     stopVoice();
     // Keep private refinement context out of the visible objective field.
     if (!override) setObjective(text);
-    imageCache.current.clear(); modelCache.current.clear();
+    imageCache.current.clear();
     setRequested(text);
     setLoading(true);
     setError("");
@@ -357,7 +301,7 @@ export function IndependentEngage() {
     generation.current += 1;
     abort.current?.abort();
     stopVoice();
-    imageCache.current.clear(); modelCache.current.clear();
+    imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null); setDive(null);
@@ -436,8 +380,8 @@ export function IndependentEngage() {
         </button>)}
       </div>
       {selected && <>
-        <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache} modelCache={modelCache}
-          onDive={(pathway, imageUrl, mode = "cutaway", modelSpec = null) => { stopVoice(); setDive({ pathway, imageUrl, mode, modelSpec }); }}
+        <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
+          onDive={(pathway, imageUrl, mode = "cutaway") => { stopVoice(); setDive({ pathway, imageUrl, mode }); }}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />
         <div className="rounded-xl border border-primary/25 p-4">
@@ -458,7 +402,7 @@ export function IndependentEngage() {
         pathway={{
           id: dive.pathway.id, label: dive.pathway.title, summary: dive.pathway.summary,
           steps: dive.pathway.steps, tradeoffs: dive.pathway.tradeoffs,
-          spiral_form: null, visual_svg: null, model_spec: dive.modelSpec,
+          spiral_form: null, visual_svg: null, model_spec: null,
           generated_image_url: dive.imageUrl, generated_blueprint_url: null,
           generated_environment_url: null, model_url: null,
           outcome_score: null, outcome_reason: null,

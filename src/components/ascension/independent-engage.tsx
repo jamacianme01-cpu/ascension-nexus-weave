@@ -81,11 +81,17 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
     }
     const controller = new AbortController();
     setPicture(null); setPictureError(""); setPictureLoading(true);
-    void fetch("/api/public/ascension/independent", {
-      method: "POST", headers: { "content-type": "application/json" },
+    void fetch("/api/public/ascension/independent", {method: "GET", cache: "no-store", signal: controller.signal})
+      .then(async res => res.ok ? res.json() : { picture_generation_enabled: false })
+      .then((status: { picture_generation_enabled?: boolean }) => {
+        if (!status.picture_generation_enabled) return null;
+        return fetch("/api/public/ascension/independent", {
+          method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ objective, phase: "picture", pathway: path }),
-      signal: controller.signal,
-    }).then(async response => {
+          signal: controller.signal,
+        });
+      }).then(async response => {
+      if (!response) return;
       const data: { image_url?: string; error?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
       if (!data.image_url || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{4000,12000000}$/i.test(data.image_url))
@@ -100,6 +106,32 @@ function PathwayView({ path, objective, onDive, imageCache, modelCache, onSpeak,
     }).finally(() => { if (!controller.signal.aborted) setPictureLoading(false); });
     return () => controller.abort();
   }, [path, objective, imageCache]);
+  useEffect(() => {
+    const key = JSON.stringify([objective, path.id, path.title]);
+    const stored = modelCache.current.get(key);
+    if (stored) { setConceptSpec(stored); setConceptError(""); setConceptLoading(false); return; }
+    const controller = new AbortController();
+    setConceptSpec(null);
+    setConceptError("");
+    setConceptLoading(true);
+    void fetch("/api/public/ascension/independent", {
+      method: "POST", headers: { "content-type": "application/json" },
+      signal: controller.signal, body: JSON.stringify({ phase: "concept", objective, pathway: path }),
+    }).then(async response => {
+      const data: { model_spec?: ObjectiveModelSpec; error?: string } = await response.json();
+      if (!response.ok) throw new Error(data.error || "The concept view could not be constructed.");
+      if (!data.model_spec || !Array.isArray(data.model_spec.parts) || data.model_spec.parts.length < 5)
+        throw new Error("The selected design returned no usable concept geometry.");
+      if (!controller.signal.aborted) {
+        modelCache.current.set(key, data.model_spec);
+        setConceptSpec(data.model_spec);
+      }
+    }).catch(cause => {
+      if (!controller.signal.aborted)
+        setConceptError(cause instanceof Error ? cause.message : "Concept model unavailable.");
+    }).finally(() => { if (!controller.signal.aborted) setConceptLoading(false); });
+    return () => controller.abort();
+  }, [path, objective, modelCache]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak} />

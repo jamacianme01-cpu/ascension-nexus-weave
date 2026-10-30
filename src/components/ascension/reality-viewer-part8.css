@@ -24,3 +24,21 @@
  .reality-navigation { grid-template-columns:minmax(0,1fr) auto; }
  .reality-navigation .reality-title { grid-column:1/-1;grid-row:1; }
  .reality-navigation .reality-back { grid-row:2; }
+ .reality-title h1 { font-size:18px; max-height:64px; overflow:auto; white-space:normal; }
+ .reality-pathway-label { white-space:normal; }
+ .reality-title span { font-size:9px; }
+ .reality-view-controls { grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px; }
+ .reality-view-controls button { font-size:10px; min-height:44px; padding:4px; }
+ .reality-extra-controls { gap:10px; }
+ .reality-screen[open] { grid-template-rows:auto minmax(50dvh,1fr) auto auto; overflow-y:auto; }
+ .reality-parts { max-height:40dvh; bottom:12px; }
+ .reality-screen:has(.reality-parts) .reality-dissection { right:0; }
+ .reality-semantic-sequence { inset:6% 8% 48%; gap:6px; }
+ .reality-semantic-sequence h2 { font-size:22px; }
+ .reality-dissection-picture { width:auto; }
+ .reality-dissection-label { max-width:115px; font-size:10px!important; }
+ .reality-screen:has(.reality-parts) .reality-demonstration { display:none; }
+ .reality-demo-flow { max-height:100px; overflow:auto; }
+ .reality-demo-actions { grid-template-columns:auto auto minmax(40px,1fr); }
+ .reality-demo-actions output { grid-column:1/-1; }
+}

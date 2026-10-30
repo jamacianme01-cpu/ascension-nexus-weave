@@ -201,16 +201,61 @@ async function build(objective: string, firstAnswerText = "") {
 /** Produce a real image for the selected pathway, never substitute diagram boxes.
  * A separate owner-controlled switch prevents surprise image-generation charges.
  */
-async function picture(_objective: string, _value: Record<string, unknown>) {
-  // The owner did not authorize a paid external image-generation dependency.
-  // Do not substitute a paid provider for the owner's existing engine.
-  throw new Error("ASCENSION's own image-generation engine is not yet connected to the live app. No paid image service was used.");
+function ownImageConfigured() {
+  return process.env["ASCENSION_ALLOW_FREE_IMAGES"] === "true" &&
+    Boolean(process.env["ASCENSION_IMAGE_ENDPOINT"]?.trim());
+}
+async function picture(objective: string, value: Record<string, unknown>) {
+  // Existing owner-configurable image bridge only. Never trigger paid image API
+  // calls or substitute stock/placeholder images for the selected invention.
+  if (!ownImageConfigured())
+    throw new Error("ASCENSION's image engine is not connected. No picture was fabricated or purchased.");
+  const target = new URL(process.env["ASCENSION_IMAGE_ENDPOINT"]!.trim());
+  const loopback = ["localhost", "127.0.0.1", "::1"].includes(target.hostname);
+  if (target.protocol !== "https:" && !(loopback && target.protocol === "http:"))
+    throw new Error("The approved image bridge must use HTTPS or local loopback.");
+  const title = String(value["title"] ?? "").trim().slice(0, 140);
+  const summary = String(value["summary"] ?? "").trim().slice(0, 1400);
+  const steps = Array.isArray(value["steps"]) ? value["steps"].filter((v): v is string => typeof v === "string").slice(0, 6) : [];
+  if (!title || summary.length < 30)
+    throw new Error("Select a complete pathway before requesting its picture.");
+  const prompt = [
+    "Illustrate the actual selected invention as one coherent concept design.",
+    "User objective: " + objective.slice(0, 500),
+    "Selected pathway: " + title,
+    "Architecture: " + summary,
+    "Key functional structure: " + steps.join("; ").slice(0, 1800),
+    "Show the selected subject, not a generic tree, icon, flowchart, numbered boxes or CORE diagram.",
+    "One complete invention visible; no textual labels, unrelated parts or misleading dimensions.",
+    "Concept illustration only; physical feasibility remains unverified.",
+  ].join("\n");
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  const token = process.env["ASCENSION_IMAGE_TOKEN"]?.trim();
+  if (token) headers["authorization"] = "Bearer " + token;
+  const response = await fetch(target.toString(), {
+    method: "POST", headers, signal: AbortSignal.timeout(45000),
+    body: JSON.stringify({ prompt, objective, pathway: { title, summary } }),
+  });
+  if (!response.ok) throw new Error("ASCENSION image bridge HTTP " + response.status);
+  const body = obj(await response.json());
+  const first = Array.isArray(body["data"]) ? obj(body["data"][0]) : {};
+  const input = String(first["b64_json"] ?? body["image_base64"] ?? body["image_url"] ?? "").trim();
+  const match = input.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/i);
+  const base64 = match ? match[2]! : input;
+  if (!/^[A-Za-z0-9+/=]+$/.test(base64) || base64.length < 4000 || base64.length > 12_000_000)
+    throw new Error("ASCENSION image bridge did not return valid bounded image data.");
+  const mime = match ? match[1]!.toLowerCase() :
+    base64.startsWith("iVBORw0KGgo") ? "png" :
+      base64.startsWith("/9j/") ? "jpeg" :
+        base64.startsWith("UklGR") ? "webp" : null;
+  if (!mime) throw new Error("ASCENSION image bridge returned an unsupported image format.");
+  return { image_url: "data:image/" + mime + ";base64," + base64, verified: false };
 }
 
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false, picture_generation_enabled: false, note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+      governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");

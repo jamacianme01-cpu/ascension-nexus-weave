@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+.output
+dist
+.env
+.env.*
+*.log
+runtime_bridge/__pycache__
+runtime_bridge/logs
+coverage
+tmp
+temp

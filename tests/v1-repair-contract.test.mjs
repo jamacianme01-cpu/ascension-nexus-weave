@@ -86,7 +86,7 @@ const tests = [
   ["concept renderer is from selected design only, never stock picture", () => {
     assert.match(route, /if \(input\["phase"\] === "concept"\)/);
     assert.match(route, /async function concept\(objective: string/);
-    assert.match(route, /No coherent pathway-specific concept geometry/);
+    assert.match(route, /The concept geometry could not faithfully represent this pathway/);
     assert.match(ui, /modelCache\.current\.set\(key, data\.model_spec\)/);
     assert.match(ui, /SelectedModelPreview/);
     assert.match(ui, /model_spec: dive\.modelSpec/);

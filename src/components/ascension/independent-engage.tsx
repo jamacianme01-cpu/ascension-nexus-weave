@@ -431,8 +431,8 @@ export function IndependentEngage() {
         onV1PartSelected={part => { if (talking) say(part.name + '. ' + part.purpose + ' ' + part.location); }}
         onClose={() => setDive(null)}
         onNewObjective={reset} newObjectiveDisabled={loading}
-        soundEnabled={false}
-        onToggleSound={() => { /* V1 Tree speech remains controlled by Hear Tree. */ }}
+        soundEnabled={talking}
+        onToggleSound={() => { stopVoice(); setTalking(v => !v); }}
         onDive={() => {}}
         onBuildOn={() => { const selectedPath = dive.pathway; setDive(null); buildOn(selectedPath); }}
         onNewAnswers={() => setDive(null)}

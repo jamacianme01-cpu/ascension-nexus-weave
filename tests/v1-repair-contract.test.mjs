@@ -21,10 +21,13 @@ const tests = [
     assert.match(ui, /window\.addEventListener\("pointerdown", tryWelcome/);
     assert.match(ui, /say\(greeting/);
   }],
-  ["initial analysis is concise on screen and full in backend", () => {
-    assert.match(ui, /split\(\/\(\?\<\=\[\.\!\?\]\)\\s\+\/\)/);
-    assert.match(ui, /slice\(0, 350\)/);
+  ["initial analysis is backend-only and never rendered to users", () => {
+    assert.match(ui, /setFirstAnswer\(answer\)/);
+    assert.match(ui, /await generatePathways\(text, answer, controller, token\)/);
     assert.match(ui, /phase: "pathways", firstAnswer: answer\.slice\(0, 6000\)/);
+    assert.doesNotMatch(ui, /aria-label="Initial objective answer"/);
+    assert.doesNotMatch(ui, />INITIAL ANSWER</);
+    assert.doesNotMatch(ui, /firstThought/);
   }],
   ["three pathways and fourth blend are real selectable responses", () => {
     assert.match(ui, /data\.pathways\.length !== 3/);

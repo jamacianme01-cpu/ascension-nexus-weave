@@ -53,7 +53,7 @@ function stopVoice() {
 function PathwayView({ path, objective, onDive, imageCache, onSpeak }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
-  onDive: (path: Pathway, imageUrl: string, mode?: "cutaway" | "blueprint") => void;
+  onDive: (path: Pathway, imageUrl: string, mode?: "cutaway" | "blueprint" | "dissect") => void;
   imageCache: { current: Map<string, string> };
   onSpeak: (text: string) => void;
 }) {
@@ -102,7 +102,7 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak }: {
           className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold">{tab.toUpperCase()}</button>)}
       <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "blueprint")}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
-      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "cutaway")}
+      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "dissect")}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT / EXPLODE</button>
     </div>
     <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
@@ -171,7 +171,7 @@ export function IndependentEngage() {
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
-  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string; mode: "cutaway" | "blueprint" } | null>(null);
+  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string; mode: "cutaway" | "blueprint" | "dissect" } | null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
@@ -412,7 +412,8 @@ export function IndependentEngage() {
           generated_environment_url: null, model_url: null,
           outcome_score: null, outcome_reason: null,
         } satisfies ObjectivePathway}
-        objective={requested} requestId={null} initialMode={dive.mode}
+        objective={requested} requestId={null} initialMode={dive.mode === "blueprint" ? "blueprint" : "cutaway"}
+        v1InitialDissected={dive.mode === "dissect"}
         v1Parts={dive.pathway.parts.map((part): DesignPart => ({
           name: part.name, purpose: part.purpose, location: part.location,
           operation: part.purpose,

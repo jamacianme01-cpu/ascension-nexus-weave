@@ -102,6 +102,7 @@ export function RealityViewer({
   onTogglePart,
   blendControls,
   v1Parts,
+  v1InitialDissected = false,
 }: {
   pathway: ObjectivePathway;
   objective: string;
@@ -122,6 +123,8 @@ export function RealityViewer({
   blendControls: ReactNode;
   /** Source-authored named parts from the selected V1 pathway, not invented mesh anchors. */
   v1Parts?: DesignPart[];
+  /** The selected DISSECT control starts in the actual dissection flow. */
+  v1InitialDissected?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -143,7 +146,7 @@ export function RealityViewer({
   conceptPartsRef.current = conceptParts;
   useEffect(() => { edited.current = false; setLoadedUrl(pathway.model_url); setExploded(false); setDisplayExtents(null); }, [pathway.id]);
   useEffect(() => { if (!edited.current && pathway.model_url) setLoadedUrl(pathway.model_url); }, [pathway.model_url]);
-  const [dissected, setDissected] = useState(false);
+  const [dissected, setDissected] = useState(v1InitialDissected);
   const [exploded, setExploded] = useState(false);
   const [explosionError, setExplosionError] = useState<string | null>(null);
   // A freshly built scene (concept or newly arrived GLB) is always assembled; keep the EXPLODE/IMPLODE state truthful.
@@ -168,8 +171,8 @@ export function RealityViewer({
   const [dissectionAttempt, setDissectionAttempt] = useState(0);
   useEffect(() => {
     setAssembledImage(null);setAssembledError(null);setAssembledLoading(false);
-    setDissection(null);setDissected(false);setDissectionError(null);
-  }, [pathway.id]);
+    setDissection(null);setDissected(v1InitialDissected);setDissectionError(null);
+  }, [pathway.id, v1InitialDissected]);
   useEffect(() => {
     // Open the objective with the complete assembled object, not the exploded
     // alternate. The generation result is also the model worker's source.

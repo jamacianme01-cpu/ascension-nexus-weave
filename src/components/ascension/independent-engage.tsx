@@ -322,7 +322,7 @@ export function IndependentEngage() {
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}
     data-realities={result ? "true" : undefined}>
-    <section aria-label="Engage ASCENSION" className="ascension-command">
+    {!result && <section aria-label="Engage ASCENSION" className="ascension-command">
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
@@ -341,7 +341,7 @@ export function IndependentEngage() {
         </div>
         {error && <p role="alert" className="relative z-30 rounded-xl border border-red-500 p-4 text-sm text-red-200">{error}</p>}
       </div>
-    </section>
+    </section>}
 
     {loading && <section className="mx-auto mt-4 max-w-3xl p-5 text-center text-gold" role="status">
       Developing your pathways…
@@ -358,7 +358,7 @@ export function IndependentEngage() {
       </button>
     </section>}
 
-    {result && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
+    {result && choice === null && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg text-gold">THREE PATHWAYS + FOURTH BLEND</h2>
         <div className="flex flex-wrap gap-3 text-xs">
@@ -374,11 +374,12 @@ export function IndependentEngage() {
       </div>
       <p className="text-sm text-foreground/80">{requested.split("\nBuild on the selected pathway:")[0]}</p>
       <div role="tablist" aria-label="Choose a pathway" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {choices.map((p, index) => <button type="button" role="tab" aria-selected={choice === index}
+        {choices.map((p, index) => <button type="button" role="tab" aria-selected={false}
           key={p.id} className={"min-h-40 rounded-xl border p-4 text-left transition-colors " +
             (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
           onClick={() => {
             setChoice(index); setRefinement("");
+            window.scrollTo(0, 0);
             if (talking) say(p.title + ". " + p.summary.slice(0, 230));
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
@@ -388,7 +389,13 @@ export function IndependentEngage() {
           </span>
         </button>)}
       </div>
-      {selected && <>
+    </section>}
+    {selected && <section className="ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
+      aria-label="Selected pathway design">
+      <div className="flex items-center justify-between">
+        <button type="button" onClick={() => { stopVoice(); setDive(null); setChoice(null); window.scrollTo(0, 0); }}
+          className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
+      </div>
         <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
           onDive={(pathway, imageUrl, mode = "cutaway") => { stopVoice(); setDive({ pathway, imageUrl, mode }); }}
           speakingEnabled={talking}
@@ -404,7 +411,6 @@ export function IndependentEngage() {
             BUILD ON RESULT
           </button>
         </div>
-      </>}
     </section>}
     {dive && <Suspense fallback={<p role="status" className="p-5 text-center text-gold">Opening invention view…</p>}>
       <RealityViewer

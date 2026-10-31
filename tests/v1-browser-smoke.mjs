@@ -127,10 +127,15 @@ try {
   await page.waitForTimeout(850);
   await page.getByRole("tab").nth(2).click();
   await canonical("Rotor");
+  await page.getByRole("button",{name:"LABELS",exact:true}).click();
+  assert.ok(await page.getByRole("button",{name:"Modular payload docking rail"}).count(),"Modular pathway must have its own geometry");
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
   await page.waitForTimeout(850);
   await page.getByRole("tab").nth(3).click();
   await canonical("Rotor");
+  await page.getByRole("button",{name:"LABELS",exact:true}).click();
+  assert.ok(await page.getByRole("button",{name:"Team coordination antenna"}).count(),"BLEND must show its coordinated component geometry");
+  assert.ok(await page.getByRole("button",{name:"Modular payload docking rail"}).count(),"BLEND must retain modular features");
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
   await page.waitForTimeout(850);
 

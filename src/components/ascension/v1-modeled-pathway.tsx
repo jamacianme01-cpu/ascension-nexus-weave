@@ -19,6 +19,11 @@ export function V1ModeledPathway({
   const [reset,setReset]=useState(0);
   const [full,setFull]=useState(false);
   const [error,setError]=useState("");
+  const [edit,setEdit]=useState<{id:number;name:string;action:"left"|"right"|"up"|"down"|"hide"|"restore"}>();
+  const applyEdit=(action:"left"|"right"|"up"|"down"|"hide"|"restore")=>{
+    if(selected&&components.some(p=>p.name===selected))
+      setEdit(previous=>({id:(previous?.id??0)+1,name:selected,action}));
+  };
   useEffect(()=>{
     if(!full)return;
     const original=document.body.style.overflow;
@@ -76,7 +81,7 @@ export function V1ModeledPathway({
           aria-label="Selected invention model">
           <V1ModelWorkbench kind={kind} mode={mode} title={path.title}
             zoom={zoom} rotation={rotation} reset={reset}
-            selected={selected} onParts={setComponents} onSelect={inspect} onError={setError}/>
+            selected={selected} edit={edit} onParts={setComponents} onSelect={inspect} onError={setError}/>
           <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-[#031320cf] px-3 py-2 text-xs text-cyan-100">
             {mode==="assembled"?"ASSEMBLED · SAME COMPONENTS":mode==="blueprint"
               ?"ORTHOGRAPHIC · SAME COMPONENTS":"EXPLODED · SAME COMPONENTS"}
@@ -87,7 +92,7 @@ export function V1ModeledPathway({
           <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-sm text-gold" onClick={()=>setZoom(v=>Math.max(.45,v/1.25))}>ZOOM OUT</button>
           <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-sm text-gold" onClick={()=>setRotation(v=>v-15)}>ROTATE LEFT</button>
           <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-sm text-gold" onClick={()=>setRotation(v=>v+15)}>ROTATE RIGHT</button>
-          <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-sm text-gold" onClick={()=>{setZoom(1);setRotation(0);setReset(n=>n+1);}}>RESET</button>
+          <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-sm text-gold" onClick={()=>{setZoom(1);setRotation(0);setSelected(null);setReset(n=>n+1);}}>RESET</button>
           {!full&&<button type="button" onClick={()=>setFull(true)}
             className="rounded-lg border border-primary/60 px-4 py-2 text-sm text-primary">DIVE INTO REALITY</button>}
         </div>
@@ -124,6 +129,20 @@ export function V1ModeledPathway({
             <p className="mt-2"><b>WHAT:</b> {attached?.name||current?.name}</p>
             <p className="mt-2"><b>WHERE:</b> {attached?.location||"Relative position shown in the model; no measured coordinates."}</p>
             <p className="mt-2"><b>DOES:</b> {attached?.purpose||current?.role}</p>
+          </div>}
+          {selected&&components.some(p=>p.name===selected)&&<div className="mt-3 border-t border-gold/25 pt-3">
+            <h4 className="mb-2 text-xs text-gold">MOVE SELECTED COMPONENT · CONCEPT UNITS</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {(["left","right","up","down"] as const).map(action=><button type="button"
+                key={action} onClick={()=>applyEdit(action)}
+                className="rounded-lg border border-gold/35 px-3 py-2 text-xs text-gold">
+                MOVE {action.toUpperCase()}
+              </button>)}
+              <button type="button" onClick={()=>applyEdit("hide")}
+                className="rounded-lg border border-gold/35 px-3 py-2 text-xs text-gold">HIDE PART</button>
+              <button type="button" onClick={()=>applyEdit("restore")}
+                className="rounded-lg border border-gold/35 px-3 py-2 text-xs text-gold">RESTORE PART</button>
+            </div>
           </div>}
           {path.parts.length>0&&<details className="mt-3 text-sm">
             <summary className="cursor-pointer text-gold">Other pathway-described components</summary>

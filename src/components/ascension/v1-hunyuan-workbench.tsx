@@ -22,6 +22,7 @@ type MeshRecord = {
   mesh: THREE.Mesh;
   originalPosition: THREE.Vector3;
   originalMaterials: THREE.Material | THREE.Material[];
+  blueprintMaterials: THREE.Material | THREE.Material[];
 };
 type Runtime = {
   scene: THREE.Scene; root: THREE.Group; renderer: THREE.WebGLRenderer;
@@ -42,6 +43,7 @@ export function V1HunyuanWorkbench({
   const latestSelect = useRef(onSelect);
   latestSelect.current=onSelect;
   const [loading,setLoading]=useState(true);
+  const [revision,setRevision]=useState(0);
   const [error,setError]=useState("");
   useEffect(()=>{
     const node=host.current;
@@ -148,12 +150,27 @@ export function V1HunyuanWorkbench({
       gltf.scene.scale.setScalar(4.6/Math.max(size.x,size.y,size.z,0.001));
       gltf.scene.traverse(item=>{
         if(item instanceof THREE.Mesh){
-          runtime.meshes.push({mesh:item,originalPosition:item.position.clone(),originalMaterials:item.material});
+          const original=item.material;
+          const clone=(m:THREE.Material)=>{
+            const material=m.clone();
+            if(material instanceof THREE.MeshStandardMaterial){
+              material.color.setHex(0x63e5ff);material.wireframe=true;
+            }
+            return material;
+          };
+          const blueprint=Array.isArray(original)?original.map(clone):clone(original);
+          runtime.meshes.push({
+            mesh:item,
+            originalPosition:item.position.clone(),
+            originalMaterials:original,
+            blueprintMaterials:blueprint,
+          });
         }
       });
       if(!runtime.meshes.length){setError("Hunyuan GLB has no mesh surfaces");onError("Hunyuan GLB is not a surface mesh");return;}
       onParts(runtime.meshes.map((m,i)=>({name:m.mesh.name || "Hunyuan mesh "+(i+1),meshIndex:i})));
       setLoading(false);
+      setRevision(n=>n+1);
     },error=>{
       if(!closed){const message=error instanceof Error?error.message:String(error);
         setError("Cannot load Hunyuan GLB: "+message.slice(0,120));onError(message);}
@@ -163,6 +180,10 @@ export function V1HunyuanWorkbench({
       observer.disconnect();controls.dispose();
       renderer.domElement.removeEventListener("pointerdown",onDown);
       renderer.domElement.removeEventListener("pointerup",onUp);
+      runtime.meshes.forEach(record=>{
+        const paints=Array.isArray(record.blueprintMaterials)?record.blueprintMaterials:[record.blueprintMaterials];
+        paints.forEach(p=>p.dispose());
+      });
       scene.traverse(item=>{
         if(item instanceof THREE.Mesh){
           item.geometry.dispose();
@@ -184,14 +205,7 @@ export function V1HunyuanWorkbench({
       const mesh=record.mesh;
       mesh.position.copy(record.originalPosition);
       mesh.material=record.originalMaterials;
-      if(blueprint){
-        const original=Array.isArray(record.originalMaterials)?record.originalMaterials:[record.originalMaterials];
-        mesh.material=original.map(m=>{
-          const copy=m.clone();
-          if(copy instanceof THREE.MeshStandardMaterial){copy.color.setHex(0x63e5ff);copy.wireframe=true;}
-          return copy;
-        });
-      }
+      if(blueprint)mesh.material=record.blueprintMaterials;
       if(explode){
         const world=new THREE.Vector3();
         mesh.getWorldPosition(world);
@@ -201,15 +215,15 @@ export function V1HunyuanWorkbench({
         mesh.position.add(offset);
       }
     });
-  },[mode,bytes]);
+  },[mode,bytes,revision]);
 
   useEffect(()=>{
     const st=live.current;if(!st)return;
     st.camera.position.setLength(Math.max(1.7,Math.min(35,7/zoom)));
     st.camera.updateProjectionMatrix();
     st.orthos.forEach(c=>{c.zoom=zoom;c.updateProjectionMatrix();});
-  },[zoom,bytes]);
-  useEffect(()=>{const st=live.current;if(st)st.root.rotation.y=rotation*Math.PI/180;},[rotation,bytes]);
+  },[zoom,bytes,revision]);
+  useEffect(()=>{const st=live.current;if(st)st.root.rotation.y=rotation*Math.PI/180;},[rotation,bytes,revision]);
   useEffect(()=>{
     const st=live.current;if(!st)return;
     st.meshes.forEach(m=>m.mesh.position.copy(m.originalPosition));

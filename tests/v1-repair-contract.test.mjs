@@ -90,8 +90,8 @@ const tests = [
     assert.match(route, /You are the Tree of Knowledge: ASCENSION's welcoming, knowledgeable, practical design assistant/);
     assert.match(route, /FIRST answer the person's exact question with concrete, technically useful information/);
     assert.match(route, /never like a narrator/);
-    assert.match(ui, /It's good to have you here/);
-    assert.match(ui, /One important part is|essential.name \+ ": " \+ essential.purpose/);
+    assert.match(ui, /Glad you.re here/);
+    assert.doesNotMatch(ui, /if \(talking\) say\("I have three different approaches/);\n    assert.doesNotMatch(ui, /say\("Let.s work on " \+ p.title/);
   }],
   ["owner signoff remains unchecked", () => {
     assert.ok(checklist.includes("- [ ]"));

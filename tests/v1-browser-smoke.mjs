@@ -51,7 +51,11 @@ try {
     const phase = request.method() === "GET" ? "capabilities" : request.postDataJSON()?.phase;
     calls.push(phase);
     let body;
-    if (phase === "capabilities") body = { picture_generation_enabled: true, providers: {OpenAI:true,Claude:false,Grok:false} };
+    if (phase === "capabilities") body = {
+      // The first design has an image; all remaining pathways must open even without one.
+      picture_generation_enabled: calls.filter(value => value === "capabilities").length === 1,
+      providers: {OpenAI:true,Claude:false,Grok:false},
+    };
     else if (phase === "initial") body = { phase: "initial", answer: "A useful private engineering architecture for a four-rotor material-handling worker drone, with battery, motor controllers, sensors, lightweight frame and a gripper." };
     else if (phase === "pathways") body = {
       introduction: "Here are four engineered directions.",
@@ -108,9 +112,22 @@ try {
   assert.equal(await detail.count(), 0, "Going back removes the second screen completely");
   assert.equal(await page.getByRole("tab").count(), 4, "Back returns to exactly the four pathway choices");
   assert.equal(await page.locator('img[alt^="Concept picture of"]').count(), 0, "No design picture beneath pathway cards");
-  await page.getByRole("tab", {name:/Adaptive modular team/}).click();
-  assert.equal(await page.getByRole("tab").count(), 0, "BLEND also opens its own design screen");
-  assert.ok(await detail.getByRole("heading", {name:"Adaptive modular team"}).count());
+  for (const title of ["Coordinated team architecture", "Modular platform architecture", "Adaptive modular team"]) {
+    // The detail screen and back control cannot depend on the image endpoint.
+    await page.getByRole("tab", {name:new RegExp(title)}).click();
+    await detail.waitFor({state:"visible"});
+    await detail.getByRole("heading", {name:title}).waitFor({state:"visible"});
+    await page.waitForFunction(() => {
+      const panel = document.querySelector('section[aria-label="Selected pathway design"]');
+      return panel && panel.getBoundingClientRect().top < window.innerHeight / 2
+        && panel.getBoundingClientRect().bottom > 0;
+    }, {timeout:5000});
+    assert.equal(await page.getByRole("tab").count(), 0, "Selection cards must be removed on every detail view");
+    await detail.getByText("ASCENSION's image engine is not connected.").waitFor({state:"visible"});
+    await detail.getByRole("button", {name:/BACK TO PATHWAYS/}).click();
+    await page.getByRole("tab").first().waitFor({state:"visible"});
+    assert.equal(await page.getByRole("tab").count(), 4);
+  }
   assert.equal(messages.length, 0, messages.join(" | "));
   console.log("PASS V1 browser: Tree and Book; four pathways only on selection screen; pathway-specific second screen including BLEND; labels; Tree guidance; blueprint immersion; back navigation");
 } finally {

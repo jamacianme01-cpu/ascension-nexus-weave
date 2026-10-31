@@ -109,6 +109,12 @@ function PathwayView({ path, objective, imageCache, onSpeak, speakingEnabled }: 
   }, [path, objective, imageCache, imageKey, mode, pictureAttempt]);
 
   useEffect(() => {
+    if (!pictureError.toLowerCase().includes("rate-limit") || pictureAttempt >= 3) return;
+    const timer = window.setTimeout(() => setPictureAttempt(value => value + 1), 35000);
+    return () => window.clearTimeout(timer);
+  }, [pictureError, pictureAttempt, mode]);
+
+  useEffect(() => {
     if (!immersive) return;
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setImmersive(false);

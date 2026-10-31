@@ -106,14 +106,19 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak} />
+    <p className="mb-4 max-w-3xl leading-7 text-foreground" aria-label="Selected pathway summary">{path.summary}</p>
     <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Selected pathway views">
       {(["description", "labels"] as const).map(tab =>
         <button key={tab} type="button" aria-pressed={panel === tab}
           onClick={() => setPanel(tab)}
           className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold">{tab.toUpperCase()}</button>)}
-      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "blueprint")}
+      <button type="button" disabled={!picture}
+        title={!picture ? "A selected invention picture is required; its generator is not connected or still processing." : undefined}
+        onClick={() => picture && onDive(path, picture, "blueprint")}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
-      <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "dissect")}
+      <button type="button" disabled={!picture}
+        title={!picture ? "A selected invention picture is required; its generator is not connected or still processing." : undefined}
+        onClick={() => picture && onDive(path, picture, "dissect")}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT / EXPLODE</button>
     </div>
     <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
@@ -138,12 +143,12 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
             onClick={() => onDive(path, picture)}>DIVE INTO REALITY</button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Actual generated concept artwork. No verified 3D mesh is available yet; 3D editing requires a reconstructed model.</p>
-      </> : <p className="p-6 text-center text-sm text-muted-foreground" role={pictureError ? "alert" : "status"}>
+      </> : <p className="p-2 text-left text-sm text-muted-foreground" role={pictureError ? "alert" : "status"}>
         {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
+        {pictureError && <span className="mt-2 block">The pathway is open: use DESCRIPTION and LABELS above. Image-based views need the picture generator connected.</span>}
       </p>}
     </div>
     {panel === "description" && <>
-    <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
     {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
     <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>
     <ol className="mb-5 list-decimal space-y-2 pl-5 text-sm leading-6">

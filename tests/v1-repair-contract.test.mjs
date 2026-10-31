@@ -47,7 +47,7 @@ const tests = [
   }],
   ["V1 views are blueprint and dissect and assembled with real generation routes", () => {
     assert.match(ui, /type DesignView = "assembled" \| "blueprint" \| "dissect"/);
-    assert.match(ui, />BLUEPRINT/);
+    assert.match(ui, /view === "blueprint" \? "BLUEPRINT"/);
     assert.match(ui, /DISSECT \/ EXPLODE/);
     assert.match(ui, /IMPLODE \/ REASSEMBLE/);
     assert.match(ui, /DIVE INTO REALITY/);

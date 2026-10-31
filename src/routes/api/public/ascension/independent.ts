@@ -248,19 +248,17 @@ async function guide(objective: string, question: string, selected: Record<strin
 /** Produce a real image for the selected pathway, never substitute diagram boxes.
  * A separate owner-controlled switch prevents surprise image-generation charges.
  */
+const FREE_SDXL_ENDPOINT = "https://stable-diffusion-xl.endpoints.kepler.ai.cloud.ovh.net/api/text2image";
 function ownImageConfigured() {
-  return process.env["ASCENSION_ALLOW_FREE_IMAGES"] === "true" &&
-    Boolean(process.env["ASCENSION_IMAGE_ENDPOINT"]?.trim());
+  // A public, anonymous, no-charge image model is available when enabled.
+  // The existing owner-controlled custom bridge still takes precedence.
+  return process.env["ASCENSION_ALLOW_FREE_IMAGES"] === "true";
 }
 async function picture(objective: string, value: Record<string, unknown>) {
   // Existing owner-configurable image bridge only. Never trigger paid image API
   // calls or substitute stock/placeholder images for the selected invention.
   if (!ownImageConfigured())
     throw new Error("ASCENSION's image engine is not connected. No picture was fabricated or purchased.");
-  const target = new URL(process.env["ASCENSION_IMAGE_ENDPOINT"]!.trim());
-  const loopback = ["localhost", "127.0.0.1", "::1"].includes(target.hostname);
-  if (target.protocol !== "https:" && !(loopback && target.protocol === "http:"))
-    throw new Error("The approved image bridge must use HTTPS or local loopback.");
   const title = String(value["title"] ?? "").trim().slice(0, 140);
   const summary = String(value["summary"] ?? "").trim().slice(0, 1400);
   const steps = Array.isArray(value["steps"]) ? value["steps"].filter((v): v is string => typeof v === "string").slice(0, 6) : [];
@@ -276,6 +274,43 @@ async function picture(objective: string, value: Record<string, unknown>) {
     "One complete invention visible; no textual labels, unrelated parts or misleading dimensions.",
     "Concept illustration only; physical feasibility remains unverified.",
   ].join("\n");
+  // OVHcloud publicly documents SDXL as free with two anonymous requests
+  // per minute. No paid API key, image purchase, or shared volunteer worker.
+  if (!process.env["ASCENSION_IMAGE_ENDPOINT"]?.trim()) {
+    const response = await fetch(FREE_SDXL_ENDPOINT, {
+      method: "POST",
+      signal: AbortSignal.timeout(110000),
+      headers: { "content-type": "application/json", "accept": "application/octet-stream" },
+      body: JSON.stringify({
+        prompt,
+        negative_prompt: "flowchart, drawing, text, watermark, disconnected parts, abstract diagram",
+      }),
+    });
+    if (!response.ok) {
+      if (response.status === 429)
+        throw new Error("Free image generation is temporarily rate-limited. Retry shortly.");
+      throw new Error("Free image engine HTTP " + response.status);
+    }
+    if (Number(response.headers.get("content-length") || 0) > 9_000_000)
+      throw new Error("Image provider returned an oversized picture.");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length < 4000 || bytes.length > 9_000_000)
+      throw new Error("Image provider returned an invalid image size.");
+    const png = bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71;
+    const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+    const webp = String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+      String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+    if (!png && !jpeg && !webp) throw new Error("Image provider returned no usable image.");
+    return {
+      image_url: "data:image/" + (png ? "png" : jpeg ? "jpeg" : "webp") + ";base64," +
+        Buffer.from(bytes).toString("base64"),
+      verified: false,
+    };
+  }
+  const target = new URL(process.env["ASCENSION_IMAGE_ENDPOINT"]!.trim());
+  const loopback = ["localhost", "127.0.0.1", "::1"].includes(target.hostname);
+  if (target.protocol !== "https:" && !(loopback && target.protocol === "http:"))
+    throw new Error("The approved image bridge must use HTTPS or local loopback.");
   const headers: Record<string, string> = { "content-type": "application/json" };
   const token = process.env["ASCENSION_IMAGE_TOKEN"]?.trim();
   if (token) headers["authorization"] = "Bearer " + token;

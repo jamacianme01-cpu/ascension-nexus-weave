@@ -138,7 +138,8 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
   const host=useRef<HTMLDivElement>(null);
   const state=useRef<{
     renderer:THREE.WebGLRenderer; scene:THREE.Scene; perspective:THREE.PerspectiveCamera;
-    orthographic:THREE.OrthographicCamera; controls:OrbitControls; assembly:Assembly;
+    orthographic:THREE.OrthographicCamera; front:THREE.OrthographicCamera; side:THREE.OrthographicCamera;
+    controls:OrbitControls; assembly:Assembly;
     raf:number; observer:ResizeObserver; pick:(event:PointerEvent)=>void;
   }|null>(null);
   const onSelectRef=useRef(onSelect);
@@ -151,21 +152,32 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
     try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"default"});}
     catch{setMissingWebgl(true);onError("3D acceleration is unavailable in this browser.");return;}
     const scene=new THREE.Scene();
-    scene.background=new THREE.Color("#061420");
+    const assembledBackground=new THREE.Color("#071521");
+    const blueprintBackground=new THREE.Color("#041d32");
+    scene.background=assembledBackground;
     const assembly=build(kind);
     scene.add(assembly.root);
     scene.add(new THREE.HemisphereLight(0xe6f9ff,0x2a4150,2.1));
     const light=new THREE.DirectionalLight(0xffffff,2.6);
     light.position.set(6,9,7);scene.add(light);
-    const grid=new THREE.GridHelper(10,20,0x376e88,0x1c3649);
+    const grid=new THREE.GridHelper(12,24,0x376e88,0x1c3649);
+    (grid.material as THREE.LineBasicMaterial).transparent=true;
     grid.position.y=-1.25;scene.add(grid);
     const perspective=new THREE.PerspectiveCamera(38,1,0.1,120);
-    perspective.position.set(8,6.5,9);
+    perspective.position.set(4,3.3,5.5);
     perspective.lookAt(0,0,0);
     const orthographic=new THREE.OrthographicCamera(-5,5,5,-5,0.1,120);
     orthographic.position.set(0,12,0.01);
     orthographic.up.set(0,0,-1);
     orthographic.lookAt(0,0,0);
+    const front=orthographic.clone();
+    front.up.set(0,1,0);
+    front.position.set(0,2.0,12);
+    front.lookAt(0,0,0);
+    const side=orthographic.clone();
+    side.up.set(0,1,0);
+    side.position.set(12,2.0,0);
+    side.lookAt(0,0,0);
     const controls=new OrbitControls(perspective,renderer.domElement);
     controls.enableDamping=true;
     controls.dampingFactor=0.08;
@@ -184,8 +196,12 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
     const pointer=new THREE.Vector2();
     const pick=(event:PointerEvent)=>{
       const rect=renderer.domElement.getBoundingClientRect();
-      pointer.set(2*(event.clientX-rect.left)/rect.width-1,1-2*(event.clientY-rect.top)/rect.height);
-      raycaster.setFromCamera(pointer,container.dataset.mode==="blueprint"?orthographic:perspective);
+      const blueprint=container.dataset.mode==="blueprint";
+      const screenX=(event.clientX-rect.left)/rect.width;
+      const slot=Math.min(2,Math.max(0,Math.floor(screenX*3)));
+      const relativeX=blueprint?screenX*3-slot:screenX;
+      pointer.set(2*relativeX-1,1-2*(event.clientY-rect.top)/rect.height);
+      raycaster.setFromCamera(pointer,blueprint?[orthographic,front,side][slot]!:perspective);
       const objects=raycaster.intersectObjects(assembly.root.children,true);
       const match=objects[0]?.object;
       if(!match)return;
@@ -203,12 +219,14 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
       const width=Math.max(container.clientWidth,300),height=Math.max(container.clientHeight,300);
       perspective.aspect=width/height;
       perspective.updateProjectionMatrix();
-      const range=5.2,aspect=width/height;
-      orthographic.left=-range*aspect;
-      orthographic.right=range*aspect;
-      orthographic.top=range;
-      orthographic.bottom=-range;
-      orthographic.updateProjectionMatrix();
+      const range=5.2,aspect=(width/3)/height;
+      for(const camera of [orthographic,front,side]){
+        camera.left=-range*aspect;
+        camera.right=range*aspect;
+        camera.top=range;
+        camera.bottom=-range;
+        camera.updateProjectionMatrix();
+      }
       renderer.setSize(width,height,false);
     });
     observer.observe(container);
@@ -216,17 +234,34 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
     let lastFrame=0;
     const animate=(time:number)=>{
       raf=requestAnimationFrame(animate);
-      if(time-lastFrame<42)return;
-      lastFrame=time;
       const blueprint=container.dataset.mode==="blueprint";
-      grid.visible=blueprint;
-      scene.background=new THREE.Color(blueprint?"#041d32":"#071521");
+      if(time-lastFrame<(blueprint?70:42))return;
+      lastFrame=time;
+      grid.visible=true;
+      (grid.material as THREE.LineBasicMaterial).opacity=blueprint?.2:.09;
+      scene.background=blueprint?blueprintBackground:assembledBackground;
       controls.enabled=!blueprint;
       controls.update();
-      renderer.render(scene,blueprint?orthographic:perspective);
+      if(blueprint){
+        const width=Math.max(container.clientWidth,300),height=Math.max(container.clientHeight,300);
+        const cameras=[orthographic,front,side];
+        const column=width/3;
+        renderer.setScissorTest(true);
+        cameras.forEach((camera,i)=>{
+          const x=Math.round(i*column);
+          const w=Math.round((i+1)*column)-x;
+          renderer.setViewport(x,0,w,height);
+          renderer.setScissor(x,0,w,height);
+          renderer.render(scene,camera);
+        });
+        renderer.setScissorTest(false);
+        renderer.setViewport(0,0,width,height);
+      }else{
+        renderer.render(scene,perspective);
+      }
     };
     animate();
-    state.current={renderer,scene,perspective,orthographic,controls,assembly,raf,observer,pick};
+    state.current={renderer,scene,perspective,orthographic,front,side,controls,assembly,raf,observer,pick};
     onParts(assembly.parts.map(p=>({name:p.name,position:[p.home.x,p.home.y,p.home.z],role:p.role})));
     return ()=>{
       cancelAnimationFrame(raf);
@@ -272,10 +307,13 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
   },[mode,kind]);
   useEffect(()=>{
     const st=state.current;if(!st)return;
-    st.perspective.position.setLength(Math.max(3,Math.min(25,12/zoom)));
+    const baseDistance=kind==="linear"?7.5:kind==="rover"?6.8:6.2;
+    st.perspective.position.setLength(Math.max(3,Math.min(25,baseDistance/zoom)));
     st.perspective.updateProjectionMatrix();
-    st.orthographic.zoom=zoom;
-    st.orthographic.updateProjectionMatrix();
+    for(const camera of [st.orthographic,st.front,st.side]){
+      camera.zoom=zoom;
+      camera.updateProjectionMatrix();
+    }
   },[zoom]);
   useEffect(()=>{const st=state.current;if(st)st.assembly.root.rotation.y=rotation*Math.PI/180;},[rotation]);
   useEffect(()=>{

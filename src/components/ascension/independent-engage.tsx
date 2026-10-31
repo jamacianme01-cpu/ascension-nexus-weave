@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { TreeGuide } from "@/components/ascension/tree-guide";
+import { v1AssemblyKind } from "@/components/ascension/v1-model-workbench";
+import { V1ModeledPathway } from "@/components/ascension/v1-modeled-pathway";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -49,7 +51,21 @@ function stopVoice() {
 }
 type DesignView = "assembled" | "blueprint" | "dissect";
 
-function PathwayView({ path, objective, imageCache, onSpeak, speakingEnabled }: {
+function PathwayView(props: {
+  path: Pathway & {blend_reason?:string};
+  objective: string;
+  imageCache: {current:Map<string,string>};
+  onSpeak: (text:string)=>void;
+  speakingEnabled:boolean;
+}) {
+  const kind=v1AssemblyKind(props.objective,props.path.title,props.path.summary);
+  return kind ? <V1ModeledPathway key={props.path.id} path={props.path} objective={props.objective}
+    kind={kind} onSpeak={props.onSpeak} speakingEnabled={props.speakingEnabled}/> :
+    <ImagePathwayView {...props}/>;
+}
+
+/** Unsupported geometry remains an explicitly labeled illustration only. */
+function ImagePathwayView({ path, objective, imageCache, onSpeak, speakingEnabled }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
   imageCache: { current: Map<string, string> };

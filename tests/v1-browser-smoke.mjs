@@ -76,6 +76,12 @@ try {
     await detail.waitFor({state:"visible"});
     await canvas.waitFor({state:"visible",timeout:20000});
     console.log("CANVAS ready "+kindName);
+    if (process.env.V1_CAPTURE === "1" && (kindName === "Rotor" || kindName === "Coil station") && !globalThis["__captured_" + kindName.replace(/ /g,"_")]) {
+      globalThis["__captured_" + kindName.replace(/ /g,"_")] = true;
+      await page.waitForTimeout(650);
+      const jpeg = await canvas.screenshot({type:"jpeg",quality:50,animations:"disabled"});
+      console.log("V1_VISUAL_"+kindName.replace(/ /g,"_")+":"+jpeg.toString("base64"));
+    }
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
     await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="blueprint"]').waitFor();
     console.log("BLUEPRINT mode ready "+kindName);

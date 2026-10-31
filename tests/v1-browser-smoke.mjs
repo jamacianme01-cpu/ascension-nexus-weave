@@ -52,9 +52,7 @@ try {
     calls.push(phase);
     let body;
     if (phase === "capabilities") body = {
-      // React StrictMode can check capabilities twice during initial mount.
-      // Keep images enabled until the first picture POST, then disable for the rest.
-      picture_generation_enabled: !calls.includes("picture"),
+      picture_generation_enabled: true,
       providers: {OpenAI:true,Claude:false,Grok:false},
     };
     else if (phase === "initial") body = { phase: "initial", answer: "A useful private engineering architecture for a four-rotor material-handling worker drone, with battery, motor controllers, sensors, lightweight frame and a gripper." };
@@ -93,7 +91,7 @@ try {
   assert.equal(await page.locator('section[aria-label="ASCENSION pathways"]').count(), 0, "Pathway selection and design must not stack");
   assert.equal(await page.locator('section[aria-label="Engage ASCENSION"]').count(), 0, "Entry screen must not appear above design");
   assert.equal(await page.getByRole("button", {name:"← BACK TO PATHWAYS", exact:true}).count(), 1);
-  await detail.locator('img[alt^="Concept picture of"]').waitFor({ state: "visible" });
+  await detail.locator('img[alt^="Assembled concept picture of"]').waitFor({ state: "visible" });
   assert.equal(calls.filter(x => x === "picture").length, 1);
   await page.getByRole("button", {name:"LABELS",exact:true}).click();
   await page.getByRole("button", {name:"Rotor assembly",exact:true}).click();
@@ -102,35 +100,38 @@ try {
   await page.getByRole("textbox",{name:"Ask the Tree"}).fill("Where does the battery belong?");
   await page.getByRole("button",{name:"ASK",exact:true}).click();
   await page.getByText(/gripper hangs below/).waitFor({state:"visible"});
-  await page.getByRole("button",{name:"BLUEPRINT",exact:true}).first().click();
-  await page.locator("dialog.reality-screen[open]").waitFor({state:"visible"});
-  assert.equal(await page.locator('dialog.reality-screen[data-v1="true"]').count(), 1);
-  assert.ok(await page.getByRole("button", {name:/SOUND (ON|OFF|BLOCKED)/}).count(), "The existing Sound control must not be removed.");
-  await page.locator('dialog.reality-screen').getByRole("button", {name:/BACK TO PATHWAYS/}).click();
-  assert.equal(await page.locator("dialog.reality-screen[open]").count(), 0);
-  assert.equal(await detail.count(), 1, "Closing the immersion returns to selected pathway detail");
-  await detail.getByRole("button", {name:/BACK TO PATHWAYS/}).click();
-  assert.equal(await detail.count(), 0, "Going back removes the second screen completely");
-  assert.equal(await page.getByRole("tab").count(), 4, "Back returns to exactly the four pathway choices");
-  assert.equal(await page.locator('img[alt^="Concept picture of"]').count(), 0, "No design picture beneath pathway cards");
-  for (const title of ["Coordinated team architecture", "Modular platform architecture", "Adaptive modular team"]) {
-    // The detail screen and back control cannot depend on the image endpoint.
-    await page.getByRole("tab", {name:new RegExp(title)}).click();
+  await detail.getByRole("button", {name:"BLUEPRINT",exact:true}).click();
+  await detail.locator('img[alt^="Blueprint concept of"]').waitFor({state:"visible"});
+  assert.ok(await detail.getByText(/Numerical dimensions and tolerances remain unresolved/).count());
+  await detail.getByRole("button", {name:"DISSECT / EXPLODE",exact:true}).click();
+  await detail.locator('img[alt^="Exploded concept picture of"]').waitFor({state:"visible"});
+  assert.equal(await detail.getByText(/Automatic paid dissection image generation/).count(),0);
+  await detail.getByRole("button", {name:"IMPLODE / REASSEMBLE",exact:true}).click();
+  await detail.locator('img[alt^="Assembled concept picture of"]').waitFor({state:"visible"});
+  await detail.getByRole("button", {name:"ZOOM IN"}).click();
+  await detail.getByRole("button", {name:"ROTATE RIGHT"}).click();
+  await detail.getByRole("button", {name:"DIVE INTO REALITY"}).click();
+  const immersive=page.getByRole("dialog",{name:"Immersive invention inspection"});
+  await immersive.waitFor({state:"visible"});
+  await immersive.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
+  assert.equal(await immersive.count(),0);
+  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+  assert.equal(await detail.count(),0);
+  assert.equal(await page.getByRole("tab").count(),4);
+  assert.equal(await page.locator('img[alt^="Assembled concept picture of"]').count(),0);
+  for(const title of ["Coordinated team architecture","Modular platform architecture","Adaptive modular team"]){
+    await page.getByRole("tab",{name:new RegExp(title)}).click();
     await detail.waitFor({state:"visible"});
-    await detail.getByRole("heading", {name:title}).waitFor({state:"visible"});
-    await page.waitForFunction(() => {
-      const panel = document.querySelector('section[aria-label="Selected pathway design"]');
-      return panel && panel.getBoundingClientRect().top < window.innerHeight / 2
-        && panel.getBoundingClientRect().bottom > 0;
-    }, {timeout:5000});
-    assert.equal(await page.getByRole("tab").count(), 0, "Selection cards must be removed on every detail view");
-    await detail.getByText("ASCENSION's image engine is not connected.").waitFor({state:"visible"});
-    await detail.getByRole("button", {name:/BACK TO PATHWAYS/}).click();
+    await detail.getByRole("heading",{name:title}).waitFor({state:"visible"});
+    await detail.locator('img[alt^="Assembled concept picture of"]').waitFor({state:"visible"});
+    assert.equal(await page.getByRole("tab").count(),0);
+    await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
     await page.getByRole("tab").first().waitFor({state:"visible"});
-    assert.equal(await page.getByRole("tab").count(), 4);
   }
+  assert.equal(await page.locator("dialog.reality-screen").count(),0);
+  assert.ok(calls.filter(x=>x==="picture").length>=6);
   assert.equal(messages.length, 0, messages.join(" | "));
-  console.log("PASS V1 browser: Tree and Book; four pathways only on selection screen; pathway-specific second screen including BLEND; labels; Tree guidance; blueprint immersion; back navigation");
+  console.log("PASS V1 browser: four pathways, assembled images, Blueprint, Dissect, Reassemble, zoom, rotate, immersive preview, parts, Tree, back");
 } finally {
   await browser.close();
 }

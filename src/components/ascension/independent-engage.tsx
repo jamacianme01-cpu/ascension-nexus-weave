@@ -109,7 +109,7 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
     <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Selected pathway views">
       {(["description", "labels"] as const).map(tab =>
         <button key={tab} type="button" aria-pressed={panel === tab}
-          onClick={() => { setPanel(tab); onSpeak(tab === "description" ? path.summary.slice(0, 260) : "Choose a named component to learn what it does and where it belongs."); }}
+          onClick={() => setPanel(tab)}
           className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold">{tab.toUpperCase()}</button>)}
       <button type="button" disabled={!picture} onClick={() => picture && onDive(path, picture, "blueprint")}
         className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
@@ -194,7 +194,7 @@ export function IndependentEngage() {
   useEffect(() => {
     // Tree and Book remain in place; the Tree speaks without a new entrance scene.
     // When a browser blocks autoplay, retry in the first genuine user interaction.
-    const greeting = "Welcome to ASCENSION. You're entering a world where knowledge connects and ideas become possibilities. I'm here to explore those connections with you. What would you like to accomplish?";
+    const greeting = "Welcome to ASCENSION. I'm the Tree of Knowledge. It's good to have you here. Tell me what you want to create or solve, and I'll help you develop the design, understand the choices, and improve it with you.";
     let disposed = false;
     const tryWelcome = () => {
       if (disposed || welcomeStarted.current || document.hidden) return;
@@ -226,7 +226,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      if (talking && data.introduction?.trim()) say(data.introduction.trim().slice(0, 260));
+      if (talking) say("I have three different approaches and a fourth that blends them. Choose the design you want to work on. I can help you understand its parts, weigh the tradeoffs, and improve it.");
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.
       window.setTimeout(() => {
@@ -260,7 +260,7 @@ export function IndependentEngage() {
     setChoice(null);
     setDive(null);
     setStage("processing");
-    if (talking) say("Exploring your objective.");
+    if (talking) say("I'll work through your objective and develop the design options.");
     try {
       // Internal reasoning only: never narrate or render this essay to the user.
       const response = await fetch("/api/public/ascension/independent", {
@@ -380,7 +380,14 @@ export function IndependentEngage() {
           onClick={() => {
             setChoice(index); setRefinement("");
             window.scrollTo(0, 0);
-            if (talking) say(p.title + ". " + p.summary.slice(0, 230));
+            if (talking) {
+              const essential = p.parts.find(part => part.name.trim() && part.purpose.trim());
+              const keyDetail = essential
+                ? essential.name + ": " + essential.purpose
+                : p.steps[0] ?? p.summary.slice(0, 140);
+              say("Let's work on " + p.title + ". " + keyDetail +
+                " You can ask me about a component, a design choice, or what to improve.");
+            }
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>

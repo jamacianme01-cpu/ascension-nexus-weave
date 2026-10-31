@@ -69,7 +69,7 @@ try {
     else body = { error: "Unexpected test API request" };
     await route.fulfill({ status: body.error ? 503 : 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  const pageResponse = await page.goto("http://127.0.0.1:4174/", { waitUntil: "domcontentloaded" });
+  const pageResponse = await page.goto(process.env.ASCENSION_BASE_URL || "http://127.0.0.1:4174/", { waitUntil: "domcontentloaded" });
   assert.equal(pageResponse?.status(), 200, "The app's entry URL did not return successfully.");
   await page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]').waitFor({ state: "visible", timeout: 20000 });
   await page.waitForFunction(() => window.__treeSpoken?.some(x => x.includes("Welcome to ASCENSION") && x.includes("Glad you") ), { timeout: 10000 });

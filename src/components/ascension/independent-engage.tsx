@@ -416,8 +416,8 @@ export function IndependentEngage() {
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}
-    data-realities={result ? "true" : undefined}>
-    {!result && <section aria-label="Engage ASCENSION" className="ascension-command">
+    data-realities={choice !== null ? "true" : undefined}>
+    {choice === null && <section aria-label="Engage ASCENSION" className="ascension-command">
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />

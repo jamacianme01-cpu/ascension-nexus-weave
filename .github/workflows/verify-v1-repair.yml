@@ -38,13 +38,13 @@ jobs:
             if curl -fsS http://127.0.0.1:4174/ > /dev/null; then break; fi
             sleep 2
           done
-          node tests/v1-browser-smoke.mjs
+          timeout 150s node tests/v1-browser-smoke.mjs
       - name: Browser acceptance on deployed ASCENSION V1
         env:
           ASCENSION_BASE_URL: https://ascension-nexus-weave-production.up.railway.app/
         run: |
           for attempt in $(seq 1 10); do
-            if node tests/v1-browser-smoke.mjs; then
+            if timeout 150s node tests/v1-browser-smoke.mjs; then
               exit 0
             fi
             echo "Deployed site not yet on this revision; retrying browser acceptance."

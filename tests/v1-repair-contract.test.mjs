@@ -91,7 +91,8 @@ const tests = [
     assert.match(route, /FIRST answer the person's exact question with concrete, technically useful information/);
     assert.match(route, /never like a narrator/);
     assert.match(ui, /Glad you.re here/);
-    assert.doesNotMatch(ui, /if \(talking\) say\("I have three different approaches/);\n    assert.doesNotMatch(ui, /say\("Let.s work on " \+ p.title/);
+    assert.doesNotMatch(ui, /if \(talking\) say\("I have three different approaches/);
+    assert.doesNotMatch(ui, /say\("Let.s work on " \+ p.title/);
   }],
   ["owner signoff remains unchecked", () => {
     assert.ok(checklist.includes("- [ ]"));

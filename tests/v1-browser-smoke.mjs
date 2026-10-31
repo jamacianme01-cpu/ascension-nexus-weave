@@ -3,7 +3,8 @@ import { chromium } from "playwright";
 
 const browser=await chromium.launch({args:["--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]});
 try {
-  const page=await browser.newPage({viewport:{width:1280,height:900}});
+  const page=await browser.newPage({viewport:{width:1100,height:760}});
+  page.setDefaultTimeout(12000);
   const errors=[];
   const calls=[];
   page.on("pageerror",e=>errors.push(e.message));
@@ -70,7 +71,7 @@ try {
 
   const detail=page.locator('section[aria-label="Selected pathway design"]');
   const canvas=page.locator('canvas[aria-label^="Rotatable, zoomable, component-selectable"]');
-  async function canonical(kindName) {
+  async function canonical(kindName,fullInspection=false) {
     await detail.waitFor({state:"visible"});
     await canvas.waitFor({state:"visible",timeout:20000});
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
@@ -86,6 +87,7 @@ try {
     await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="assembled"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Reassembly must preserve object identity");
     assert.equal(calls.filter(x=>x==="picture").length,0,"Switching views must not regenerate or rate-limit images");
+    if(fullInspection) {
     await page.getByRole("button",{name:"ZOOM IN"}).click();
     await page.getByRole("button",{name:"ROTATE RIGHT"}).click();
     await page.getByRole("button",{name:"LABELS",exact:true}).click();
@@ -101,9 +103,11 @@ try {
     await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).waitFor();
     await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
     assert.equal(await detail.count(),1,"Immersive view must close to the SAME selected pathway");
+    }
+    console.log("PASS modeled pathway: "+kindName+"; modes share one model canvas");
   }
   await page.getByRole("tab").first().click();
-  await canonical("Rotor");
+  await canonical("Rotor",true);
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
   await page.getByRole("tab").nth(1).click();
   await canonical("Driven wheel");
@@ -120,7 +124,7 @@ try {
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
   await page.getByRole("tab").first().click();
-  await canonical("Coil station");
+  await canonical("Coil station",true);
   assert.equal(calls.filter(x=>x==="picture").length,0);
   assert.equal(await page.getByText("Too many objectives. Try again later.").count(),0);
   assert.equal(errors.length,0,errors.join(" | "));

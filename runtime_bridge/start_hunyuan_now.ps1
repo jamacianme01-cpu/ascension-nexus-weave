@@ -16,7 +16,7 @@ if ([string]::IsNullOrWhiteSpace($token)) {
   $token = [Environment]::GetEnvironmentVariable('ASCENSION_PUBLISH_TOKEN', 'Machine')
 }
 if ([string]::IsNullOrWhiteSpace($token)) {
-  throw 'ASCENSION_PUBLISH_TOKEN is absent from User and Machine environment. Worker cannot claim jobs.'
+  Write-Host 'Remote publish token not configured. Local browser Hunyuan generation does not need it.'
 }
 # Do not print the secret.
 # Install a persistent logon task where Windows permits it. Startup still works
@@ -45,6 +45,17 @@ if ($existing.Count -eq 0) {
 } else {
   Write-Host 'ASCENSION Hunyuan bridge already running.'
 }
+# Start an origin-restricted localhost bridge for the browser. A served web
+# page cannot access a private 8081 process unless this localhost adapter runs.
+$browserBridge = Join-Path $Repo 'runtime_bridge\hunyuan_browser_bridge.py'
+if (-not (Test-Path $browserBridge)) { throw "Missing Hunyuan browser bridge: $browserBridge" }
+$browserLive = [bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue)
+if (-not $browserLive) {
+  Start-Process -FilePath $python -WindowStyle Hidden -WorkingDirectory $Repo `
+    -ArgumentList '-B','-u',$browserBridge `
+    -RedirectStandardOutput (Join-Path $logs 'hunyuan-browser.out.log') `
+    -RedirectStandardError (Join-Path $logs 'hunyuan-browser.err.log')
+}
 $readyApi = $false
 $readyWorker = $false
 for ($attempt = 1; $attempt -le 24; $attempt++) {
@@ -56,7 +67,9 @@ for ($attempt = 1; $attempt -le 24; $attempt++) {
 }
 Write-Host ('Hunyuan API on 127.0.0.1:8081: ' + $(if ($readyApi) {'LISTENING'} else {'NOT READY'}))
 Write-Host ('ASCENSION model queue worker: ' + $(if ($readyWorker) {'RUNNING'} else {'NOT RUNNING'}))
-if (-not ($readyApi -and $readyWorker)) {
+$readyBrowser = [bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue)
+Write-Host ('ASCENSION local browser Hunyuan bridge on 127.0.0.1:8082: ' + $(if ($readyBrowser) {'LISTENING'} else {'NOT READY'}))
+if (-not ($readyApi -and $readyBrowser)) {
   foreach ($name in @('hunyuan-api.err.log','hunyuan-worker.err.log','hunyuan-bridge.err.log')) {
     $log = Join-Path $logs $name
     if (Test-Path $log) {
@@ -66,4 +79,4 @@ if (-not ($readyApi -and $readyWorker)) {
   }
   throw 'Hunyuan startup incomplete. Errors above identify the failing component.'
 }
-Write-Host 'ASCENSION Hunyuan local bridge online; queued work can now be claimed.'
+Write-Host 'ASCENSION Hunyuan browser 3D generation path online. Remote queued jobs also work when a publish token is configured.'

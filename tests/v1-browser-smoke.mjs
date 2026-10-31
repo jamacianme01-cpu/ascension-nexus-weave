@@ -3,7 +3,7 @@ import { chromium } from "playwright";
 
 const browser=await chromium.launch({args:["--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]});
 try {
-  const page=await browser.newPage({viewport:{width:1100,height:760}});
+  const page=await browser.newPage({viewport:{width:1100,height:760},reducedMotion:"reduce"});
   page.setDefaultTimeout(12000);
   const errors=[];
   const calls=[];
@@ -114,15 +114,19 @@ try {
   await page.getByRole("tab").first().click();
   await canonical("Rotor",true);
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+  await page.waitForTimeout(850);
   await page.getByRole("tab").nth(1).click();
   await canonical("Driven wheel");
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+  await page.waitForTimeout(850);
   await page.getByRole("tab").nth(2).click();
   await canonical("Rotor");
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+  await page.waitForTimeout(850);
   await page.getByRole("tab").nth(3).click();
   await canonical("Rotor");
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+  await page.waitForTimeout(850);
 
   await page.getByRole("button",{name:"New objective"}).click();
   await page.locator("#objective").fill("make a linear propulsion engine");

@@ -41,6 +41,7 @@ function build(kind: Kind): Assembly {
   function mesh(node: THREE.Group, geometry: THREE.BufferGeometry, color: number, offset: [number,number,number]=[0,0,0]) {
     const item = new THREE.Mesh(geometry,material(color));
     item.position.set(...offset);
+    (item.material as THREE.MeshStandardMaterial).userData["naturalColor"] = color;
     item.castShadow = true;
     item.receiveShadow = true;
     node.add(item);
@@ -183,7 +184,7 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
     const pick=(event:PointerEvent)=>{
       const rect=renderer.domElement.getBoundingClientRect();
       pointer.set(2*(event.clientX-rect.left)/rect.width-1,1-2*(event.clientY-rect.top)/rect.height);
-      raycaster.setFromCamera(pointer,mode==="blueprint"?orthographic:perspective);
+      raycaster.setFromCamera(pointer,container.dataset.mode==="blueprint"?orthographic:perspective);
       const objects=raycaster.intersectObjects(assembly.root.children,true);
       const match=objects[0]?.object;
       if(!match)return;
@@ -256,8 +257,7 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
       part.node.traverse(item=>{if(item instanceof THREE.Mesh){
         const mat=item.material as THREE.MeshStandardMaterial;
         mat.wireframe=blueprint;
-        mat.color.setHex(blueprint?0x69dfe7:mat.userData["naturalColor"]||mat.color.getHex());
-        if(!mat.userData["naturalColor"] && !blueprint)mat.userData["naturalColor"]=mat.color.getHex();
+        mat.color.setHex(blueprint?0x69dfe7:Number(mat.userData["naturalColor"]??steel));
       }});
     });
     st.controls.reset();

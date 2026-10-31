@@ -91,6 +91,12 @@ try {
     await page.getByRole("button",{name:"LABELS",exact:true}).click();
     await page.locator('[aria-label="Selectable components"]').getByRole("button",{name:new RegExp(kindName)}).first().click();
     assert.ok(await page.getByText(/WHAT:/).count());
+    await page.getByRole("button",{name:"MOVE RIGHT"}).click();
+    await page.getByRole("button",{name:"HIDE PART"}).click();
+    await page.getByRole("button",{name:"RESTORE PART"}).click();
+    await page.getByRole("button",{name:"DISSECT / EXPLODE"}).click();
+    await page.getByRole("button",{name:"IMPLODE / REASSEMBLE"}).click();
+    assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Model edits must keep one canvas");
     await page.getByRole("button",{name:"DIVE INTO REALITY"}).click();
     await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).waitFor();
     await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();

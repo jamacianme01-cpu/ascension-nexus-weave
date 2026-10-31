@@ -72,10 +72,13 @@ try {
   const detail=page.locator('section[aria-label="Selected pathway design"]');
   const canvas=page.locator('canvas[aria-label^="Rotatable, zoomable, component-selectable"]');
   async function canonical(kindName,fullInspection=false) {
+    console.log("ENTER canonical scene: "+kindName);
     await detail.waitFor({state:"visible"});
     await canvas.waitFor({state:"visible",timeout:20000});
+    console.log("CANVAS ready "+kindName);
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
     await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="blueprint"]').waitFor();
+    console.log("BLUEPRINT mode ready "+kindName);
     const sameCanvas=await canvas.evaluate(el=>{
       window.__canonicalCanvas=el;return el.width>=200&&el.height>=300;
     });
@@ -83,6 +86,7 @@ try {
     await page.getByRole("button",{name:"DISSECT / EXPLODE",exact:true}).click();
     await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="dissect"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Dissect must preserve the SAME 3D model/canvas");
+    console.log("EXPLODE preserves source "+kindName);
     await page.getByRole("button",{name:"IMPLODE / REASSEMBLE",exact:true}).click();
     await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="assembled"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Reassembly must preserve object identity");
@@ -106,6 +110,7 @@ try {
     }
     console.log("PASS modeled pathway: "+kindName+"; modes share one model canvas");
   }
+  console.log("PATHWAYS returned four selectable designs");
   await page.getByRole("tab").first().click();
   await canonical("Rotor",true);
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();

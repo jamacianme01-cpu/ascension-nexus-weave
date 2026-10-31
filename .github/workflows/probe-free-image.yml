@@ -1,0 +1,42 @@
+name: Probe no-cost image generator (generic technical object only)
+on:
+  push:
+    branches: [repair/v1-pathway-entry-20261029]
+    paths: [.github/workflows/probe-free-image.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Validate actual 1024px image bytes from documented free anonymous SDXL endpoint
+        run: |
+          node --input-type=module <<'JS'
+          const url = "https://stable-diffusion-xl.endpoints.kepler.ai.cloud.ovh.net/api/text2image";
+          const start = Date.now();
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {"content-type": "application/json", "accept": "application/octet-stream"},
+            signal: AbortSignal.timeout(110000),
+            body: JSON.stringify({
+              prompt: "Single complete industrial robot floor-cleaner with wheels, integrated vacuum nozzle and upright LiDAR scanner, coherent technical product render, studio lighting, entire product visible, no text, no labels",
+              negative_prompt: "sketch, boxes, diagram, text, watermark"
+            }),
+          });
+          console.log("STATUS",response.status,"MIME",response.headers.get("content-type"),"MILLISECONDS",Date.now()-start);
+          if (!response.ok) {
+            const error=(await response.text()).slice(0,900);
+            console.log("PROVIDER_ERROR",error);
+            process.exitCode=1;
+          } else {
+            const bytes=new Uint8Array(await response.arrayBuffer());
+            const png=bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71;
+            const jpeg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
+            const webp=String.fromCharCode(...bytes.slice(0,4))==="RIFF";
+            console.log("IMAGE_BYTES",bytes.length,"VALID_IMAGE",png||jpeg||webp);
+            if (!png&&!jpeg&&!webp) process.exitCode=1;
+            if(bytes.length<4000||bytes.length>9000000)process.exitCode=1;
+          }
+          JS

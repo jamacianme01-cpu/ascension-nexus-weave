@@ -67,12 +67,12 @@ try {
   const pageResponse = await page.goto("http://127.0.0.1:4174/", { waitUntil: "domcontentloaded" });
   assert.equal(pageResponse?.status(), 200, "The app's entry URL did not return successfully.");
   await page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]').waitFor({ state: "visible", timeout: 20000 });
-  await page.waitForFunction(() => window.__treeSpoken?.some(x => x.includes("Welcome to ASCENSION") && x.includes("good to have you here")), { timeout: 10000 });
+  await page.waitForFunction(() => window.__treeSpoken?.some(x => x.includes("Welcome to ASCENSION") && x.includes("Glad you") ), { timeout: 10000 });
   assert.ok(!(await page.evaluate(() => window.__treeSpoken.some(x => x.includes("ideas become possibilities")))), "Guide must welcome as an assistant, not recite a poetic introduction");
   await page.locator("#objective").fill("make worker drones");
   await page.getByRole("button", { name: "ENGAGE ASCENSION" }).click();
   await page.getByRole("tab").first().waitFor();
-  await page.waitForFunction(() => window.__treeSpoken?.some(x => x.includes("three different approaches and a fourth")), { timeout: 10000 });
+  assert.equal(await page.evaluate(() => window.__treeSpoken.some(x => x.includes("three different approaches") || x.includes("work through your objective"))), false, "Tree should not narrate processing or pathway screens");
   assert.equal(await page.getByRole("tab").count(), 4);
   for (const title of ["Mobility-first architecture", "Coordinated team architecture", "Modular platform architecture", "Adaptive modular team"]) {
     assert.equal(await page.getByRole("tab", {name: new RegExp(title)}).count(),1, "The actual pathway title must remain visible: " + title);
@@ -83,7 +83,7 @@ try {
   await page.getByRole("tab").first().click();
   const detail = page.locator('section[aria-label="Selected pathway design"]');
   await detail.waitFor({ state: "visible" });
-  await page.waitForFunction(() => window.__treeSpoken?.some(x => x.includes("Rotor assembly") && x.includes("Provides lift and steering")), {timeout:10000});
+  assert.equal(await page.evaluate(() => window.__treeSpoken.some(x => x.includes("Let\u0027s work on") || x.includes("One important part"))), false, "Selecting a pathway must not trigger unsolicited narration");
   assert.equal(await page.getByRole("tab").count(), 0, "Pathway cards must disappear on the second screen");
   assert.equal(await page.locator('section[aria-label="ASCENSION pathways"]').count(), 0, "Pathway selection and design must not stack");
   assert.equal(await page.locator('section[aria-label="Engage ASCENSION"]').count(), 0, "Entry screen must not appear above design");

@@ -52,7 +52,5 @@ jobs:
           done
           exit 1
 
-      - name: Verify genuine selected-pathway picture on live app (no paid credits)
-        env:
-          ASCENSION_BASE_URL: https://ascension-nexus-weave-production.up.railway.app/
-        run: node tests/v1-live-image-smoke.mjs
+      # Canonical 3D assembly/blueprint/explosion acceptance replaces independent
+      # image generations. Those are not evidence of one consistent invention.

@@ -64,6 +64,7 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
   const [picture, setPicture] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState("");
   const [pictureLoading, setPictureLoading] = useState(true);
+  const [pictureAttempt, setPictureAttempt] = useState(0);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   useEffect(() => { setPart(null); setPanel("description"); }, [path.id]);
@@ -102,7 +103,7 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
         setPictureError(cause instanceof Error ? cause.message : String(cause));
     }).finally(() => { if (!controller.signal.aborted) setPictureLoading(false); });
     return () => controller.abort();
-  }, [path, objective, imageCache]);
+  }, [path, objective, imageCache, pictureAttempt]);
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak} />
@@ -143,10 +144,16 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
             onClick={() => onDive(path, picture)}>DIVE INTO REALITY</button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Actual generated concept artwork. No verified 3D mesh is available yet; 3D editing requires a reconstructed model.</p>
-      </> : <p className="p-2 text-left text-sm text-muted-foreground" role={pictureError ? "alert" : "status"}>
-        {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
-        {pictureError && <span className="mt-2 block">The pathway is open: use DESCRIPTION and LABELS above. Image-based views need the picture generator connected.</span>}
-      </p>}
+      </> : <div className="p-2 text-left text-sm text-muted-foreground">
+        <p role={pictureError ? "alert" : "status"}>
+          {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
+        </p>
+        {pictureError && <button type="button"
+          onClick={() => setPictureAttempt(value => value + 1)}
+          className="mt-3 rounded-full border border-gold/50 px-4 py-2 text-gold">
+          RETRY PICTURE
+        </button>}
+      </div>}
     </div>
     {panel === "description" && <>
     {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}

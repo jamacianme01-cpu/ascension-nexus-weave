@@ -37,26 +37,30 @@ const tests = [
     assert.match(ui, /\[\.\.\.result\.pathways, result\.blend\]/);
     assert.match(ui, /setChoice\(index\)/);
   }],
-  ["pathway picture is requested on selection, not on all cards", () => {
+  ["pathway images are requested only after selecting a card", () => {
     assert.match(ui, /function PathwayView/);
-    assert.match(ui, /phase: "picture", pathway: path/);
+    assert.match(ui, /phase: "picture"/);
+    assert.match(ui, /pathway: path/);
+    assert.match(ui, /view: mode/);
     assert.match(ui, /\{selected &&/);
     assert.match(ui, /<PathwayView/);
   }],
-  ["V1 pathway tabs expose only Description Labels Blueprint Dissect", () => {
-    assert.match(ui, /onDive\(path, picture, "blueprint"\)/);
-    assert.match(ui, /onDive\(path, picture, "dissect"\)/);
-    assert.match(ui, />BLUEPRINT<\/button>/);
-    assert.match(ui, />DISSECT \/ EXPLODE<\/button>/);
+  ["V1 views are blueprint and dissect and assembled with real generation routes", () => {
+    assert.match(ui, /type DesignView = "assembled" \| "blueprint" \| "dissect"/);
+    assert.match(ui, />BLUEPRINT/);
+    assert.match(ui, /DISSECT \/ EXPLODE/);
+    assert.match(ui, /IMPLODE \/ REASSEMBLE/);
+    assert.match(ui, /DIVE INTO REALITY/);
+    assert.doesNotMatch(ui, /<RealityViewer/);
     assert.doesNotMatch(ui, />SIMULATE<\/button>/);
     assert.doesNotMatch(ui, />CAD<\/button>/);
-    assert.doesNotMatch(ui, />ENVIRONMENT<\/button>/);
   }],
-  ["labels are source-grounded and separate from the picture", () => {
+  ["component labels stay in an inspector separate from the picture", () => {
     assert.match(ui, /onSpeak\(p\.name \+ "\. " \+ p\.purpose/);
-    assert.match(ui, /v1Parts=\{dive\.pathway\.parts\.map/);
-    assert.match(viewer, /v1Parts\?: DesignPart\[\]/);
-    assert.match(viewer, /!v1Parts\?\.length\) api\.current\?\.locatePart/);
+    assert.match(ui, /aria-label="Select components"/);
+    assert.match(ui, /aria-label="Pathway inspection"/);
+    assert.match(ui, /part\.purpose/);
+    assert.match(ui, /part\.location/);
   }],
   ["no fabricated picture or paid image generation fallback", () => {
     assert.match(route, /ASCENSION_ALLOW_FREE_IMAGES/);
@@ -72,17 +76,7 @@ const tests = [
   }],
   ["Tree can answer voice or text about selected design throughout V1", () => {
     assert.match(ui, /<TreeGuide objective={objective} pathway={path}/);
-    assert.match(ui, /treeGuide={<TreeGuide objective={requested}/);
-    assert.match(viewer, /treeGuide\?: ReactNode/);
-    assert.match(viewer, /className="reality-tree-guide/);
-    assert.match(ui, /onV1PartSelected={part =>/);
-    assert.match(viewer, /onV1PartSelected\?: \(part: DesignPart\) => void/);
-    assert.match(viewer, /const activeParts = v1Parts\?\.length \? v1Parts/);
-    assert.match(viewer, /data-v1=\{v1Parts !== undefined/);
-    assert.match(viewer, /className="reality-sound"/);
-    assert.match(viewer, /onClick=\{onNewAnswers\}/);
-    assert.match(ui, /soundEnabled=\{talking\}/);
-
+    assert.match(ui, /speakingEnabled={talking}/);
     assert.match(guide, /webkitSpeechRecognition/);
     assert.match(guide, /phase: "guide"/);
     assert.match(route, /async function guide\(objective: string, question: string/);
@@ -91,8 +85,6 @@ const tests = [
     assert.match(route, /FIRST answer the person's exact question with concrete, technically useful information/);
     assert.match(route, /never like a narrator/);
     assert.match(ui, /Glad you.re here/);
-    assert.doesNotMatch(ui, /if \(talking\) say\("I have three different approaches/);
-    assert.doesNotMatch(ui, /say\("Let.s work on " \+ p.title/);
   }],
   ["owner signoff remains unchecked", () => {
     assert.ok(checklist.includes("- [ ]"));

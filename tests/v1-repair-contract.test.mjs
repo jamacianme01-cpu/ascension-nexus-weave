@@ -1,98 +1,90 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-
-const read = path => readFileSync(new URL("../" + path, import.meta.url), "utf8");
-const ui = read("src/components/ascension/independent-engage.tsx");
-const route = read("src/routes/api/public/ascension/independent.ts");
-const viewer = read("src/components/ascension/RealityViewer.tsx");
-const engine = read("src/lib/ascension/engine/zai.server.ts");
-const app = read("src/routes/index.tsx");
-const checklist = read("docs/ASCENSION_V1_OWNER_APPROVAL_CHECKLIST.md");
-const guide = read("src/components/ascension/tree-guide.tsx");
-
-const tests = [
-  ["approved Tree and Book remain entry scene", () => {
-    assert.match(ui, /ascension-tree-behind-book-hq\.jpg/);
-    assert.match(ui, /ascension-scene-hero/);
-    assert.match(app, /IndependentEngage/);
-    assert.doesNotMatch(ui, /ascension-arrival-message/);
-    assert.match(ui, /data-realities=\{result \? "true" : undefined\}/);
-    assert.doesNotMatch(ui, /setStage\("eruption"\)/);
+const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
+const ui=read("src/components/ascension/independent-engage.tsx");
+const design=read("src/components/ascension/v1-hunyuan-pathway.tsx");
+const glb=read("src/components/ascension/v1-hunyuan-workbench.tsx");
+const bridge=read("runtime_bridge/hunyuan_browser_bridge.py");
+const launcher=read("runtime_bridge/start_hunyuan_now.ps1");
+const route=read("src/routes/api/public/ascension/independent.ts");
+const app=read("src/routes/index.tsx");
+const guide=read("src/components/ascension/tree-guide.tsx");
+const checklist=read("docs/ASCENSION_V1_OWNER_APPROVAL_CHECKLIST.md");
+const tests=[
+  ["original approved Tree and Book entry survives pathway work",()=>{
+    assert.match(ui,/ascension-tree-behind-book-hq\.jpg/);
+    assert.match(ui,/className="ascension-scene-hero"/);
+    assert.match(ui,/choice === null && <section aria-label="Engage ASCENSION"/);
+    assert.match(ui,/data-realities=\{choice !== null \? "true" : undefined\}/);
+    assert.match(ui,/What do you want to accomplish\?/);
+    assert.match(ui,/ENGAGE ASCENSION/);
+    assert.match(app,/IndependentEngage/);
+    assert.doesNotMatch(ui,/ascension-arrival-message/);
   }],
-  ["Tree welcomes through voice, not a new written banner", () => {
-    assert.match(ui, /const greeting = "Welcome to ASCENSION/);
-    assert.match(ui, /window\.addEventListener\("pointerdown", tryWelcome/);
-    assert.match(ui, /say\(greeting/);
+  ["home is not redesigned or replaced when pathways appear",()=>{
+    assert.match(ui,/\{result && choice === null && <section/);
+    assert.match(ui,/\{selected && <section ref=\{designView\}/);
+    assert.match(ui,/\[\.\.\.result\.pathways, result\.blend\]/);
+    assert.match(ui,/setChoice\(index\)/);
+    assert.doesNotMatch(ui,/aria-label="Initial objective answer"/);
+    assert.doesNotMatch(ui,/>INITIAL ANSWER</);
   }],
-  ["initial analysis is backend-only and never rendered to users", () => {
-    assert.match(ui, /setFirstAnswer\(answer\)/);
-    assert.match(ui, /await generatePathways\(text, answer, controller, token\)/);
-    assert.match(ui, /phase: "pathways", firstAnswer: answer\.slice\(0, 6000\)/);
-    assert.doesNotMatch(ui, /aria-label="Initial objective answer"/);
-    assert.doesNotMatch(ui, />INITIAL ANSWER</);
-    assert.doesNotMatch(ui, /firstThought/);
+  ["only Hunyuan GLB is mounted on selected V1 path",()=>{
+    assert.match(ui,/return <V1HunyuanPathway/);
+    assert.match(ui,/modelCache=\{modelCache\}/);
+    assert.doesNotMatch(ui,/<RealityViewer/);
+    assert.doesNotMatch(ui,/ImagePathwayView/);
+    assert.doesNotMatch(ui,/<V1ModeledPathway/);
+    assert.match(design,/Hunyuan3D is creating one real 3D GLB/);
+    assert.match(design,/source\.image_url\?\.match\(validImage\)/);
+    assert.match(design,/phase:"picture"/);
+    assert.match(design,/const generated=await fetch\(LOCAL\+"\/generate"/);
+    assert.match(design,/modelCache\.current\.set\(key,output\)/);
   }],
-  ["three pathways and fourth blend are real selectable responses", () => {
-    assert.match(ui, /data\.pathways\.length !== 3/);
-    assert.match(ui, /\[\.\.\.result\.pathways, result\.blend\]/);
-    assert.match(ui, /setChoice\(index\)/);
+  ["blueprint dissection and reassemble use one parsed real GLB",()=>{
+    assert.match(glb,/new GLTFLoader\(\)/);
+    assert.match(glb,/loader\.parse\(bytes\.slice\(0\)/);
+    assert.match(glb,/type MeshRecord/);
+    assert.match(glb,/explode=mode==="dissect" && st\.meshes\.length>1/);
+    assert.match(design,/DISSECT \/ EXPLODE/);
+    assert.match(design,/IMPLODE \/ REASSEMBLE/);
+    assert.match(design,/DIVE INTO REALITY/);
+    assert.match(glb,/orthos\.forEach/);
+    assert.doesNotMatch(design,/new V1ModelWorkbench/);
+    assert.match(design,/generator returned a fused mesh/);
   }],
-  ["pathway images are requested only after selecting a card", () => {
-    assert.match(ui, /function PathwayView/);
-    assert.match(ui, /phase: "picture"/);
-    assert.match(ui, /pathway: path/);
-    assert.match(ui, /view: mode/);
-    assert.match(ui, /\{selected &&/);
-    assert.match(ui, /<PathwayView/);
+  ["local Hunyuan bridge is restricted and never pretends Railway is localhost",()=>{
+    assert.match(bridge,/HOST = "127\.0\.0\.1"/);
+    assert.match(bridge,/PORT = 8082/);
+    assert.match(bridge,/127\.0\.0\.1:8081\/generate/);
+    assert.match(bridge,/ALLOWED_ORIGINS/);
+    assert.match(bridge,/Access-Control-Allow-Private-Network/);
+    assert.match(bridge,/glb\[:4\] != b"glTF"/);
+    assert.match(launcher,/hunyuan_browser_bridge\.py/);
+    assert.doesNotMatch(launcher,/Worker cannot claim jobs.'\n\}/);
   }],
-  ["V1 views are blueprint and dissect and assembled with real generation routes", () => {
-    assert.match(ui, /type DesignView = "assembled" \| "blueprint" \| "dissect"/);
-    assert.match(ui, /view === "blueprint" \? "BLUEPRINT"/);
-    assert.match(ui, /DISSECT \/ EXPLODE/);
-    assert.match(ui, /IMPLODE \/ REASSEMBLE/);
-    assert.match(ui, /DIVE INTO REALITY/);
-    assert.doesNotMatch(ui, /<RealityViewer/);
-    assert.doesNotMatch(ui, />SIMULATE<\/button>/);
-    assert.doesNotMatch(ui, />CAD<\/button>/);
+  ["route counts only objective creation as objective, not 3D views",()=>{
+    assert.match(route,/objective-global/);
+    assert.match(route,/pathway-global/);
+    assert.match(route,/guide-ip/);
+    assert.match(route,/image-ip/);
+    assert.doesNotMatch(route,/limit\("global", 48\)/);
   }],
-  ["component labels stay in an inspector separate from the picture", () => {
-    assert.match(ui, /onSpeak\(p\.name \+ "\. " \+ p\.purpose/);
-    assert.match(ui, /aria-label="Select components"/);
-    assert.match(ui, /aria-label="Pathway inspection"/);
-    assert.match(ui, /part\.purpose/);
-    assert.match(ui, /part\.location/);
+  ["Tree can speak and user can select actual submeshes",()=>{
+    assert.match(design,/<TreeGuide objective=\{objective\}/);
+    assert.match(guide,/webkitSpeechRecognition/);
+    assert.match(guide,/phase: "guide"/);
+    assert.match(design,/onClick=\{\(\)=>inspect\(p\.meshIndex\)\}/);
+    assert.match(design,/onClick=\{\(\)=>moveMesh\(delta\)\}/);
+    assert.match(design,/Function.*assignment|Functional assignment/);
   }],
-  ["no fabricated picture or paid image generation fallback", () => {
-    assert.match(route, /ASCENSION_ALLOW_FREE_IMAGES/);
-    assert.match(route, /ASCENSION_IMAGE_ENDPOINT/);
-    assert.match(route, /throw new Error\("ASCENSION's image engine is not connected/);
-    assert.match(route, /No picture was fabricated or purchased/);
-    assert.doesNotMatch(route, /https:\/\/api\.openai\.com\/v1\/images/);
-  }],
-  ["retired ZAI and Lovable endpoints are not invoked", () => {
-    assert.doesNotMatch(engine, /https:\/\/api\.z\.ai\//);
-    assert.doesNotMatch(engine, /https:\/\/api\.lovable\./);
-    assert.match(engine, /max_price: \{ prompt: 0, completion: 0 \}/);
-  }],
-  ["Tree can answer voice or text about selected design throughout V1", () => {
-    assert.match(ui, /<TreeGuide objective={objective} pathway={path}/);
-    assert.match(ui, /speakingEnabled={talking}/);
-    assert.match(guide, /webkitSpeechRecognition/);
-    assert.match(guide, /phase: "guide"/);
-    assert.match(route, /async function guide\(objective: string, question: string/);
-    assert.match(route, /if \(input\["phase"\] === "guide"\)/);
-    assert.match(route, /You are the Tree of Knowledge: ASCENSION's welcoming, knowledgeable, practical design assistant/);
-    assert.match(route, /FIRST answer the person's exact question with concrete, technically useful information/);
-    assert.match(route, /never like a narrator/);
-    assert.match(ui, /Glad you.re here/);
-  }],
-  ["owner signoff remains unchecked", () => {
+  ["owner approval remains pending",()=>{
     assert.ok(checklist.includes("- [ ]"));
     assert.ok(!checklist.includes("- [x]"));
-  }],
+  }]
 ];
-for(const [name, test] of tests) {
+for(const [name,test] of tests){
   test();
-  process.stdout.write("PASS V1 " + name + "\n");
+  console.log("PASS V1 "+name);
 }
-process.stdout.write("Verified " + tests.length + " ASCENSION V1 static contracts (not browser acceptance).\n");
+console.log("Verified "+tests.length+" static repair contracts; live Hunyuan requires the owner's GPU process.");

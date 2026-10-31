@@ -18,15 +18,21 @@ const pathway = {
 };
 for (const [index, view] of ["assembled","blueprint","dissect"].entries()) {
   if(index) await new Promise(resolve=>setTimeout(resolve,45000));
-  const response = await fetch(url, {
-    method: "POST",
-    signal: AbortSignal.timeout(135000),
-    headers: {"content-type":"application/json"},
-    body: JSON.stringify({
-      objective: "make one autonomous industrial floor cleaning robot",
-      phase: "picture", view, pathway
-    })
-  });
+  let response;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    response = await fetch(url, {
+      method: "POST",
+      signal: AbortSignal.timeout(135000),
+      headers: {"content-type":"application/json"},
+      body: JSON.stringify({
+        objective: "make one autonomous industrial floor cleaning robot",
+        phase: "picture", view, pathway
+      })
+    });
+    if(response.status===200 || ![429,502,503].includes(response.status) || attempt===2) break;
+    console.log("Live "+view+" generation temporarily unavailable (HTTP "+response.status+"), retrying");
+    await new Promise(resolve=>setTimeout(resolve,45000));
+  }
   if(response.status!==200){
     const body=(await response.text()).slice(0,600);
     throw new Error("Hosted " + view + " image generation failed, HTTP "+response.status+": "+body);

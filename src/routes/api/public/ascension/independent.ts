@@ -264,15 +264,26 @@ async function picture(objective: string, value: Record<string, unknown>) {
   const steps = Array.isArray(value["steps"]) ? value["steps"].filter((v): v is string => typeof v === "string").slice(0, 6) : [];
   if (!title || summary.length < 30)
     throw new Error("Select a complete pathway before requesting its picture.");
+  const view = value["view"] === "blueprint" ? "blueprint" :
+    value["view"] === "dissect" ? "dissect" : "assembled";
+  const parts = Array.isArray(value["parts"]) ? value["parts"]
+    .filter((part): part is Record<string, unknown> =>
+      Boolean(part) && typeof part === "object" && !Array.isArray(part))
+    .slice(0, 14).map(part => String(part["name"] ?? "").slice(0, 80)).filter(Boolean) : [];
   const prompt = [
-    "Illustrate the actual selected invention as one coherent concept design.",
+    "Engineering design of exactly the requested physical object or environment.",
     "User objective: " + objective.slice(0, 500),
     "Selected pathway: " + title,
     "Architecture: " + summary,
     "Key functional structure: " + steps.join("; ").slice(0, 1800),
-    "Show the selected subject, not a generic tree, icon, flowchart, numbered boxes or CORE diagram.",
-    "One complete invention visible; no textual labels, unrelated parts or misleading dimensions.",
-    "Concept illustration only; physical feasibility remains unverified.",
+    "Named components: " + parts.join(", ").slice(0, 900),
+    view === "blueprint"
+      ? "ORTHOGRAPHIC ENGINEERING BLUEPRINT STYLE, front and top technical projection of ONE assembled subject, crisp white and cyan line art on dark navy blueprint paper, coherent mechanical proportions, connection lines, NO invented numerical dimensions, no decorative diagram boxes, no textual labels."
+      : view === "dissect"
+      ? "EXPLODED ASSEMBLY CONCEPT drawing of the SAME specified subject, key functional physical modules lifted apart vertically with clear spacing along their true approximate assembly axis, all parts still recognizable and aligned to their assembled positions, clear component interfaces and mounting locations, no unrelated objects, no hovering random machines, no text or numerical labels."
+      : "THREE-QUARTER ISOMETRIC PRODUCT DESIGN RENDER, one completely assembled functional subject with visible key components, coherent arrangement, neutral background, entire invention centered and large, no surrounding unrelated objects.",
+    "Accurate to this objective and pathway. No generic tree, no abstract flowchart, no watermarks.",
+    "Unverified concept only: no invented physical specifications or manufactured-product claims.",
   ].join("\n");
   // OVHcloud publicly documents SDXL as free with two anonymous requests
   // per minute. No paid API key, image purchase, or shared volunteer worker.
@@ -283,7 +294,9 @@ async function picture(objective: string, value: Record<string, unknown>) {
       headers: { "content-type": "application/json", "accept": "application/octet-stream" },
       body: JSON.stringify({
         prompt,
-        negative_prompt: "flowchart, drawing, text, watermark, disconnected parts, abstract diagram",
+        negative_prompt: view === "dissect"
+          ? "watermark, text, unrelated extra machines, random parts, UI screenshot, vague abstract geometric shapes"
+          : "flowchart, text, watermark, unrelated objects, schematic numbered boxes, UI screenshot",
       }),
     });
     if (!response.ok) {
@@ -361,9 +374,9 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
           return json(await guide(objective, question, obj(input["pathway"])));
         }
         if (input["phase"] === "picture") {
-          if (!limit("image-ip:" + address, 4) || !limit("image-global", 24))
+          if (!limit("image-ip:" + address, 24) || !limit("image-global", 120))
             return json({ error: "Image generation limit reached. No credits charged." }, 429);
-          return json(await picture(objective, obj(input["pathway"])));
+          return json(await picture(objective, { ...obj(input["pathway"]), view: input["view"] }));
         }
         const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
         return json(await build(objective, prior));

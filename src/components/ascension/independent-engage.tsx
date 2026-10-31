@@ -326,7 +326,7 @@ export function IndependentEngage() {
     if (!result) return;
     const frame = window.requestAnimationFrame(() => {
       (choice === null ? view.current : designView.current)?.scrollIntoView({
-        behavior: "instant", block: "start",
+        behavior: "auto", block: "start",
       });
     });
     return () => window.cancelAnimationFrame(frame);

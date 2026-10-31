@@ -4,6 +4,9 @@ on:
     branches:
       - repair/v1-pathway-entry-20261029
   workflow_dispatch:
+concurrency:
+  group: ascension-v1-repair-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

@@ -85,6 +85,12 @@ try {
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
     await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="blueprint"]').waitFor();
     console.log("BLUEPRINT mode ready "+kindName);
+    if(process.env.V1_CAPTURE==="1" && kindName==="Rotor" && !globalThis.__blueprintCaptured){
+      globalThis.__blueprintCaptured=true;
+      await page.waitForTimeout(550);
+      const shot=await canvas.screenshot({type:"jpeg",quality:50,animations:"disabled"});
+      console.log("V1_BLUEPRINT_VISUAL:"+shot.toString("base64"));
+    }
     const sameCanvas=await canvas.evaluate(el=>{
       window.__canonicalCanvas=el;return el.width>=200&&el.height>=300;
     });
@@ -93,6 +99,12 @@ try {
     await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="dissect"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Dissect must preserve the SAME 3D model/canvas");
     console.log("EXPLODE preserves source "+kindName);
+    if(process.env.V1_CAPTURE==="1" && kindName==="Rotor" && !globalThis.__explodedCaptured){
+      globalThis.__explodedCaptured=true;
+      await page.waitForTimeout(450);
+      const shot=await canvas.screenshot({type:"jpeg",quality:50,animations:"disabled"});
+      console.log("V1_EXPLODE_VISUAL:"+shot.toString("base64"));
+    }
     await page.getByRole("button",{name:"IMPLODE / REASSEMBLE",exact:true}).click();
     await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="assembled"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Reassembly must preserve object identity");

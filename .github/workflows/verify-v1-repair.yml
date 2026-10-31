@@ -48,3 +48,8 @@ jobs:
             sleep 15
           done
           exit 1
+
+      - name: Verify genuine selected-pathway picture on live app (no paid credits)
+        env:
+          ASCENSION_BASE_URL: https://ascension-nexus-weave-production.up.railway.app/
+        run: node tests/v1-live-image-smoke.mjs

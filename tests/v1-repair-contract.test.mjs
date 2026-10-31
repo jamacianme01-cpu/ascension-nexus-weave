@@ -87,7 +87,11 @@ const tests = [
     assert.match(guide, /phase: "guide"/);
     assert.match(route, /async function guide\(objective: string, question: string/);
     assert.match(route, /if \(input\["phase"\] === "guide"\)/);
-    assert.match(route, /You are the Tree of Knowledge, the warm, knowledgeable, spoken guide/);
+    assert.match(route, /You are the Tree of Knowledge: ASCENSION's welcoming, knowledgeable, practical design assistant/);
+    assert.match(route, /FIRST answer the person's exact question with concrete, technically useful information/);
+    assert.match(route, /never like a narrator/);
+    assert.match(ui, /It's good to have you here/);
+    assert.match(ui, /One important part is|essential.name \+ ": " \+ essential.purpose/);
   }],
   ["owner signoff remains unchecked", () => {
     assert.ok(checklist.includes("- [ ]"));

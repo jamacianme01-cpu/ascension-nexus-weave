@@ -20,7 +20,7 @@ export function v1AssemblyKind(objective: string, title: string, summary: string
   return null;
 }
 type Kind = NonNullable<ReturnType<typeof v1AssemblyKind>>;
-type Part = { node: THREE.Group; name: string; role: string; home: THREE.Vector3 };
+type Part = { node: THREE.Group; name: string; role: string; home: THREE.Vector3; original: THREE.Vector3 };
 type Assembly = { root: THREE.Group; parts: Part[] };
 const steel = 0x6c8fa4, cyan = 0x52dce9, gold = 0xe5b458, dark = 0x202e3b, copper = 0xbe714b;
 
@@ -35,7 +35,7 @@ function build(kind: Kind): Assembly {
     node.name = name;
     node.position.set(...pos);
     root.add(node);
-    parts.push({node,name,role,home:node.position.clone()});
+    parts.push({node,name,role,home:node.position.clone(),original:node.position.clone()});
     return node;
   }
   function mesh(node: THREE.Group, geometry: THREE.BufferGeometry, color: number, offset: [number,number,number]=[0,0,0]) {
@@ -131,9 +131,10 @@ type Props = {
   zoom: number; rotation: number; reset: number;
   onParts: (parts: V1Component[]) => void; onSelect: (name: string) => void;
   onError: (reason: string) => void;
+  edit?: {id:number;name:string;action:"left"|"right"|"up"|"down"|"hide"|"restore"};
 };
 /** One immutable assembly identity, three camera/transform views. No picture regeneration. */
-export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,onParts,onSelect,onError}:Props) {
+export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,onParts,onSelect,onError,edit}:Props) {
   const host=useRef<HTMLDivElement>(null);
   const state=useRef<{
     renderer:THREE.WebGLRenderer; scene:THREE.Scene; perspective:THREE.PerspectiveCamera;
@@ -274,7 +275,34 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
     st.orthographic.updateProjectionMatrix();
   },[zoom]);
   useEffect(()=>{const st=state.current;if(st)st.assembly.root.rotation.y=rotation*Math.PI/180;},[rotation]);
-  useEffect(()=>{const st=state.current;if(!st)return;st.assembly.parts.forEach(p=>p.node.position.copy(p.home));st.assembly.root.rotation.set(0,0,0);},[reset]);
+  useEffect(()=>{
+    const st=state.current;if(!st)return;
+    st.assembly.parts.forEach(p=>{
+      p.home.copy(p.original);
+      p.node.position.copy(p.home);
+      p.node.visible=true;
+    });
+    st.assembly.root.rotation.set(0,0,0);
+  },[reset]); 
+  useEffect(()=>{
+    const st=state.current;
+    if(!st||!edit)return;
+    const p=st.assembly.parts.find(x=>x.name===edit.name);
+    if(!p)return;
+    if(edit.action==="hide"){p.node.visible=false;return;}
+    if(edit.action==="restore"){p.node.visible=true;return;}
+    const axis=edit.action==="left"||edit.action==="right"?"x":"y";
+    p.home[axis]+=(edit.action==="left"||edit.action==="down"?-0.16:0.16);
+    p.node.position.copy(p.home);
+    if(mode==="dissect"){
+      const index=st.assembly.parts.indexOf(p);
+      const outward=new THREE.Vector3(p.home.x,0,p.home.z);
+      if(outward.lengthSq()<0.05)outward.set(index%2?1:-1,0,index%3-1);
+      outward.normalize().multiplyScalar(0.7);
+      p.node.position.add(outward);
+      p.node.position.y+=((index%6)-2.5)*0.42;
+    }
+  },[edit?.id]);
   useEffect(()=>{
     const st=state.current;if(!st)return;
     st.assembly.parts.forEach(p=>p.node.traverse(item=>{

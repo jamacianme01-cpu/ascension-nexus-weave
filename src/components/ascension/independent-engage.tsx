@@ -1,9 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { ObjectivePathway } from "@/lib/ascension/result-model";
-import type { DesignPart } from "@/lib/ascension/parts-model";
+import { useEffect, useRef, useState } from "react";
 import { TreeGuide } from "@/components/ascension/tree-guide";
-
-const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -51,26 +47,33 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEnabled }: {
+type DesignView = "assembled" | "blueprint" | "dissect";
+
+function PathwayView({ path, objective, imageCache, onSpeak, speakingEnabled }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
-  onDive: (path: Pathway, imageUrl: string, mode?: "cutaway" | "blueprint" | "dissect") => void;
   imageCache: { current: Map<string, string> };
   onSpeak: (text: string) => void;
   speakingEnabled: boolean;
 }) {
   const [part, setPart] = useState<Part | null>(null);
   const [panel, setPanel] = useState<"description" | "labels">("description");
+  const [mode, setMode] = useState<DesignView>("assembled");
   const [picture, setPicture] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState("");
   const [pictureLoading, setPictureLoading] = useState(true);
   const [pictureAttempt, setPictureAttempt] = useState(0);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  useEffect(() => { setPart(null); setPanel("description"); }, [path.id]);
+  const [immersive, setImmersive] = useState(false);
+  const imageKey = JSON.stringify([objective, path.id, path.title, mode]);
+
   useEffect(() => {
-    const cacheKey = JSON.stringify([objective, path.id, path.title]);
-    const stored = imageCache.current.get(cacheKey);
+    setPart(null); setPanel("description"); setMode("assembled");
+    setScale(1); setRotation(0); setImmersive(false);
+  }, [path.id]);
+  useEffect(() => {
+    const stored = imageCache.current.get(imageKey);
     if (stored) {
       setPicture(stored); setPictureError(""); setPictureLoading(false);
       return;
@@ -86,7 +89,7 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
         throw new Error("ASCENSION's image engine is not connected.");
       return fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective, phase: "picture", pathway: path }),
+        body: JSON.stringify({ objective, phase: "picture", view: mode, pathway: path }),
         signal: controller.signal,
       });
     }).then(async response => {
@@ -95,7 +98,7 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
       if (!data.image_url || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{4000,12000000}$/i.test(data.image_url))
         throw new Error("The image provider did not return a usable picture.");
       if (!controller.signal.aborted) {
-        imageCache.current.set(cacheKey, data.image_url);
+        imageCache.current.set(imageKey, data.image_url);
         setPicture(data.image_url);
       }
     }).catch(cause => {
@@ -103,83 +106,130 @@ function PathwayView({ path, objective, onDive, imageCache, onSpeak, speakingEna
         setPictureError(cause instanceof Error ? cause.message : String(cause));
     }).finally(() => { if (!controller.signal.aborted) setPictureLoading(false); });
     return () => controller.abort();
-  }, [path, objective, imageCache, pictureAttempt]);
-  return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
-    <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
-    <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak} />
-    <p className="mb-4 max-w-3xl leading-7 text-foreground" aria-label="Selected pathway summary">{path.summary}</p>
-    <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Selected pathway views">
-      {(["description", "labels"] as const).map(tab =>
-        <button key={tab} type="button" aria-pressed={panel === tab}
-          onClick={() => setPanel(tab)}
-          className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold">{tab.toUpperCase()}</button>)}
-      <button type="button" disabled={!picture}
-        title={!picture ? "A selected invention picture is required; its generator is not connected or still processing." : undefined}
-        onClick={() => picture && onDive(path, picture, "blueprint")}
-        className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
-      <button type="button" disabled={!picture}
-        title={!picture ? "A selected invention picture is required; its generator is not connected or still processing." : undefined}
-        onClick={() => picture && onDive(path, picture, "dissect")}
-        className="rounded-full border border-gold/50 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT / EXPLODE</button>
+  }, [path, objective, imageCache, imageKey, mode, pictureAttempt]);
+
+  useEffect(() => {
+    if (!immersive) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImmersive(false);
+    };
+    document.addEventListener("keydown", escape);
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", escape);
+      document.body.style.overflow = original;
+    };
+  }, [immersive]);
+
+  const changeView = (next: DesignView) => {
+    setMode(next);
+    setScale(1);
+    setRotation(0);
+  };
+  const image = (enlarged: boolean) => picture ? <img
+    src={picture} alt={mode === "assembled"
+      ? "Assembled concept picture of " + path.title
+      : mode === "blueprint" ? "Blueprint concept of " + path.title
+      : "Exploded concept picture of " + path.title}
+    draggable={false}
+    className={"mx-auto max-h-full max-w-full object-contain transition-transform " +
+      (enlarged ? "h-full" : "h-[min(60vh,560px)]")}
+    style={{transform: "scale(" + scale + ") rotate(" + rotation + "deg)"}} /> :
+    <div className="flex min-h-72 flex-col items-center justify-center gap-4 p-5 text-center text-sm text-foreground/80"
+      role={pictureError ? "alert" : "status"}>
+      <p>{pictureError || (pictureLoading ? "Creating the selected " + mode + " view…" : "Picture unavailable.")}</p>
+      {pictureError && <button type="button" onClick={() => setPictureAttempt(i => i + 1)}
+        className="rounded-full border border-gold/55 px-5 py-2 text-gold">RETRY {mode.toUpperCase()} VIEW</button>}
+    </div>;
+  const controls = <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Picture inspection controls">
+    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => setScale(v => Math.min(4, v * 1.25))}>ZOOM IN</button>
+    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => setScale(v => Math.max(0.5, v / 1.25))}>ZOOM OUT</button>
+    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => setRotation(v => v - 15)}>ROTATE LEFT</button>
+    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => setRotation(v => v + 15)}>ROTATE RIGHT</button>
+    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => { setScale(1); setRotation(0); }}>RESET</button>
+  </div>;
+
+  return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-4 shadow-2xl sm:p-7">
+    <h3 className="mb-2 text-lg text-gold">{path.title}</h3>
+    <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak}/>
+    <p className="mb-5 max-w-4xl leading-7 text-foreground">{path.summary}</p>
+    <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Selected pathway views">
+      {(["assembled", "blueprint", "dissect"] as const).map(view => <button key={view}
+        type="button" aria-pressed={mode === view}
+        onClick={() => changeView(view)}
+        className={"rounded-xl border px-4 py-2 text-sm " + (mode === view
+          ? "border-primary bg-primary/20 text-primary" : "border-gold/35 text-gold")}>
+        {view === "assembled" ? "ASSEMBLED" : view === "blueprint" ? "BLUEPRINT" : "DISSECT / EXPLODE"}
+      </button>)}
+      {mode === "dissect" && <button type="button" onClick={() => changeView("assembled")}
+        className="rounded-xl border border-gold/40 px-4 py-2 text-sm text-gold">IMPLODE / REASSEMBLE</button>}
     </div>
-    <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
-      {picture ? <>
-        <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-black/40 sm:min-h-[440px]">
-          <img src={picture} alt={`Concept picture of ${path.title}`}
-            className="max-h-[70vh] w-full object-contain transition-transform"
-            style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }} />
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.85fr)]">
+      <div className="min-w-0 space-y-3">
+        <div className="flex min-h-[330px] items-center justify-center overflow-hidden rounded-xl border border-gold/25 bg-[#051322] sm:min-h-[480px]"
+          aria-label="Selected invention picture">
+          {image(false)}
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setScale(v => Math.min(4, v * 1.25))}>ZOOM IN</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setScale(v => Math.max(0.5, v / 1.25))}>ZOOM OUT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setRotation(v => v - 15)}>ROTATE LEFT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setRotation(v => v + 15)}>ROTATE RIGHT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => { setScale(1); setRotation(0); }}>RESET VIEW</button>
-          <button type="button" className="rounded-full border border-primary/60 px-5 py-2 text-sm text-primary"
-            onClick={() => onDive(path, picture)}>DIVE INTO REALITY</button>
+        {controls}
+        {mode === "blueprint" && <p className="text-xs text-foreground/65">
+          Blueprint concept. Numerical dimensions and tolerances remain unresolved unless established by the design.
+        </p>}
+        {mode === "dissect" && <p className="text-xs text-foreground/65">
+          Exploded concept illustration. Part alignment is illustrative, not verified physical geometry.
+        </p>}
+        <button type="button" disabled={!picture} onClick={() => setImmersive(true)}
+          className="rounded-xl border border-primary/60 px-5 py-3 text-primary disabled:opacity-40">
+          DIVE INTO REALITY
+        </button>
+      </div>
+      <aside className="min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4" aria-label="Pathway inspection">
+        <div className="mb-4 flex flex-wrap gap-2">
+          {(["description", "labels"] as const).map(view => <button type="button" key={view}
+            aria-pressed={panel === view} onClick={() => setPanel(view)}
+            className={"rounded-lg border px-4 py-2 text-sm " +
+              (panel === view ? "border-primary text-primary" : "border-gold/40 text-gold")}>
+            {view.toUpperCase()}
+          </button>)}
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Actual generated concept artwork. No verified 3D mesh is available yet; 3D editing requires a reconstructed model.</p>
-      </> : <div className="p-2 text-left text-sm text-muted-foreground">
-        <p role={pictureError ? "alert" : "status"}>
-          {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
-        </p>
-        {pictureError && <button type="button"
-          onClick={() => setPictureAttempt(value => value + 1)}
-          className="mt-3 rounded-full border border-gold/50 px-4 py-2 text-gold">
-          RETRY PICTURE
-        </button>}
-      </div>}
+        {panel === "description" ? <div className="space-y-4 text-sm leading-6">
+          {path.blend_reason && <p className="border-l-2 border-primary pl-3">{path.blend_reason}</p>}
+          <p>{path.summary}</p>
+          <h4 className="font-semibold text-gold">HOW IT WORKS</h4>
+          <ol className="list-decimal space-y-2 pl-5">{path.steps.map((step,i) => <li key={i}>{step}</li>)}</ol>
+          {path.tradeoffs.length > 0 && <details><summary className="cursor-pointer text-gold">Engineering limits</summary>
+            <ul className="mt-2 list-disc pl-4">{path.tradeoffs.map((t,i) => <li key={i}>{t}</li>)}</ul></details>}
+        </div> : <div className="space-y-3" aria-label="Select components">
+          {path.parts.length === 0 && <p className="text-sm">No named components returned for this pathway.</p>}
+          {path.parts.map((p,i) => <button type="button" key={i}
+            aria-pressed={part === p}
+            onClick={() => {setPart(p);onSpeak(p.name + ". " + p.purpose + (p.location ? " Located " + p.location : ""));}}
+            className="block w-full rounded-lg border border-gold/35 p-3 text-left text-sm text-foreground hover:border-primary">
+            {p.name}
+          </button>)}
+          <div className="min-h-24 rounded-lg border border-primary/25 p-3 text-sm" aria-live="polite">
+            {part ? <><strong className="text-gold">{part.name}</strong>
+              <p className="mt-2"><b>WHAT / DOES:</b> {part.purpose}</p>
+              <p className="mt-2"><b>WHERE:</b> {part.location || "Location not specified."}</p></>
+              : <p>Select a named component to see what, where, and what it does.</p>}
+          </div>
+        </div>}
+      </aside>
     </div>
-    {panel === "description" && <>
-    {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
-    <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>
-    <ol className="mb-5 list-decimal space-y-2 pl-5 text-sm leading-6">
-      {path.steps.map((step, i) => <li key={i}>{step}</li>)}
-    </ol>
-    </>}
-    {panel === "labels" && (path.parts.length > 0 ? <div className="mb-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-      <div className="space-y-2" aria-label="Select components">
-        <h4 className="text-sm font-semibold text-primary">Components — select to inspect</h4>
-        {path.parts.map((p, i) => <button type="button" key={i} onClick={() => {setPart(p); onSpeak(p.name + ". " + p.purpose + (p.location ? " Location: " + p.location : ""));}}
-          className="block w-full rounded-lg border border-gold/30 bg-black/25 p-3 text-left text-sm hover:border-gold">
-          {p.name}</button>)}
+    {immersive && <div role="dialog" aria-modal="true" aria-label="Immersive invention inspection"
+      className="fixed inset-0 z-[200] flex flex-col overflow-auto bg-[#020a12] p-4 sm:p-8">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-lg text-gold">{path.title} · {mode.toUpperCase()}</h3>
+        <button type="button" onClick={() => setImmersive(false)}
+          className="rounded-xl border border-gold/60 px-5 py-3 text-gold">CLOSE REALITY VIEW</button>
       </div>
-      <div className="min-h-40 rounded-xl border border-primary/25 bg-[#08192a] p-5">
-        {part ? <><h4 className="mb-2 text-gold">{part.name}</h4><p className="mb-3 text-sm">{part.purpose}</p>
-          {part.location && <p className="text-xs text-muted-foreground">Location / relationship: {part.location}</p>}</>
-          : <p className="text-sm text-muted-foreground">Select a component to see what it does and where it belongs.</p>}
-        <p className="mt-4 text-xs text-muted-foreground">Part descriptions are conceptual; dimensions are unresolved unless independently established.</p>
-      </div>
-    </div> : <p role="status" className="text-sm text-muted-foreground">This pathway did not specify named components.</p>)}
-    {panel === "description" && path.tradeoffs.length > 0 && <details className="mb-5 text-sm text-muted-foreground">
-      <summary className="cursor-pointer text-gold">Limits and tradeoffs</summary>
-      <ul className="mt-2 list-disc space-y-1 pl-5">{path.tradeoffs.map((v, i) => <li key={i}>{v}</li>)}</ul>
-    </details>}
+      <div className="min-h-[50vh] flex-1 overflow-hidden rounded-xl border border-gold/30 bg-[#061522]"
+        aria-label="Immersive concept preview">{image(true)}</div>
+      <div className="mt-3">{controls}</div>
+      <p className="mt-2 text-xs text-foreground/70">
+        Concept illustration, not a verified 3D mesh. The physical dimensions remain unverified.
+      </p>
+    </div>}
   </section>;
 }
 
@@ -194,7 +244,6 @@ export function IndependentEngage() {
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
-  const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string; mode: "cutaway" | "blueprint" | "dissect" } | null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
@@ -271,7 +320,6 @@ export function IndependentEngage() {
     setFirstAnswer("");
     setRefinement("");
     setChoice(null);
-    setDive(null);
     setStage("processing");
     // ENGAGE is a user action, not a cue for unsolicited voice narration.
     try {
@@ -325,7 +373,7 @@ export function IndependentEngage() {
     imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
-    setStage("idle"); setChoice(null); setDive(null);
+    setStage("idle"); setChoice(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -417,11 +465,10 @@ export function IndependentEngage() {
     {selected && <section ref={designView} className="ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
       aria-label="Selected pathway design">
       <div className="flex items-center justify-between">
-        <button type="button" onClick={() => { stopVoice(); setDive(null); setChoice(null); }}
+        <button type="button" onClick={() => { stopVoice(); setChoice(null); }}
           className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
       </div>
         <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
-          onDive={(pathway, imageUrl, mode = "cutaway") => { stopVoice(); setDive({ pathway, imageUrl, mode }); }}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />
         <div className="rounded-xl border border-primary/25 p-4">
@@ -436,39 +483,5 @@ export function IndependentEngage() {
           </button>
         </div>
     </section>}
-    {dive && <Suspense fallback={<p role="status" className="p-5 text-center text-gold">Opening invention view…</p>}>
-      <RealityViewer
-        pathway={{
-          id: dive.pathway.id, label: dive.pathway.title, summary: dive.pathway.summary,
-          steps: dive.pathway.steps, tradeoffs: dive.pathway.tradeoffs,
-          spiral_form: null, visual_svg: null, model_spec: null,
-          generated_image_url: dive.imageUrl, generated_blueprint_url: null,
-          generated_environment_url: null, model_url: null,
-          outcome_score: null, outcome_reason: null,
-        } satisfies ObjectivePathway}
-        objective={requested} requestId={null} initialMode={dive.mode === "blueprint" ? "blueprint" : "cutaway"}
-        v1InitialDissected={dive.mode === "dissect"}
-        treeGuide={<TreeGuide objective={requested}
-          pathway={dive.pathway} compact enabled={talking}
-          onSpeak={text => { if (talking) say(text); }} />}
-        v1Parts={dive.pathway.parts.map((part): DesignPart => ({
-          name: part.name, purpose: part.purpose, location: part.location,
-          operation: part.purpose,
-          connections: "Connections have not been specified.",
-          limitations: "Unverified concept; precise mechanical dimensions and location are not supplied.",
-          x: -1, y: -1,
-        }))}
-        onV1PartSelected={part => { if (talking) say(part.name + '. ' + part.purpose + ' ' + part.location); }}
-        onClose={() => setDive(null)}
-        onNewObjective={reset} newObjectiveDisabled={loading}
-        soundEnabled={talking}
-        onToggleSound={() => { stopVoice(); setTalking(v => !v); }}
-        onDive={() => {}}
-        onBuildOn={() => { const selectedPath = dive.pathway; setDive(null); buildOn(selectedPath); }}
-        onNewAnswers={() => setDive(null)}
-        isPartSelected={() => false} onTogglePart={() => {}}
-        blendControls={null}
-      />
-    </Suspense>}
   </div>;
 }

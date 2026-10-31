@@ -48,10 +48,11 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-function PathwayView({ path, objective, onDive, imageCache }: {
+function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
   onDive: (path: Pathway, imageUrl: string) => void;
+  onExplain: (part: Part) => void;
   imageCache: { current: Map<string, string> };
 }) {
   const [part, setPart] = useState<Part | null>(null);
@@ -126,7 +127,7 @@ function PathwayView({ path, objective, onDive, imageCache }: {
     {path.parts.length > 0 && <div className="mb-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <div className="space-y-2" aria-label="Select components">
         <h4 className="text-sm font-semibold text-primary">Components — select to inspect</h4>
-        {path.parts.map((p, i) => <button type="button" key={i} onClick={() => setPart(p)}
+        {path.parts.map((p, i) => <button type="button" key={i} onClick={() => { setPart(p); onExplain(p); }}
           className="block w-full rounded-lg border border-gold/30 bg-black/25 p-3 text-left text-sm hover:border-gold">
           {p.name}</button>)}
       </div>
@@ -156,13 +157,23 @@ export function IndependentEngage() {
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
   const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string } | null>(null);
-  const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
+  const [stage, setStage] = useState<"idle" | "processing">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const imageCache = useRef(new Map<string, string>());
+  const welcomed = useRef(false);
+  useEffect(() => {
+    if (welcomed.current) return;
+    welcomed.current = true;
+    say("Welcome to ASCENSION. What are we creating today? Tell me what you want to accomplish, and I'll help you explore it.");
+  }, []);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
+  function toggleTalking() {
+    if (talking) { stopVoice(); setTalking(false); }
+    else { setTalking(true); say("I'm here. Choose a pathway, and I'll help you examine how it works."); }
+  }
 
   async function generatePathways(text: string, answer: string, controller: AbortController, token: number) {
     setPathwayError("");
@@ -179,8 +190,8 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      if (talking && data.introduction?.trim()) say(data.introduction.trim().slice(0, 260));
-      setStage("eruption");
+      if (talking) say("Your four approaches are ready. Choose one to inspect its design and components.");
+      setStage("idle");
       // Do not interrupt the Tree reading the initial answer when pathways arrive.
       window.setTimeout(() => {
         if (generation.current === token) view.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -213,7 +224,7 @@ export function IndependentEngage() {
     setChoice(null);
     setDive(null);
     setStage("processing");
-    if (talking) say("Exploring your objective.");
+    // Wait for the real result instead of narrating a progress filler.
     try {
       // Internal reasoning only: never narrate or render this essay to the user.
       const response = await fetch("/api/public/ascension/independent", {
@@ -277,7 +288,7 @@ export function IndependentEngage() {
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}>
-    <section aria-label="Engage ASCENSION" className="ascension-command">
+    <section aria-label="Engage ASCENSION" className="ascension-command" hidden={Boolean(selected)}>
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
@@ -292,6 +303,10 @@ export function IndependentEngage() {
           <button type="button" disabled={loading || objective.trim().length < 3} onClick={() => void engage()}
             className="min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
             {loading ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
+          </button>
+          <button type="button" onClick={toggleTalking} aria-pressed={!talking}
+            className="min-h-11 rounded-full border border-gold/35 px-4 text-xs text-gold">
+            {talking ? "MUTE TREE" : "HEAR TREE"}
           </button>
         </div>
         {error && <p role="alert" className="relative z-30 rounded-xl border border-red-500 p-4 text-sm text-red-200">{error}</p>}
@@ -313,21 +328,28 @@ export function IndependentEngage() {
       </button>
     </section>}
 
-    {firstAnswer && <section className="mx-auto mt-4 max-w-3xl rounded-xl border border-gold/35 bg-[#020913ed] p-5" aria-label="Initial objective answer">
+    {firstAnswer && !selected && <section className="mx-auto mt-4 max-w-3xl rounded-xl border border-gold/35 bg-[#020913ed] p-5" aria-label="Initial objective answer">
       <h2 className="mb-2 text-lg text-gold">INITIAL ANSWER</h2>
       <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
       {loading && <p className="mt-3 text-xs text-gold" role="status">Developing three pathways and the fourth BLEND…</p>}
     </section>}
 
-    {result && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
+    {result && <section ref={view} className="ascension-result-reveal relative isolate mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
+      {selected ? <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
+        <button type="button" onClick={() => {
+          stopVoice(); setChoice(null); setRefinement("");
+          window.requestAnimationFrame(() => view.current?.scrollIntoView({ behavior: "auto", block: "start" }));
+        }} className="min-h-11 rounded-full border border-gold/50 px-5 text-sm text-gold">
+          BACK TO PATHWAYS
+        </button>
+        <button type="button" onClick={toggleTalking} className="min-h-11 rounded-full border border-gold/40 px-4 text-xs text-gold">
+          {talking ? "MUTE TREE" : "HEAR TREE"}
+        </button>
+      </div> : <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg text-gold">THREE PATHWAYS + FOURTH BLEND</h2>
         <div className="flex flex-wrap gap-3 text-xs">
-          <button type="button" onClick={() => {
-            if (talking) stopVoice();
-            else say(selected ? selected.title + ". " + selected.summary : "Three pathways and a blend are ready.");
-            setTalking(!talking);
-          }} className="rounded-full border border-gold/40 px-4 py-2 text-gold">
+          <button type="button" onClick={toggleTalking} className="rounded-full border border-gold/40 px-4 py-2 text-gold">
             {talking ? "Mute Tree" : "Hear Tree"}
           </button>
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
@@ -340,7 +362,8 @@ export function IndependentEngage() {
             (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
           onClick={() => {
             setChoice(index); setRefinement("");
-            if (talking) say(p.title + ". " + p.summary.slice(0, 230));
+            if (talking) say(p.title + ". " + p.summary.slice(0, 135));
+            window.requestAnimationFrame(() => view.current?.scrollIntoView({ behavior: "auto", block: "start" }));
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>
@@ -349,8 +372,14 @@ export function IndependentEngage() {
           </span>
         </button>)}
       </div>
+      </>}
       {selected && <>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-10"
+          style={{ backgroundImage: `url(${SCENE})`, backgroundPosition: "center top", backgroundSize: "contain", backgroundRepeat: "no-repeat" }} />
         <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
+          onExplain={(part) => {
+            if (talking) say(part.name + ". " + part.purpose + (part.location ? " Located at " + part.location : ""));
+          }}
           onDive={(pathway, imageUrl) => { stopVoice(); setDive({ pathway, imageUrl }); }} />
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>

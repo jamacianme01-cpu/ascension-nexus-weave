@@ -79,7 +79,13 @@ try {
   assert.equal(await page.getByText("INITIAL ANSWER").count(), 0);
   assert.ok(await page.locator('.ascension-world[data-realities="true"]').count());
   await page.getByRole("tab").first().click();
-  await page.locator('img[alt^="Concept picture of"]').waitFor({ state: "visible" });
+  const detail = page.locator('section[aria-label="Selected pathway design"]');
+  await detail.waitFor({ state: "visible" });
+  assert.equal(await page.getByRole("tab").count(), 0, "Pathway cards must disappear on the second screen");
+  assert.equal(await page.locator('section[aria-label="ASCENSION pathways"]').count(), 0, "Pathway selection and design must not stack");
+  assert.equal(await page.locator('section[aria-label="Engage ASCENSION"]').count(), 0, "Entry screen must not appear above design");
+  assert.equal(await page.getByRole("button", {name:"← BACK TO PATHWAYS", exact:true}).count(), 1);
+  await detail.locator('img[alt^="Concept picture of"]').waitFor({ state: "visible" });
   assert.equal(calls.filter(x => x === "picture").length, 1);
   await page.getByRole("button", {name:"LABELS",exact:true}).click();
   await page.getByRole("button", {name:"Rotor assembly",exact:true}).click();
@@ -92,10 +98,18 @@ try {
   await page.locator("dialog.reality-screen[open]").waitFor({state:"visible"});
   assert.equal(await page.locator('dialog.reality-screen[data-v1="true"]').count(), 1);
   assert.ok(await page.getByRole("button", {name:/SOUND (ON|OFF|BLOCKED)/}).count(), "The existing Sound control must not be removed.");
-  await page.getByRole("button", {name:/BACK TO PATHWAYS/}).click();
+  await page.locator('dialog.reality-screen').getByRole("button", {name:/BACK TO PATHWAYS/}).click();
   assert.equal(await page.locator("dialog.reality-screen[open]").count(), 0);
+  assert.equal(await detail.count(), 1, "Closing the immersion returns to selected pathway detail");
+  await detail.getByRole("button", {name:/BACK TO PATHWAYS/}).click();
+  assert.equal(await detail.count(), 0, "Going back removes the second screen completely");
+  assert.equal(await page.getByRole("tab").count(), 4, "Back returns to exactly the four pathway choices");
+  assert.equal(await page.locator('img[alt^="Concept picture of"]').count(), 0, "No design picture beneath pathway cards");
+  await page.getByRole("tab", {name:/Adaptive modular team/}).click();
+  assert.equal(await page.getByRole("tab").count(), 0, "BLEND also opens its own design screen");
+  assert.ok(await detail.getByRole("heading", {name:"Adaptive modular team"}).count());
   assert.equal(messages.length, 0, messages.join(" | "));
-  console.log("PASS V1 browser: approved Tree and Book; speech welcome; objective; four pathways; image only on selection; labels and Tree guidance; blueprint opens; no unapproved V1 controls");
+  console.log("PASS V1 browser: Tree and Book; four pathways only on selection screen; pathway-specific second screen including BLEND; labels; Tree guidance; blueprint immersion; back navigation");
 } finally {
   await browser.close();
 }

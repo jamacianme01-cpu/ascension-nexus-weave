@@ -82,6 +82,9 @@ export function V1ModeledPathway({
           <V1ModelWorkbench kind={kind} mode={mode} title={path.title}
             zoom={zoom} rotation={rotation} reset={reset}
             selected={selected} edit={edit} onParts={setComponents} onSelect={inspect} onError={setError}/>
+          {mode==="blueprint"&&<div className="pointer-events-none absolute inset-x-0 top-3 grid grid-cols-3 text-center text-xs tracking-wide text-cyan-200">
+            <span>TOP</span><span>FRONT</span><span>SIDE</span>
+          </div>}
           <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-[#031320cf] px-3 py-2 text-xs text-cyan-100">
             {mode==="assembled"?"ASSEMBLED · SAME COMPONENTS":mode==="blueprint"
               ?"ORTHOGRAPHIC · SAME COMPONENTS":"EXPLODED · SAME COMPONENTS"}

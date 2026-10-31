@@ -52,8 +52,9 @@ try {
     calls.push(phase);
     let body;
     if (phase === "capabilities") body = {
-      // The first design has an image; all remaining pathways must open even without one.
-      picture_generation_enabled: calls.filter(value => value === "capabilities").length === 1,
+      // React StrictMode can check capabilities twice during initial mount.
+      // Keep images enabled until the first picture POST, then disable for the rest.
+      picture_generation_enabled: !calls.includes("picture"),
       providers: {OpenAI:true,Claude:false,Grok:false},
     };
     else if (phase === "initial") body = { phase: "initial", answer: "A useful private engineering architecture for a four-rotor material-handling worker drone, with battery, motor controllers, sensors, lightweight frame and a gripper." };

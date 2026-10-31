@@ -67,8 +67,22 @@ function Start-Worker {
     -RedirectStandardError (Join-Path $logDir 'hunyuan-worker.err.log')
 }
 
+function Start-BrowserBridge {
+  if ([bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue)) { return }
+  $browser = Join-Path $Repo 'runtime_bridge\hunyuan_browser_bridge.py'
+  if (-not (Test-Path $browser)) {
+    Add-Content -Path (Join-Path $logDir 'hunyuan-bridge.err.log') -Value "Missing localhost Hunyuan browser bridge: $browser"
+    return
+  }
+  Start-Process -FilePath $python -WorkingDirectory $Repo -WindowStyle Hidden `
+    -ArgumentList '-B','-u',$browser `
+    -RedirectStandardOutput (Join-Path $logDir 'hunyuan-browser.out.log') `
+    -RedirectStandardError (Join-Path $logDir 'hunyuan-browser.err.log')
+}
+
 while ($true) {
   Start-Hunyuan
+  Start-BrowserBridge
   if (Test-Hunyuan) { Start-Worker }
   Start-Sleep -Seconds 15
 }

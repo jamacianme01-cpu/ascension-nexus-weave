@@ -1,166 +1,196 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 
+// Two physically distinct named triangles make a valid GLB; unlike a picture,
+// its identity and vertices can be checked across every inspection view.
+function fixtureGlb(){
+  const triangles=new Float32Array([
+    -1,-.2,0, -.2,.8,0, -.2,-.2,.6,
+    .2,-.2,0, 1,.8,0, 1,-.2,.6,
+  ]);
+  const binary=Buffer.from(triangles.buffer);
+  const document={
+    asset:{version:"2.0",generator:"ASCENSION Hunyuan3D transport test"},
+    buffers:[{byteLength:binary.length}],
+    bufferViews:[
+      {buffer:0,byteOffset:0,byteLength:36,target:34962},
+      {buffer:0,byteOffset:36,byteLength:36,target:34962},
+    ],
+    accessors:[
+      {bufferView:0,componentType:5126,count:3,type:"VEC3",min:[-1,-.2,0],max:[-.2,.8,.6]},
+      {bufferView:1,componentType:5126,count:3,type:"VEC3",min:[.2,-.2,0],max:[1,.8,.6]},
+    ],
+    meshes:[
+      {primitives:[{attributes:{POSITION:0}}]},
+      {primitives:[{attributes:{POSITION:1}}]},
+    ],
+    nodes:[
+      {mesh:0,name:"Hunyuan rotor mesh"},
+      {mesh:1,name:"Hunyuan payload mesh"},
+    ],
+    scenes:[{nodes:[0,1]}],scene:0,
+  };
+  let json=Buffer.from(JSON.stringify(document),"utf8");
+  json=Buffer.concat([json,Buffer.alloc((4-json.length%4)%4,32)]);
+  const total=12+8+json.length+8+binary.length;
+  const out=Buffer.alloc(total);
+  out.write("glTF",0);out.writeUInt32LE(2,4);out.writeUInt32LE(total,8);
+  out.writeUInt32LE(json.length,12);out.write("JSON",16);json.copy(out,20);
+  const at=20+json.length;
+  out.writeUInt32LE(binary.length,at);out.write("BIN\0",at+4);binary.copy(out,at+8);
+  return out;
+}
+
 const browser=await chromium.launch({args:["--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]});
-try {
-  const page=await browser.newPage({viewport:{width:1100,height:760},reducedMotion:"reduce"});
-  page.setDefaultTimeout(12000);
+try{
+  const page=await browser.newPage({viewport:{width:1100,height:800},reducedMotion:"reduce"});
+  page.setDefaultTimeout(16000);
   const errors=[];
-  const calls=[];
+  const generated=[];
   page.on("pageerror",e=>errors.push(e.message));
-  await page.addInitScript(()=>{
-    window.__treeSpoken=[];
+  const mockBytes=fixtureGlb();
+  const mockImage=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(4300,21)]).toString("base64");
+  await page.addInitScript((b64)=>{
+    window.__localHunyuanCalls=[];
+    const realFetch=window.fetch.bind(window);
+    window.fetch=async(input,init)=>{
+      const url=typeof input==="string"?input:input instanceof Request?input.url:String(input);
+      if(!url.startsWith("http://127.0.0.1:8082/"))return realFetch(input,init);
+      window.__localHunyuanCalls.push(url);
+      if(url.endsWith("/status"))
+        return new Response(JSON.stringify({ready:true,engine:"Hunyuan3D",source:"owner-local"}),{
+          status:200,headers:{"content-type":"application/json"}
+        });
+      if(url.endsWith("/generate")){
+        const body=JSON.parse(init?.body??"{}");
+        if(typeof body.image!=="string"||body.image.length<4000)
+          return new Response(JSON.stringify({error:"Invalid reference image"}),{status:400});
+        const decoded=atob(b64);
+        const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));
+        return new Response(bytes,{status:200,headers:{"content-type":"model/gltf-binary"}});
+      }
+      return new Response("unrecognized route",{status:404});
+    };
     Object.defineProperty(window,"speechSynthesis",{configurable:true,value:{
-      cancel(){},speak(utterance){window.__treeSpoken.push(utterance.text);
-        queueMicrotask(()=>{utterance.onstart?.();utterance.onend?.();});}
+      cancel(){},speak(utterance){queueMicrotask(()=>{
+        utterance.onstart?.();utterance.onend?.();
+      });}
     }});
     window.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};
-  });
+  },mockBytes.toString("base64"));
+
   const path=(id,title,summary,parts)=>({
     id,title,summary,
-    steps:["Build the core structure and mount supported parts","Connect power and control","Inspect placement before any fabrication"],
-    tradeoffs:["Dimensions and forces remain unverified"],parts
+    steps:["Build the core structure","Configure power and navigation","Validate the mechanical layout"],
+    tradeoffs:["Dimensions remain unverified"],parts
   });
   const droneParts=[
-    {name:"Rotor",purpose:"Provides lift and steering",location:"Ends of the airframe arms"},
-    {name:"Battery",purpose:"Supplies electrical power",location:"Central body"},
-    {name:"Work tool",purpose:"Handles objects",location:"Underside of the airframe"}
+    {name:"Rotor",purpose:"Lift",location:"Airframe ends"},
+    {name:"Gripper",purpose:"Move materials",location:"Underside"},
   ];
   const linearParts=[
-    {name:"Coil station",purpose:"Produces controlled electromagnetic force",location:"Surrounding the track"},
-    {name:"Guide rail",purpose:"Guides translator movement",location:"Along the propulsion path"},
-    {name:"Translator carriage",purpose:"Transfers force to the moving load",location:"Slides along the guide rails"}
+    {name:"Coil",purpose:"Electromagnetic drive",location:"Track"},
+    {name:"Translator",purpose:"Moves along rails",location:"Rail center"},
   ];
   await page.route("**/api/public/ascension/independent",async route=>{
-    const request=route.request();
-    const input=request.method()==="POST"?request.postDataJSON():{};
-    const phase=request.method()==="GET"?"capability":input?.phase;
-    calls.push(phase);
-    const isLinear=(input?.objective||"").includes("linear propulsion");
+    const req=route.request(),input=req.method()==="POST"?req.postDataJSON():{};
+    const phase=req.method()==="GET"?"capability":input.phase;
+    const linear=String(input.objective??"").includes("linear propulsion");
     let body;
-    if(phase==="capability") body={picture_generation_enabled:true,providers:{OpenAI:true}};
-    else if(phase==="initial")body={phase:"initial",answer:"Private engineering evaluation with constraints and candidate components"};
-    else if(phase==="pathways")body=isLinear?{
-      introduction:"Four engineered directions",pathways:[
-        path("linear1","Linear propulsion with three coil stations","Electromagnetic linear propulsion uses staged coil stations, three guidance rails and a translator carriage.",linearParts),
-        path("linear2","Modular magnetic track architecture","A guided electromagnetic translator travels on a linear track with coil stages.",linearParts),
-        path("linear3","Rail and coil propulsion architecture","A controlled electromagnetic drive moves a carriage along supported rails.",linearParts)
+    if(phase==="capability")body={picture_generation_enabled:true};
+    else if(phase==="initial")body={phase:"initial",answer:"Private engineering analysis"};
+    else if(phase==="picture"){
+      generated.push({id:input.pathway?.id,view:input.view});
+      body={image_url:"data:image/png;base64,"+mockImage,verified:false};
+    }
+    else if(phase==="pathways")body=linear?{
+      introduction:"Design choices",
+      pathways:[
+        path("linear1","Three coil drive","Linear propulsion uses staged electromagnetic coils.",linearParts),
+        path("linear2","Segmented translator","Linear propulsion uses a modular track.",linearParts),
+        path("linear3","Rail controlled path","Linear motor with managed motion.",linearParts)
       ],
-      blend:{...path("linear4","BLEND linear propulsion system","Combines track guidance, coils and translator carriage in one architecture.",linearParts),blend_reason:"Consolidated approach"},
-      verified:false,contributors:["OpenAI"],unavailable:[],providerErrors:[],mode:"test",governance:"unverified",persistence:"not persisted"
+      blend:{...path("linear4","BLEND propulsion","Integrated linear motor drive.",linearParts),blend_reason:"Combined"},
+      verified:false,contributors:["OpenAI"],unavailable:[],providerErrors:[],governance:"unverified"
     }:{
-      introduction:"Four engineered directions",pathways:[
-        path("rotor","Rotorcraft-based Multirotor Worker Drone with Edge AI","Multirotor worker drone with four lift rotors, battery, sensors, airframe and gripper.",droneParts),
-        path("rover","Ground Rover Worker Drone with Modular Tooling","Wheeled ground rover with traction wheels, modular tool and obstacle sensor.",droneParts),
-        path("modular","Modular worker drone platform","Worker drone with interchangeable four-rotor modules and grip tool.",droneParts)
+      introduction:"Design choices",
+      pathways:[
+        path("rotor","Rotorcraft Worker Drone","Four rotors carry a payload gripper.",droneParts),
+        path("rover","Ground Rover Worker Drone","Ground robot drives by wheels.",droneParts),
+        path("modular","Modular Worker Drone","Swappable multirotor work tool.",droneParts)
       ],
-      blend:{...path("blend","Adaptive modular worker drone team","Multirotor worker drones with modular gripper tool and coordinated sensing.",droneParts),blend_reason:"A blended modular architecture"},
-      verified:false,contributors:["OpenAI"],unavailable:[],providerErrors:[],mode:"test",governance:"unverified",persistence:"not persisted"
+      blend:{...path("blend","BLEND modular team","Coordinated drones with interchangeable tools.",droneParts),blend_reason:"Combined"},
+      verified:false,contributors:["OpenAI"],unavailable:[],providerErrors:[],governance:"unverified"
     };
-    else if(phase==="guide")body={phase:"guide",answer:"The battery powers the rotor drive and the gripper serves as the work tool."};
-    else body={error:"Unexpected API phase in canonical viewer "+phase};
+    else if(phase==="guide")body={phase:"guide",answer:"Inspect the selected source geometry."};
+    else body={error:"Unexpected phase "+phase};
     await route.fulfill({status:body.error?503:200,contentType:"application/json",body:JSON.stringify(body)});
   });
-  const res=await page.goto(process.env.ASCENSION_BASE_URL||"http://127.0.0.1:4174/",{waitUntil:"domcontentloaded"});
+  const res=await page.goto(process.env.ASCENSION_BASE_URL||"http://127.0.0.1:4174/",{
+    waitUntil:"domcontentloaded",
+  });
   assert.equal(res?.status(),200);
-  await page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]').waitFor();
+  const hero=page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]');
+  await hero.waitFor();
+  const entry=page.getByRole("region",{name:"Engage ASCENSION"});
+  await entry.waitFor({state:"visible"});
   await page.locator("#objective").fill("make worker drones");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
   assert.equal(await page.getByRole("tab").count(),4);
+  await entry.waitFor({state:"visible"});
+  assert.equal(await page.locator('img[alt^="Concept picture of"]').count(),0,
+    "No image generated on first page");
 
   const detail=page.locator('section[aria-label="Selected pathway design"]');
-  const canvas=page.locator('canvas[aria-label^="Rotatable, zoomable, component-selectable"]');
-  async function canonical(kindName,fullInspection=false) {
-    console.log("ENTER canonical scene: "+kindName);
+  const canvas=page.locator('canvas[aria-label^="Hunyuan3D generated mesh"]');
+  const stages=["BLUEPRINT","DISSECT / EXPLODE","IMPLODE / REASSEMBLE"];
+  async function inspect(expectedId){
     await detail.waitFor({state:"visible"});
-    await canvas.waitFor({state:"visible",timeout:20000});
-    console.log("CANVAS ready "+kindName);
-    if (process.env.V1_CAPTURE === "1" && (kindName === "Rotor" || kindName === "Coil station") && !globalThis["__captured_" + kindName.replace(/ /g,"_")]) {
-      globalThis["__captured_" + kindName.replace(/ /g,"_")] = true;
-      await page.waitForTimeout(650);
-      const jpeg = await canvas.screenshot({type:"jpeg",quality:50,animations:"disabled"});
-      console.log("V1_VISUAL_"+kindName.replace(/ /g,"_")+":"+jpeg.toString("base64"));
-    }
+    await canvas.waitFor({state:"visible",timeout:16000});
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
-    await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="blueprint"]').waitFor();
-    console.log("BLUEPRINT mode ready "+kindName);
-    if(process.env.V1_CAPTURE==="1" && kindName==="Rotor" && !globalThis.__blueprintCaptured){
-      globalThis.__blueprintCaptured=true;
-      await page.waitForTimeout(550);
-      const shot=await canvas.screenshot({type:"jpeg",quality:50,animations:"disabled"});
-      console.log("V1_BLUEPRINT_VISUAL:"+shot.toString("base64"));
-    }
-    const sameCanvas=await canvas.evaluate(el=>{
-      window.__canonicalCanvas=el;return el.width>=200&&el.height>=300;
-    });
-    assert.equal(sameCanvas,true,"Canvas must have renderable dimensions");
+    await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="blueprint"]').waitFor();
+    const preserved=await canvas.evaluate(el=>{window.__realMesh=el;return el.width>200;});
+    assert.ok(preserved);
     await page.getByRole("button",{name:"DISSECT / EXPLODE",exact:true}).click();
-    await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="dissect"]').waitFor();
-    assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Dissect must preserve the SAME 3D model/canvas");
-    console.log("EXPLODE preserves source "+kindName);
-    if(process.env.V1_CAPTURE==="1" && kindName==="Rotor" && !globalThis.__explodedCaptured){
-      globalThis.__explodedCaptured=true;
-      await page.waitForTimeout(450);
-      const shot=await canvas.screenshot({type:"jpeg",quality:50,animations:"disabled"});
-      console.log("V1_EXPLODE_VISUAL:"+shot.toString("base64"));
-    }
+    await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="dissect"]').waitFor();
+    assert.equal(await canvas.evaluate(el=>el===window.__realMesh),true,
+      "Dissect must reuse the actual Hunyuan GLB canvas");
     await page.getByRole("button",{name:"IMPLODE / REASSEMBLE",exact:true}).click();
-    await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="assembled"]').waitFor();
-    assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Reassembly must preserve object identity");
-    assert.equal(calls.filter(x=>x==="picture").length,0,"Switching views must not regenerate or rate-limit images");
-    if(fullInspection) {
-    await page.getByRole("button",{name:"ZOOM IN"}).click();
-    await page.getByRole("button",{name:"ROTATE RIGHT"}).click();
+    await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="assembled"]').waitFor();
+    assert.equal(await canvas.evaluate(el=>el===window.__realMesh),true,
+      "Reassemble must not regenerate another design");
     await page.getByRole("button",{name:"LABELS",exact:true}).click();
-    await page.locator('[aria-label="Selectable components"]').getByRole("button",{name:new RegExp(kindName)}).first().click();
-    assert.ok(await page.getByText(/WHAT:/).count());
+    await page.getByRole("button",{name:"Hunyuan rotor mesh"}).click();
     await page.getByRole("button",{name:"MOVE RIGHT"}).click();
-    await page.getByRole("button",{name:"HIDE PART"}).click();
-    await page.getByRole("button",{name:"RESTORE PART"}).click();
-    await page.getByRole("button",{name:"DISSECT / EXPLODE"}).click();
-    await page.getByRole("button",{name:"IMPLODE / REASSEMBLE"}).click();
-    assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Model edits must keep one canvas");
+    await page.getByRole("button",{name:"ZOOM IN"}).click();
     await page.getByRole("button",{name:"DIVE INTO REALITY"}).click();
-    await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).waitFor();
     await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
-    assert.equal(await detail.count(),1,"Immersive view must close to the SAME selected pathway");
-    }
-    console.log("PASS modeled pathway: "+kindName+"; modes share one model canvas");
+    assert.equal(await detail.count(),1);
+    assert.equal(await detail.getByText("Hunyuan3D mesh ready").count(),0);
+    assert.equal(await page.locator('canvas[aria-label^="Rotatable, zoomable"]').count(),0,
+      "Generic procedural substitute must never render");
+    console.log("PASS actual Hunyuan GLB path "+expectedId);
   }
-  console.log("PATHWAYS returned four selectable designs");
-  await page.getByRole("tab").first().click();
-  await canonical("Rotor",true);
-  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
-  await page.waitForTimeout(850);
-  await page.getByRole("tab").nth(1).click();
-  await canonical("Driven wheel");
-  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
-  await page.waitForTimeout(850);
-  await page.getByRole("tab").nth(2).click();
-  await canonical("Rotor");
-  await page.getByRole("button",{name:"LABELS",exact:true}).click();
-  assert.ok(await page.getByRole("button",{name:"Modular payload docking rail"}).count(),"Modular pathway must have its own geometry");
-  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
-  await page.waitForTimeout(850);
-  await page.getByRole("tab").nth(3).click();
-  await canonical("Rotor");
-  await page.getByRole("button",{name:"LABELS",exact:true}).click();
-  assert.ok(await page.getByRole("button",{name:"Team coordination antenna"}).count(),"BLEND must show its coordinated component geometry");
-  assert.ok(await page.getByRole("button",{name:"Modular payload docking rail"}).count(),"BLEND must retain modular features");
-  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
-  await page.waitForTimeout(850);
+  for(const [index,id] of ["rotor","rover","modular","blend"].entries()){
+    await page.getByRole("tab").nth(index).click();
+    await inspect(id);
+    await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+    await page.getByRole("tab").first().waitFor();
+  }
+  assert.deepEqual(generated.map(x=>x.id),["rotor","rover","modular","blend"]);
+  assert.ok(generated.every(x=>x.view==="assembled"),
+    "Blueprint and Dissect must never regenerate unrelated pictures");
 
   await page.getByRole("button",{name:"New objective"}).click();
   await page.locator("#objective").fill("make a linear propulsion engine");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
   await page.getByRole("tab").first().click();
-  await canonical("Coil station",true);
-  assert.equal(calls.filter(x=>x==="picture").length,0);
-  assert.equal(await page.getByText("Too many objectives. Try again later.").count(),0);
+  await inspect("linear1");
+  assert.equal(generated.length,5,"Only selected pathways generate Hunyuan input images");
   assert.equal(errors.length,0,errors.join(" | "));
-  console.log("PASS V1 canonical browser: worker drone, rover, 4 paths, linear propulsion; one live 3D model for assemble/blueprint/explode/reassemble, selectable components, zoom, immersive view, no regeneration");
-} finally {
+  console.log("PASS V1 browser: approved home, four pathway choices, real GLB bytes, same model in blueprint/explode/reassemble, native submesh controls, no invented procedural model, linear propulsion");
+} finally{
   await browser.close();
 }

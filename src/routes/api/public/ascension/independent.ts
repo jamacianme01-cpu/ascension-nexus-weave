@@ -358,14 +358,20 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
       if (fetchSite === "cross-site" || (origin && new URL(origin).hostname !== publicHost))
         return json({ error: "Cross-site requests are not permitted." }, 403);
       const address = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0]?.trim() || "unknown";
-      if (!limit("global", 48) || !limit("ip:" + address, 12)) return json({ error: "Too many objectives. Try again later." }, 429);
+      // A view, image, or Tree question is NOT a new objective. Apply the
+      // objective cap only to answer/pathway creation below, not to inspection.
+      // Inspections have their own quotas to prevent resource exhaustion.
       try {
         const raw = await request.text();
         if (raw.length > 15000) return json({ error: "Objective too long." }, 413);
         const input = obj(JSON.parse(raw));
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
-        if (input["phase"] === "initial") return json(await firstAnswer(objective));
+        if (input["phase"] === "initial") {
+          if (!limit("objective-global", 48) || !limit("objective-ip:" + address, 12))
+            return json({ error: "Too many objectives. Try again later." }, 429);
+          return json(await firstAnswer(objective));
+        }
         if (input["phase"] === "guide") {
           const question = typeof input["question"] === "string" ? input["question"].trim() : "";
           if (question.length < 3 || question.length > 800)
@@ -378,6 +384,8 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
             return json({ error: "Image generation limit reached. No credits charged." }, 429);
           return json(await picture(objective, { ...obj(input["pathway"]), view: input["view"] }));
         }
+        if (!limit("pathway-global", 48) || !limit("pathway-ip:" + address, 12))
+          return json({ error: "Too many objectives. Try again later." }, 429);
         const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
         return json(await build(objective, prior));
       } catch (error) {

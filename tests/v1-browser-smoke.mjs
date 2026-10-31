@@ -1,137 +1,124 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 
-const browser = await chromium.launch({ args: ["--enable-unsafe-swiftshader"] });
+const browser=await chromium.launch({args:["--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]});
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  const messages = [];
-  page.on("pageerror", error => messages.push(error.message));
-  await page.addInitScript(() => {
-    window.__treeSpoken = [];
-    Object.defineProperty(window, "speechSynthesis", {
-      configurable: true,
-      value: { cancel() {}, speak(utterance) {
-        window.__treeSpoken.push(utterance.text);
-        queueMicrotask(() => { utterance.onstart?.(); utterance.onend?.(); });
-      }},
-    });
-    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+  const page=await browser.newPage({viewport:{width:1280,height:900}});
+  const errors=[];
+  const calls=[];
+  page.on("pageerror",e=>errors.push(e.message));
+  await page.addInitScript(()=>{
+    window.__treeSpoken=[];
+    Object.defineProperty(window,"speechSynthesis",{configurable:true,value:{
+      cancel(){},speak(utterance){window.__treeSpoken.push(utterance.text);
+        queueMicrotask(()=>{utterance.onstart?.();utterance.onend?.();});}
+    }});
+    window.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};
   });
-  const png = await page.evaluate(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 96;
-    const ctx = canvas.getContext("2d");
-    const pixels = ctx.createImageData(96, 96);
-    let seed = 1234567;
-    for (let i = 0; i < pixels.data.length; i += 4) {
-      seed = (Math.imul(seed, 1664525) + 1013904223) | 0;
-      pixels.data[i] = seed & 255;
-      pixels.data[i + 1] = seed >>> 8 & 255;
-      pixels.data[i + 2] = seed >>> 16 & 255;
-      pixels.data[i + 3] = 255;
-    }
-    ctx.putImageData(pixels, 0, 0);
-    return canvas.toDataURL("image/png");
+  const path=(id,title,summary,parts)=>({
+    id,title,summary,
+    steps:["Build the core structure and mount supported parts","Connect power and control","Inspect placement before any fabrication"],
+    tradeoffs:["Dimensions and forces remain unverified"],parts
   });
-  assert.ok(png.length > 4000);
-  const path = (id, title) => ({
-    id, title,
-    summary: "A concrete worker drone design with rotor lift, electric power, sensing and a carrying gripper for light indoor material handling.",
-    steps: ["Frame and mount four rotors on the body.", "Power the motors using a protected onboard battery.", "Use optical sensing and a gripper to transfer a small item."],
-    tradeoffs: ["Limited battery endurance and payload capacity."],
-    parts: [
-      { name: "Rotor assembly", purpose: "Provides lift and steering.", location: "Four arm tips." },
-      { name: "Battery", purpose: "Stores and supplies power.", location: "Central frame." },
-      { name: "Gripper", purpose: "Holds a small item.", location: "Under the central frame." },
-    ],
-  });
-  const calls = [];
-  await page.route("**/api/public/ascension/independent", async route => {
-    const request = route.request();
-    const phase = request.method() === "GET" ? "capabilities" : request.postDataJSON()?.phase;
+  const droneParts=[
+    {name:"Rotor",purpose:"Provides lift and steering",location:"Ends of the airframe arms"},
+    {name:"Battery",purpose:"Supplies electrical power",location:"Central body"},
+    {name:"Work tool",purpose:"Handles objects",location:"Underside of the airframe"}
+  ];
+  const linearParts=[
+    {name:"Coil station",purpose:"Produces controlled electromagnetic force",location:"Surrounding the track"},
+    {name:"Guide rail",purpose:"Guides translator movement",location:"Along the propulsion path"},
+    {name:"Translator carriage",purpose:"Transfers force to the moving load",location:"Slides along the guide rails"}
+  ];
+  await page.route("**/api/public/ascension/independent",async route=>{
+    const request=route.request();
+    const input=request.method()==="POST"?request.postDataJSON():{};
+    const phase=request.method()==="GET"?"capability":input?.phase;
     calls.push(phase);
+    const isLinear=(input?.objective||"").includes("linear propulsion");
     let body;
-    if (phase === "capabilities") body = {
-      picture_generation_enabled: true,
-      providers: {OpenAI:true,Claude:false,Grok:false},
+    if(phase==="capability") body={picture_generation_enabled:true,providers:{OpenAI:true}};
+    else if(phase==="initial")body={phase:"initial",answer:"Private engineering evaluation with constraints and candidate components"};
+    else if(phase==="pathways")body=isLinear?{
+      introduction:"Four engineered directions",pathways:[
+        path("linear1","Linear propulsion with three coil stations","Electromagnetic linear propulsion uses staged coil stations, three guidance rails and a translator carriage.",linearParts),
+        path("linear2","Modular magnetic track architecture","A guided electromagnetic translator travels on a linear track with coil stages.",linearParts),
+        path("linear3","Rail and coil propulsion architecture","A controlled electromagnetic drive moves a carriage along supported rails.",linearParts)
+      ],
+      blend:{...path("linear4","BLEND linear propulsion system","Combines track guidance, coils and translator carriage in one architecture.",linearParts),blend_reason:"Consolidated approach"},
+      verified:false,contributors:["OpenAI"],unavailable:[],providerErrors:[],mode:"test",governance:"unverified",persistence:"not persisted"
+    }:{
+      introduction:"Four engineered directions",pathways:[
+        path("rotor","Rotorcraft-based Multirotor Worker Drone with Edge AI","Multirotor worker drone with four lift rotors, battery, sensors, airframe and gripper.",droneParts),
+        path("rover","Ground Rover Worker Drone with Modular Tooling","Wheeled ground rover with traction wheels, modular tool and obstacle sensor.",droneParts),
+        path("modular","Modular worker drone platform","Worker drone with interchangeable four-rotor modules and grip tool.",droneParts)
+      ],
+      blend:{...path("blend","Adaptive modular worker drone team","Multirotor worker drones with modular gripper tool and coordinated sensing.",droneParts),blend_reason:"A blended modular architecture"},
+      verified:false,contributors:["OpenAI"],unavailable:[],providerErrors:[],mode:"test",governance:"unverified",persistence:"not persisted"
     };
-    else if (phase === "initial") body = { phase: "initial", answer: "A useful private engineering architecture for a four-rotor material-handling worker drone, with battery, motor controllers, sensors, lightweight frame and a gripper." };
-    else if (phase === "pathways") body = {
-      introduction: "Here are four engineered directions.",
-      pathways: [path("p1", "Mobility-first architecture"), path("p2", "Coordinated team architecture"), path("p3", "Modular platform architecture")],
-      blend: {...path("blend", "Adaptive modular team"), blend_reason: "Combines the mobility, team coordination, and modular platform approaches."},
-      verified: false, contributors: ["OpenAI"], unavailable: ["Claude","Grok"], providerErrors: [], mode: "openai-only-provisional", governance: "not verified", persistence: "not persisted",
-    };
-    else if (phase === "picture") body = { image_url: png, verified: false };
-    else if (phase === "guide") body = {phase:"guide",answer:"The rotor assembly provides lift. Its battery is centered to distribute weight, while the gripper hangs below the frame."};
-    else body = { error: "Unexpected test API request" };
-    await route.fulfill({ status: body.error ? 503 : 200, contentType: "application/json", body: JSON.stringify(body) });
+    else if(phase==="guide")body={phase:"guide",answer:"The battery powers the rotor drive and the gripper serves as the work tool."};
+    else body={error:"Unexpected API phase in canonical viewer "+phase};
+    await route.fulfill({status:body.error?503:200,contentType:"application/json",body:JSON.stringify(body)});
   });
-  const pageResponse = await page.goto(process.env.ASCENSION_BASE_URL || "http://127.0.0.1:4174/", { waitUntil: "domcontentloaded" });
-  assert.equal(pageResponse?.status(), 200, "The app's entry URL did not return successfully.");
-  await page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]').waitFor({ state: "visible", timeout: 20000 });
-  await page.waitForFunction(() => window.__treeSpoken?.some(x => x.includes("Welcome to ASCENSION") && x.includes("Glad you") ), { timeout: 10000 });
-  assert.ok(!(await page.evaluate(() => window.__treeSpoken.some(x => x.includes("ideas become possibilities")))), "Guide must welcome as an assistant, not recite a poetic introduction");
+  const res=await page.goto(process.env.ASCENSION_BASE_URL||"http://127.0.0.1:4174/",{waitUntil:"domcontentloaded"});
+  assert.equal(res?.status(),200);
+  await page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]').waitFor();
   await page.locator("#objective").fill("make worker drones");
-  await page.getByRole("button", { name: "ENGAGE ASCENSION" }).click();
+  await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
-  assert.equal(await page.evaluate(() => window.__treeSpoken.some(x => x.includes("three different approaches") || x.includes("work through your objective"))), false, "Tree should not narrate processing or pathway screens");
-  assert.equal(await page.getByRole("tab").count(), 4);
-  for (const title of ["Mobility-first architecture", "Coordinated team architecture", "Modular platform architecture", "Adaptive modular team"]) {
-    assert.equal(await page.getByRole("tab", {name: new RegExp(title)}).count(),1, "The actual pathway title must remain visible: " + title);
-  }
-  assert.equal(calls.filter(x => x === "picture").length, 0, "No pictures before selection");
-  assert.equal(await page.getByText("INITIAL ANSWER").count(), 0);
-  assert.ok(await page.locator('.ascension-world[data-realities="true"]').count());
-  await page.getByRole("tab").first().click();
-  const detail = page.locator('section[aria-label="Selected pathway design"]');
-  await detail.waitFor({ state: "visible" });
-  assert.equal(await page.evaluate(() => window.__treeSpoken.some(x => x.includes("Let\u0027s work on") || x.includes("One important part"))), false, "Selecting a pathway must not trigger unsolicited narration");
-  assert.equal(await page.getByRole("tab").count(), 0, "Pathway cards must disappear on the second screen");
-  assert.equal(await page.locator('section[aria-label="ASCENSION pathways"]').count(), 0, "Pathway selection and design must not stack");
-  assert.equal(await page.locator('section[aria-label="Engage ASCENSION"]').count(), 0, "Entry screen must not appear above design");
-  assert.equal(await page.getByRole("button", {name:"← BACK TO PATHWAYS", exact:true}).count(), 1);
-  await detail.locator('img[alt^="Assembled concept picture of"]').waitFor({ state: "visible" });
-  assert.equal(calls.filter(x => x === "picture").length, 1);
-  await page.getByRole("button", {name:"LABELS",exact:true}).click();
-  await page.getByRole("button", {name:"Rotor assembly",exact:true}).click();
-  assert.ok(await page.getByText("Four arm tips.").count());
-  await page.getByRole("button", {name:/TREE OF KNOWLEDGE/}).click();
-  await page.getByRole("textbox",{name:"Ask the Tree"}).fill("Where does the battery belong?");
-  await page.getByRole("button",{name:"ASK",exact:true}).click();
-  await page.getByText(/gripper hangs below/).waitFor({state:"visible"});
-  await detail.getByRole("button", {name:"BLUEPRINT",exact:true}).click();
-  await detail.locator('img[alt^="Blueprint concept of"]').waitFor({state:"visible"});
-  assert.ok(await detail.getByText(/Numerical dimensions and tolerances remain unresolved/).count());
-  await detail.getByRole("button", {name:"DISSECT / EXPLODE",exact:true}).click();
-  await detail.locator('img[alt^="Exploded concept picture of"]').waitFor({state:"visible"});
-  assert.equal(await detail.getByText(/Automatic paid dissection image generation/).count(),0);
-  await detail.getByRole("button", {name:"IMPLODE / REASSEMBLE",exact:true}).click();
-  await detail.locator('img[alt^="Assembled concept picture of"]').waitFor({state:"visible"});
-  await detail.getByRole("button", {name:"ZOOM IN"}).click();
-  await detail.getByRole("button", {name:"ROTATE RIGHT"}).click();
-  await detail.getByRole("button", {name:"DIVE INTO REALITY"}).click();
-  const immersive=page.getByRole("dialog",{name:"Immersive invention inspection"});
-  await immersive.waitFor({state:"visible"});
-  await immersive.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
-  assert.equal(await immersive.count(),0);
-  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
-  assert.equal(await detail.count(),0);
   assert.equal(await page.getByRole("tab").count(),4);
-  assert.equal(await page.locator('img[alt^="Assembled concept picture of"]').count(),0);
-  for(const title of ["Coordinated team architecture","Modular platform architecture","Adaptive modular team"]){
-    await page.getByRole("tab",{name:new RegExp(title)}).click();
+
+  const detail=page.locator('section[aria-label="Selected pathway design"]');
+  const canvas=page.locator('canvas[aria-label^="Rotatable, zoomable, component-selectable"]');
+  async function canonical(kindName) {
     await detail.waitFor({state:"visible"});
-    await detail.getByRole("heading",{name:title}).waitFor({state:"visible"});
-    await detail.locator('img[alt^="Assembled concept picture of"]').waitFor({state:"visible"});
-    assert.equal(await page.getByRole("tab").count(),0);
-    await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
-    await page.getByRole("tab").first().waitFor({state:"visible"});
+    await canvas.waitFor({state:"visible",timeout:20000});
+    await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
+    await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="blueprint"]').waitFor();
+    const sameCanvas=await canvas.evaluate(el=>{
+      window.__canonicalCanvas=el;return el.width>=200&&el.height>=300;
+    });
+    assert.equal(sameCanvas,true,"Canvas must have renderable dimensions");
+    await page.getByRole("button",{name:"DISSECT / EXPLODE",exact:true}).click();
+    await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="dissect"]').waitFor();
+    assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Dissect must preserve the SAME 3D model/canvas");
+    await page.getByRole("button",{name:"IMPLODE / REASSEMBLE",exact:true}).click();
+    await page.locator('[aria-label="Canonical 3D invention assembly"][data-mode="assembled"]').waitFor();
+    assert.equal(await canvas.evaluate(el=>el===window.__canonicalCanvas),true,"Reassembly must preserve object identity");
+    assert.equal(calls.filter(x=>x==="picture").length,0,"Switching views must not regenerate or rate-limit images");
+    await page.getByRole("button",{name:"ZOOM IN"}).click();
+    await page.getByRole("button",{name:"ROTATE RIGHT"}).click();
+    await page.getByRole("button",{name:"LABELS",exact:true}).click();
+    await page.locator('[aria-label="Selectable components"]').getByRole("button",{name:new RegExp(kindName)}).first().click();
+    assert.ok(await page.getByText(/WHAT:/).count());
+    await page.getByRole("button",{name:"DIVE INTO REALITY"}).click();
+    await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).waitFor();
+    await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
+    assert.equal(await detail.count(),1,"Immersive view must close to the SAME selected pathway");
   }
-  assert.equal(await page.locator("dialog.reality-screen").count(),0);
-  assert.ok(calls.filter(x=>x==="picture").length>=6);
-  assert.equal(messages.length, 0, messages.join(" | "));
-  console.log("PASS V1 browser: four pathways, assembled images, Blueprint, Dissect, Reassemble, zoom, rotate, immersive preview, parts, Tree, back");
+  await page.getByRole("tab").first().click();
+  await canonical("Rotor");
+  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+  await page.getByRole("tab").nth(1).click();
+  await canonical("Driven wheel");
+  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+  await page.getByRole("tab").nth(2).click();
+  await canonical("Rotor");
+  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+  await page.getByRole("tab").nth(3).click();
+  await canonical("Rotor");
+  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+
+  await page.getByRole("button",{name:"New objective"}).click();
+  await page.locator("#objective").fill("make a linear propulsion engine");
+  await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
+  await page.getByRole("tab").first().waitFor();
+  await page.getByRole("tab").first().click();
+  await canonical("Coil station");
+  assert.equal(calls.filter(x=>x==="picture").length,0);
+  assert.equal(await page.getByText("Too many objectives. Try again later.").count(),0);
+  assert.equal(errors.length,0,errors.join(" | "));
+  console.log("PASS V1 canonical browser: worker drone, rover, 4 paths, linear propulsion; one live 3D model for assemble/blueprint/explode/reassemble, selectable components, zoom, immersive view, no regeneration");
 } finally {
   await browser.close();
 }

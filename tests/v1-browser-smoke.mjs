@@ -48,6 +48,7 @@ try{
   const errors=[];
   const generated=[];
   page.on("pageerror",e=>errors.push(e.message));
+  page.on("console",msg=>{if(msg.type()==="error")console.log("BROWSER ERROR: "+msg.text().slice(0,500));});
   const mockBytes=fixtureGlb();
   const mockImage=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(4300,21)]).toString("base64");
   await page.addInitScript((b64)=>{
@@ -150,6 +151,12 @@ try{
     await canvas.waitFor({state:"visible",timeout:16000});
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="blueprint"]').waitFor();
+    console.log("V1 DIAGNOSTIC "+expectedId,JSON.stringify({
+      detail: (await detail.innerText()).slice(0,500),
+      canvasCount: await canvas.count(),
+      local: await page.evaluate(()=>window.__localHunyuanCalls),
+      errors: errors.slice(-4),
+    }));
     const preserved=await canvas.evaluate(el=>{window.__realMesh=el;return el.width>200;});
     assert.ok(preserved);
     await page.getByRole("button",{name:"DISSECT / EXPLODE",exact:true}).click();

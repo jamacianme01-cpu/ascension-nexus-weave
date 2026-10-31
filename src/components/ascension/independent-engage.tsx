@@ -194,7 +194,7 @@ export function IndependentEngage() {
   useEffect(() => {
     // Tree and Book remain in place; the Tree speaks without a new entrance scene.
     // When a browser blocks autoplay, retry in the first genuine user interaction.
-    const greeting = "Welcome to ASCENSION. I'm the Tree of Knowledge. It's good to have you here. Tell me what you want to create or solve, and I'll help you develop the design, understand the choices, and improve it with you.";
+    const greeting = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're here. What would you like to create? I'll help you work through it.";
     let disposed = false;
     const tryWelcome = () => {
       if (disposed || welcomeStarted.current || document.hidden) return;
@@ -226,7 +226,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      if (talking) say("I have three different approaches and a fourth that blends them. Choose the design you want to work on. I can help you understand its parts, weigh the tradeoffs, and improve it.");
+      // The results speak for themselves. Do not narrate the screen.
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.
       window.setTimeout(() => {
@@ -260,7 +260,7 @@ export function IndependentEngage() {
     setChoice(null);
     setDive(null);
     setStage("processing");
-    if (talking) say("I'll work through your objective and develop the design options.");
+    // ENGAGE is a user action, not a cue for unsolicited voice narration.
     try {
       // Internal reasoning only: never narrate or render this essay to the user.
       const response = await fetch("/api/public/ascension/independent", {
@@ -380,14 +380,7 @@ export function IndependentEngage() {
           onClick={() => {
             setChoice(index); setRefinement("");
             window.scrollTo(0, 0);
-            if (talking) {
-              const essential = p.parts.find(part => part.name.trim() && part.purpose.trim());
-              const keyDetail = essential
-                ? essential.name + ": " + essential.purpose
-                : p.steps[0] ?? p.summary.slice(0, 140);
-              say("Let's work on " + p.title + ". " + keyDetail +
-                " You can ask me about a component, a design choice, or what to improve.");
-            }
+            // Open the design silently. The Tree answers only when the user asks.
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>

@@ -48,8 +48,6 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
-type DesignView = "assembled" | "blueprint" | "dissect";
-
 function PathwayView(props: {
   path: Pathway & { blend_reason?: string };
   objective: string;
@@ -60,197 +58,6 @@ function PathwayView(props: {
   return <V1HunyuanPathway
     path={props.path} objective={props.objective} modelCache={props.modelCache}
     onSpeak={props.onSpeak} speakingEnabled={props.speakingEnabled} />;
-}
-
-/** Unsupported geometry remains an explicitly labeled illustration only. */
-function ImagePathwayView({ path, objective, imageCache, onSpeak, speakingEnabled }: {
-  path: Pathway & { blend_reason?: string };
-  objective: string;
-  imageCache: { current: Map<string, string> };
-  onSpeak: (text: string) => void;
-  speakingEnabled: boolean;
-}) {
-  const [part, setPart] = useState<Part | null>(null);
-  const [panel, setPanel] = useState<"description" | "labels">("description");
-  const [mode, setMode] = useState<DesignView>("assembled");
-  const [picture, setPicture] = useState<string | null>(null);
-  const [pictureError, setPictureError] = useState("");
-  const [pictureLoading, setPictureLoading] = useState(true);
-  const [pictureAttempt, setPictureAttempt] = useState(0);
-  const [scale, setScale] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [immersive, setImmersive] = useState(false);
-  const imageKey = JSON.stringify([objective, path.id, path.title, mode]);
-
-  useEffect(() => {
-    setPart(null); setPanel("description"); setMode("assembled");
-    setScale(1); setRotation(0); setImmersive(false);
-  }, [path.id]);
-  useEffect(() => {
-    const stored = imageCache.current.get(imageKey);
-    if (stored) {
-      setPicture(stored); setPictureError(""); setPictureLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    setPicture(null); setPictureError(""); setPictureLoading(true);
-    void fetch("/api/public/ascension/independent", {
-      method: "GET", cache: "no-store", signal: controller.signal,
-    }).then(async response => {
-      if (!response.ok) throw new Error("ASCENSION image engine status could not be checked.");
-      const capability: { picture_generation_enabled?: boolean } = await response.json();
-      if (!capability.picture_generation_enabled)
-        throw new Error("ASCENSION's image engine is not connected.");
-      return fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective, phase: "picture", view: mode, pathway: path }),
-        signal: controller.signal,
-      });
-    }).then(async response => {
-      const data: { image_url?: string; error?: string } = await response.json();
-      if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
-      if (!data.image_url || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{4000,12000000}$/i.test(data.image_url))
-        throw new Error("The image provider did not return a usable picture.");
-      if (!controller.signal.aborted) {
-        imageCache.current.set(imageKey, data.image_url);
-        setPicture(data.image_url);
-      }
-    }).catch(cause => {
-      if (!controller.signal.aborted)
-        setPictureError(cause instanceof Error ? cause.message : String(cause));
-    }).finally(() => { if (!controller.signal.aborted) setPictureLoading(false); });
-    return () => controller.abort();
-  }, [path, objective, imageCache, imageKey, mode, pictureAttempt]);
-
-  useEffect(() => {
-    if (!pictureError.toLowerCase().includes("rate-limit") || pictureAttempt >= 3) return;
-    const timer = window.setTimeout(() => setPictureAttempt(value => value + 1), 35000);
-    return () => window.clearTimeout(timer);
-  }, [pictureError, pictureAttempt, mode]);
-
-  useEffect(() => {
-    if (!immersive) return;
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setImmersive(false);
-    };
-    document.addEventListener("keydown", escape);
-    const original = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", escape);
-      document.body.style.overflow = original;
-    };
-  }, [immersive]);
-
-  const changeView = (next: DesignView) => {
-    setMode(next);
-    setScale(1);
-    setRotation(0);
-  };
-  const image = (enlarged: boolean) => picture ? <img
-    src={picture} alt={mode === "assembled"
-      ? "Assembled concept picture of " + path.title
-      : mode === "blueprint" ? "Blueprint concept of " + path.title
-      : "Exploded concept picture of " + path.title}
-    draggable={false}
-    className={"mx-auto max-h-full max-w-full object-contain transition-transform " +
-      (enlarged ? "h-full" : "h-[min(60vh,560px)]")}
-    style={{transform: "scale(" + scale + ") rotate(" + rotation + "deg)"}} /> :
-    <div className="flex min-h-72 flex-col items-center justify-center gap-4 p-5 text-center text-sm text-foreground/80"
-      role={pictureError ? "alert" : "status"}>
-      <p>{pictureError || (pictureLoading ? "Creating the selected " + mode + " view…" : "Picture unavailable.")}</p>
-      {pictureError && <button type="button" onClick={() => setPictureAttempt(i => i + 1)}
-        className="rounded-full border border-gold/55 px-5 py-2 text-gold">RETRY {mode.toUpperCase()} VIEW</button>}
-    </div>;
-  const controls = <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Picture inspection controls">
-    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => setScale(v => Math.min(4, v * 1.25))}>ZOOM IN</button>
-    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => setScale(v => Math.max(0.5, v / 1.25))}>ZOOM OUT</button>
-    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => setRotation(v => v - 15)}>ROTATE LEFT</button>
-    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => setRotation(v => v + 15)}>ROTATE RIGHT</button>
-    <button type="button" className="rounded-lg border border-gold/40 px-3 py-2 text-gold" onClick={() => { setScale(1); setRotation(0); }}>RESET</button>
-  </div>;
-
-  return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-4 shadow-2xl sm:p-7">
-    <h3 className="mb-2 text-lg text-gold">{path.title}</h3>
-    <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak}/>
-    <p className="mb-5 max-w-4xl leading-7 text-foreground">{path.summary}</p>
-    <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Selected pathway views">
-      {(["assembled", "blueprint", "dissect"] as const).map(view => <button key={view}
-        type="button" aria-pressed={mode === view}
-        onClick={() => changeView(view)}
-        className={"rounded-xl border px-4 py-2 text-sm " + (mode === view
-          ? "border-primary bg-primary/20 text-primary" : "border-gold/35 text-gold")}>
-        {view === "assembled" ? "ASSEMBLED" : view === "blueprint" ? "BLUEPRINT" : "DISSECT / EXPLODE"}
-      </button>)}
-      {mode === "dissect" && <button type="button" onClick={() => changeView("assembled")}
-        className="rounded-xl border border-gold/40 px-4 py-2 text-sm text-gold">IMPLODE / REASSEMBLE</button>}
-    </div>
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.85fr)]">
-      <div className="min-w-0 space-y-3">
-        <div className="flex min-h-[330px] items-center justify-center overflow-hidden rounded-xl border border-gold/25 bg-[#051322] sm:min-h-[480px]"
-          aria-label="Selected invention picture">
-          {image(false)}
-        </div>
-        {controls}
-        {mode === "blueprint" && <p className="text-xs text-foreground/65">
-          Blueprint concept. Numerical dimensions and tolerances remain unresolved unless established by the design.
-        </p>}
-        {mode === "dissect" && <p className="text-xs text-foreground/65">
-          Exploded concept illustration. Part alignment is illustrative, not verified physical geometry.
-        </p>}
-        <button type="button" disabled={!picture} onClick={() => setImmersive(true)}
-          className="rounded-xl border border-primary/60 px-5 py-3 text-primary disabled:opacity-40">
-          DIVE INTO REALITY
-        </button>
-      </div>
-      <aside className="min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4" aria-label="Pathway inspection">
-        <div className="mb-4 flex flex-wrap gap-2">
-          {(["description", "labels"] as const).map(view => <button type="button" key={view}
-            aria-pressed={panel === view} onClick={() => setPanel(view)}
-            className={"rounded-lg border px-4 py-2 text-sm " +
-              (panel === view ? "border-primary text-primary" : "border-gold/40 text-gold")}>
-            {view.toUpperCase()}
-          </button>)}
-        </div>
-        {panel === "description" ? <div className="space-y-4 text-sm leading-6">
-          {path.blend_reason && <p className="border-l-2 border-primary pl-3">{path.blend_reason}</p>}
-          <p>{path.summary}</p>
-          <h4 className="font-semibold text-gold">HOW IT WORKS</h4>
-          <ol className="list-decimal space-y-2 pl-5">{path.steps.map((step,i) => <li key={i}>{step}</li>)}</ol>
-          {path.tradeoffs.length > 0 && <details><summary className="cursor-pointer text-gold">Engineering limits</summary>
-            <ul className="mt-2 list-disc pl-4">{path.tradeoffs.map((t,i) => <li key={i}>{t}</li>)}</ul></details>}
-        </div> : <div className="space-y-3" aria-label="Select components">
-          {path.parts.length === 0 && <p className="text-sm">No named components returned for this pathway.</p>}
-          {path.parts.map((p,i) => <button type="button" key={i}
-            aria-pressed={part === p}
-            onClick={() => {setPart(p);onSpeak(p.name + ". " + p.purpose + (p.location ? " Located " + p.location : ""));}}
-            className="block w-full rounded-lg border border-gold/35 p-3 text-left text-sm text-foreground hover:border-primary">
-            {p.name}
-          </button>)}
-          <div className="min-h-24 rounded-lg border border-primary/25 p-3 text-sm" aria-live="polite">
-            {part ? <><strong className="text-gold">{part.name}</strong>
-              <p className="mt-2"><b>WHAT / DOES:</b> {part.purpose}</p>
-              <p className="mt-2"><b>WHERE:</b> {part.location || "Location not specified."}</p></>
-              : <p>Select a named component to see what, where, and what it does.</p>}
-          </div>
-        </div>}
-      </aside>
-    </div>
-    {immersive && <div role="dialog" aria-modal="true" aria-label="Immersive invention inspection"
-      className="fixed inset-0 z-[200] flex flex-col overflow-auto bg-[#020a12] p-4 sm:p-8">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-lg text-gold">{path.title} · {mode.toUpperCase()}</h3>
-        <button type="button" onClick={() => setImmersive(false)}
-          className="rounded-xl border border-gold/60 px-5 py-3 text-gold">CLOSE REALITY VIEW</button>
-      </div>
-      <div className="min-h-[50vh] flex-1 overflow-hidden rounded-xl border border-gold/30 bg-[#061522]"
-        aria-label="Immersive concept preview">{image(true)}</div>
-      <div className="mt-3">{controls}</div>
-      <p className="mt-2 text-xs text-foreground/70">
-        Concept illustration, not a verified 3D mesh. The physical dimensions remain unverified.
-      </p>
-    </div>}
-  </section>;
 }
 
 /** Hosted Tree entry. The first model answer is backend context, not a public essay. */
@@ -270,7 +77,6 @@ export function IndependentEngage() {
   const designView = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
-  const imageCache = useRef(new Map<string, string>());
   const modelCache = useRef(new Map<string, ArrayBuffer>());
   const welcomeStarted = useRef(false);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
@@ -332,7 +138,6 @@ export function IndependentEngage() {
     stopVoice();
     // Keep private refinement context out of the visible objective field.
     if (!override) setObjective(text);
-    imageCache.current.clear();
     modelCache.current.clear();
     setRequested(text);
     setLoading(true);
@@ -392,7 +197,6 @@ export function IndependentEngage() {
     generation.current += 1;
     abort.current?.abort();
     stopVoice();
-    imageCache.current.clear();
     modelCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);

@@ -172,7 +172,7 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
     controls.minDistance=2.8;
     controls.maxDistance=28;
     controls.target.set(0,0,0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
     renderer.setSize(Math.max(container.clientWidth,300),Math.max(container.clientHeight,340));
     renderer.domElement.style.width="100%";
     renderer.domElement.style.height="100%";
@@ -213,8 +213,11 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
     });
     observer.observe(container);
     let raf=0;
-    const animate=()=>{
+    let lastFrame=0;
+    const animate=(time:number)=>{
       raf=requestAnimationFrame(animate);
+      if(time-lastFrame<42)return;
+      lastFrame=time;
       const blueprint=container.dataset.mode==="blueprint";
       grid.visible=blueprint;
       scene.background=new THREE.Color(blueprint?"#041d32":"#071521");

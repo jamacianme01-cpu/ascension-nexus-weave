@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { TreeGuide } from "@/components/ascension/tree-guide";
-import { v1AssemblyKind } from "@/components/ascension/v1-model-workbench";
-import { V1ModeledPathway } from "@/components/ascension/v1-modeled-pathway";
+import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -52,16 +51,15 @@ function stopVoice() {
 type DesignView = "assembled" | "blueprint" | "dissect";
 
 function PathwayView(props: {
-  path: Pathway & {blend_reason?:string};
+  path: Pathway & { blend_reason?: string };
   objective: string;
-  imageCache: {current:Map<string,string>};
-  onSpeak: (text:string)=>void;
-  speakingEnabled:boolean;
+  modelCache: { current: Map<string, ArrayBuffer> };
+  onSpeak: (text: string) => void;
+  speakingEnabled: boolean;
 }) {
-  const kind=v1AssemblyKind(props.objective,props.path.title,props.path.summary);
-  return kind ? <V1ModeledPathway key={props.path.id} path={props.path} objective={props.objective}
-    kind={kind} onSpeak={props.onSpeak} speakingEnabled={props.speakingEnabled}/> :
-    <ImagePathwayView {...props}/>;
+  return <V1HunyuanPathway
+    path={props.path} objective={props.objective} modelCache={props.modelCache}
+    onSpeak={props.onSpeak} speakingEnabled={props.speakingEnabled} />;
 }
 
 /** Unsupported geometry remains an explicitly labeled illustration only. */
@@ -273,6 +271,7 @@ export function IndependentEngage() {
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const imageCache = useRef(new Map<string, string>());
+  const modelCache = useRef(new Map<string, ArrayBuffer>());
   const welcomeStarted = useRef(false);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
   useEffect(() => {
@@ -334,6 +333,7 @@ export function IndependentEngage() {
     // Keep private refinement context out of the visible objective field.
     if (!override) setObjective(text);
     imageCache.current.clear();
+    modelCache.current.clear();
     setRequested(text);
     setLoading(true);
     setError("");
@@ -393,6 +393,7 @@ export function IndependentEngage() {
     abort.current?.abort();
     stopVoice();
     imageCache.current.clear();
+    modelCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);
@@ -490,7 +491,7 @@ export function IndependentEngage() {
         <button type="button" onClick={() => { stopVoice(); setChoice(null); }}
           className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
       </div>
-        <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}
+        <PathwayView key={selected.id} path={selected} objective={requested} modelCache={modelCache}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />
         <div className="rounded-xl border border-primary/25 p-4">

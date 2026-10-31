@@ -186,6 +186,7 @@ export function IndependentEngage() {
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const view = useRef<HTMLElement | null>(null);
+  const designView = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const imageCache = useRef(new Map<string, string>());
@@ -319,6 +320,18 @@ export function IndependentEngage() {
   const choices = result ? [...result.pathways, result.blend] : [];
   const selected = choice === null ? null : choices[choice];
 
+  // Move the viewport only after React has mounted the destination screen.
+  // The previous scrollTo inside the click ran before the cards disappeared.
+  useEffect(() => {
+    if (!result) return;
+    const frame = window.requestAnimationFrame(() => {
+      (choice === null ? view.current : designView.current)?.scrollIntoView({
+        behavior: "instant", block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [choice]);
+
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}
     data-realities={result ? "true" : undefined}>
@@ -379,8 +392,7 @@ export function IndependentEngage() {
             (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
           onClick={() => {
             setChoice(index); setRefinement("");
-            window.scrollTo(0, 0);
-            // Open the design silently. The Tree answers only when the user asks.
+            // The mounted design screen receives the viewport on the next frame.
           }}>
           <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>
@@ -390,10 +402,10 @@ export function IndependentEngage() {
         </button>)}
       </div>
     </section>}
-    {selected && <section className="ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
+    {selected && <section ref={designView} className="ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
       aria-label="Selected pathway design">
       <div className="flex items-center justify-between">
-        <button type="button" onClick={() => { stopVoice(); setDive(null); setChoice(null); window.scrollTo(0, 0); }}
+        <button type="button" onClick={() => { stopVoice(); setDive(null); setChoice(null); }}
           className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
       </div>
         <PathwayView key={selected.id} path={selected} objective={requested} imageCache={imageCache}

@@ -24,7 +24,8 @@ type Part = { node: THREE.Group; name: string; role: string; home: THREE.Vector3
 type Assembly = { root: THREE.Group; parts: Part[] };
 const steel = 0x6c8fa4, cyan = 0x52dce9, gold = 0xe5b458, dark = 0x202e3b, copper = 0xbe714b;
 
-function build(kind: Kind): Assembly {
+function build(kind: Kind, title: string): Assembly {
+  const pathwayIdentity=title.toLowerCase();
   const root = new THREE.Group();
   const parts: Part[] = [];
   const material = (color: number) => new THREE.MeshStandardMaterial({
@@ -124,6 +125,32 @@ function build(kind: Kind): Assembly {
     const gripper=add("Front tool gripper","Grips or transfers light materials",[-2.08,0.34,0]);
     for(const z of [-0.18,0.18])box(gripper,[0.42,0.17,0.09],steel,[0,0,z]);
   }
+  // Named pathway architecture variants are built once, then reused across views.
+  if(kind==="multirotor") {
+    if(/modular|platform|interchangeable/.test(pathwayIdentity)) {
+      const dock=add("Modular payload docking rail","Provides a swappable attachment interface",[0,-0.85,0]);
+      box(dock,[1.35,0.12,0.27],gold);
+      for(const z of [-0.58,0.58]) {
+        const latch=add("Tool-module latch "+(z<0?"left":"right"),"Secures interchangeable attachments",[0,-0.66,z]);
+        box(latch,[0.46,0.16,0.15],cyan);
+      }
+    }
+    if(/team|coordinat|swarm|collaborat|adaptive|blend|fleet/.test(pathwayIdentity)) {
+      const transceiver=add("Team coordination antenna","Exchanges cooperative positioning and task messages",[0,0.88,0.04]);
+      cylinder(transceiver,0.055,0.65,steel);
+      mesh(transceiver,new THREE.SphereGeometry(0.15,18,14),cyan,[0,0.38,0]);
+      for(const [i,x] of [[1,-0.62],[2,0.62]] as [number,number][]) {
+        const sensor=add("Coordination sensor pod "+i,"Provides additional local scene observations",[x,0.42,-0.48]);
+        box(sensor,[0.25,0.19,0.30],gold);
+      }
+    }
+  }
+  if(kind==="linear" && /modular|segment|distributed/.test(pathwayIdentity)){
+    for(const x of [-2.3,2.3]) {
+      const connector=add("Modular track coupler "+(x<0?"left":"right"),"Connects repeatable propulsion track sections",[x,0.14,0]);
+      box(connector,[0.22,0.32,1.12],gold);
+    }
+  }
   return {root,parts};
 }
 type Props = {
@@ -155,7 +182,7 @@ export function V1ModelWorkbench({kind,mode,title,selected,zoom,rotation,reset,o
     const assembledBackground=new THREE.Color("#071521");
     const blueprintBackground=new THREE.Color("#041d32");
     scene.background=assembledBackground;
-    const assembly=build(kind);
+    const assembly=build(kind,title);
     scene.add(assembly.root);
     scene.add(new THREE.HemisphereLight(0xe6f9ff,0x2a4150,2.1));
     const light=new THREE.DirectionalLight(0xffffff,2.6);

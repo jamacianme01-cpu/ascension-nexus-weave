@@ -183,12 +183,12 @@ export function IndependentEngage() {
     else { setTalking(true); say("I'm here. Choose a pathway, and I'll help you examine how it works."); }
   }
 
-  async function generatePathways(text: string, answer: string, controller: AbortController, token: number) {
+  async function generatePathways(text: string, controller: AbortController, token: number) {
     setPathwayError("");
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: answer.slice(0, 6000) }),
+        body: JSON.stringify({ objective: text, phase: "pathways" }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();
@@ -234,7 +234,7 @@ export function IndependentEngage() {
     // Wait for the real result instead of narrating a progress filler.
     try {
       // The selected objective goes directly to the four-pathway result.
-      await generatePathways(text, "", controller, token);
+      await generatePathways(text, controller, token);
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
         setError(cause instanceof Error ? cause.message : String(cause));
@@ -251,7 +251,7 @@ export function IndependentEngage() {
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
     setLoading(true); setStage("processing"); setPathwayError("");
-    void generatePathways(requested, "", controller, token)
+    void generatePathways(requested, controller, token)
       .finally(() => { if (generation.current === token) setLoading(false); });
   }
 

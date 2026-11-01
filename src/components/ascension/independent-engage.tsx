@@ -226,21 +226,8 @@ export function IndependentEngage() {
     setStage("processing");
     // Wait for the real result instead of narrating a progress filler.
     try {
-      // Internal reasoning only: never narrate or render this essay to the user.
-      const response = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "initial" }),
-        signal: controller.signal,
-      });
-      const data: { phase?: string; answer?: string; error?: string } = await response.json();
-      if (!response.ok) throw new Error(data.error || "The answer engine did not complete.");
-      if (data.phase !== "initial" || !data.answer?.trim())
-        throw new Error("The answer engine returned no usable analysis.");
-      if (generation.current !== token) return;
-      const answer = data.answer.trim();
-      setFirstAnswer(answer);
-      // Keep the Tree conversational: announce a short useful finding, never read the whole analysis.
-      await generatePathways(text, answer, controller, token);
+      // The selected objective goes directly to the four-pathway result.
+      await generatePathways(text, "", controller, token);
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
         setError(cause instanceof Error ? cause.message : String(cause));

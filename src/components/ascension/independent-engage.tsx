@@ -110,7 +110,7 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
           : "Exploded and imploded geometry unavailable: a component-separated 3D model is required."}
     </p>}
     <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
-      {picture ? <>
+      {inspection !== "assembled" ? <div className="min-h-[280px] rounded-lg border border-gold/20 bg-black/30 p-6" role="status"><h4 className="mb-3 text-gold">{inspection === "blueprint" ? "BLUEPRINT" : inspection === "dissect" ? "DISSECT" : "EXPLODED / IMPLODED"}</h4><p className="text-sm text-muted-foreground">This view requires verified geometry and component dimensions. ASCENSION has not generated them for this pathway.</p></div> : picture ? <>
         <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-black/40 sm:min-h-[440px]">
           <img src={picture} alt={`Concept picture of ${path.title}`}
             className="max-h-[70vh] w-full object-contain transition-transform"

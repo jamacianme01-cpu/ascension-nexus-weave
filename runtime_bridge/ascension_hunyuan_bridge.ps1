@@ -91,12 +91,25 @@ function Start-BrowserBridge {
     Add-Content -Path (Join-Path $logDir 'hunyuan-bridge.err.log') -Value "Missing localhost Hunyuan browser bridge: $browser"
     return
   }
-  Start-Process -FilePath $python -WorkingDirectory $Repo -WindowStyle Hidden `
-    -ArgumentList '-B','-u',$browser `
-    -RedirectStandardOutput (Join-Path $logDir 'hunyuan-browser.out.log') `
-    -RedirectStandardError (Join-Path $logDir 'hunyuan-browser.err.log')
+  # Do not spawn a new browser Python process every 15 seconds when the prior
+  # instance is still starting. The launcher can safely recover stalled ones.
+  $starting = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.Name -like 'python*.exe' -and
+      $_.CommandLine -like '*hunyuan_browser_bridge.py*'
+    })
+  if ($starting.Count -gt 0) { return }
+  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
+  $browserArgs = @{
+    FilePath = $python
+    WorkingDirectory = $Repo
+    WindowStyle = 'Hidden'
+    ArgumentList = @('-B','-u',('"' + $browser + '"'))
+    RedirectStandardOutput = (Join-Path $logDir "hunyuan-browser-$stamp.out.log")
+    RedirectStandardError = (Join-Path $logDir "hunyuan-browser-$stamp.err.log")
+  }
+  Start-Process @browserArgs
 }
-
 while ($true) {
   Start-Hunyuan
   Start-BrowserBridge

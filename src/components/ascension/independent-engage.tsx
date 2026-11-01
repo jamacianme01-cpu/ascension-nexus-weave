@@ -1,4 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
 
 const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
@@ -48,6 +51,78 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
+function HunyuanMesh({ url, mode }: { url: string; mode: "assembled" | "blueprint" | "dissect" | "exploded" | "imploded" }) {
+  const host = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<{ group: THREE.Group; parts: THREE.Object3D[]; original: THREE.Vector3[]; materials: Map<THREE.Mesh, THREE.Material | THREE.Material[]> } | null>(null);
+  useEffect(() => {
+    const element = host.current;
+    if (!element) return;
+    let cancelled = false;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#08192a");
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+    camera.position.set(3, 2, 4);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    element.appendChild(renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x506080, 2.2));
+    const light = new THREE.DirectionalLight(0xffffff, 2);
+    light.position.set(4, 8, 5);
+    scene.add(light);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    const resize = () => {
+      const w = Math.max(1, element.clientWidth), h = Math.max(1, element.clientHeight);
+      camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(element); resize();
+    let frame = 0;
+    const animate = () => { frame = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); };
+    animate();
+    new GLTFLoader().load(url, gltf => {
+      if (cancelled) return;
+      const group = gltf.scene;
+      scene.add(group);
+      const bounds = new THREE.Box3().setFromObject(group);
+      const center = bounds.getCenter(new THREE.Vector3());
+      group.position.sub(center);
+      const size = bounds.getSize(new THREE.Vector3()).length();
+      const distance = Math.max(1, size * 1.25);
+      camera.position.set(distance, distance * 0.65, distance);
+      camera.near = Math.max(0.001, distance / 1000);
+      camera.far = distance * 100;
+      camera.updateProjectionMatrix();
+      controls.target.set(0, 0, 0);
+      const parts = group.children.length > 1 ? [...group.children] : [group];
+      const original = parts.map(part => part.position.clone());
+      const materials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+      group.traverse(child => { if (child instanceof THREE.Mesh) materials.set(child, child.material); });
+      sceneRef.current = { group, parts, original, materials };
+    }, undefined, () => { element.dataset.modelError = "Hunyuan GLB could not be loaded"; });
+    return () => {
+      cancelled = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
+      sceneRef.current = null;
+      scene.traverse(child => { if (child instanceof THREE.Mesh) child.geometry.dispose(); });
+      renderer.dispose(); renderer.domElement.remove();
+    };
+  }, [url]);
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.parts.forEach((part, index) => {
+      const origin = state.original[index]!;
+      part.position.copy(origin);
+      part.visible = true;
+      if (mode === "exploded") part.position.add(new THREE.Vector3((index % 3 - 1) * 0.6, Math.floor(index / 3) * 0.5, index % 2 ? 0.5 : -0.5));
+      if (mode === "dissect") part.visible = index % 2 === 0;
+    });
+    state.materials.forEach((original, mesh) => {
+      mesh.material = mode === "blueprint" ? new THREE.MeshBasicMaterial({ color: "#49c8ff", wireframe: true }) : original;
+    });
+  }, [mode, url]);
+  return <div ref={host} className="h-[420px] w-full touch-none" aria-label="Interactive 3D invention. Drag to rotate; scroll or pinch to zoom." />;
+}
 function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
@@ -57,6 +132,7 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
 }) {
   const [part, setPart] = useState<Part | null>(null);
   const [picture, setPicture] = useState<string | null>(null);
+  const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState("");
   const [pictureLoading, setPictureLoading] = useState(true);
   const [scale, setScale] = useState(1);
@@ -71,13 +147,14 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
       return;
     }
     const controller = new AbortController();
-    setPicture(null); setPictureError(""); setPictureLoading(true);
+    setPicture(null); setModelUrl(null); setPictureError(""); setPictureLoading(true);
     void fetch("/api/public/ascension/independent", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ objective, phase: "picture", pathway: path }),
       signal: controller.signal,
     }).then(async response => {
-      const data: { image_url?: string; error?: string } = await response.json();
+      const data: { image_url?: string; model_url?: string; error?: string } = await response.json();
+      if (data.model_url) { setModelUrl(data.model_url); return; }
       if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
       if (!/^data:image\/(png|jpeg|webp);base64,/.test(data.image_url ?? ""))
         throw new Error("The image provider did not return a usable picture.");
@@ -101,9 +178,7 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
           onClick={() => setInspection(mode)}>{mode.toUpperCase()}</button>)}
     </div>
     <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention model">
-      <p role="status" className="p-6 text-sm text-gold">
-        {inspection.toUpperCase()}: Hunyuan 3D geometry is required for this view. No 2D image is being represented as an editable 3D model.
-      </p>
+      {modelUrl ? <HunyuanMesh url={modelUrl} mode={inspection} /> : <p role="status" className="p-6 text-sm text-gold">{pictureLoading ? "Requesting Hunyuan model…" : pictureError || "Hunyuan 3D geometry is not available. An image is not an editable mesh."}</p>}
     </div>
     {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
     <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>

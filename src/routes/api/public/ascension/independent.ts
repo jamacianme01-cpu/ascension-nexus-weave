@@ -230,6 +230,14 @@ async function picture(objective: string, value: Record<string, unknown>) {
   });
   if (!response.ok) throw new Error("ASCENSION image worker returned HTTP " + response.status);
   const payload = obj(await response.json());
+  const model = String(payload["model_url"] ?? "");
+  if (model) {
+    const parsed = new URL(model);
+    if (!["https:", "http:"].includes(parsed.protocol) || (parsed.protocol === "http:" && !["localhost", "127.0.0.1"].includes(parsed.hostname)))
+      throw new Error("Hunyuan worker returned an unsafe model URL.");
+    if (!/\\.(glb|gltf)(?:[?#]|$)/i.test(parsed.pathname)) throw new Error("Hunyuan worker did not return a GLB or glTF model.");
+    return { model_url: model, provider: "ascension-owner-worker", verified: false };
+  }
   const image = String(payload["image_url"] ?? "");
   if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length < 200)
     throw new Error("ASCENSION image worker returned no valid image.");

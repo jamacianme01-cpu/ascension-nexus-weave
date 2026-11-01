@@ -205,16 +205,36 @@ async function build(objective: string, firstAnswerText = "") {
 /** Produce a real image for the selected pathway, never substitute diagram boxes.
  * A separate owner-controlled switch prevents surprise image-generation charges.
  */
-async function picture(_objective: string, _value: Record<string, unknown>) {
-  // The owner did not authorize a paid external image-generation dependency.
-  // Do not substitute a paid provider for the owner's existing engine.
-  throw new Error("ASCENSION's own image-generation engine is not yet connected to the live app. No paid image service was used.");
+async function picture(objective: string, value: Record<string, unknown>) {
+  // Use only an explicitly configured owner-controlled image worker.
+  // Never silently charge an external image service or invent a picture.
+  const endpoint = process.env["ASCENSION_LOCAL_IMAGE_ENDPOINT"]?.trim();
+  if (!endpoint) throw new Error("ASCENSION image worker is not configured. Set ASCENSION_LOCAL_IMAGE_ENDPOINT to the owner-controlled image service.");
+  const target = new URL(endpoint);
+  if (target.protocol !== "https:" && !(target.protocol === "http:" && ["127.0.0.1", "localhost"].includes(target.hostname)))
+    throw new Error("ASCENSION image worker must use HTTPS or local loopback.");
+  const title = String(value["title"] ?? "").slice(0, 140);
+  const summary = String(value["summary"] ?? "").slice(0, 1500);
+  if (!title || !summary) throw new Error("Select a complete pathway before generating its image.");
+  const token = process.env["ASCENSION_LOCAL_IMAGE_TOKEN"]?.trim();
+  const response = await fetch(target, {
+    method: "POST",
+    signal: AbortSignal.timeout(120000),
+    headers: { "content-type": "application/json", ...(token ? { authorization: "Bearer " + token } : {}) },
+    body: JSON.stringify({ objective, pathway: { title, summary, parts: value["parts"] ?? [] } }),
+  });
+  if (!response.ok) throw new Error("ASCENSION image worker returned HTTP " + response.status);
+  const payload = obj(await response.json());
+  const image = String(payload["image_url"] ?? "");
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length < 200)
+    throw new Error("ASCENSION image worker returned no valid image.");
+  return { image_url: image, provider: "ascension-owner-worker", verified: false };
 }
 
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false, picture_generation_enabled: false, note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+      governed_runtime_connected: false, picture_generation_enabled: Boolean(process.env["ASCENSION_LOCAL_IMAGE_ENDPOINT"]?.trim()), note: "Only configured providers can contribute. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");

@@ -119,7 +119,7 @@ export async function generatePathwayImages(
     spiral_form?: string | null;
   }>,
   requestId = "unscoped",
-): Promise<{ urls: Map<string, string>; errors: string[] } {
+): Promise<{ urls: Map<string, string>; errors: string[] }> {
   const urls = new Map<string, string>();
   const errors: string[] = [];
   if (!pathways.length) return { urls, errors };

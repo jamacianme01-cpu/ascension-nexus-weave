@@ -78,7 +78,7 @@ type ViewerControls = {
   combine: (source: string, target: string, blend: boolean) => void;
   undo: () => void;
   exportAssembly: () => Promise<void>;
-  explode: (enabled: boolean) => void;
+  explode: (amount: boolean | number) => void;
   isolate: (id: string | null) => void;
 };
 
@@ -101,6 +101,7 @@ export function RealityViewer({
   isPartSelected,
   onTogglePart,
   blendControls,
+  layout = "workbench",
 }: {
   pathway: ObjectivePathway;
   objective: string;
@@ -119,6 +120,8 @@ export function RealityViewer({
   isPartSelected: (part: DesignPart, field?: "purpose" | "location" | "operation" | "connections" | "limitations") => boolean;
   onTogglePart: (part: DesignPart, field?: "purpose" | "location" | "operation" | "connections" | "limitations") => void;
   blendControls: ReactNode;
+  /** Public exact-flow chrome. The workbench layout stays the default. */
+  layout?: "workbench" | "flow";
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -279,6 +282,9 @@ export function RealityViewer({
   const [mode, setMode] = useState<RealityMode>(
     "cutaway",
   );
+  type FlowView = "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
+  const [flowView, setFlowView] = useState<FlowView>("assembled");
+  const flowViewRef = useRef<FlowView>("assembled");
   const [selectedObject, setSelectedObject] = useState("Nothing selected");
   const [transformMode, setTransformMode] = useState<"translate" | "rotate" | "scale">("translate");
   const [addKind, setAddKind] = useState<CatalogKind>("box");
@@ -302,17 +308,23 @@ export function RealityViewer({
     setSection(100);
     setExploring(false);
     setError(null);
+    flowViewRef.current = "assembled";
+    setFlowView("assembled");
   }, [pathway.id, initialMode]);
 
   useEffect(() => {
     if (!ready) return;
     dive.current();
+    if (layout === "flow") {
+      setArrived(true);
+      return;
+    }
     const timer = window.setTimeout(
       () => setArrived(true),
       window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 1800,
     );
     return () => window.clearTimeout(timer);
-  }, [ready, pathway.id, initialMode]);
+  }, [ready, pathway.id, initialMode, layout]);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -1274,29 +1286,30 @@ export function RealityViewer({
         const target=id?componentObjects.get(id):null;
         model?.traverse(node=>{if(!(node instanceof THREE.Mesh)||node.userData["ascensionDisplayEdge"])return;node.visible=!target||isAncestor(target,node)||node===target||isAncestor(node,target);});
       },
-      explode(enabled) {
+      explode(amount) {
+        const spread = amount === true ? 1 : amount === false ? 0 : Math.max(0, Math.min(1, amount));
         if (!model) throw new Error("The 3D model has not loaded.");
         if (conceptual) {
-          explodeAssembly(model, enabled, explodedPositions);
-        } else if (!enabled) {
+          explodeAssembly(model, spread > 0, explodedPositions, spread || 1);
+        } else {
           for (const [object, position] of explodedPositions) object.position.copy(position);
           explodedPositions.clear();
-        } else {
-          const all = [...componentObjects.values()].filter(object => object.parent);
-          const roots = all.filter(object => !all.some(other => other !== object && isAncestor(other, object)));
-          if (roots.length < 2) throw new Error("This GLB does not contain two independently separable components.");
-          model.updateWorldMatrix(true, true);
-          roots.forEach((object, index) => {
-            if (explodedPositions.has(object)) return;
-            explodedPositions.set(object, object.position.clone());
-            const worldCenter = new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3());
-            const direction = worldCenter.clone().sub(center);
-            if (direction.lengthSq() < 1e-8) direction.set(Math.cos(index * 2.4), Math.sin(index * 2.4), 0);
-            direction.normalize().multiplyScalar(Math.max(0.4, bounds.length() * 0.16));
-            const parent = object.parent!;
-            const offset = parent.worldToLocal(worldCenter.clone().add(direction)).sub(parent.worldToLocal(worldCenter));
-            object.position.add(offset);
-          });
+          if (spread > 0) {
+            const all = [...componentObjects.values()].filter(object => object.parent);
+            const roots = all.filter(object => !all.some(other => other !== object && isAncestor(other, object)));
+            if (roots.length < 2) throw new Error("This GLB does not contain two independently separable components.");
+            model.updateWorldMatrix(true, true);
+            roots.forEach((object, index) => {
+              explodedPositions.set(object, object.position.clone());
+              const worldCenter = new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3());
+              const direction = worldCenter.clone().sub(center);
+              if (direction.lengthSq() < 1e-8) direction.set(Math.cos(index * 2.4), Math.sin(index * 2.4), 0);
+              direction.normalize().multiplyScalar(Math.max(0.4, bounds.length() * 0.16) * spread);
+              const parent = object.parent!;
+              const offset = parent.worldToLocal(worldCenter.clone().add(direction)).sub(parent.worldToLocal(worldCenter));
+              object.position.add(offset);
+            });
+          }
         }
         model.updateWorldMatrix(true, true);
         fit();
@@ -1803,17 +1816,76 @@ export function RealityViewer({
 
   useEffect(() => {
     api.current?.mode(mode);
-    setSection(100);
+    if (layout === "flow") {
+      const next = flowViewRef.current;
+      const sectionValue = next === "dissect" ? 42 : 100;
+      setSection(sectionValue);
+      api.current?.section(sectionValue);
+      const spread = next === "exploded" ? 1 : next === "imploded" ? 0.38 : 0;
+      try { api.current?.explode(spread); setExploded(spread > 0); } catch { /* applied again when the model is ready */ }
+    } else {
+      setSection(100);
+    }
     setExploring(false);
-  }, [mode]);
+  }, [mode, layout]);
+
+  useEffect(() => {
+    if (layout !== "flow" || !ready) return;
+    const next = flowViewRef.current;
+    const sectionValue = next === "dissect" ? 42 : 100;
+    setSection(sectionValue);
+    api.current?.mode(next === "blueprint" ? "blueprint" : "cutaway");
+    api.current?.section(sectionValue);
+    const spread = next === "exploded" ? 1 : next === "imploded" ? 0.38 : 0;
+    try { api.current?.explode(spread); setExploded(spread > 0); setExplosionError(null); }
+    catch (cause) { setExplosionError(cause instanceof Error ? cause.message : "That assembly view is unavailable."); }
+  }, [layout, ready, pathway.id]);
+
+  function showFlow(next: FlowView) {
+    flowViewRef.current = next;
+    setFlowView(next);
+    setDissected(false);
+    setShowParts(next === "dissect" || next === "exploded" || next === "imploded");
+    const sectionValue = next === "dissect" ? 42 : 100;
+    setSection(sectionValue);
+    setMode(next === "blueprint" ? "blueprint" : "cutaway");
+    api.current?.mode(next === "blueprint" ? "blueprint" : "cutaway");
+    api.current?.section(sectionValue);
+    const spread = next === "exploded" ? 1 : next === "imploded" ? 0.38 : 0;
+    try {
+      api.current?.explode(spread);
+      setExploded(spread > 0);
+      setExplosionError(null);
+    } catch (cause) {
+      setExplosionError(cause instanceof Error ? cause.message : "That assembly view is unavailable.");
+    }
+  }
+
+  const flowStep = flowView === "blueprint" ? "03" : flowView === "dissect" ? "04" : flowView === "exploded" ? "05" : "02";
+  const flowTitle = flowView === "blueprint" ? "BLUEPRINT" : flowView === "dissect" ? "DISSECT" : flowView === "exploded" ? "EXPLODED VIEW" : flowView === "imploded" ? "IMPLODED VIEW" : "OVERVIEW";
+  const flowViews = ["assembled", "blueprint", "dissect", "exploded", "imploded"] as const;
+  function flowPartList() {
+    if (!activeParts.length) return <p className="flow-note">This pathway did not name separate components.</p>;
+    return <ol className="flow-components">
+      {activeParts.map((part, index) => <li key={part.name + index}>
+        <button type="button" aria-pressed={partIndex === index} onClick={() => { setPartIndex(index); api.current?.locatePart(index); }}>
+          <span>{String(index + 1).padStart(2, "0")}</span>
+          <strong>{part.name}</strong>
+          {(flowView === "blueprint" || flowView === "dissect" || partIndex === index) && <small>{part.purpose !== pathway.summary ? part.purpose : part.location}</small>}
+        </button>
+      </li>)}
+    </ol>;
+  }
 
   return createPortal(
     <dialog
       ref={dialog}
       className="reality-screen"
       data-mode={mode}
+      data-layout={layout}
+      data-flow-view={layout === "flow" ? flowView : undefined}
       data-visual-source={conceptual ? "concept" : "glb"}
-      data-sidebar={showParts ? "open" : "closed"}
+      data-sidebar={layout === "flow" ? "closed" : showParts ? "open" : "closed"}
       data-geometry={conceptual ? geometryStatus : "glb"}
       data-arrived={arrived}
       aria-label={`${pathway.label} — immersive reality`}
@@ -1822,6 +1894,53 @@ export function RealityViewer({
         close.current();
       }}
     >
+      {layout === "flow" && <div className="flow-chrome">
+        <div className="flow-brand">
+          <button type="button" onClick={onClose}>← PATHWAYS</button>
+          <strong>ASCENSION</strong>
+          <span>PATHWAY SELECTED</span>
+        </div>
+        <div className="flow-stage-title">
+          <span>{flowView === "imploded" ? "ASSEMBLY" : `STEP ${flowStep} / 05`}</span>
+          <h2>{flowTitle}</h2>
+        </div>
+        <aside className="flow-rail flow-rail--left" aria-label="Pathway analysis">
+          <p className="flow-kicker">STEP {flowStep} / 05</p>
+          <h2>ANALYSIS</h2>
+          <div className="flow-badge">
+            <strong>{pathway.label}</strong>
+            <span>{flowView === "assembled" ? "SELECTED PATHWAY" : flowTitle}</span>
+          </div>
+          <p className="flow-summary">{pathway.summary}</p>
+          {(flowView === "exploded" || flowView === "imploded") && <>
+            <h3>{flowView === "exploded" ? "COMPONENTS SEPARATED" : "VIEW OPTIONS"}</h3>
+            {flowView === "exploded" ? flowPartList() : <div className="flow-view-options">
+              {flowViews.map(view => <button type="button" key={view} aria-pressed={flowView === view} onClick={() => showFlow(view)}>{view.toUpperCase()}</button>)}
+            </div>}
+            <p className="flow-note">{flowView === "exploded" ? "Separated for inspection. This is the concept assembly, not a manufactured unit." : "Components are drawn partway together. This is a concept assembly, not a finished build."}</p>
+          </>}
+          <button type="button" className="flow-build" disabled={newObjectiveDisabled} onClick={onBuildOn}>BUILD ON RESULT</button>
+          {explosionError && <p role="alert">{explosionError}</p>}
+        </aside>
+        {flowView !== "exploded" && flowView !== "imploded" && <aside className="flow-rail flow-rail--right" aria-label="Components">
+          <h2>{flowView === "dissect" ? "INTERNAL COMPONENTS" : "COMPONENTS"}</h2>
+          {flowPartList()}
+          {flowView === "blueprint" && <div className="flow-parameters">
+            <h3>LIMITS</h3>
+            {pathway.tradeoffs.length ? <ul>{pathway.tradeoffs.map(item => <li key={item}>{item}</li>)}</ul> : <p>No limits were stated for this pathway.</p>}
+            <p>Concept drawing. Physical dimensions were not measured.</p>
+            {displayExtents && <p>Display envelope {displayExtents.x.toFixed(2)} × {displayExtents.y.toFixed(2)} × {displayExtents.z.toFixed(2)} units.</p>}
+          </div>}
+          {flowView === "dissect" && <p className="flow-note">Section through the concept assembly. These roles come from the selected pathway.</p>}
+        </aside>}
+        <p className="flow-ribbon">ASCENSION · CONCEPT ASSEMBLY · UNVERIFIED</p>
+        <div className="flow-toolbar" role="toolbar" aria-label="Invention views">
+          {flowViews.map(view => <button type="button" key={view} aria-pressed={flowView === view} onClick={() => showFlow(view)}>
+            {view === "assembled" ? "ASSEMBLED" : view === "blueprint" ? "BLUEPRINT" : view === "dissect" ? "DISSECT" : view === "exploded" ? "EXPLODED" : "IMPLODED"}
+          </button>)}
+          <button type="button" aria-pressed={soundEnabled && !soundBlocked} onClick={onToggleSound}>SOUND</button>
+        </div>
+      </div>}
       {!arrived && (
         <div className="reality-dive" data-entering={ready} aria-hidden="true">
           <img src="/approved-scene/ascension-tree-behind-book-hq.jpg" alt="" />

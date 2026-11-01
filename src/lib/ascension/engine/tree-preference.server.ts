@@ -45,6 +45,7 @@ function bump<T extends { weight: number; lastSeen: string }>(
   const stamp = nowIso();
   if (idx >= 0) {
     const item = list[idx];
+    if (!item) return list;
     const updated = { ...item, weight: item.weight * DECAY + weight, lastSeen: stamp };
     const rest = list.filter((_, i) => i !== idx);
     return [updated, ...rest].slice(0, MAX_PROFILE_ITEMS);

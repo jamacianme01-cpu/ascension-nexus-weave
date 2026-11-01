@@ -2,7 +2,7 @@ import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { observation, published } from "../ascension-published";
 
-export default defineTool({{
+export default defineTool({
   name: "ascension_ledger",
   title: "Verified Δ ledger",
   description:
@@ -18,7 +18,7 @@ export default defineTool({{
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: ({ limit }) =>
-    observation({{
+    observation({
       ledger_entries: published.semantic["ledger_entries"] ?? null,
       ledger_valid: published.semantic["ledger_valid"] ?? null,
       records: limit ? published.ledger.slice(-limit) : published.ledger,

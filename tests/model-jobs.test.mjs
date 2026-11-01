@@ -51,23 +51,34 @@ try {
   );
   const priorKey = process.env.LOVABLE_API_KEY;
   const priorOptIn = process.env.ASCENSION_ALLOW_PAID_IMAGES;
+  const priorOpenAI = process.env.OPENAI_API_KEY;
+  const priorOpenAIAllow = process.env.ASCENSION_ALLOW_OPENAI_AI;
   const originalFetch = globalThis.fetch;
   try {
     process.env.LOVABLE_API_KEY = "test-only";
     delete process.env.ASCENSION_ALLOW_PAID_IMAGES;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ASCENSION_ALLOW_OPENAI_AI;
     let calls = 0;
     globalThis.fetch = async () => { calls++; throw new Error("No image API should be contacted"); };
     assert.equal(imageProvider(), null);
     await assert.rejects(generateConceptImage("test preview", "assembled/example.png"), /disabled/);
     assert.equal(calls, 0);
     process.env.ASCENSION_ALLOW_PAID_IMAGES = "true";
-    assert.equal(imageProvider()?.provider, "lovable");
+    assert.equal(imageProvider(), null);
+    process.env.OPENAI_API_KEY = "image-test-only";
+    process.env.ASCENSION_ALLOW_OPENAI_AI = "true";
+    assert.equal(imageProvider()?.provider, "openai");
   } finally {
     globalThis.fetch = originalFetch;
     if (priorKey === undefined) delete process.env.LOVABLE_API_KEY;
     else process.env.LOVABLE_API_KEY = priorKey;
     if (priorOptIn === undefined) delete process.env.ASCENSION_ALLOW_PAID_IMAGES;
     else process.env.ASCENSION_ALLOW_PAID_IMAGES = priorOptIn;
+    if (priorOpenAI === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = priorOpenAI;
+    if (priorOpenAIAllow === undefined) delete process.env.ASCENSION_ALLOW_OPENAI_AI;
+    else process.env.ASCENSION_ALLOW_OPENAI_AI = priorOpenAIAllow;
   }
   console.log("PASS no implicit paid image API calls on default pathway flow");
   const { enqueueDeliveryModels, attachCompletedModels } = await server.ssrLoadModule(

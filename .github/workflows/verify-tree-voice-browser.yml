@@ -76,7 +76,7 @@ jobs:
             await field.evaluate(element => element.setSelectionRange(element.value.length, element.value.length));
             await page.getByRole("button", { name: "Speak", exact: true }).click();
             await page.evaluate(() => {
-              const result = [{ transcript: "a telescope" }); result.isFinal = true;
+              const result = [{ transcript: "a telescope" }]; result.isFinal = true;
               window.__recognition.onresult({ results: [result] });
             });
             await page.waitForFunction(() => document.querySelector("textarea[maxlength='4000']")?.value === "a telescope");

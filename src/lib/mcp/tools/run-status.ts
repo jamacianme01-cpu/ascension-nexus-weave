@@ -43,7 +43,11 @@ export default defineTool({
       return { content: [{ type: "text", text }], structuredContent: JSON.parse(text) as never };
     }
 
-    const data = listRequests({ userId: ctx.getUserId() ?? undefined, limit });
+    const userId = ctx.getUserId();
+    const data = listRequests({
+      ...(typeof userId === "string" ? { userId } : {}),
+      ...(typeof limit === "number" ? { limit } : {}),
+    });
     const body = {
       read_only: true,
       note: "Status fields are written only by the governed ASCENSION runtime. A submission that is still 'queued' has not been seen by the runtime yet.",

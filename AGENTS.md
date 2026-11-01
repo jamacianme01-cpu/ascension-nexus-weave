@@ -10,3 +10,9 @@
 - Ordinary answer inference defaults to the currently configured **zero-token-charge** cloud routes (OpenRouter free with zero-data-retention filters); never silently substitute a billed provider/model or turn on paid image generation.
 - Free routes are usage-limited and not a production SLA. Add server-side per-user quotas, fraud controls, authenticated usage/accounting and owner-approved premium computing **before** large-scale public launch; do not claim this work is finished.
 - Local models remain optional for development and specialty execution, not the default public-answer architecture. No generic SaaS dashboards, replacement architecture, fake simulation, pretend verification, or placeholder 3D offered as real.
+
+## Cursor Cloud specific instructions
+
+- Install dependencies with `npm install`. `npm ci` fails on the current lockfile because `package-lock.json` does not match `package.json`.
+- Start the web app with `npm run dev`. Vite listens on port 3000 and already sets `host: true`. `GET /api/health` should return `{"status":"ok","service":"ascension-web","scope":"web_server_only"}`.
+- Public ENGAGE does not need Ollama, a desktop worker, or a paid model. Without an inference key, submitting an objective returns the provider configuration error and does not fabricate an answer.

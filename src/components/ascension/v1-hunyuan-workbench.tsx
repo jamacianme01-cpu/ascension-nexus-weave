@@ -168,7 +168,14 @@ export function V1HunyuanWorkbench({
         }
       });
       if(!runtime.meshes.length){setError("Hunyuan GLB has no mesh surfaces");onError("Hunyuan GLB is not a surface mesh");return;}
-      onParts(runtime.meshes.map((m,i)=>({name:m.mesh.name || "Hunyuan mesh "+(i+1),meshIndex:i})));
+      // glTF frequently names the parent node, leaving the Mesh unnamed.
+      // Use names carried by the actual GLB only, never invent component identities.
+      onParts(runtime.meshes.map((m,i)=>{
+        const own=m.mesh.name.trim();
+        const parent=m.mesh.parent?.name?.trim()??"";
+        const generic=/^(?:mesh|node|primitive)[_\\s-]*\\d+$/i.test(own);
+        return {name:(generic?parent||own:own||parent)||"Hunyuan mesh "+(i+1),meshIndex:i};
+      }));
       setLoading(false);
       setRevision(n=>n+1);
     },error=>{

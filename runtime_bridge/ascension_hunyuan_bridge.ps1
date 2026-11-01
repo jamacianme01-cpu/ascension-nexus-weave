@@ -13,6 +13,7 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 # Locate the actual API script instead of silently failing at startup.
 $apiCandidates = @(
   (Join-Path $HunyuanRoot 'Hunyuan3D-2.1'),
+  (Join-Path $HunyuanRoot 'Hunyuan3D-2-vanilla'),
   (Join-Path $HunyuanRoot 'Hunyuan3D-2')
 )
 $apiCandidates += @(Get-ChildItem -Path $HunyuanRoot -Directory -Filter 'Hunyuan3D-2*' -ErrorAction SilentlyContinue |
@@ -23,6 +24,22 @@ if (-not (Test-Path $python) -or -not (Test-Path $worker) -or -not $apiDir) {
   Add-Content -Path (Join-Path $logDir 'hunyuan-bridge.err.log') -Value "$(Get-Date -Format o) $message"
   throw $message
 }
+
+# Match the model weights to the ACTUAL API version.
+# Hunyuan3D-2.1's api_server.py cannot load Hunyuan3D-2mini (2.0) weights.
+# The mini weights belong to Hunyuan3D-2's API with its mini subfolder.
+$apiName = Split-Path $apiDir -Leaf
+if ($apiName -eq 'Hunyuan3D-2.1') {
+  $modelPath = 'tencent/Hunyuan3D-2.1'
+  $subfolder = 'hunyuan3d-dit-v2-1'
+} else {
+  $modelPath = 'tencent/Hunyuan3D-2mini'
+  $subfolder = 'hunyuan3d-dit-v2-mini'
+}
+Write-Host ("ASCENSION Hunyuan selected API: " + $apiName)
+Write-Host ("ASCENSION Hunyuan matching weights: " + $modelPath + " / " + $subfolder)
+# The Windows portable distribution downloads model weights on first use when
+# missing from its HuggingFaceHub cache. That is not an indication of a crash.
 
 function Test-Hunyuan {
   return [bool](Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue)
@@ -43,7 +60,7 @@ function Start-Hunyuan {
   $env:HY3DGEN_MODELS = Join-Path $HunyuanRoot 'HuggingFaceHub'
   $env:PYTORCH_CUDA_ALLOC_CONF = 'expandable_segments:True'
   Start-Process -FilePath $python -WorkingDirectory $apiDir -WindowStyle Hidden `
-    -ArgumentList '-s','api_server.py','--host','127.0.0.1','--port','8081','--model_path','tencent/Hunyuan3D-2mini' `
+    -ArgumentList '-s','api_server.py','--host','127.0.0.1','--port','8081','--model_path',$modelPath,'--subfolder',$subfolder `
     -RedirectStandardOutput (Join-Path $logDir 'hunyuan-api.out.log') `
     -RedirectStandardError (Join-Path $logDir 'hunyuan-api.err.log')
 }

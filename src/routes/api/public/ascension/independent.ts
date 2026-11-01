@@ -156,19 +156,25 @@ const outputSchema = {
 async function build(objective: string) {
   const providerStatus = configured();
   if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
-  const external = await Promise.allSettled([
+  // Collect three independent answers before synthesis.
+  const independent = await Promise.allSettled([
+    firstAnswer(objective),
     providerStatus.Claude ? claude(objective) : Promise.resolve(null),
     providerStatus.Grok ? grok(objective) : Promise.resolve(null),
   ]);
   const sources: Contributor[] = [];
   const errors: string[] = [];
-  for (const [i, result] of external.entries()) {
-    if (result.status === "fulfilled" && result.value) sources.push(result.value);
-    if (result.status === "rejected") errors.push((i === 0 ? "Claude" : "Grok") + " did not respond");
+  const names = ["OpenAI", "Claude", "Grok"] as const;
+  for (const [i, result] of independent.entries()) {
+    if (result.status === "fulfilled" && result.value) {
+      if (i === 0) sources.push({ provider: "OpenAI", answer: (result.value as Awaited<ReturnType<typeof firstAnswer>>).answer });
+      else sources.push(result.value as Contributor);
+    } else {
+      errors.push(names[i]! + " did not respond");
+    }
   }
-  // Do not substitute invented OpenAI pathways for missing Grok or Claude answers.
-  if (sources.length !== 2) {
-    throw new Error("Grok and Claude must both return their own answers before ASCENSION can form the four-pathway result.");
+  if (sources.length !== 3) {
+    throw new Error("OpenAI, Claude and Grok must each return an independent answer before ASCENSION can form four pathways.");
   }
   const allConnected = true;
   const response = await callOpenAIResponse({
@@ -177,7 +183,7 @@ async function build(objective: string) {
     system: [
       "You are drafting an ASCENSION creation result, not reporting execution or verification.",
       allConnected
-        ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
+        ? "Use three actual provider contributions, preserving their provenance. path_one must faithfully structure OpenAI's independently supplied proposal; path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
         : "Provider responses incomplete; do not generate substituted pathways.",
       "Return exactly one JSON object with required keys: introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
@@ -191,7 +197,7 @@ async function build(objective: string) {
   const result = parseText(response.text);
   return {
     ...result,
-    contributors: ["OpenAI", ...sources.map(s => s.provider)],
+    contributors: sources.map(s => s.provider),
     unavailable: ["Claude", "Grok"].filter(provider => !sources.some(s => s.provider === provider)),
     providerErrors: errors,
     mode: allConnected ? "three-provider-synthesis" : "openai-only-provisional",

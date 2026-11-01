@@ -1,15 +1,3 @@
-  .reality-spaces {
-    width: 100%;
-  }
-  .reality-space-label {
-    width: 100%;
-  }
-  .reality-spaces button {
-    min-width: 0;
-    flex: 1 1 42%;
-  }
-}
-
 .reality-parts { min-width: 0; }
 .reality-parts .reality-parts-hint { text-align: left; margin-bottom: 10px; }
 .reality-part-labels { display: flex; flex-wrap: wrap; gap: 8px; }

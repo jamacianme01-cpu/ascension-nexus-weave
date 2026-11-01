@@ -177,6 +177,7 @@ async function build(objective: string, firstAnswerText = "") {
         : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
       "Return exactly one JSON object with required keys: introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
+      "Titles name the approach itself. Never put a provider or model name in a title, summary, step, or the blend, including ChatGPT, OpenAI, Claude, and Grok. The fourth object is the blend of the three readings.",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",
       "Provide substance specific to the objective. Do not just describe an app interface or repeat the same concept three times.",
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",

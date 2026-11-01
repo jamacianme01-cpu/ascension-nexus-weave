@@ -200,7 +200,7 @@ export function IndependentEngage() {
       setChoice(null);
       if (talking) say("Your four approaches are ready. Choose one to inspect its design and components.");
       setStage("idle");
-      // Do not interrupt the Tree reading the initial answer when pathways arrive.
+      // Scroll to the four-pathway result after generation completes.
       window.setTimeout(() => {
         if (generation.current === token) view.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 120);

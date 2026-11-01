@@ -52,11 +52,12 @@ function PathwayView(props: {
   path: Pathway & { blend_reason?: string };
   objective: string;
   modelCache: { current: Map<string, ArrayBuffer> };
+  imageCache: { current: Map<string, string> };
   onSpeak: (text: string) => void;
   speakingEnabled: boolean;
 }) {
   return <V1HunyuanPathway
-    path={props.path} objective={props.objective} modelCache={props.modelCache}
+    path={props.path} objective={props.objective} modelCache={props.modelCache} imageCache={props.imageCache}
     onSpeak={props.onSpeak} speakingEnabled={props.speakingEnabled} />;
 }
 
@@ -78,6 +79,7 @@ export function IndependentEngage() {
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const modelCache = useRef(new Map<string, ArrayBuffer>());
+  const imageCache = useRef(new Map<string, string>());
   const welcomeStarted = useRef(false);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
   useEffect(() => {
@@ -138,7 +140,7 @@ export function IndependentEngage() {
     stopVoice();
     // Keep private refinement context out of the visible objective field.
     if (!override) setObjective(text);
-    modelCache.current.clear();
+    modelCache.current.clear(); imageCache.current.clear();
     setRequested(text);
     setLoading(true);
     setError("");
@@ -197,7 +199,7 @@ export function IndependentEngage() {
     generation.current += 1;
     abort.current?.abort();
     stopVoice();
-    modelCache.current.clear();
+    modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);
@@ -258,6 +260,11 @@ export function IndependentEngage() {
       </button>
     </section>}
 
+    {firstAnswer && choice === null && <section className="mx-auto mt-4 max-w-6xl rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-6" aria-label="Initial objective answer">
+      <h2 className="mb-2 text-lg text-gold">INITIAL ANSWER</h2>
+      <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
+    </section>}
+
     {result && choice === null && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg text-gold">THREE PATHWAYS + FOURTH BLEND</h2>
@@ -295,7 +302,7 @@ export function IndependentEngage() {
         <button type="button" onClick={() => { stopVoice(); setChoice(null); }}
           className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
       </div>
-        <PathwayView key={selected.id} path={selected} objective={requested} modelCache={modelCache}
+        <PathwayView key={selected.id} path={selected} objective={requested} modelCache={modelCache} imageCache={imageCache}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />
         <div className="rounded-xl border border-primary/25 p-4">

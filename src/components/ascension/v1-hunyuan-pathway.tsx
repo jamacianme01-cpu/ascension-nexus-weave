@@ -15,12 +15,14 @@ function formatError(reason:unknown){
 }
 
 export function V1HunyuanPathway({
-  path,objective,onSpeak,speakingEnabled,modelCache,
+  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,
 }:{
   path:Pathway;objective:string;onSpeak:(text:string)=>void; speakingEnabled:boolean;modelCache:Cache;
+  imageCache:{current:Map<string,string>};
 }) {
   const key=JSON.stringify([objective,path.id,path.title,path.summary]);
   const [bytes,setBytes]=useState<ArrayBuffer|null>(null);
+  const [picture,setPicture]=useState<string|null>(null);
   const [working,setWorking]=useState(false);
   const [status,setStatus]=useState("Checking for the owner's local Hunyuan3D generator…");
   const [failure,setFailure]=useState("");
@@ -45,29 +47,39 @@ export function V1HunyuanPathway({
     if(stored){setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");return;}
     let active=true;
     const controller=new AbortController();
-    setBytes(null);setFailure("");setWorking(true);setParts([]);
+    setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
     (async()=>{
+      // Show the already-approved selected pathway picture even when the owner's
+      // Windows-only Hunyuan3D bridge cannot be reached from this browser.
+      let sourceImage=imageCache.current.get(key);
+      if(!sourceImage) {
+        setStatus("Preparing this selected pathway's reference picture…");
+        const response=await fetch("/api/public/ascension/independent",{
+          method:"POST",signal:controller.signal,
+          headers:{"content-type":"application/json"},
+          body:JSON.stringify({objective,phase:"picture",view:"assembled",pathway:path}),
+        });
+        const source=await response.json() as {image_url?:string;error?:string};
+        if(!response.ok)throw new Error(source.error||"Reference picture generation failed");
+        sourceImage=source.image_url;
+        if(!sourceImage?.match(validImage))throw new Error("ASCENSION did not return a usable selected invention picture.");
+        if(!active)return;
+        imageCache.current.set(key,sourceImage);
+        setPicture(sourceImage);
+      }
+      const match=sourceImage.match(validImage);
+      if(!match)throw new Error("The saved selected invention picture is invalid.");
       setStatus("Checking the owner's Hunyuan3D engine on this computer…");
       let ready:Response;
       try{
         ready=await fetch(LOCAL+"/status",{signal:controller.signal,cache:"no-store"});
       }catch{
-        throw new Error("Hunyuan3D is not connected to this browser. Start the local bridge on the Windows PC. No substitute 3D model will be shown.");
+        throw new Error("Hunyuan3D is not connected to this browser. The invention picture remains available; real 3D requires the Windows local bridge.");
       }
-      if(!ready.ok)throw new Error("Hunyuan3D is not ready on the Windows PC (port 8081).");
+      if(!ready.ok)throw new Error("Hunyuan3D is not ready on the Windows PC (port 8082).");
       const condition=await ready.json() as {ready?:boolean;engine?:string};
       if(!condition.ready||condition.engine!=="Hunyuan3D")
         throw new Error("The local bridge is not connected to Hunyuan3D.");
-      setStatus("Preparing this selected pathway's Hunyuan reference image…");
-      const response=await fetch("/api/public/ascension/independent",{
-        method:"POST",signal:controller.signal,
-        headers:{"content-type":"application/json"},
-        body:JSON.stringify({objective,phase:"picture",view:"assembled",pathway:path}),
-      });
-      const source=await response.json() as {image_url?:string;error?:string};
-      if(!response.ok)throw new Error(source.error||"Reference picture generation failed");
-      const match=source.image_url?.match(validImage);
-      if(!match)throw new Error("ASCENSION did not return a usable picture for Hunyuan3D.");
       setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
       const generated=await fetch(LOCAL+"/generate",{
         method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},
@@ -90,7 +102,7 @@ export function V1HunyuanPathway({
       setFailure(formatError(e));setStatus("Hunyuan3D unavailable");
     }).finally(()=>{if(active)setWorking(false);});
     return()=>{active=false;controller.abort();};
-  },[key,attempt,modelCache]);
+  },[key,attempt,modelCache,imageCache]);
 
   useEffect(()=>{
     if(!immersive)return;
@@ -154,6 +166,15 @@ export function V1HunyuanPathway({
             bytes={bytes} title={path.title} mode={mode} zoom={zoom}
             rotation={rotation} selected={meshIndex} move={move}
             reset={reset} onParts={setParts} onError={setGeneratorError} onSelect={inspect}/>:
+            picture?<div className="flex h-full min-h-0 flex-col gap-2 p-3">
+              <img src={picture} alt={`Concept picture of ${path.title}`}
+                className="min-h-0 flex-1 w-full rounded-lg object-contain" />
+              <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
+                <span>{working?status:failure||status}</span>
+                {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
+                  onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
+              </div>
+            </div>:
             <div role={failure?"alert":"status"} className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
               <p className="max-w-xl text-sm text-gold">{working?status:failure||status}</p>
               {failure&&<button type="button" className="rounded-lg border border-gold/50 px-4 py-2 text-gold"

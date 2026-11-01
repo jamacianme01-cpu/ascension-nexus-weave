@@ -524,10 +524,18 @@ export function buildCanonicalAssembly(objective: string, path: ObjectivePathway
  }
  return group;
 }
-export function explodeAssembly(group: THREE.Group, enabled: boolean, saved: Map<THREE.Object3D,THREE.Vector3>) {
+export function explodeAssembly(group: THREE.Group, enabled: boolean, saved: Map<THREE.Object3D,THREE.Vector3>, amount = 1) {
+ const spread = enabled ? Math.max(0, Math.min(1, amount)) : 0;
  for(const [i,node] of group.children.entries()) {
-  if(enabled && !saved.has(node)) {saved.set(node,node.position.clone()); node.position.multiplyScalar(1.55); node.position.y += (i-(group.children.length-1)/2)*.12;}
-  else if(!enabled) { const p=saved.get(node); if(p)node.position.copy(p); saved.delete(node); }
+  if(spread > 0) {
+   if(!saved.has(node)) saved.set(node, node.position.clone());
+   const origin = saved.get(node)!;
+   node.position.copy(origin);
+   node.position.multiplyScalar(1 + 0.55 * spread);
+   node.position.y += (i-(group.children.length-1)/2)*.12*spread;
+  } else {
+   const p=saved.get(node); if(p)node.position.copy(p); saved.delete(node);
+  }
  }
  group.updateWorldMatrix(true,true);
 }

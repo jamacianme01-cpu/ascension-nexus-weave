@@ -32,7 +32,7 @@ export async function callZai(
   userPrompt: string,
   options: CallZaiOptions = {},
 ): Promise<string> {
-  const model = options.model || zaiModel('flash);
+  const model = options.model || zaiModel('flash');
   const temperature = options.temperature ?? 0.7;
   const maxTokens = options.maxTokens ?? 4096;
 

@@ -62,7 +62,7 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [inspection, setInspection] = useState<"assembled" | "blueprint" | "dissect" | "exploded">("assembled");
-  useEffect(() => setPart(null), [path.id]);
+  useEffect(() => { setPart(null); setInspection("assembled"); setScale(1); setRotation(0); }, [path.id]);
   useEffect(() => {
     const cacheKey = JSON.stringify([objective, path.id, path.title]);
     const stored = imageCache.current.get(cacheKey);

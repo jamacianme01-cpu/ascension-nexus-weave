@@ -61,7 +61,7 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   const [pictureLoading, setPictureLoading] = useState(true);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [inspection, setInspection] = useState<"assembled" | "blueprint" | "dissect" | "exploded">("assembled");
+  const [inspection, setInspection] = useState<"assembled" | "blueprint" | "dissect" | "exploded" | "imploded">("assembled");
   useEffect(() => { setPart(null); setInspection("assembled"); setScale(1); setRotation(0); }, [path.id]);
   useEffect(() => {
     const cacheKey = JSON.stringify([objective, path.id, path.title]);
@@ -95,38 +95,15 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
     <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Invention inspection views">
-      {(["assembled", "blueprint", "dissect", "exploded"] as const).map(mode =>
+      {(["assembled", "blueprint", "dissect", "exploded", "imploded"] as const).map(mode =>
         <button type="button" key={mode} aria-pressed={inspection === mode}
           className={"rounded-full border px-4 py-2 text-sm " + (inspection === mode ? "border-primary text-primary" : "border-gold/40 text-gold")}
-          onClick={() => setInspection(mode)}>
-          {mode === "assembled" ? "ASSEMBLED" : mode === "blueprint" ? "BLUEPRINT" : mode === "dissect" ? "DISSECT" : "EXPLODED / IMPLODED"}
-        </button>)}
+          onClick={() => setInspection(mode)}>{mode.toUpperCase()}</button>)}
     </div>
-    <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
-      {inspection !== "assembled" ? <div className="min-h-[280px] rounded-lg border border-gold/20 bg-black/30 p-6" role="status"><h4 className="mb-3 text-gold">{inspection === "blueprint" ? "BLUEPRINT" : inspection === "dissect" ? "DISSECT" : "EXPLODED / IMPLODED"}</h4><p className="text-sm text-muted-foreground">This view requires verified geometry and component dimensions. ASCENSION has not generated them for this pathway.</p></div> : picture ? <>
-        <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-black/40 sm:min-h-[440px]">
-          <img src={picture} alt={`Concept picture of ${path.title}`}
-            className="max-h-[70vh] w-full object-contain transition-transform"
-            style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }} />
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setScale(v => Math.min(4, v * 1.25))}>ZOOM IN</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setScale(v => Math.max(0.5, v / 1.25))}>ZOOM OUT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setRotation(v => v - 15)}>ROTATE LEFT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setRotation(v => v + 15)}>ROTATE RIGHT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => { setScale(1); setRotation(0); }}>RESET VIEW</button>
-          <button type="button" className="rounded-full border border-primary/60 px-5 py-2 text-sm text-primary"
-            onClick={() => onDive(path, picture)}>DIVE INTO REALITY</button>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">Actual generated concept artwork. No verified 3D mesh is available yet; 3D editing requires a reconstructed model.</p>
-      </> : <p className="p-6 text-center text-sm text-muted-foreground" role={pictureError ? "alert" : "status"}>
-        {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
-      </p>}
+    <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention model">
+      <p role="status" className="p-6 text-sm text-gold">
+        {inspection.toUpperCase()}: Hunyuan 3D geometry is required for this view. No 2D image is being represented as an editable 3D model.
+      </p>
     </div>
     {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
     <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>

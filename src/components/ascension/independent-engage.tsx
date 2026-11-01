@@ -78,7 +78,7 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
     }).then(async response => {
       const data: { image_url?: string; error?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
-      if (!data.image_url?.startsWith("data:image/png;base64,"))
+      if (!/^data:image\/(png|jpeg|webp);base64,/.test(data.image_url ?? ""))
         throw new Error("The image provider did not return a usable picture.");
       if (!controller.signal.aborted) {
         imageCache.current.set(cacheKey, data.image_url);
@@ -152,7 +152,6 @@ export function IndependentEngage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
-  const [firstAnswer, setFirstAnswer] = useState("");
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
@@ -219,7 +218,6 @@ export function IndependentEngage() {
     setError("");
     setPathwayError("");
     setResult(null);
-    setFirstAnswer("");
     setRefinement("");
     setChoice(null);
     setDive(null);
@@ -263,7 +261,7 @@ export function IndependentEngage() {
     stopVoice();
     imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
-    setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
+    setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null); setDive(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }

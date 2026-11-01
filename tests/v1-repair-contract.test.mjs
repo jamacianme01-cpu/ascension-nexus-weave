@@ -26,8 +26,8 @@ const tests=[
     assert.match(ui,/\{selected && <section ref=\{designView\}/);
     assert.match(ui,/\[\.\.\.result\.pathways, result\.blend\]/);
     assert.match(ui,/setChoice\(index\)/);
-    assert.doesNotMatch(ui,/aria-label="Initial objective answer"/);
-    assert.doesNotMatch(ui,/>INITIAL ANSWER</);
+    assert.match(ui,/aria-label="Initial objective answer"/);
+    assert.match(ui,/>INITIAL ANSWER</);
   }],
   ["only Hunyuan GLB is mounted on selected V1 path",()=>{
     assert.match(ui,/return <V1HunyuanPathway/);
@@ -36,7 +36,9 @@ const tests=[
     assert.doesNotMatch(ui,/ImagePathwayView/);
     assert.doesNotMatch(ui,/<V1ModeledPathway/);
     assert.match(design,/Hunyuan3D is creating one real 3D GLB/);
-    assert.match(design,/source\.image_url\?\.match\(validImage\)/);
+    assert.match(design,/sourceImage\.match\(validImage\)/);
+    assert.match(design,/imageCache\.current\.set\(key,sourceImage\)/);
+    assert.match(design,/picture\?<div/);
     assert.match(design,/phase:"picture"/);
     assert.match(design,/const generated=await fetch\(LOCAL\+"\/generate"/);
     assert.match(design,/modelCache\.current\.set\(key,output\)/);

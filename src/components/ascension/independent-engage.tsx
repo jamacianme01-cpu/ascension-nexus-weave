@@ -54,10 +54,13 @@ function stopVoice() {
 function HunyuanMesh({ url, mode }: { url: string; mode: "assembled" | "blueprint" | "dissect" | "exploded" | "imploded" }) {
   const host = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{ group: THREE.Group; parts: THREE.Object3D[]; original: THREE.Vector3[]; materials: Map<THREE.Mesh, THREE.Material | THREE.Material[]> } | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
   useEffect(() => {
     const element = host.current;
     if (!element) return;
     let cancelled = false;
+    setLoaded(false); setLoadError("");
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#08192a");
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
@@ -99,7 +102,8 @@ function HunyuanMesh({ url, mode }: { url: string; mode: "assembled" | "blueprin
       const materials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
       group.traverse(child => { if (child instanceof THREE.Mesh) materials.set(child, child.material); });
       sceneRef.current = { group, parts, original, materials };
-    }, undefined, () => { element.dataset.modelError = "Hunyuan GLB could not be loaded"; });
+      setLoaded(true);
+    }, undefined, () => { if (!cancelled) setLoadError("Hunyuan GLB could not be loaded."); });
     return () => {
       cancelled = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
       sceneRef.current = null;
@@ -118,10 +122,13 @@ function HunyuanMesh({ url, mode }: { url: string; mode: "assembled" | "blueprin
       if (mode === "dissect") part.visible = index % 2 === 0;
     });
     state.materials.forEach((original, mesh) => {
-      mesh.material = mode === "blueprint" ? new THREE.MeshBasicMaterial({ color: "#49c8ff", wireframe: true }) : original;
+      if (mode === "blueprint") {
+        const wire = new THREE.MeshBasicMaterial({ color: "#49c8ff", wireframe: true });
+        mesh.material = Array.isArray(original) ? original.map(() => wire) : wire;
+      } else mesh.material = original;
     });
-  }, [mode, url]);
-  return <div ref={host} className="h-[420px] w-full touch-none" aria-label="Interactive 3D invention. Drag to rotate; scroll or pinch to zoom." />;
+  }, [mode, url, loaded]);
+  return <div className="relative"><div ref={host} className="h-[420px] w-full touch-none" aria-label="Interactive 3D invention. Drag to rotate; scroll or pinch to zoom." />{loadError && <p role="alert" className="text-sm text-red-300">{loadError}</p>}</div>;
 }
 function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   path: Pathway & { blend_reason?: string };

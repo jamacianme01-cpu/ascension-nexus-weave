@@ -1,7 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { ObjectivePathway } from "@/lib/ascension/result-model";
-
-const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
+import { useEffect, useRef, useState } from "react";
+import { PathwayStage, PATH_STYLES, SpiralBoard } from "@/components/ascension/spiral-flow";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -50,31 +48,6 @@ function stopVoice() {
 }
 const WELCOME = "Welcome. I can stay with you as a guide.";
 
-function pathwayGuide(index: number, namedProviders: boolean) {
-  if (index === 3) {
-    return {
-      eyebrow: "BLEND",
-      tone: namedProviders ? "SYNTHESIZED · BALANCED · VERSATILE" : "A possible combination of the other three",
-    };
-  }
-  if (namedProviders) {
-    const eyebrows = ["OPENAI", "CLAUDE", "GROK"];
-    const tones = [
-      "MODULAR · PRECISE · ADAPTIVE",
-      "CONTEMPLATIVE · STRUCTURED · RELIABLE",
-      "BOLD · EXPLORATORY · UNFILTERED",
-    ];
-    return { eyebrow: eyebrows[index] ?? `PATH ${index + 1}`, tone: tones[index] ?? "Another way to look at it" };
-  }
-  const eyebrows = ["ONE READING", "ANOTHER READING", "A WIDER READING"];
-  const tones = [
-    "A precise reading, if that fits",
-    "A more structured reading, if that fits",
-    "A wider reading, if that fits",
-  ];
-  return { eyebrow: eyebrows[index] ?? `PATH ${index + 1}`, tone: tones[index] ?? "Another way to look at it" };
-}
-
 /** Hosted Tree entry. The first model answer is backend context, not a public essay. */
 export function IndependentEngage() {
   const [objective, setObjective] = useState("");
@@ -88,7 +61,6 @@ export function IndependentEngage() {
   const [dive, setDive] = useState<{ pathway: Pathway; imageUrl: string } | null>(null);
   const [stage, setStage] = useState<"idle" | "processing">("idle");
   const [talking, setTalking] = useState(true);
-  const [guideLine, setGuideLine] = useState(WELCOME);
   const view = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
@@ -100,16 +72,13 @@ export function IndependentEngage() {
   }, []);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
   function offer(text: string) {
-    setGuideLine(text);
     if (talking) say(text);
   }
   function toggleTalking() {
     if (talking) { stopVoice(); setTalking(false); }
     else {
-      const line = "I'm here if a suggestion would help.";
       setTalking(true);
-      setGuideLine(line);
-      say(line);
+      say("I'm here if a suggestion would help.");
     }
   }
 
@@ -128,7 +97,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      offer("Three approaches are here, and a fourth that brings pieces of them together. Any of them can be opened if a closer look would help.");
+      offer("Four ways are here. Any of them can be opened if a closer look would help.");
       setStage("idle");
       window.setTimeout(() => {
         if (generation.current === token) view.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -136,7 +105,7 @@ export function IndependentEngage() {
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
         setPathwayError(cause instanceof Error ? cause.message : String(cause));
-        setGuideLine("The pathways didn't finish. Trying again is there whenever you want it.");
+        offer("The pathways didn't finish. Trying again is there whenever you want it.");
         setStage("idle");
       }
     }
@@ -159,7 +128,6 @@ export function IndependentEngage() {
     setChoice(null);
     setDive(null);
     setStage("processing");
-    setGuideLine("Looking at a few different ways this could go.");
     try {
       // Internal reasoning only: never narrate or render this essay to the user.
       const response = await fetch("/api/public/ascension/independent", {
@@ -178,7 +146,7 @@ export function IndependentEngage() {
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
         setError(cause instanceof Error ? cause.message : String(cause));
-        setGuideLine("That didn't connect. The book can wait for another intention.");
+        offer("That didn't connect. The book can wait for another intention.");
         setStage("idle");
       }
     } finally {
@@ -211,7 +179,6 @@ export function IndependentEngage() {
     stopVoice();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setPathwayError(""); setLoading(false);
-    setGuideLine(WELCOME);
     setStage("idle"); setChoice(null); setDive(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -240,13 +207,12 @@ export function IndependentEngage() {
         <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
           {talking ? "QUIET THE TREE" : "HEAR THE TREE"}
         </button>
-        {talking && guideLine && <p className="ascension-tree-whisper" role="status">{guideLine}</p>}
         {loading && <p className="ascension-tree-status" role="status">
           {!talking && "Looking at a few different ways this could go. "}
           <button type="button" onClick={() => {
             generation.current += 1; abort.current?.abort(); stopVoice();
             setLoading(false); setStage("idle");
-            setGuideLine("Stopped. The book can wait until you want to try again.");
+            offer("Stopped. The book can wait until you want to try again.");
           }}>Stop</button>
         </p>}
         {error && <p role="alert">{error}</p>}
@@ -257,67 +223,28 @@ export function IndependentEngage() {
       </div>
     </section>
 
-    {result && <section ref={view} className="ascension-spiral" aria-label="Spiral pathways">
-      <div className="ascension-spiral-head">
-        <p className="ascension-spiral-kicker">SPIRAL PATHWAYS</p>
-        <div className="ascension-spiral-mark" aria-hidden="true" />
-        <h2>3 DISTINCT PATHS + BLEND</h2>
-        {talking && guideLine && <p className="ascension-tree-whisper" role="status">{guideLine}</p>}
-        <p className="ascension-spiral-note">
-          {result.mode === "three-provider-synthesis"
-            ? "OpenAI, Claude, and Grok each offered a reading. The fourth is a blend you can open if it seems useful."
-            : "These are three different readings, plus a blend. Claude and Grok were not connected, so none of these is presented as their answer."}
-        </p>
-        <p className="ascension-spiral-objective">{requested.split("\nBuild on the selected pathway:")[0]}</p>
-        <div className="ascension-spiral-tools">
-          <button type="button" onClick={toggleTalking}>
-            {talking ? "Quiet the tree" : "Hear the tree"}
-          </button>
-          <button type="button" onClick={reset}>New objective</button>
-        </div>
-      </div>
-      <div className="ascension-spiral-grid">
-        {choices.map((p, index) => {
-          const guide = pathwayGuide(index, result.mode === "three-provider-synthesis");
-          const summary = p.summary.length > 280 ? p.summary.slice(0, 277).trimEnd() + "…" : p.summary;
-          return <button type="button" key={p.id}
-            className={choice === index ? "ascension-path-card is-open" : "ascension-path-card"}
-            aria-pressed={choice === index}
-            onClick={() => {
-              setChoice(index);
-              offer(p.title + ". This is one way it might come together. You could turn it, look inside, or set the parts apart.");
-              setDive({ pathway: p, imageUrl: "" });
-            }}>
-            <span className="ascension-path-index" aria-hidden="true">{index + 1}</span>
-            <span className="ascension-path-eyebrow">{guide.eyebrow}</span>
-            <strong>{p.title}</strong>
-            <span className="ascension-path-summary">{summary}</span>
-            <span className="ascension-path-tone">{guide.tone}</span>
-          </button>;
-        })}
-      </div>
-    </section>}
-    {dive && <Suspense fallback={<p role="status" className="p-5 text-center text-gold">Opening invention view…</p>}>
-      <RealityViewer
-        pathway={{
-          id: dive.pathway.id, label: dive.pathway.title, summary: dive.pathway.summary,
-          steps: dive.pathway.steps, tradeoffs: dive.pathway.tradeoffs,
-          spiral_form: null, visual_svg: null, model_spec: null,
-          generated_image_url: dive.imageUrl, generated_blueprint_url: null,
-          generated_environment_url: null, model_url: null,
-          outcome_score: null, outcome_reason: null,
-        } satisfies ObjectivePathway}
-        objective={requested} requestId={null} initialMode="cutaway"
-        onClose={() => setDive(null)}
-        onNewObjective={reset} newObjectiveDisabled={loading}
-        soundEnabled={talking}
-        onToggleSound={() => { stopVoice(); setTalking(v => !v); }}
-        onDive={() => {}}
-        onBuildOn={() => { const selectedPath = dive.pathway; setDive(null); buildOn(selectedPath); }}
-        onNewAnswers={() => setDive(null)}
-        isPartSelected={() => false} onTogglePart={() => {}}
-        blendControls={null}
+    {result && !dive && <div ref={view}>
+      <SpiralBoard
+        pathways={choices}
+        talking={talking}
+        onToggleTalking={toggleTalking}
+        onReset={reset}
+        onOpen={(index) => {
+          const path = choices[index];
+          if (!path) return;
+          const style = PATH_STYLES[index];
+          setChoice(index);
+          offer(`${style?.name ?? path.title}. This is one way it might come together. Assembled is here, and the parts can be opened if you want a closer look.`);
+          setDive({ pathway: path, imageUrl: "" });
+        }}
       />
-    </Suspense>}
+    </div>}
+    {dive && <PathwayStage
+      pathway={dive.pathway}
+      variant={choice ?? 0}
+      talking={talking}
+      onClose={() => setDive(null)}
+      onGuide={offer}
+    />}
   </div>;
 }

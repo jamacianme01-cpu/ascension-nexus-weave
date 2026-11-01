@@ -319,7 +319,239 @@ body:has(.ascension-world > .ascension-command) main {
   .ascension-history { top: 132px; }
 }
 
-.ascension-stage > div.flex.flex-wrap.items-center.justify-between > button:last-child {
+.ascension-tree-hear {
+  position: absolute;
+  z-index: 8;
+  top: 1.25rem;
+  right: 1.25rem;
+  min-height: 2.75rem;
+  border: 1px solid rgb(220 177 91 / 40%);
+  border-radius: 999px;
+  background: rgb(2 8 16 / 72%);
+  padding: 0.4rem 0.9rem;
+  color: rgb(232 198 126);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+}
+
+.ascension-tree-whisper {
+  position: absolute;
+  z-index: 8;
+  top: 1.15rem;
+  left: 50%;
+  width: min(34rem, calc(100% - 12rem));
+  margin: 0;
+  transform: translateX(-50%);
+  color: rgb(244 228 190 / 92%);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  text-align: center;
+  text-shadow: 0 2px 14px #000, 0 0 18px rgb(0 0 0 / 80%);
+  pointer-events: none;
+}
+
+.ascension-tree-status {
+  position: absolute;
+  z-index: 9;
+  top: 5.4rem;
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+  color: rgb(244 228 190 / 92%);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.ascension-tree-status button,
+.ascension-stage > p[role="alert"] button {
+  margin-left: 0.75rem;
+  border: 1px solid rgb(220 177 91 / 55%);
+  border-radius: 999px;
+  background: rgb(2 8 16 / 72%);
+  padding: 0.35rem 0.85rem;
+  color: rgb(232 198 126);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.ascension-spiral {
+  position: relative;
+  z-index: 2;
+  margin: 0 !important;
+  min-height: 100svh;
+  padding: clamp(2.2rem, 5vh, 3.5rem) clamp(1rem, 3vw, 2.4rem) 4.5rem;
+  background:
+    linear-gradient(180deg, rgb(2 6 12 / 90%) 0%, rgb(2 6 12 / 94%) 36%, rgb(1 4 10 / 98%) 100%),
+    url("/approved-scene/ascension-tree-behind-book-hq.jpg") center 10% / cover no-repeat;
+  color: #e7e1d6;
+}
+
+.ascension-spiral-head {
+  max-width: 52rem;
+  margin: 0 auto 1.75rem;
+  text-align: center;
+}
+
+.ascension-spiral-kicker {
+  margin: 0;
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: clamp(1.7rem, 4.2vw, 3.15rem);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: #f3efe6;
+}
+
+.ascension-spiral-mark {
+  position: relative;
+  width: 7rem;
+  height: 1px;
+  margin: 0.85rem auto 0.7rem;
+  background: linear-gradient(90deg, transparent, rgb(232 214 170 / 70%), transparent);
+}
+
+.ascension-spiral-mark::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border: 1px solid rgb(232 214 170 / 80%);
+  background: #070b12;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.ascension-spiral h2 {
+  margin: 0;
+  color: #c9c3b6;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.32em;
+}
+
+.ascension-spiral .ascension-tree-whisper {
+  position: static;
+  width: min(40rem, 100%);
+  margin: 1rem auto 0;
+  transform: none;
+  text-shadow: none;
+}
+
+.ascension-spiral-note,
+.ascension-spiral-objective {
+  max-width: 40rem;
+  margin: 0.75rem auto 0;
+  color: rgb(231 225 214 / 78%);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.ascension-spiral-objective {
+  color: rgb(232 198 126 / 88%);
+}
+
+.ascension-spiral-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.ascension-spiral-tools button {
+  min-height: 2.4rem;
+  border: 1px solid rgb(220 177 91 / 40%);
+  border-radius: 999px;
+  background: rgb(2 8 16 / 55%);
+  padding: 0.35rem 0.95rem;
+  color: rgb(232 198 126);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.ascension-spiral-grid {
+  display: grid;
+  max-width: 76rem;
+  margin: 0 auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.ascension-path-card {
+  display: flex;
+  min-height: 22rem;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid rgb(186 196 214 / 28%);
+  border-radius: 0.85rem;
+  background: rgb(8 12 18 / 78%);
+  padding: 1.15rem 0.95rem 1rem;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.ascension-path-card:hover,
+.ascension-path-card.is-open,
+.ascension-path-card:focus-visible {
+  border-color: rgb(232 198 126 / 72%);
+  box-shadow: 0 0 0 1px rgb(232 198 126 / 25%);
+}
+
+.ascension-path-index {
+  display: grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border: 1px solid rgb(210 216 228 / 45%);
+  border-radius: 999px;
+  color: #d5dbe6;
+  font-size: 0.75rem;
+}
+
+.ascension-path-eyebrow {
+  margin-top: 0.85rem;
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.14em;
+}
+
+.ascension-path-card strong {
+  margin-top: 0.85rem;
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+}
+
+.ascension-path-summary {
+  flex: 1;
+  margin-top: 0.75rem;
+  color: rgb(226 222 214 / 82%);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.ascension-path-tone {
+  margin-top: 1rem;
+  color: rgb(198 204 214 / 78%);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+}
+
+@media (max-width: 980px) {
+  .ascension-spiral-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+  .ascension-spiral-grid { grid-template-columns: 1fr; }
+  .ascension-path-card { min-height: 0; }
+}
+
+.ascension-stage > div.flex.flex-wrap.items-center.justify-between > button.ascension-engage {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -343,20 +575,20 @@ body:has(.ascension-world > .ascension-command) main {
 
 .ascension-stage
   > div.flex.flex-wrap.items-center.justify-between
-  > button:last-child:focus-visible {
+  > button.ascension-engage:focus-visible {
   outline: 2px solid rgb(110 209 255 / 88%) !important;
   outline-offset: 4px;
 }
 
 .ascension-stage
   > div.flex.flex-wrap.items-center.justify-between
-  > button:last-child:hover:not(:disabled) {
+  > button.ascension-engage:hover:not(:disabled) {
   border-color: rgb(239 205 135 / 92%) !important;
   background: linear-gradient(180deg, rgb(10 28 52 / 96%), rgb(3 10 21 / 98%)) !important;
   color: rgb(255 223 158) !important;
 }
 
-.ascension-stage > div.flex.flex-wrap.items-center.justify-between > button:last-child:disabled {
+.ascension-stage > div.flex.flex-wrap.items-center.justify-between > button.ascension-engage:disabled {
   cursor: default;
   opacity: 0.45 !important;
 }
@@ -392,6 +624,15 @@ body:has(.ascension-world > .ascension-command) main {
 }
 
 @media (max-width: 820px) {
+  .ascension-tree-whisper {
+    top: 4.5rem;
+    width: min(22rem, calc(100% - 2rem));
+  }
+
+  .ascension-tree-status {
+    top: 8.4rem;
+  }
+
   .ascension-stage {
     min-height: 620px;
   }

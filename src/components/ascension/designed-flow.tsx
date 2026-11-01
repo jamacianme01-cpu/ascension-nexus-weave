@@ -16,7 +16,16 @@ const PICTURE: Record<DesignedScreen, string> = {
   imploded: "/designed-flow/imploded.jpg",
 };
 
-type Hit = { label: string; x: number; y: number; w: number; h: number; to: DesignedTarget };
+export type PathwayReading = { title: string; line: string; blend?: boolean };
+
+type Hit = { label: string; x: number; y: number; w: number; h: number; to: DesignedTarget; index?: number };
+
+const CARD_BOXES: [number, number, number, number][] = [
+  [125, 222, 246, 437],
+  [386, 222, 244, 437],
+  [645, 222, 236, 437],
+  [897, 222, 253, 437],
+];
 
 function bar(
   x: number,
@@ -34,7 +43,7 @@ function bar(
   return hits;
 }
 
-function hitsFor(screen: DesignedScreen): Hit[] {
+function hitsFor(screen: DesignedScreen, readings: PathwayReading[]): Hit[] {
   const back: DesignedTarget = screen === "spiral" ? "book" : "spiral";
   const margin: Hit[] = [
     { label: "Back", x: 0, y: 0, w: 100, h: FRAME.height, to: back },
@@ -43,10 +52,12 @@ function hitsFor(screen: DesignedScreen): Hit[] {
   if (screen === "spiral") {
     return [
       ...margin,
-      { label: "ChatGPT", x: 125, y: 222, w: 246, h: 437, to: "assembled" },
-      { label: "Claude", x: 386, y: 222, w: 244, h: 437, to: "assembled" },
-      { label: "Grok", x: 645, y: 222, w: 236, h: 437, to: "assembled" },
-      { label: "BLEND", x: 897, y: 222, w: 253, h: 437, to: "assembled" },
+      ...CARD_BOXES.map(([x, y, w, h], index) => ({
+        label: readings[index]?.title || `Pathway ${index + 1}`,
+        x, y, w, h,
+        to: "assembled" as const,
+        index,
+      })),
     ];
   }
   if (screen === "assembled") {
@@ -115,10 +126,18 @@ function place(hit: Hit): CSSProperties {
 
 export function DesignedFlow({
   screen,
+  readings,
+  talking,
+  onToggleTalking,
   onScreen,
+  onOpen,
 }: {
   screen: DesignedScreen;
+  readings: PathwayReading[];
+  talking: boolean;
+  onToggleTalking: () => void;
   onScreen: (next: DesignedTarget) => void;
+  onOpen: (index: number) => void;
 }) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -132,17 +151,31 @@ export function DesignedFlow({
   const back = screen === "spiral" ? "book" : "spiral";
   return (
     <div className="designed-screen">
+      <button type="button" className="designed-tree-hear" aria-pressed={!talking} onClick={onToggleTalking}>
+        {talking ? "MUTE TREE" : "HEAR TREE"}
+      </button>
       <button type="button" className="designed-margin" aria-label="Back" onClick={() => onScreen(back)} />
       <div className="designed-frame" data-screen={screen}>
         <img src={PICTURE[screen]} alt="" draggable={false} />
-        {hitsFor(screen).map((hit, index) => (
+        {screen === "spiral" && CARD_BOXES.map(([x, , w], index) => {
+          const reading = readings[index];
+          if (!reading) return null;
+          return <div key={reading.title} className="designed-reading" style={{ left: `${((x + 8) / FRAME.width) * 100}%`, width: `${((w - 16) / FRAME.width) * 100}%` }}>
+            <p className="designed-reading-name">{reading.title}</p>
+            <p className="designed-reading-line">{reading.blend ? "Blend" : reading.line}</p>
+          </div>;
+        })}
+        {hitsFor(screen, readings).map((hit, index) => (
           <button
             key={`${hit.label}-${index}`}
             type="button"
             className="designed-hit"
             style={place(hit)}
             aria-label={hit.label}
-            onClick={() => onScreen(hit.to)}
+            onClick={() => {
+              if (hit.index !== undefined) onOpen(hit.index);
+              else onScreen(hit.to);
+            }}
           />
         ))}
       </div>

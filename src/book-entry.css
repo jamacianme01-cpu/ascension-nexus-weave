@@ -353,13 +353,15 @@ body:has(.ascension-world > .ascension-command) main {
 .ascension-tree-status {
   position: absolute;
   z-index: 9;
-  top: 5.4rem;
   left: 50%;
+  bottom: clamp(12.4rem, 23vh, 15rem);
+  width: min(36rem, 78vw);
   margin: 0;
   transform: translateX(-50%);
   color: rgb(244 228 190 / 92%);
   font-size: 0.92rem;
   text-align: center;
+  text-shadow: 0 2px 12px #000;
 }
 
 .ascension-tree-status button,
@@ -630,7 +632,8 @@ body:has(.ascension-world > .ascension-command) main {
   }
 
   .ascension-tree-status {
-    top: 8.4rem;
+    bottom: 11.2rem;
+    width: min(20rem, 88vw);
   }
 
   .ascension-stage {

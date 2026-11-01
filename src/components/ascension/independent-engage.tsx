@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { DesignedFlow, type DesignedScreen, type DesignedTarget } from "@/components/ascension/designed-flow";
+import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
+
+type Part = { name: string; purpose: string; location: string };
+type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; blend_reason?: string };
+type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
 
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 
@@ -42,20 +46,54 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
+
 const WELCOME = "Welcome. I can stay with you as a guide.";
 
-/** Hosted Tree entry. The designed screens follow the opening. */
+function sentence(text: string): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  const end = cleaned.search(/[.!?](\s|$)/);
+  const line = end >= 0 ? cleaned.slice(0, end + 1) : cleaned;
+  return line.length > 140 ? line.slice(0, 137).trim() + "…" : line;
+}
+
+function cardLine(text: string): string {
+  const phrase = text.replace(/\s+/g, " ").trim().split(/[.!?]/)[0]?.trim() ?? "";
+  return phrase.length <= 28 ? phrase : "";
+}
+
+function guideFor(result: Result): string {
+  const intro = result.introduction.replace(/\b(ChatGPT|OpenAI|Claude|Grok)\b/gi, "").replace(/\s+/g, " ").trim();
+  if (intro.length > 40 && intro.length < 320) return intro;
+  const [first, second, third] = result.pathways;
+  return `Three readings came back: ${first?.title}, ${second?.title}, and ${third?.title}. The fourth is a blend, ${result.blend.title}. Any of them can be opened if a closer look would help.`;
+}
+
+function openLine(path: Pathway, blend: boolean): string {
+  const detail = sentence(blend ? path.blend_reason || path.summary : path.summary);
+  if (blend) return `This fourth one is the blend. ${path.title}. ${detail}`;
+  return `${path.title}. ${detail} The other views are there if a closer look would help.`;
+}
+
+/** Hosted Tree entry. Engines analyze the answer; the fourth pathway is the blend. */
 export function IndependentEngage() {
   const [objective, setObjective] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<Result | null>(null);
   const [screen, setScreen] = useState<DesignedScreen | null>(null);
+  const [choice, setChoice] = useState(0);
   const [talking, setTalking] = useState(true);
+  const abort = useRef<AbortController | null>(null);
+  const generation = useRef(0);
   const welcomed = useRef(false);
+
   useEffect(() => {
     if (welcomed.current) return;
     welcomed.current = true;
     say(WELCOME);
   }, []);
-  useEffect(() => () => stopVoice(), []);
+  useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
+
   function offer(text: string) {
     if (talking) say(text);
   }
@@ -66,20 +104,97 @@ export function IndependentEngage() {
       say("I'm here if a suggestion would help.");
     }
   }
-  function engage() {
-    if (objective.trim().length < 3) return;
-    setScreen("spiral");
-    offer("Four ways are here. Any of them can be opened if a closer look would help.");
+
+  async function engage() {
+    const text = objective.trim();
+    if (text.length < 3 || loading) return;
+    const token = ++generation.current;
+    abort.current?.abort();
+    const controller = new AbortController();
+    abort.current = controller;
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setScreen(null);
+    setChoice(0);
+    offer("I'm with you. I'll read this and bring back a few ways it could come together.");
+    try {
+      const initial = await fetch("/api/public/ascension/independent", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ objective: text, phase: "initial" }),
+        signal: controller.signal,
+      });
+      const first: { answer?: string; error?: string } = await initial.json();
+      if (!initial.ok) throw new Error(first.error || "The reading didn't finish.");
+      if (!first.answer?.trim()) throw new Error("The reading didn't finish.");
+      if (generation.current !== token) return;
+      const pathways = await fetch("/api/public/ascension/independent", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
+        signal: controller.signal,
+      });
+      const data: Result & { error?: string } = await pathways.json();
+      if (!pathways.ok) throw new Error(data.error || "The pathways didn't finish.");
+      if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend?.title)
+        throw new Error("The pathways didn't finish.");
+      if (generation.current !== token) return;
+      setResult(data);
+      setScreen("spiral");
+      offer(guideFor(data));
+    } catch (cause) {
+      if (!controller.signal.aborted && generation.current === token) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        const quiet = /not configured|unavailable|did not respond/i.test(message)
+          ? "The reading engines aren't connected from here, so I don't have that analysis yet. The book can wait if you want to try again."
+          : "That reading didn't finish. The book can wait if you want to try again.";
+        setError(quiet);
+        offer(quiet);
+      }
+    } finally {
+      if (generation.current === token) setLoading(false);
+    }
   }
+
+  function stop() {
+    generation.current += 1;
+    abort.current?.abort();
+    setLoading(false);
+    offer("Stopped. The book can wait until you want to try again.");
+  }
+
+  const readings: PathwayReading[] = result
+    ? [...result.pathways, result.blend].map((path, index) => ({
+        title: path.title,
+        line: cardLine(path.summary),
+        blend: index === 3,
+      }))
+    : [];
+
   function show(next: DesignedTarget) {
     if (next === "book") {
       setScreen(null);
+      offer("The book is here whenever another reading would help.");
       return;
     }
-    if (screen === "spiral" && next === "assembled") {
-      offer("Assembled is here. The other views are along the bottom if a closer look would help.");
-    }
+    const selected = readings[choice];
+    if (next === "assembled" && selected) offer(openLine(
+      choice === 3 ? result!.blend : result!.pathways[choice]!,
+      choice === 3,
+    ));
+    else if (next === "blueprint") offer("The blueprint is this same reading, drawn out, if that view would help.");
+    else if (next === "dissect") offer("This opens the same reading so the parts can be seen.");
+    else if (next === "exploded") offer("The parts are set apart here, if seeing them separately would help.");
+    else if (next === "imploded") offer("The parts can come back together from here.");
+    else if (next === "spiral") offer("The four readings are still here. The fourth is the blend, if you want to compare them.");
     setScreen(next);
+  }
+
+  function openPathway(index: number) {
+    const path = index === 3 ? result?.blend : result?.pathways[index];
+    if (!path) return;
+    setChoice(index);
+    offer(openLine(path, index === 3));
+    setScreen("assembled");
   }
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none">
@@ -89,22 +204,27 @@ export function IndependentEngage() {
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
         </div>
         <label htmlFor="objective">What do you want to accomplish?</label>
-        <textarea id="objective" rows={3} value={objective} maxLength={2400}
+        <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
           aria-label="What do you want to accomplish?" placeholder="Type your intention..."
           onChange={event => setObjective(event.target.value)}
-          onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); engage(); } }}
+          onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !loading) { event.preventDefault(); void engage(); } }}
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" disabled={objective.trim().length < 3} onClick={engage}
+          <button type="button" disabled={loading || objective.trim().length < 3} onClick={() => void engage()}
             className="ascension-engage min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
-            ENGAGE ASCENSION
+            {loading ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
           </button>
         </div>
+        {loading && <p className="ascension-tree-status" role="status">
+          Reading this with you.
+          <button type="button" onClick={stop}>Stop</button>
+        </p>}
+        {error && <p className="ascension-tree-status" role="status">{error}</p>}
         <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
           {talking ? "MUTE TREE" : "HEAR TREE"}
         </button>
       </div>
     </section>
-    {screen && <DesignedFlow screen={screen} onScreen={show} />}
+    {screen && result && <DesignedFlow screen={screen} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
   </div>;
 }

@@ -153,28 +153,38 @@ const outputSchema = {
   required: ["introduction", "path_one", "path_two", "path_three", "blend"],
   additionalProperties: false,
 };
-async function build(objective: string, firstAnswerText = "") {
+async function build(objective: string) {
   const providerStatus = configured();
   if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
-  const external = await Promise.allSettled([
+  // Collect three independent answers before synthesis.
+  const independent = await Promise.allSettled([
+    firstAnswer(objective),
     providerStatus.Claude ? claude(objective) : Promise.resolve(null),
     providerStatus.Grok ? grok(objective) : Promise.resolve(null),
   ]);
   const sources: Contributor[] = [];
   const errors: string[] = [];
-  for (const [i, result] of external.entries()) {
-    if (result.status === "fulfilled" && result.value) sources.push(result.value);
-    if (result.status === "rejected") errors.push((i === 0 ? "Claude" : "Grok") + " did not respond");
+  const names = ["OpenAI", "Claude", "Grok"] as const;
+  for (const [i, result] of independent.entries()) {
+    if (result.status === "fulfilled" && result.value) {
+      if (i === 0) sources.push({ provider: "OpenAI", answer: (result.value as Awaited<ReturnType<typeof firstAnswer>>).answer });
+      else sources.push(result.value as Contributor);
+    } else {
+      errors.push(names[i]! + " did not respond");
+    }
   }
-  const allConnected = sources.length === 2;
+  if (sources.length !== 3) {
+    throw new Error("OpenAI, Claude and Grok must each return an independent answer before ASCENSION can form four pathways.");
+  }
+  const allConnected = true;
   const response = await callOpenAIResponse({
     timeoutMs: 28500,
     structuredOutput: { name: "ascension_four_pathways", schema: outputSchema },
     system: [
       "You are drafting an ASCENSION creation result, not reporting execution or verification.",
       allConnected
-        ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
-        : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
+        ? "Use three actual provider contributions, preserving their provenance. path_one must faithfully structure OpenAI's independently supplied proposal; path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
+        : "Provider responses incomplete; do not generate substituted pathways.",
       "Return exactly one JSON object with required keys: introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",
@@ -182,13 +192,12 @@ async function build(objective: string, firstAnswerText = "") {
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",
     ].join(" "),
     user: "OBJECTIVE (user wording is authoritative):\n" + objective +
-      (firstAnswerText ? "\nINITIAL USER-FACING ANSWER TO BUILD ON (unverified):\n" + firstAnswerText.slice(0, 9000) : "") +
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
   });
   const result = parseText(response.text);
   return {
     ...result,
-    contributors: ["OpenAI", ...sources.map(s => s.provider)],
+    contributors: sources.map(s => s.provider),
     unavailable: ["Claude", "Grok"].filter(provider => !sources.some(s => s.provider === provider)),
     providerErrors: errors,
     mode: allConnected ? "three-provider-synthesis" : "openai-only-provisional",
@@ -201,16 +210,44 @@ async function build(objective: string, firstAnswerText = "") {
 /** Produce a real image for the selected pathway, never substitute diagram boxes.
  * A separate owner-controlled switch prevents surprise image-generation charges.
  */
-async function picture(_objective: string, _value: Record<string, unknown>) {
-  // The owner did not authorize a paid external image-generation dependency.
-  // Do not substitute a paid provider for the owner's existing engine.
-  throw new Error("ASCENSION's own image-generation engine is not yet connected to the live app. No paid image service was used.");
+async function picture(objective: string, value: Record<string, unknown>) {
+  // Use only an explicitly configured owner-controlled image worker.
+  // Never silently charge an external image service or invent a picture.
+  const endpoint = process.env["ASCENSION_LOCAL_IMAGE_ENDPOINT"]?.trim();
+  if (!endpoint) throw new Error("ASCENSION image worker is not configured. Set ASCENSION_LOCAL_IMAGE_ENDPOINT to the owner-controlled image service.");
+  const target = new URL(endpoint);
+  if (target.protocol !== "https:" && !(target.protocol === "http:" && ["127.0.0.1", "localhost"].includes(target.hostname)))
+    throw new Error("ASCENSION image worker must use HTTPS or local loopback.");
+  const title = String(value["title"] ?? "").slice(0, 140);
+  const summary = String(value["summary"] ?? "").slice(0, 1500);
+  if (!title || !summary) throw new Error("Select a complete pathway before generating its image.");
+  const token = process.env["ASCENSION_LOCAL_IMAGE_TOKEN"]?.trim();
+  const response = await fetch(target, {
+    method: "POST",
+    signal: AbortSignal.timeout(120000),
+    headers: { "content-type": "application/json", ...(token ? { authorization: "Bearer " + token } : {}) },
+    body: JSON.stringify({ objective, pathway: { title, summary, parts: value["parts"] ?? [] } }),
+  });
+  if (!response.ok) throw new Error("ASCENSION image worker returned HTTP " + response.status);
+  const payload = obj(await response.json());
+  const model = String(payload["model_url"] ?? "");
+  if (model) {
+    const parsed = new URL(model);
+    if (!["https:", "http:"].includes(parsed.protocol) || (parsed.protocol === "http:" && !["localhost", "127.0.0.1"].includes(parsed.hostname)))
+      throw new Error("Hunyuan worker returned an unsafe model URL.");
+    if (!/\\.(glb|gltf)(?:[?#]|$)/i.test(parsed.pathname)) throw new Error("Hunyuan worker did not return a GLB or glTF model.");
+    return { model_url: model, provider: "ascension-owner-worker", verified: false };
+  }
+  const image = String(payload["image_url"] ?? "");
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length < 200)
+    throw new Error("ASCENSION image worker returned no valid image.");
+  return { image_url: image, provider: "ascension-owner-worker", verified: false };
 }
 
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false, picture_generation_enabled: false, note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+      governed_runtime_connected: false, picture_generation_enabled: Boolean(process.env["ASCENSION_LOCAL_IMAGE_ENDPOINT"]?.trim()), note: "Only configured providers can contribute. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");
@@ -225,14 +262,13 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         const input = obj(JSON.parse(raw));
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
-        if (input["phase"] === "initial") return json(await firstAnswer(objective));
+        
         if (input["phase"] === "picture") {
           if (!limit("image-ip:" + address, 4) || !limit("image-global", 24))
             return json({ error: "Image generation limit reached. No credits charged." }, 429);
           return json(await picture(objective, obj(input["pathway"])));
         }
-        const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
-        return json(await build(objective, prior));
+        return json(await build(objective));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to generate a response.";
         console.error("[ASCENSION answer] " + message.slice(0, 600));

@@ -1,4 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { ObjectivePathway } from "@/lib/ascension/result-model";
 
 const RealityViewer = lazy(() => import("@/components/ascension/RealityViewer").then(mod => ({ default: mod.RealityViewer })));
@@ -48,6 +51,85 @@ function stopVoice() {
   activeUtterance = null;
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
+function HunyuanMesh({ url, mode }: { url: string; mode: "assembled" | "blueprint" | "dissect" | "exploded" | "imploded" }) {
+  const host = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<{ group: THREE.Group; parts: THREE.Object3D[]; original: THREE.Vector3[]; materials: Map<THREE.Mesh, THREE.Material | THREE.Material[]> } | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    const element = host.current;
+    if (!element) return;
+    let cancelled = false;
+    setLoaded(false); setLoadError("");
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#08192a");
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+    camera.position.set(3, 2, 4);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    element.appendChild(renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x506080, 2.2));
+    const light = new THREE.DirectionalLight(0xffffff, 2);
+    light.position.set(4, 8, 5);
+    scene.add(light);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    const resize = () => {
+      const w = Math.max(1, element.clientWidth), h = Math.max(1, element.clientHeight);
+      camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(element); resize();
+    let frame = 0;
+    const animate = () => { frame = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); };
+    animate();
+    new GLTFLoader().load(url, gltf => {
+      if (cancelled) return;
+      const group = gltf.scene;
+      scene.add(group);
+      const bounds = new THREE.Box3().setFromObject(group);
+      const center = bounds.getCenter(new THREE.Vector3());
+      group.position.sub(center);
+      const size = bounds.getSize(new THREE.Vector3()).length();
+      const distance = Math.max(1, size * 1.25);
+      camera.position.set(distance, distance * 0.65, distance);
+      camera.near = Math.max(0.001, distance / 1000);
+      camera.far = distance * 100;
+      camera.updateProjectionMatrix();
+      controls.target.set(0, 0, 0);
+      const parts = group.children.length > 1 ? [...group.children] : [group];
+      const original = parts.map(part => part.position.clone());
+      const materials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+      group.traverse(child => { if (child instanceof THREE.Mesh) materials.set(child, child.material); });
+      sceneRef.current = { group, parts, original, materials };
+      setLoaded(true);
+    }, undefined, () => { if (!cancelled) setLoadError("Hunyuan GLB could not be loaded."); });
+    return () => {
+      cancelled = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
+      sceneRef.current = null;
+      scene.traverse(child => { if (child instanceof THREE.Mesh) child.geometry.dispose(); });
+      renderer.dispose(); renderer.domElement.remove();
+    };
+  }, [url]);
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.parts.forEach((part, index) => {
+      const origin = state.original[index]!;
+      part.position.copy(origin);
+      part.visible = true;
+      if (mode === "exploded") part.position.add(new THREE.Vector3((index % 3 - 1) * 0.6, Math.floor(index / 3) * 0.5, index % 2 ? 0.5 : -0.5));
+      if (mode === "dissect") part.visible = index % 2 === 0;
+    });
+    state.materials.forEach((original, mesh) => {
+      if (mode === "blueprint") {
+        const wire = new THREE.MeshBasicMaterial({ color: "#49c8ff", wireframe: true });
+        mesh.material = Array.isArray(original) ? original.map(() => wire) : wire;
+      } else mesh.material = original;
+    });
+  }, [mode, url, loaded]);
+  return <div className="relative"><div ref={host} className="h-[420px] w-full touch-none" aria-label="Interactive 3D invention. Drag to rotate; scroll or pinch to zoom." />{loadError && <p role="alert" className="text-sm text-red-300">{loadError}</p>}</div>;
+}
 function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   path: Pathway & { blend_reason?: string };
   objective: string;
@@ -57,11 +139,13 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
 }) {
   const [part, setPart] = useState<Part | null>(null);
   const [picture, setPicture] = useState<string | null>(null);
+  const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState("");
   const [pictureLoading, setPictureLoading] = useState(true);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  useEffect(() => setPart(null), [path.id]);
+  const [inspection, setInspection] = useState<"assembled" | "blueprint" | "dissect" | "exploded" | "imploded">("assembled");
+  useEffect(() => { setPart(null); setInspection("assembled"); setScale(1); setRotation(0); }, [path.id]);
   useEffect(() => {
     const cacheKey = JSON.stringify([objective, path.id, path.title]);
     const stored = imageCache.current.get(cacheKey);
@@ -70,15 +154,16 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
       return;
     }
     const controller = new AbortController();
-    setPicture(null); setPictureError(""); setPictureLoading(true);
+    setPicture(null); setModelUrl(null); setPictureError(""); setPictureLoading(true);
     void fetch("/api/public/ascension/independent", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ objective, phase: "picture", pathway: path }),
       signal: controller.signal,
     }).then(async response => {
-      const data: { image_url?: string; error?: string } = await response.json();
+      const data: { image_url?: string; model_url?: string; error?: string } = await response.json();
+      if (data.model_url) { setModelUrl(data.model_url); return; }
       if (!response.ok) throw new Error(data.error || "An invention picture could not be produced.");
-      if (!data.image_url?.startsWith("data:image/png;base64,"))
+      if (!/^data:image\/(png|jpeg|webp);base64,/.test(data.image_url ?? ""))
         throw new Error("The image provider did not return a usable picture.");
       if (!controller.signal.aborted) {
         imageCache.current.set(cacheKey, data.image_url);
@@ -93,31 +178,14 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
-    <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
-      {picture ? <>
-        <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-black/40 sm:min-h-[440px]">
-          <img src={picture} alt={`Concept picture of ${path.title}`}
-            className="max-h-[70vh] w-full object-contain transition-transform"
-            style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }} />
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setScale(v => Math.min(4, v * 1.25))}>ZOOM IN</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setScale(v => Math.max(0.5, v / 1.25))}>ZOOM OUT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setRotation(v => v - 15)}>ROTATE LEFT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => setRotation(v => v + 15)}>ROTATE RIGHT</button>
-          <button type="button" className="rounded-full border border-gold/45 px-4 py-2 text-sm text-gold"
-            onClick={() => { setScale(1); setRotation(0); }}>RESET VIEW</button>
-          <button type="button" className="rounded-full border border-primary/60 px-5 py-2 text-sm text-primary"
-            onClick={() => onDive(path, picture)}>DIVE INTO REALITY</button>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">Actual generated concept artwork. No verified 3D mesh is available yet; 3D editing requires a reconstructed model.</p>
-      </> : <p className="p-6 text-center text-sm text-muted-foreground" role={pictureError ? "alert" : "status"}>
-        {pictureError || (pictureLoading ? "Creating the selected invention picture…" : "Invention picture unavailable.")}
-      </p>}
+    <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Invention inspection views">
+      {(["assembled", "blueprint", "dissect", "exploded", "imploded"] as const).map(mode =>
+        <button type="button" key={mode} aria-pressed={inspection === mode}
+          className={"rounded-full border px-4 py-2 text-sm " + (inspection === mode ? "border-primary text-primary" : "border-gold/40 text-gold")}
+          onClick={() => setInspection(mode)}>{mode.toUpperCase()}</button>)}
+    </div>
+    <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention model">
+      {modelUrl ? <HunyuanMesh url={modelUrl} mode={inspection} /> : <p role="status" className="p-6 text-sm text-gold">{pictureLoading ? "Requesting Hunyuan model…" : pictureError || "Hunyuan 3D geometry is not available. An image is not an editable mesh."}</p>}
     </div>
     {path.blend_reason && <p className="mb-4 border-l-2 border-primary pl-4 text-sm text-foreground/85">{path.blend_reason}</p>}
     <h4 className="mb-2 text-sm font-semibold text-primary">How this approach works</h4>
@@ -152,7 +220,6 @@ export function IndependentEngage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
-  const [firstAnswer, setFirstAnswer] = useState("");
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
@@ -175,12 +242,12 @@ export function IndependentEngage() {
     else { setTalking(true); say("I'm here. Choose a pathway, and I'll help you examine how it works."); }
   }
 
-  async function generatePathways(text: string, answer: string, controller: AbortController, token: number) {
+  async function generatePathways(text: string, controller: AbortController, token: number) {
     setPathwayError("");
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: answer.slice(0, 6000) }),
+        body: JSON.stringify({ objective: text, phase: "pathways" }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();
@@ -192,7 +259,7 @@ export function IndependentEngage() {
       setChoice(null);
       if (talking) say("Your four approaches are ready. Choose one to inspect its design and components.");
       setStage("idle");
-      // Do not interrupt the Tree reading the initial answer when pathways arrive.
+      // Scroll to the four-pathway result after generation completes.
       window.setTimeout(() => {
         if (generation.current === token) view.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 120);
@@ -219,30 +286,14 @@ export function IndependentEngage() {
     setError("");
     setPathwayError("");
     setResult(null);
-    setFirstAnswer("");
     setRefinement("");
     setChoice(null);
     setDive(null);
     setStage("processing");
     // Wait for the real result instead of narrating a progress filler.
     try {
-      // Internal reasoning only: never narrate or render this essay to the user.
-      const response = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "initial" }),
-        signal: controller.signal,
-      });
-      const data: { phase?: string; answer?: string; error?: string } = await response.json();
-      if (!response.ok) throw new Error(data.error || "The answer engine did not complete.");
-      if (data.phase !== "initial" || !data.answer?.trim())
-        throw new Error("The answer engine returned no usable analysis.");
-      if (generation.current !== token) return;
-      const answer = data.answer.trim();
-      setFirstAnswer(answer);
-      // Keep the Tree conversational: announce a short useful finding, never read the whole analysis.
-      const firstThought = answer.split(/(?<=[.!?])\s+/)[0]?.trim().slice(0, 240);
-      if (talking && firstThought) say(firstThought);
-      await generatePathways(text, answer, controller, token);
+      // The selected objective goes directly to the four-pathway result.
+      await generatePathways(text, controller, token);
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
         setError(cause instanceof Error ? cause.message : String(cause));
@@ -254,12 +305,12 @@ export function IndependentEngage() {
   }
 
   function retryPathways() {
-    if (loading || !firstAnswer || !requested) return;
+    if (loading || !requested) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
     setLoading(true); setStage("processing"); setPathwayError("");
-    void generatePathways(requested, firstAnswer, controller, token)
+    void generatePathways(requested, controller, token)
       .finally(() => { if (generation.current === token) setLoading(false); });
   }
 
@@ -278,7 +329,7 @@ export function IndependentEngage() {
     stopVoice();
     imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
-    setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
+    setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null); setDive(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -326,12 +377,6 @@ export function IndependentEngage() {
       <button type="button" onClick={retryPathways} className="mt-3 rounded-full border border-gold/50 px-4 py-2 text-gold">
         Retry pathways
       </button>
-    </section>}
-
-    {firstAnswer && !selected && <section className="mx-auto mt-4 max-w-3xl rounded-xl border border-gold/35 bg-[#020913ed] p-5" aria-label="Initial objective answer">
-      <h2 className="mb-2 text-lg text-gold">INITIAL ANSWER</h2>
-      <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
-      {loading && <p className="mt-3 text-xs text-gold" role="status">Developing three pathways and the fourth BLEND…</p>}
     </section>}
 
     {result && <section ref={view} className="ascension-result-reveal relative isolate mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">

@@ -153,7 +153,7 @@ const outputSchema = {
   required: ["introduction", "path_one", "path_two", "path_three", "blend"],
   additionalProperties: false,
 };
-async function build(objective: string, firstAnswerText = "") {
+async function build(objective: string) {
   const providerStatus = configured();
   if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
   const external = await Promise.allSettled([
@@ -249,14 +249,13 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         const input = obj(JSON.parse(raw));
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
-        if (input["phase"] === "initial") return json(await firstAnswer(objective));
+        
         if (input["phase"] === "picture") {
           if (!limit("image-ip:" + address, 4) || !limit("image-global", 24))
             return json({ error: "Image generation limit reached. No credits charged." }, 429);
           return json(await picture(objective, obj(input["pathway"])));
         }
-        const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
-        return json(await build(objective, prior));
+        return json(await build(objective));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to generate a response.";
         console.error("[ASCENSION answer] " + message.slice(0, 600));

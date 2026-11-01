@@ -1,0 +1,31 @@
+name: Hunyuan localhost bridge startup smoke
+on:
+  push:
+    branches:
+      - repair/v1-pathway-entry-20261029
+    paths:
+      - runtime_bridge/hunyuan_browser_bridge.py
+      - runtime_bridge/start_hunyuan_now.ps1
+      - tests/hunyuan-browser-startup-smoke.py
+      - .github/workflows/hunyuan-browser-startup.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile localhost bridge
+        run: python -m py_compile runtime_bridge/hunyuan_browser_bridge.py
+      - name: Assert real port 8082 startup and approved-origin preflight
+        run: python tests/hunyuan-browser-startup-smoke.py
+      - name: Parse PowerShell launch script
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $problems = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile('runtime_bridge/start_hunyuan_now.ps1',[ref]$tokens,[ref]$problems)
+          if ($problems.Count) { $problems | Format-List | Out-String | Write-Error; exit 1 }
+          Write-Host 'PASS PowerShell launcher parses correctly'

@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { createServer } from 'vite';
+
+function readStylesheet(path) {
+  const css = readFileSync(path, 'utf8');
+  const dir = path.slice(0, path.lastIndexOf('/'));
+  return css.replace(/@import\s+["']\.\/([^"']+)["'];/g, (_, file) => readFileSync(`${dir}/${file}`, 'utf8'));
+}
 const server = await createServer({ server: { middlewareMode: true } });
 let passed = 0;
 function check(name, fn) { fn(); passed++; console.log(`PASS ${name}`); }
@@ -29,7 +35,7 @@ try {
   check('GLB path still parses actual downloaded models', () => { assert.match(viewer,/fetch\(loadedUrl/); assert.match(viewer,/GLTFLoader\(\)\.parseAsync/); assert.match(viewer,/model = gltf.scene/); });
   check('concept controls are no longer blocked by absent model_url', () => { assert.doesNotMatch(viewer,/if \(!pathway.model_url\)/); assert.match(viewer,/setReady\(true\)/); assert.match(viewer,/api\.current\?\.explode\(false\)/); });
   check('model arrival protects edited assemblies', () => { assert.match(viewer,/if \(!edited.current && pathway.model_url\)/); assert.match(viewer,/REPLACE EDITED CONCEPT WITH HUNYUAN MODEL/); });
-  check('all approved views are visible in full-screen editor on mobile', () => { const css=readFileSync('src/components/ascension/reality-viewer.css','utf8'); assert.match(css,/\.reality-view-controls[\s\S]*repeat\(6, minmax\(0, 1fr\)\)/); assert.match(css,/\.reality-view-controls \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/); for (const control of ['CUTAWAY','BLUEPRINT','ENVIRONMENT','DISSECTED','PARTS']) assert.ok(viewer.includes(control)); assert.match(viewer,/setMode\("environment"\)/); });
+  check('all approved views are visible in full-screen editor on mobile', () => { const css=readStylesheet('src/components/ascension/reality-viewer.css'); assert.match(css,/\.reality-view-controls[\s\S]*repeat\(6, minmax\(0, 1fr\)\)/); assert.match(css,/\.reality-view-controls \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/); for (const control of ['CUTAWAY','BLUEPRINT','ENVIRONMENT','DISSECTED','PARTS']) assert.ok(viewer.includes(control)); assert.match(viewer,/setMode\("environment"\)/); });
   check('part labels are clickable on the model picture for concepts and real GLBs', () => { assert.match(viewer,/ready && !dissected && showParts/); assert.match(viewer,/aria-label="Labels on the model"/); assert.match(viewer,/api.current\?\.locatePart\(index\)/); });
   check('ASSEMBLED automatically generates the primary picture, DISSECTED remains optional', () => {
     assert.match(viewer, /view:"assembled",requestId,pathwayId:pathway\.id/);
@@ -76,7 +82,7 @@ try {
     assert.match(viewer, /<div className="reality-component-workbench">/);
     assert.match(viewer, />ISOLATE</);
     assert.match(viewer, /isolate\(id\)/);
-    const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');
+    const css=readStylesheet('src/components/ascension/reality-viewer.css');
     assert.match(css, /data-split="true"\] \.reality-viewport \{ left:50%/);
     assert.match(css, /data-sidebar="open"\] \{ padding-right:min\(380px,32vw\)/);
     assert.match(css, /\.reality-dissection-label\[aria-pressed="true"\]/);
@@ -103,11 +109,11 @@ try {
     assert.match(viewer,/simulate && !dissected && phases.length > 0 && <div className=/);
     assert.match(viewer,/Animated objective operation/);
     assert.match(viewer,/reality-operation-pulse/);
-    const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');
+    const css=readStylesheet('src/components/ascension/reality-viewer.css');
     assert.match(css,/\.reality-operation-stage \{/);
     assert.match(css,/@media \(max-width:760px\) \{[\s\S]*\.reality-operation-stage/);
   });
   check('nonphysical demonstrations show the actual pathway rather than unrelated 3D geometry',()=>{assert.match(viewer,/reality-operation-stage\$\{interpretiveDemo \? "" : " reality-operation-stage--with-model"\}/);assert.match(viewer,/CONCEPTUAL OPERATION/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
-  check('image navigation avoids lower inspector overlap and desktop inspector leaves image room',()=>{const css=readFileSync('src/components/ascension/reality-viewer.css','utf8');assert.match(css,/\.reality-image-tools \{[^}]*top:8px; bottom:auto/);assert.match(css,/\.reality-screen:has\(\.reality-parts\) \.reality-dissection \{ right:414px/);});
+  check('image navigation avoids lower inspector overlap and desktop inspector leaves image room',()=>{const css=readStylesheet('src/components/ascension/reality-viewer.css');assert.match(css,/\.reality-image-tools \{[^}]*top:8px; bottom:auto/);assert.match(css,/\.reality-screen:has\(\.reality-parts\) \.reality-dissection \{ right:414px/);});
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

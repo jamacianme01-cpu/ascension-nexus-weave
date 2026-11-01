@@ -186,7 +186,6 @@ async function build(objective: string) {
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",
     ].join(" "),
     user: "OBJECTIVE (user wording is authoritative):\n" + objective +
-      (firstAnswerText ? "\nINITIAL USER-FACING ANSWER TO BUILD ON (unverified):\n" + firstAnswerText.slice(0, 9000) : "") +
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
   });
   const result = parseText(response.text);

@@ -166,7 +166,11 @@ async function build(objective: string, firstAnswerText = "") {
     if (result.status === "fulfilled" && result.value) sources.push(result.value);
     if (result.status === "rejected") errors.push((i === 0 ? "Claude" : "Grok") + " did not respond");
   }
-  const allConnected = sources.length === 2;
+  // Do not substitute invented OpenAI pathways for missing Grok or Claude answers.
+  if (sources.length !== 2) {
+    throw new Error("Grok and Claude must both return their own answers before ASCENSION can form the four-pathway result.");
+  }
+  const allConnected = true;
   const response = await callOpenAIResponse({
     timeoutMs: 28500,
     structuredOutput: { name: "ascension_four_pathways", schema: outputSchema },
@@ -174,7 +178,7 @@ async function build(objective: string, firstAnswerText = "") {
       "You are drafting an ASCENSION creation result, not reporting execution or verification.",
       allConnected
         ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
-        : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
+        : "Provider responses incomplete; do not generate substituted pathways.",
       "Return exactly one JSON object with required keys: introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",

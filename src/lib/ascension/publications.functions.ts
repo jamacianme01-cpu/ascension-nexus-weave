@@ -34,7 +34,7 @@ export const getGovernedPublication = createServerFn({ method: "GET" })
       .order("revision", { ascending: false });
     if (error) throw new Error(error.message);
 
-    const rows = (data ?? []) as GovernedSurface[];
+    const rows = (data ?? []) as unknown as GovernedSurface[];
     // Highest revision wins per surface; earlier revisions stay in the store.
     const latestBySurface = new Map<string, GovernedSurface>();
     for (const row of rows) {

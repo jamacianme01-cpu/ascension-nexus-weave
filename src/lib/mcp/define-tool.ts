@@ -28,8 +28,19 @@ export type ToolDefinition<TInput = unknown> = {
   handler: (input: TInput, ctx: ToolContext) => ToolResult | Promise<ToolResult>;
 };
 
-export function defineTool<TInput>(def: ToolDefinition<TInput>): ToolDefinition<TInput> {
-  return def;
+type InferredInput<TSchema extends Record<string, ZodType>> = {
+  [K in keyof TSchema]: z.infer<TSchema[K]>;
+};
+
+export function defineTool<TSchema extends Record<string, ZodType>>(def: {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: TSchema;
+  annotations?: ToolAnnotations;
+  handler: (input: InferredInput<TSchema>, ctx: ToolContext) => ToolResult | Promise<ToolResult>;
+}): ToolDefinition {
+  return def as ToolDefinition;
 }
 
 export class ToolError extends Error {

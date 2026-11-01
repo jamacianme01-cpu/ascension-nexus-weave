@@ -1,64 +1,55 @@
-import { createAPIFileRoute } from "@tanstack/react-start/api";
+import { createFileRoute } from "@tanstack/react-router";
 import {
+  buildProfile,
+  composeSuggestion,
   recordEngagement,
-  getTreeSuggestion,
-  type EngagementEvent,
-} from "~/lib/ascension/engine/tree-preference.server";
+  type EngagementSignal,
+} from "@/lib/ascension/engine/tree-preference.server";
 
-export const APIRoute = createAPIFileRoute("/api/public/ascension/tree-signals")(
-  {
-    POST: async ({ request }) => {
-      let body: any;
-      try {
-        body = await request.json();
-      } catch {
-        return Response.json({ error: "invalid_json" }, { status: 400 });
-      }
+const kinds = {
+  select: "selected",
+  skip: "skipped",
+  refine: "refined",
+  return: "returned",
+  engage: "built_on",
+} as const;
 
-      const event: EngagementEvent = {
-        type: body?.type,
-        objective: typeof body?.objective === "string" ? body.objective : undefined,
-        pathwayId: typeof body?.pathwayId === "string" ? body.pathwayId : undefined,
-        pathwayLabel: typeof body?.pathwayLabel === "string" ? body.pathwayLabel : undefined,
-        meaningElements:
-          Array.isArray(body?.meaningElements) &&
-          body.meaningElements.every((m: unknown) => typeof m === "string")
-            ? body.meaningElements
-            : undefined,
-        spiralForms:
-          Array.isArray(body?.spiralForms) &&
-          body.spiralForms.every((m: unknown) => typeof m === "string")
-            ? body.spiralForms
-            : undefined,
-        timestamp: Date.now(),
-      };
+let signals: EngagementSignal[] = [];
 
-      if (!event.type || !isValidType(event.type)) {
-        return Response.json({ error: "invalid_event_type" }, { status: 400 });
-      }
+export const Route = createFileRoute("/api/public/ascension/tree-signals")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        let body: Record<string, unknown>;
+        try {
+          body = await request.json();
+        } catch {
+          return Response.json({ error: "invalid_json" }, { status: 400 });
+        }
 
-      try {
-        recordEngagement(event);
-      } catch (err) {
-        return Response.json(
-          { error: "record_failed", detail: String(err) },
-          { status: 500 },
-        );
-      }
+        const type = body["type"];
+        if (typeof type !== "string" || !(type in kinds)) {
+          return Response.json({ error: "invalid_event_type" }, { status: 400 });
+        }
 
-      // Return a suggestion only when the preference layer says the Tree should speak.
-      const suggestion = getTreeSuggestion(event);
-      return Response.json({ ok: true, suggestion });
+        const objective = typeof body["objective"] === "string" ? body["objective"] : undefined;
+        const pathwayId = typeof body["pathwayId"] === "string" ? body["pathwayId"] : undefined;
+        const pathwayLabel = typeof body["pathwayLabel"] === "string" ? body["pathwayLabel"] : undefined;
+        const meaningElements = Array.isArray(body["meaningElements"])
+          ? body["meaningElements"].filter((item): item is string => typeof item === "string")
+          : [];
+        signals = recordEngagement(signals, {
+          kind: kinds[type as keyof typeof kinds],
+          target: pathwayLabel ?? pathwayId ?? type,
+          meaningElements,
+          ...(objective !== undefined ? { objective } : {}),
+          ...(pathwayId !== undefined ? { pathwayId } : {}),
+        });
+        const suggestion = composeSuggestion(buildProfile(signals), {
+          ...(objective !== undefined ? { objective } : {}),
+        });
+        return Response.json({ ok: true, suggestion });
+      },
     },
   },
-);
-
-function isValidType(t: string): t is EngagementEvent["type"] {
-  return (
-    t === "select" ||
-    t === "skip" ||
-    t === "refine" ||
-    t === "return" ||
-    t === "engage"
-  );
-}
+});

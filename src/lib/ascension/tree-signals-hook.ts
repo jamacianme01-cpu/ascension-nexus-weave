@@ -45,11 +45,11 @@ export function useTreeSignals() {
       lastEvent.current = event;
       postSignal({
         event,
-        pathwayLabel: detail?.pathwayLabel,
-        objective: detail?.objective,
         timestamp: Date.now(),
         sessionId: sessionId.current,
-        context: detail?.context,
+        ...(detail?.pathwayLabel !== undefined ? { pathwayLabel: detail.pathwayLabel } : {}),
+        ...(detail?.objective !== undefined ? { objective: detail.objective } : {}),
+        ...(detail?.context !== undefined ? { context: detail.context } : {}),
       });
     },
     [],

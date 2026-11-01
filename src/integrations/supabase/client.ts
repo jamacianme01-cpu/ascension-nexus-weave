@@ -7,7 +7,7 @@ export const supabase = {
     async getUser() {
       return { data: { user: null }, error: null };
     },
-    async getSession() {
+    async getSession(): Promise<{ data: { session: { access_token: string } | null }; error: null }> {
       return { data: { session: null }, error: null };
     },
     onAuthStateChange() {
@@ -28,5 +28,11 @@ export const supabase = {
     async signOut() {
       return { error: null };
     },
+  },
+  async rpc(_name: string, _args?: Record<string, unknown>) {
+    return {
+      data: null,
+      error: { message: "ASCENSION database is not connected." },
+    };
   },
 };

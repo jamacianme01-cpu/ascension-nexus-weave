@@ -179,7 +179,7 @@ export const submitObjective = createServerFn({ method: "POST" })
       .select(RUN_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
-    return { accepted: true, executed_here: false, request: row as ObjectiveRun };
+    return { accepted: true, executed_here: false, request: row as unknown as ObjectiveRun };
   });
 
 export const listMyObjectives = createServerFn({ method: "GET" })
@@ -191,7 +191,7 @@ export const listMyObjectives = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) throw new Error(error.message);
-    return { items: (data ?? []) as ObjectiveRun[] };
+    return { items: (data ?? []) as unknown as ObjectiveRun[] };
   });
 
 export const getObjectiveStatus = createServerFn({ method: "GET" })

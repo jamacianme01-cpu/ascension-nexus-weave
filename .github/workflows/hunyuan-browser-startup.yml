@@ -28,4 +28,17 @@ jobs:
           $problems = $null
           [void][System.Management.Automation.Language.Parser]::ParseFile('runtime_bridge/start_hunyuan_now.ps1',[ref]$tokens,[ref]$problems)
           if ($problems.Count) { $problems | Format-List | Out-String | Write-Error; exit 1 }
-          Write-Host 'PASS PowerShell launcher parses correctly'
+          [void][System.Management.Automation.Language.Parser]::ParseFile('runtime_bridge/ascension_hunyuan_bridge.ps1',[ref]$tokens,[ref]$problems)
+          if ($problems.Count) { $problems | Format-List | Out-String | Write-Error; exit 1 }
+          Write-Host 'PASS PowerShell launcher and manager parse correctly'
+  windows-bridge:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Launch real browser-bridge Python on Windows and test port and preflight
+        shell: pwsh
+        run: python tests/hunyuan-browser-startup-smoke.py

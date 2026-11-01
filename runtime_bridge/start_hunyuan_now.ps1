@@ -30,53 +30,73 @@ if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) 
     Write-Warning ('Autostart registration failed: ' + $_.Exception.Message)
   }
 }
+# The previous launcher kept a stale background PowerShell bridge alive,
+# so edited model settings never took effect. Restart ONLY this named bridge.
 $existing = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
   Where-Object {
-    $_.Name -like '*powershell*.exe' -and
+    $_.Name -in @('powershell.exe','pwsh.exe') -and
     $_.CommandLine -like '*-File*ascension_hunyuan_bridge.ps1*'
   })
-if ($existing.Count -eq 0) {
-  Write-Host 'Starting ASCENSION Hunyuan bridge...'
-  Start-Process powershell.exe -WindowStyle Hidden -WorkingDirectory $Repo -ArgumentList @(
-    '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden',
-    '-File',('"' + $bridge + '"'),'-Repo',('"' + $Repo + '"'),
-    '-HunyuanRoot',('"' + $HunyuanRoot + '"')
-  )
-} else {
-  Write-Host 'ASCENSION Hunyuan bridge already running.'
+foreach ($process in $existing) {
+  Write-Host ('Replacing stale ASCENSION Hunyuan manager PID ' + $process.ProcessId)
+  Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
 }
-# Start an origin-restricted localhost bridge for the browser. A served web
-# page cannot access a private 8081 process unless this localhost adapter runs.
-$browserBridge = Join-Path $Repo 'runtime_bridge\hunyuan_browser_bridge.py'
-if (-not (Test-Path $browserBridge)) { throw "Missing Hunyuan browser bridge: $browserBridge" }
-$browserLive = [bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue)
-if (-not $browserLive) {
-  Start-Process -FilePath $python -WindowStyle Hidden -WorkingDirectory $Repo `
-    -ArgumentList '-B','-u',$browserBridge `
-    -RedirectStandardOutput (Join-Path $logs 'hunyuan-browser.out.log') `
-    -RedirectStandardError (Join-Path $logs 'hunyuan-browser.err.log')
+# A failed Hunyuan3D-2.1 process with the old 2.0 mini model identifier may
+# still be initializing. Terminate ONLY that known invalid API invocation.
+$wrongApi = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.Name -like 'python*.exe' -and
+    $_.CommandLine -like '*api_server.py*' -and
+    $_.CommandLine -like '*--port*8081*' -and
+    $_.CommandLine -like '*Hunyuan3D-2mini*'
+  })
+foreach ($process in $wrongApi) {
+  Write-Host ('Stopping mismatched 2.0 weights API PID ' + $process.ProcessId)
+  Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
 }
+# The bridge manager is now the SINGLE owner of both 8081 and 8082 launches.
+# Starting an extra browser bridge here caused simultaneous attempts to
+# redirect stdout to the same log file and could leave 8082 unavailable.
+Write-Host 'Starting corrected ASCENSION Hunyuan manager...'
+Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -WorkingDirectory $Repo -ArgumentList @(
+  '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden',
+  '-File',('"' + $bridge + '"'),'-Repo',('"' + $Repo + '"'),
+  '-HunyuanRoot',('"' + $HunyuanRoot + '"')
+)
+
 $readyApi = $false
-$readyWorker = $false
+$readyBrowser = $false
+$runningModel = $false
+# Hunyuan3D-2.1 can require a model weight download and GPU initialization.
 for ($attempt = 1; $attempt -le 24; $attempt++) {
-  $readyApi = [bool](Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue)
-  $readyWorker = [bool](Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like 'python*.exe' -and $_.CommandLine -like '*hunyuan_model_worker.py*' })
-  if ($readyApi -and $readyWorker) { break }
+  $readyApi = [bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue)
+  $readyBrowser = [bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue)
+  if ($readyApi -and $readyBrowser) { break }
   Start-Sleep -Seconds 5
 }
-Write-Host ('Hunyuan API on 127.0.0.1:8081: ' + $(if ($readyApi) {'LISTENING'} else {'NOT READY'}))
-Write-Host ('ASCENSION model queue worker: ' + $(if ($readyWorker) {'RUNNING'} else {'NOT RUNNING'}))
-$readyBrowser = [bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue)
-Write-Host ('ASCENSION local browser Hunyuan bridge on 127.0.0.1:8082: ' + $(if ($readyBrowser) {'LISTENING'} else {'NOT READY'}))
-if (-not ($readyApi -and $readyBrowser)) {
-  foreach ($name in @('hunyuan-api.err.log','hunyuan-worker.err.log','hunyuan-bridge.err.log')) {
-    $log = Join-Path $logs $name
-    if (Test-Path $log) {
-      Write-Host ('=== ' + $name + ' (last 15 lines) ===')
-      Get-Content $log -Tail 15
-    }
-  }
-  throw 'Hunyuan startup incomplete. Errors above identify the failing component.'
+$runningModel = [bool](Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -like 'python*.exe' -and $_.CommandLine -like '*api_server.py*' -and $_.CommandLine -like '*8081*' })
+Write-Host ('Hunyuan3D API 8081: ' + $(if ($readyApi) {'LISTENING'} elseif($runningModel) {'LOADING MODEL'} else {'NOT RUNNING'}))
+Write-Host ('ASCENSION browser bridge 8082: ' + $(if ($readyBrowser) {'LISTENING'} else {'NOT READY'}))
+Write-Host 'Remote model queue worker is optional for local browser rendering.'
+if ($readyApi -and $readyBrowser) {
+  Write-Host 'ASCENSION Hunyuan connected to the local GPU; refresh the ASCENSION design page.'
+  return
 }
-Write-Host 'ASCENSION Hunyuan browser 3D generation path online. Remote queued jobs also work when a publish token is configured.'
+if ($runningModel -and $readyBrowser) {
+  Write-Host 'Hunyuan is still loading/downloading weights. The corrected bridge is running; check the model startup log below.'
+}
+foreach ($name in @('hunyuan-api.err.log','hunyuan-browser.err.log','hunyuan-bridge.err.log','hunyuan-api.out.log')) {
+  $log = Join-Path $logs $name
+  if (Test-Path $log) {
+    Write-Host ('=== ' + $name + ' (last 12 lines) ===')
+    Get-Content $log -Tail 12
+  }
+}
+if (-not $readyBrowser) {
+  throw 'ASCENSION localhost browser bridge is not running. See hunyuan-browser.err.log above.'
+}
+if (-not $runningModel -and -not $readyApi) {
+  throw 'Hunyuan3D API exited during model initialization. See hunyuan-api.err.log above.'
+}
+Write-Host 'Model weights are still initializing. Browser bridge is ready; revisit when API 8081 is listening.'

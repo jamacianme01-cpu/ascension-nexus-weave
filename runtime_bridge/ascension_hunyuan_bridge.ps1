@@ -104,7 +104,7 @@ function Start-BrowserBridge {
     FilePath = $python
     WorkingDirectory = $Repo
     WindowStyle = 'Hidden'
-    ArgumentList = @('-B','-u',('"' + $browser + '"'))
+    ArgumentList = @('-S','-B','-u',('"' + $browser + '"'))
     RedirectStandardOutput = (Join-Path $logDir "hunyuan-browser-$stamp.out.log")
     RedirectStandardError = (Join-Path $logDir "hunyuan-browser-$stamp.err.log")
   }

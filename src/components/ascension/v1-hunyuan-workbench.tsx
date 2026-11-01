@@ -173,7 +173,7 @@ export function V1HunyuanWorkbench({
       onParts(runtime.meshes.map((m,i)=>{
         const own=m.mesh.name.trim();
         const parent=m.mesh.parent?.name?.trim()??"";
-        const generic=/^(?:mesh|node|primitive)[_\\s-]*\\d+$/i.test(own);
+        const generic=/^(?:mesh|node|primitive)[_\s-]*\d+$/i.test(own);
         return {name:(generic?parent||own:own||parent)||"Hunyuan mesh "+(i+1),meshIndex:i};
       }));
       setLoading(false);

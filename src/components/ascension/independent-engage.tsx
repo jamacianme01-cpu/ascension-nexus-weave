@@ -239,12 +239,12 @@ export function IndependentEngage() {
   }
 
   function retryPathways() {
-    if (loading || !firstAnswer || !requested) return;
+    if (loading || !requested) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
     setLoading(true); setStage("processing"); setPathwayError("");
-    void generatePathways(requested, firstAnswer, controller, token)
+    void generatePathways(requested, "", controller, token)
       .finally(() => { if (generation.current === token) setLoading(false); });
   }
 

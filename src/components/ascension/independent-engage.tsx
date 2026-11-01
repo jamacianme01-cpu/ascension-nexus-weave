@@ -61,6 +61,7 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   const [pictureLoading, setPictureLoading] = useState(true);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [inspection, setInspection] = useState<"assembled" | "blueprint" | "dissect" | "exploded">("assembled");
   useEffect(() => setPart(null), [path.id]);
   useEffect(() => {
     const cacheKey = JSON.stringify([objective, path.id, path.title]);
@@ -93,6 +94,21 @@ function PathwayView({ path, objective, onDive, onExplain, imageCache }: {
   return <section className="rounded-2xl border border-gold/35 bg-[#05101de8] p-5 shadow-2xl sm:p-7">
     <h3 className="mb-3 text-lg text-gold">{path.title}</h3>
     <p className="mb-5 max-w-3xl leading-7 text-foreground">{path.summary}</p>
+    <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Invention inspection views">
+      {(["assembled", "blueprint", "dissect", "exploded"] as const).map(mode =>
+        <button type="button" key={mode} aria-pressed={inspection === mode}
+          className={"rounded-full border px-4 py-2 text-sm " + (inspection === mode ? "border-primary text-primary" : "border-gold/40 text-gold")}
+          onClick={() => setInspection(mode)}>
+          {mode === "assembled" ? "ASSEMBLED" : mode === "blueprint" ? "BLUEPRINT" : mode === "dissect" ? "DISSECT" : "EXPLODED / IMPLODED"}
+        </button>)}
+    </div>
+    {inspection !== "assembled" && <p className="mb-3 text-sm text-muted-foreground" role="status">
+      {inspection === "blueprint"
+        ? "Technical blueprint unavailable: no verified dimensions or engineering drawing were returned."
+        : inspection === "dissect"
+          ? "Interior dissection unavailable: a verified 3D model is required."
+          : "Exploded and imploded geometry unavailable: a component-separated 3D model is required."}
+    </p>}
     <div className="mb-5 rounded-xl border border-gold/25 bg-[#08192a] p-3" aria-label="Selected invention picture">
       {picture ? <>
         <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-black/40 sm:min-h-[440px]">

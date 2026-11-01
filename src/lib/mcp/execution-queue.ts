@@ -22,7 +22,7 @@ export type ExecutionRequest = {
   error: string | null;
   created_at: string;
   updated_at: string;
-);
+};
 
 const store = new Map<string, ExecutionRequest>();
 
@@ -32,7 +32,7 @@ export function submitRequest(input: {
   objective: string;
   evidence?: string[] | null;
   constraints?: string[] | null;
-)): ExecutionRequest {
+}): ExecutionRequest {
   const now = new Date().toISOString();
   const req: ExecutionRequest = {
     id: randomUUID(),
@@ -58,11 +58,11 @@ export function submitRequest(input: {
   };
   store.set(req.id, req);
   return req;
-)
+}
 
 export function getRequest(id: string): ExecutionRequest | undefined {
   return store.get(id);
-)
+}
 
 export function listRequests(options: { userId?: string; limit?: number } = {}): ExecutionRequest[] {
   const { userId, limit = 10 } = options;

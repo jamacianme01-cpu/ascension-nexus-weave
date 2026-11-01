@@ -6,18 +6,18 @@ export type ToolAnnotations = {
   destructiveHint?: boolean;
   idempotentHint?: boolean;
   openWorldHint?: boolean;
-);
+};
 
 export type ToolContext = {
   isAuthenticated: () => boolean;
   getUserId: () => string | null;
-);
+};
 
 export type ToolResult = {
-  content: Array<string, { type: "text"; text: string }>;
+  content: Array<{ type: "text"; text: string }>;
   structuredContent?: unknown;
   isError?: boolean;
-);
+};
 
 export type ToolDefinition<TInput = unknown> = {
   name: string;
@@ -26,11 +26,11 @@ export type ToolDefinition<TInput = unknown> = {
   inputSchema: Record<string, ZodType>;
   annotations?: ToolAnnotations;
   handler: (input: TInput, ctx: ToolContext) => ToolResult | Promise<ToolResult>;
-);
+};
 
 export function defineTool<TInput>(def: ToolDefinition<TInput>): ToolDefinition<TInput> {
   return def;
-)
+}
 
 export class ToolError extends Error {
   constructor(message: string) {

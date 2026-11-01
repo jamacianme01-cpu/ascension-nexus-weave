@@ -20,7 +20,7 @@ export const supabaseAdmin = {
           filePath: string,
           bytes: Uint8Array,
           options?: { contentType?: string; upsert?: boolean },
-        ): Promise<{ error: { message: string } | null } | { error: null } {
+        ): Promise<{ error: { message: string } | null } | { error: null }> {
           try {
             if (REMOTE_BASE) {
               const url = `${REMOTE_BASE.replace(/\/$/, "")}/$/{bucket}/$/{filePath}`;

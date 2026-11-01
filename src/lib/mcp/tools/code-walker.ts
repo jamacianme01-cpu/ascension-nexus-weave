@@ -2,7 +2,7 @@ import { defineTool } from "../define-tool";
 import { z } from "zod";
 import { submitRequest } from "../execution-queue";
 
-const permission = z.enum(["read", "search", "write", "create", "execute", "control"]));
+const permission = z.enum(["read", "search", "write", "create", "execute", "control"]);
 
 export default defineTool({
   name: "ascension_code_walker",

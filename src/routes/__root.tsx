@@ -56,7 +56,7 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
             onClick={() => {
               router.invalidate();
               reset();
-            }
+            }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Try again
@@ -73,7 +73,7 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -124,7 +124,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}
+    <QueryClientProvider client={queryClient}>
       <Shell>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />

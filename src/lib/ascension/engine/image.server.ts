@@ -119,7 +119,7 @@ export async function generatePathwayImages(
     spiral_form?: string | null;
   }>,
   requestId = "unscoped",
-): Promise<{ urls: Map<string, string>; errors: string[] } {
+): Promise<{ urls: Map<string, string>; errors: string[] }> {
   const urls = new Map<string, string>();
   const errors: string[] = [];
   if (!pathways.length) return { urls, errors };
@@ -129,7 +129,7 @@ export async function generatePathwayImages(
   }
   const queue = [...pathways];
   const worker = async () => {
-    for (;;)
+    for (;;) {
       const pathway = queue.shift();
       if (!pathway) return;
       const safeId = pathway.id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80);
@@ -142,7 +142,9 @@ export async function generatePathwayImages(
           ),
         );
       } catch (cause) {
-        errors.push(`${pathway.label}: ${cause instanceof Error ? cause.message : String(cause)}`)}
+        errors.push(`${pathway.label}: ${cause instanceof Error ? cause.message : String(cause)}`);
+      }
+    }
   };
   await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker));
   return { urls, errors };

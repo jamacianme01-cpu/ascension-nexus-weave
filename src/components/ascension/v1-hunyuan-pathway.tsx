@@ -49,6 +49,10 @@ export function V1HunyuanPathway({
     const controller=new AbortController();
     setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
     (async()=>{
+      // React StrictMode replays mount effects during development. Defer one tick
+      // so a discarded mount never spends a second image-generation request.
+      await new Promise<void>(resolve=>window.setTimeout(resolve,0));
+      if(!active||controller.signal.aborted)return;
       // Show the already-approved selected pathway picture even when the owner's
       // Windows-only Hunyuan3D bridge cannot be reached from this browser.
       let sourceImage=imageCache.current.get(key);

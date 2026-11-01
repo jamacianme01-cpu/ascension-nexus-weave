@@ -235,9 +235,12 @@ export function V1HunyuanWorkbench({
     m.originalPosition.add(new THREE.Vector3(...move.delta));
     m.mesh.position.add(new THREE.Vector3(...move.delta));
   },[move?.seq]);
-  return <div ref={host} data-mode={mode}
+  // Keep WebGL canvas in a dedicated DOM host that React never clears when
+  // the loading overlay disappears or mode controls cause a rerender.
+  return <div data-mode={mode}
     className="relative h-full min-h-[360px] w-full overflow-hidden"
     aria-label="One real Hunyuan3D model">
+    <div ref={host} data-mode={mode} className="absolute inset-0" />
     {(loading||error)&&<div role={error?"alert":"status"}
       className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[#061420d9] p-4 text-center text-sm text-gold">
       {error||"Loading the actual Hunyuan3D GLB mesh…"}

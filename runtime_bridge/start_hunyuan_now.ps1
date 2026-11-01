@@ -30,84 +30,126 @@ if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) 
     Write-Warning ('Autostart registration failed: ' + $_.Exception.Message)
   }
 }
-# Preserve the working or loading Hunyuan GPU process. Only start a missing manager.
-$existing = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-  Where-Object { $_.Name -in @('powershell.exe','pwsh.exe') -and $_.CommandLine -like '*-File*ascension_hunyuan_bridge.ps1*' })
-if ($existing.Count -eq 0) {
-  Write-Host 'Starting Hunyuan manager without resetting existing GPU processes...'
-  $managerArgs = @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
-    '-File',('"' + $bridge + '"'),'-Repo',('"' + $Repo + '"'),
-    '-HunyuanRoot',('"' + $HunyuanRoot + '"'))
-  Start-Process -FilePath powershell.exe -WorkingDirectory $Repo -WindowStyle Hidden -ArgumentList $managerArgs
-} else {
-  Write-Host 'Hunyuan manager already running; preserving model initialization.'
-}
-
-# Recover the browser adapter independently if its port is not listening.
+# Recover only the ASCENSION browser bridge. Do not stop the GPU API (8081).
 $browserScript = Join-Path $Repo 'runtime_bridge\hunyuan_browser_bridge.py'
-if (-not (Test-Path $browserScript)) { throw "Missing Hunyuan browser bridge: $browserScript" }
+if (-not (Test-Path $browserScript)) { throw "Missing localhost browser bridge: $browserScript" }
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
+
 function Browser-Listening {
   return [bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue)
 }
+
+function Get-BridgeManagers {
+  @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.Name -in @('powershell.exe','pwsh.exe') -and
+      $_.CommandLine -like '*-File*ascension_hunyuan_bridge.ps1*'
+    })
+}
+
 if (-not (Browser-Listening)) {
-  $browserProcesses = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like 'python*.exe' -and $_.CommandLine -like '*hunyuan_browser_bridge.py*' })
-  if ($browserProcesses.Count -eq 0) {
+  # Stop ONLY the background supervisor, leaving the running Hunyuan GPU
+  # api_server.py untouched. This prevents another 8082 process spawning
+  # while we clean up the existing broken instances.
+  $managers = @(Get-BridgeManagers)
+  foreach ($item in $managers) {
+    Write-Host ('Pausing stale browser supervisor PID ' + $item.ProcessId)
+    Stop-Process -Id $item.ProcessId -Force -ErrorAction SilentlyContinue
+  }
+
+  # These processes have the exact browser bridge script in their command
+  # lines. They are not the Hunyuan GPU model, worker or other Python apps.
+  $stale = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.Name -like 'python*.exe' -and
+      $_.CommandLine -like '*hunyuan_browser_bridge.py*'
+    })
+  if ($stale.Count -gt 0) {
+    Write-Host ('Clearing ' + $stale.Count + ' stalled ASCENSION browser-bridge processes on port 8082.')
+    foreach ($item in $stale) {
+      Stop-Process -Id $item.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Seconds 2
+  }
+
+  if (-not (Browser-Listening)) {
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
     $browserOut = Join-Path $logs ("hunyuan-browser-$stamp.out.log")
     $browserErr = Join-Path $logs ("hunyuan-browser-$stamp.err.log")
-    Write-Host 'Starting local browser bridge directly, without touching Hunyuan 8081...'
-    $startArgs = @{
+    # -S skips loading third-party site packages from Hunyuan's portable
+    # Python environment. The bridge needs only Python's standard library.
+    $launch = @{
       FilePath = $python
       WorkingDirectory = $Repo
       WindowStyle = 'Hidden'
       PassThru = $true
-      ArgumentList = @('-B','-u',('"' + $browserScript + '"'))
+      ArgumentList = @('-S','-B','-u',('"' + $browserScript + '"'))
       RedirectStandardOutput = $browserOut
       RedirectStandardError = $browserErr
     }
-    try { $launched = Start-Process @startArgs }
-    catch { throw ('Browser process launch failed: ' + $_.Exception.Message) }
+    Write-Host 'Starting a single clean localhost browser bridge on 127.0.0.1:8082...'
+    try { $instance = Start-Process @launch }
+    catch { throw ('Browser bridge process failed to launch: ' + $_.Exception.Message) }
+
     $connected = $false
-    for ($attempt = 1; $attempt -le 15; $attempt++) {
+    for ($attempt = 1; $attempt -le 50; $attempt++) {
       if (Browser-Listening) { $connected = $true; break }
-      Start-Sleep -Milliseconds 400
-      $launched.Refresh()
-      if ($launched.HasExited) { break }
+      Start-Sleep -Milliseconds 300
+      $instance.Refresh()
+      if ($instance.HasExited) { break }
     }
     if (-not $connected) {
-      Write-Host ('Browser bridge process exited: ' + $launched.HasExited)
+      $instance.Refresh()
+      Write-Host ('Browser process PID: ' + $instance.Id + ', exited: ' + $instance.HasExited)
       if (Test-Path $browserErr) {
-        Write-Host '=== Browser startup error ==='
-        Get-Content $browserErr -Tail 25
+        Write-Host '=== Browser bridge stderr ==='
+        Get-Content $browserErr -Tail 30
       }
       if (Test-Path $browserOut) {
-        Write-Host '=== Browser startup output ==='
-        Get-Content $browserOut -Tail 10
+        Write-Host '=== Browser bridge stdout ==='
+        Get-Content $browserOut -Tail 12
       }
-      throw 'Browser bridge failed to listen on 8082. Diagnostic logs printed above.'
+      throw 'Browser adapter cannot bind 8082; exact diagnostic output shown above.'
     }
-  } else {
-    Write-Host ('Browser bridge process exists but not ready: PID ' + ($browserProcesses.ProcessId -join ','))
   }
 }
+
+# Start the updated manager only after establishing the browser bridge,
+# so the supervisor cannot spawn 11 competing Python processes again.
+$managers = @(Get-BridgeManagers)
+if ($managers.Count -eq 0) {
+  $managerArgs = @(
+    '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
+    '-File',('"' + $bridge + '"'),'-Repo',('"' + $Repo + '"'),
+    '-HunyuanRoot',('"' + $HunyuanRoot + '"')
+  )
+  Write-Host 'Starting Hunyuan supervisor; preserving any loading model on 8081.'
+  Start-Process -FilePath powershell.exe -WindowStyle Hidden -WorkingDirectory $Repo -ArgumentList $managerArgs
+}
+
 $readyBrowser = Browser-Listening
 $readyApi = [bool](Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue)
 $runningModel = [bool](Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-  Where-Object { $_.Name -like 'python*.exe' -and $_.CommandLine -like '*api_server.py*' -and $_.CommandLine -like '*8081*' })
+  Where-Object {
+    $_.Name -like 'python*.exe' -and
+    $_.CommandLine -like '*api_server.py*' -and
+    $_.CommandLine -like '*8081*'
+  })
 Write-Host ('ASCENSION browser bridge 8082: ' + $(if ($readyBrowser) {'LISTENING'} else {'NOT READY'}))
 Write-Host ('Hunyuan API 8081: ' + $(if ($readyApi) {'LISTENING'} elseif ($runningModel) {'LOADING MODEL'} else {'NOT RUNNING'}))
-Write-Host 'Remote queue worker is optional for local browser use.'
-if (-not $readyBrowser) { throw 'Local browser bridge is not listening. See browser logs.' }
+Write-Host 'Remote queue worker is not required for direct local browser use.'
+
+if (-not $readyBrowser) {
+  throw 'ASCENSION local browser bridge did not start.'
+}
 if ($readyApi) {
-  Write-Host 'Both Hunyuan ports are listening.'
+  Write-Host 'Hunyuan API and browser bridge are listening. The local connection is ready for verification.'
 } elseif ($runningModel) {
-  Write-Host 'Browser bridge is connected; Hunyuan weights are still loading. Preserve the model process.'
+  Write-Host 'Browser bridge repaired. Hunyuan is still loading its model; it has NOT been restarted.'
   $apiLog = Join-Path $logs 'hunyuan-api.err.log'
-  if (Test-Path $apiLog) { Get-Content $apiLog -Tail 7 }
+  if (Test-Path $apiLog) { Get-Content $apiLog -Tail 8 }
 } else {
   $apiLog = Join-Path $logs 'hunyuan-api.err.log'
   if (Test-Path $apiLog) { Get-Content $apiLog -Tail 15 }
-  throw 'Hunyuan API 8081 is not running. Review Hunyuan model startup log.'
+  throw 'Port 8082 is repaired, but Hunyuan GPU API 8081 is not running.'
 }

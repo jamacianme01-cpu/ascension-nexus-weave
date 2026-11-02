@@ -188,8 +188,11 @@ try{
     await page.waitForFunction(()=>{const b=[...document.querySelectorAll("button")].find(b=>b.textContent==="BLUEPRINT");return b&&!b.disabled;});
     assert.equal(await canvas.count(),0,"GLB arrival must not replace the invention picture");
     const original=await picture.getAttribute("src");
+    await page.getByRole("button",{name:"ASSEMBLED",exact:true}).click();
+    assert.equal(await picture.getAttribute("src"),original,"Assembled must preserve the clear reference");
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
     await canvas.waitFor({state:"visible",timeout:16000});
+    assert.equal(await page.getByRole("img",{name:"Selected design reference",exact:true}).getAttribute("src"),original,"3D study must retain the source reference");
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="blueprint"]').waitFor();
     console.log("V1 DIAGNOSTIC "+expectedId,JSON.stringify({
       detail: (await detail.innerText()).slice(0,500),
@@ -201,7 +204,7 @@ try{
     await canvas.screenshot({path:(process.env.ASCENSION_SCREENSHOT_DIR||"C:/Users/Gordo/.codex/tmp/ascension-feedback-check")+"/blueprint-"+expectedId+".png"});
     const preserved=await canvas.evaluate(el=>{window.__realMesh=el;return el.width>200;});
     assert.ok(preserved);
-    await page.getByRole("button",{name:"ASSEMBLED",exact:true}).click();
+    await page.getByRole("button",{name:"3D VIEW",exact:true}).click();
     await page.waitForTimeout(200);
     const assembledPixels=await canvas.screenshot();
     await page.getByRole("button",{name:"DISSECT / EXPLODE",exact:true}).click();

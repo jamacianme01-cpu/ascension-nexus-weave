@@ -141,12 +141,16 @@ export function V1HunyuanPathway({
     <p className="mb-4 max-w-4xl text-sm leading-6">{path.summary}</p>
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
-        key={v} type="button" aria-pressed={inspectModel&&mode===v} disabled={!bytes||(v==="dissect"&&parts.length<2)}
-        onClick={()=>changeView(v)}
+        key={v} type="button" aria-pressed={v==="assembled"?!inspectModel:inspectModel&&mode===v}
+        disabled={v==="assembled"?!picture:!bytes||(v==="dissect"&&parts.length<2)}
+        onClick={()=>{if(v==="assembled"&&picture){setMode("assembled");setInspectModel(false);}else changeView(v);}}
         className={"rounded-lg border px-4 py-2 text-sm disabled:opacity-40 "+
           (mode===v?"border-primary bg-primary/20 text-primary":"border-gold/40 text-gold")}>
         {v==="assembled"?"ASSEMBLED":v==="blueprint"?"BLUEPRINT":"DISSECT / EXPLODE"}
       </button>)}
+      {bytes&&<button type="button" aria-pressed={inspectModel&&mode==="assembled"}
+        onClick={()=>changeView("assembled")}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">3D VIEW</button>}
       {mode==="dissect"&&<button type="button"
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold"
         onClick={()=>changeView("assembled")}>IMPLODE / REASSEMBLE</button>}
@@ -183,6 +187,10 @@ export function V1HunyuanPathway({
             className="pointer-events-none absolute inset-x-0 top-3 grid grid-cols-3 text-center text-xs text-cyan-200">
             <span>TOP</span><span>FRONT</span><span>SIDE</span>
           </div>}
+          {picture&&inspectModel&&<div className="pointer-events-none absolute bottom-3 right-3 w-24 overflow-hidden rounded-xl border border-gold/50 bg-[#03101de8] p-1 sm:w-32">
+            <img src={picture} alt="Selected design reference" className="aspect-square w-full rounded-lg object-contain"/>
+            <p className="text-center text-[10px] text-gold">Design reference</p>
+          </div>}
         </div>
         {generatorError&&<p role="alert" className="text-xs text-red-300">{generatorError}</p>}
         {bytes&&inspectModel&&buttons}
@@ -193,7 +201,7 @@ export function V1HunyuanPathway({
           DIVE INTO REALITY
         </button>}
         <p className="text-xs text-foreground/70">
-          {bytes?"Actual Hunyuan3D GLB. All views use the same mesh; dimensions are not calibrated."
+          {bytes?"3D views use an unverified reconstruction. It may differ from the design reference; dimensions are not calibrated."
             :"Waiting for Hunyuan3D. No procedural or unrelated model is substituted."}
           {mode==="dissect"&&parts.length<2?" The generator returned a fused mesh that cannot honestly be dissected.":""}
         </p>

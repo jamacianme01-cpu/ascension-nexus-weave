@@ -1,9 +1,11 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 
 type Design = { id: string; title: string; summary: string; image?: string | undefined };
 export function TreePathwayCarousel({ designs, active, onRotate, onOpen }: {
   designs: Design[]; active: number; onRotate: (index: number) => void; onOpen: (index: number) => void;
 }) {
+  const [previewed, setPreviewed] = useState<number | null>(null);
+  const focused = designs[previewed ?? active];
   const rotate = (direction: number) => onRotate((active + direction + designs.length) % designs.length);
   return <div className="tree-pathway-carousel" role="region" aria-roledescription="carousel"
     aria-label="Pathways around the Tree of Knowledge" tabIndex={0}
@@ -22,24 +24,32 @@ export function TreePathwayCarousel({ designs, active, onRotate, onOpen }: {
     <div className="tree-orbit-designs" role="tablist" aria-label="Choose a pathway">
       {designs.map((design, index) => {
         const slot = (index - active + designs.length) % designs.length;
-        const angle = (45 + slot * 90) * Math.PI / 180;
+        const position = [[32, 23], [68, 23], [73, 45], [27, 45]][slot % 4]!;
         const style = {
-          "--orbit-x": `${50 + Math.sin(angle) * 37}%`,
-          "--orbit-y": `${52 + Math.cos(angle) * 24}%`,
-          "--orbit-scale": Math.cos(angle) > 0 ? 1 : .83,
-          zIndex: Math.cos(angle) > 0 ? 3 : 2,
+          "--orbit-x": `${position[0]}%`,
+          "--orbit-y": `${position[1]}%`,
+          "--orbit-scale": index === active ? 1.08 : 1,
+          zIndex: index === active ? 3 : 2,
         } as CSSProperties;
         return <button type="button" key={design.id} role="tab" aria-selected={index === active}
-          aria-label={`Open ${design.title}`} className="tree-orbit-card" data-active={index === active}
+          aria-label={`Open ${design.title}`} className="tree-orbit-card" data-active={index === active} data-blend={index === designs.length - 1}
           data-design-index={index} tabIndex={index === active ? 0 : -1}
-          style={style} onClick={() => onOpen(index)}>
+          style={style} onClick={() => onOpen(index)}
+          onPointerEnter={() => setPreviewed(index)} onPointerLeave={() => setPreviewed(null)}
+          onFocus={() => setPreviewed(index)} onBlur={() => setPreviewed(null)}>
+          <span className="tree-orb-window">
+            {design.image ? <img src={design.image} alt={`${design.title} design preview`} />
+              : <span className="tree-orb-forming" aria-hidden="true">✧</span>}
+          </span>
+          <span className="tree-orb-glass" aria-hidden="true" />
           {index === designs.length - 1 && <span className="tree-orbit-blend">BLEND</span>}
-          {design.image && <img src={design.image} alt={`${design.title} design preview`} />}
-          <strong>{design.title}</strong>
-          <span className="tree-orbit-summary">{design.summary}</span>
-          <span className="tree-orbit-open">Explore this design ↗</span>
         </button>;
       })}
+    </div>
+    <div className="tree-orb-reading" aria-live="polite" aria-atomic="true">
+      <strong>{focused?.title}</strong>
+      <p>{focused?.summary}</p>
+      <span>{focused?.image ? "Choose an orb to explore this possibility" : "The design preview is forming inside its orb"}</span>
     </div>
     <div className="tree-carousel-navigation">
       <button type="button" onClick={() => rotate(-1)} aria-label="Previous pathway">←</button>

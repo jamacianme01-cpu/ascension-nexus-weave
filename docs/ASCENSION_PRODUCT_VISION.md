@@ -29,3 +29,7 @@ Still required for the full vision: meaningful segmented components with source-
 ## Tree-centered pathway selection — owner direction, November 2
 
 The owner liked the visual pathway designs but observed that the Tree was disappearing from the selection experience. Place the pathways in a carousel around the Tree of Knowledge, keeping the Tree as the central visual presence. Clicking a pathway opens its existing dedicated inspection screen with that design's views and descriptions. Back returns to the carousel and preserves its position. Use a responsive presentation on mobile, keyboard navigation and reduced-motion support. Preserve approved artwork and existing design identity; do not regenerate designs when rotating or returning.
+
+## Crystal-orb pathways — owner correction, November 2
+
+The pathways are the crystal orbs on the Tree, not rectangular cards placed beside it. Each orb is a window onto its own design, like peering through a crystal ball at a possible destiny. Move between the orbs, reveal the focused design's title/description without covering the Tree, and choose an orb to open the existing pathway inspection page. Preserve the clear design reference; a coarse reconstruction must not silently replace it. Reconstruction inspection remains explicit and visibly separate from the reference until correspondence is established.

@@ -12,7 +12,7 @@ type Props = {
   zoom: number;
   rotation: number;
   selected: number | null;
-  move?: { seq: number; index: number; delta: [number,number,number] };
+  move?: { seq: number; index: number; delta: [number,number,number] } | undefined;
   reset: number;
   onParts: (parts: MeshPart[]) => void;
   onError: (message: string) => void;
@@ -21,6 +21,7 @@ type Props = {
 type MeshRecord = {
   mesh: THREE.Mesh;
   originalPosition: THREE.Vector3;
+  homePosition: THREE.Vector3;
   originalMaterials: THREE.Material | THREE.Material[];
   blueprintMaterials: THREE.Material | THREE.Material[];
 };
@@ -29,6 +30,7 @@ type Runtime = {
   controls: OrbitControls; camera: THREE.PerspectiveCamera;
   orthos: THREE.OrthographicCamera[]; meshes: MeshRecord[];
   observer: ResizeObserver; frame: number;
+  selection: THREE.BoxHelper;
 };
 
 /** Renders the actual GLB bytes returned by the owner's Hunyuan3D local runtime.
@@ -83,14 +85,16 @@ export function V1HunyuanWorkbench({
     renderer.domElement.style.height="100%";
     renderer.domElement.style.touchAction="none";
     renderer.domElement.setAttribute("aria-label","Hunyuan3D generated mesh of "+title);
-    const runtime:Runtime={scene,root,renderer,controls,camera,orthos,meshes:[],observer:null as unknown as ResizeObserver,frame:0};
+    const selection=new THREE.BoxHelper(new THREE.Object3D(),0xffd578);
+    selection.visible=false;scene.add(selection);
+    const runtime:Runtime={scene,root,renderer,controls,camera,orthos,meshes:[],observer:null as unknown as ResizeObserver,frame:0,selection};
     live.current=runtime;
     const measure=()=>{
       const width=Math.max(node.clientWidth,280),height=Math.max(node.clientHeight,280);
       camera.aspect=width/height;camera.updateProjectionMatrix();
       const frameWidth=(width/3)/height;
       for(const o of orthos){
-        const extent=3.25;
+        const extent=Math.max(2.8,2.8/frameWidth);
         o.left=-extent*frameWidth;o.right=extent*frameWidth;o.top=extent;o.bottom=-extent;
         o.updateProjectionMatrix();
       }
@@ -107,7 +111,7 @@ export function V1HunyuanWorkbench({
       pointerStart=null;
       const r=renderer.domElement.getBoundingClientRect();
       const raw=(e.clientX-r.left)/r.width;
-      const blueprint=node.dataset.mode==="blueprint";
+      const blueprint=node.dataset["mode"]==="blueprint";
       const segment=Math.min(2,Math.floor(raw*3));
       pointer.set(2*(blueprint?raw*3-segment:raw)-1,1-2*(e.clientY-r.top)/r.height);
       raycaster.setFromCamera(pointer,blueprint?orthos[segment]!:camera);
@@ -122,8 +126,12 @@ export function V1HunyuanWorkbench({
       runtime.frame=requestAnimationFrame(paint);
       if(time-last<48 || !node.isConnected)return;
       last=time;
-      const blueprint=node.dataset.mode==="blueprint";
+      const blueprint=node.dataset["mode"]==="blueprint";
       controls.enabled=!blueprint;controls.update();
+      const selectedIndex=Number(node.dataset["selected"]);
+      const selectedMesh=node.dataset["selected"] ? runtime.meshes[selectedIndex]?.mesh : null;
+      selection.visible=Boolean(selectedMesh);
+      if(selectedMesh)selection.setFromObject(selectedMesh);
       if(blueprint){
         const width=Math.max(node.clientWidth,280),height=Math.max(node.clientHeight,280),part=width/3;
         renderer.setScissorTest(true);
@@ -146,22 +154,21 @@ export function V1HunyuanWorkbench({
       if(bounding.isEmpty()){setError("Hunyuan returned an empty GLB");onError("Empty Hunyuan GLB");return;}
       const size=bounding.getSize(new THREE.Vector3());
       const center=bounding.getCenter(new THREE.Vector3());
-      gltf.scene.position.sub(center);
-      gltf.scene.scale.setScalar(4.6/Math.max(size.x,size.y,size.z,0.001));
+      const scale=4.6/Math.max(size.x,size.y,size.z,0.001);
+      gltf.scene.scale.setScalar(scale);
+      gltf.scene.position.copy(center).multiplyScalar(-scale);
       gltf.scene.traverse(item=>{
         if(item instanceof THREE.Mesh){
           const original=item.material;
-          const clone=(m:THREE.Material)=>{
-            const material=m.clone();
-            if(material instanceof THREE.MeshStandardMaterial){
-              material.color.setHex(0x63e5ff);material.wireframe=true;
-            }
-            return material;
-          };
+          // Technical linework must not inherit dark textures or depend on lights.
+          const clone=(_m:THREE.Material)=>new THREE.MeshBasicMaterial({
+            color:0x8feeff,wireframe:true,side:THREE.DoubleSide,
+          });
           const blueprint=Array.isArray(original)?original.map(clone):clone(original);
           runtime.meshes.push({
             mesh:item,
             originalPosition:item.position.clone(),
+            homePosition:item.position.clone(),
             originalMaterials:original,
             blueprintMaterials:blueprint,
           });
@@ -199,12 +206,14 @@ export function V1HunyuanWorkbench({
         }
       });
       renderer.dispose();renderer.domElement.remove();
+      selection.geometry.dispose();
+      (selection.material as THREE.Material).dispose();
       live.current=null;
     };
   },[bytes,title]);
 
   useEffect(()=>{
-    if(host.current)host.current.dataset.mode=mode;
+    if(host.current)host.current.dataset["mode"]=mode;
     const st=live.current;if(!st?.meshes.length)return;
     const blueprint=mode==="blueprint",explode=mode==="dissect" && st.meshes.length>1;
     st.scene.background=new THREE.Color(blueprint?"#06223a":"#051727");
@@ -214,12 +223,12 @@ export function V1HunyuanWorkbench({
       mesh.material=record.originalMaterials;
       if(blueprint)mesh.material=record.blueprintMaterials;
       if(explode){
-        const world=new THREE.Vector3();
-        mesh.getWorldPosition(world);
+        const world=new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
         const offset=world.clone();
         if(offset.lengthSq()<0.01)offset.set((i%3)-1,(i%5)-2,1);
         offset.normalize().multiplyScalar(0.65+(i%3)*0.16);
-        mesh.position.add(offset);
+        const origin=mesh.getWorldPosition(new THREE.Vector3());
+        mesh.position.copy(mesh.parent!.worldToLocal(origin.add(offset)));
       }
     });
   },[mode,bytes,revision]);
@@ -233,9 +242,11 @@ export function V1HunyuanWorkbench({
   useEffect(()=>{const st=live.current;if(st)st.root.rotation.y=rotation*Math.PI/180;},[rotation,bytes,revision]);
   useEffect(()=>{
     const st=live.current;if(!st)return;
-    st.meshes.forEach(m=>m.mesh.position.copy(m.originalPosition));
+    st.meshes.forEach(m=>{m.originalPosition.copy(m.homePosition);m.mesh.position.copy(m.homePosition);});
     st.root.rotation.set(0,0,0);
+    st.camera.position.set(5,4,7);st.controls.target.set(0,0,0);st.controls.update();
   },[reset]);
+  useEffect(()=>{if(host.current)host.current.dataset["selected"]=selected===null?"":String(selected);},[selected,revision]);
   useEffect(()=>{
     const st=live.current;if(!st||!move)return;
     const m=st.meshes[move.index];if(!m)return;

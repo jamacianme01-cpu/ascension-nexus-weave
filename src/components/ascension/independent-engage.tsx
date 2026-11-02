@@ -7,6 +7,7 @@ type Pathway = { id: string; title: string; summary: string; steps: string[]; tr
 type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string };
   contributors: string[]; unavailable: string[]; providerErrors: string[]; mode: string; verified: false; governance: string; persistence: string };
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
+const GREETING = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're here. What would you like to create? I'll help you work through it.";
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
@@ -85,7 +86,7 @@ export function IndependentEngage() {
   useEffect(() => {
     // Tree and Book remain in place; the Tree speaks without a new entrance scene.
     // When a browser blocks autoplay, retry in the first genuine user interaction.
-    const greeting = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're here. What would you like to create? I'll help you work through it.";
+    const greeting = GREETING;
     let disposed = false;
     const tryWelcome = () => {
       if (disposed || welcomeStarted.current || document.hidden) return;
@@ -117,7 +118,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      // The results speak for themselves. Do not narrate the screen.
+      if (talking) say("I've brought your designs together. Choose one and we'll explore how its parts work, or build on it together.");
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.
       window.setTimeout(() => {
@@ -245,6 +246,13 @@ export function IndependentEngage() {
       </div>
     </section>}
 
+    {choice === null && <div className="relative z-30 mx-auto max-w-6xl px-4">
+      <button type="button" onClick={() => { setTalking(true); say(GREETING); }}
+        className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
+      <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}
+        pathway={{ title: "Your idea", summary: requested || objective, steps: [], parts: [] }}
+        enabled={talking} onSpeak={text => { if (talking) say(text); }} />
+    </div>}
     {loading && <section className="mx-auto mt-4 max-w-3xl p-5 text-center text-gold" role="status">
       Developing your pathways…
       <button type="button" className="ml-4 underline" onClick={() => {
@@ -260,14 +268,10 @@ export function IndependentEngage() {
       </button>
     </section>}
 
-    {firstAnswer && choice === null && <section className="mx-auto mt-4 max-w-6xl rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-6" aria-label="Initial objective answer">
-      <h2 className="mb-2 text-lg text-gold">INITIAL ANSWER</h2>
-      <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{firstAnswer}</p>
-    </section>}
 
     {result && choice === null && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg text-gold">THREE PATHWAYS + FOURTH BLEND</h2>
+        <h2 className="text-lg text-gold">Explore your designs</h2>
         <div className="flex flex-wrap gap-3 text-xs">
           <button type="button" onClick={() => {
             if (talking) stopVoice();
@@ -288,7 +292,7 @@ export function IndependentEngage() {
             setChoice(index); setRefinement("");
             // The mounted design screen receives the viewport on the next frame.
           }}>
-          <span className="block text-xs tracking-wide">{index === 3 ? "FOURTH · BLEND" : "PATHWAY " + (index + 1)}</span>
+          {index === 3 && <span className="block text-xs tracking-wide">BLEND</span>}
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>
           <span className="mt-3 block text-sm leading-6 text-foreground/80">
             {p.summary.length > 190 ? p.summary.slice(0, 187).trimEnd() + "…" : p.summary}

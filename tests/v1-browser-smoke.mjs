@@ -20,9 +20,10 @@ function fixtureGlb(){
       {bufferView:0,componentType:5126,count:3,type:"VEC3",min:[-1,-.2,0],max:[-.2,.8,.6]},
       {bufferView:1,componentType:5126,count:3,type:"VEC3",min:[.2,-.2,0],max:[1,.8,.6]},
     ],
+    materials:[{doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[0.6,0.8,1,1],metallicFactor:0,roughnessFactor:1}}],
     meshes:[
-      {primitives:[{attributes:{POSITION:0}}]},
-      {primitives:[{attributes:{POSITION:1}}]},
+      {primitives:[{attributes:{POSITION:0},material:0}]},
+      {primitives:[{attributes:{POSITION:1},material:0}]},
     ],
     nodes:[
       {mesh:0,name:"Hunyuan rotor mesh"},
@@ -41,7 +42,7 @@ function fixtureGlb(){
   return out;
 }
 
-const browser=await chromium.launch({args:["--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]});
+const browser=await chromium.launch({channel:process.env.ASCENSION_BROWSER_CHANNEL||undefined,args:["--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]});
 try{
   const page=await browser.newPage({viewport:{width:1100,height:800},reducedMotion:"reduce"});
   page.setDefaultTimeout(16000);
@@ -50,9 +51,15 @@ try{
   page.on("pageerror",e=>errors.push(e.message));
   page.on("console",msg=>{if(msg.type()==="error")console.log("BROWSER ERROR: "+msg.text().slice(0,500));});
   const mockBytes=fixtureGlb();
-  const mockImage=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(4300,21)]).toString("base64");
+  const mockImage=await page.evaluate(()=>{
+    const c=document.createElement("canvas");c.width=64;c.height=64;
+    const ctx=c.getContext("2d"),pixels=ctx.createImageData(64,64);
+    let seed=321;const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed>>>24;};
+    for(let i=0;i<pixels.data.length;i+=4){pixels.data[i]=random();pixels.data[i+1]=random();pixels.data[i+2]=random();pixels.data[i+3]=255;}
+    ctx.putImageData(pixels,0,0);return c.toDataURL("image/png").split(",")[1];
+  });
   await page.addInitScript((b64)=>{
-    window.__localHunyuanCalls=[];
+    window.__localHunyuanCalls=[];window.__treeSpeech=[];
     const realFetch=window.fetch.bind(window);
     window.fetch=async(input,init)=>{
       const url=typeof input==="string"?input:input instanceof Request?input.url:String(input);
@@ -73,7 +80,7 @@ try{
       return new Response("unrecognized route",{status:404});
     };
     Object.defineProperty(window,"speechSynthesis",{configurable:true,value:{
-      cancel(){},speak(utterance){queueMicrotask(()=>{
+      cancel(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
         utterance.onstart?.();utterance.onend?.();
       });}
     }});
@@ -135,10 +142,15 @@ try{
   await hero.waitFor();
   const entry=page.getByRole("region",{name:"Engage ASCENSION"});
   await entry.waitFor({state:"visible"});
+  await page.getByRole("button",{name:"Hear the Tree",exact:true}).click();
+  assert.ok(await page.evaluate(()=>window.__treeSpeech.some(s=>s.startsWith("Welcome to ASCENSION"))));
   await page.locator("#objective").fill("make worker drones");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
   assert.equal(await page.getByRole("tab").count(),4);
+  assert.equal(await page.getByText("INITIAL ANSWER",{exact:true}).count(),0);
+  assert.equal(await page.getByText("THREE PATHWAYS + FOURTH BLEND",{exact:true}).count(),0);
+  assert.equal(await page.getByRole("region",{name:"Initial objective answer"}).count(),0);
   await entry.waitFor({state:"visible"});
   assert.equal(await page.locator('img[alt^="Concept picture of"]').count(),0,
     "No image generated on first page");
@@ -148,8 +160,14 @@ try{
   const stages=["BLUEPRINT","DISSECT / EXPLODE","IMPLODE / REASSEMBLE"];
   async function inspect(expectedId){
     await detail.waitFor({state:"visible"});
-    await canvas.waitFor({state:"visible",timeout:16000});
+    const picture=page.locator('img[alt^="Concept picture of"]');
+    await picture.waitFor({state:"visible"});
+    await page.getByRole("button",{name:"BLUEPRINT",exact:true}).waitFor({state:"visible"});
+    await page.waitForFunction(()=>{const b=[...document.querySelectorAll("button")].find(b=>b.textContent==="BLUEPRINT");return b&&!b.disabled;});
+    assert.equal(await canvas.count(),0,"GLB arrival must not replace the invention picture");
+    const original=await picture.getAttribute("src");
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).click();
+    await canvas.waitFor({state:"visible",timeout:16000});
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="blueprint"]').waitFor();
     console.log("V1 DIAGNOSTIC "+expectedId,JSON.stringify({
       detail: (await detail.innerText()).slice(0,500),
@@ -157,27 +175,42 @@ try{
       local: await page.evaluate(()=>window.__localHunyuanCalls),
       errors: errors.slice(-4),
     }));
+    await page.waitForTimeout(200);
+    await canvas.screenshot({path:(process.env.ASCENSION_SCREENSHOT_DIR||"C:/Users/Gordo/.codex/tmp/ascension-feedback-check")+"/blueprint-"+expectedId+".png"});
     const preserved=await canvas.evaluate(el=>{window.__realMesh=el;return el.width>200;});
     assert.ok(preserved);
+    await page.getByRole("button",{name:"ASSEMBLED",exact:true}).click();
+    await page.waitForTimeout(200);
+    const assembledPixels=await canvas.screenshot();
     await page.getByRole("button",{name:"DISSECT / EXPLODE",exact:true}).click();
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="dissect"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__realMesh),true,
       "Dissect must reuse the actual Hunyuan GLB canvas");
+    await page.waitForTimeout(200);
+    assert.notDeepEqual(await canvas.screenshot(),assembledPixels,"Explosion must actually separate geometry");
     await page.getByRole("button",{name:"IMPLODE / REASSEMBLE",exact:true}).click();
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="assembled"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__realMesh),true,
       "Reassemble must not regenerate another design");
+    await page.waitForTimeout(200);
+    assert.deepEqual(await canvas.screenshot(),assembledPixels,"Implosion must restore the original assembly");
     await page.getByRole("button",{name:"LABELS",exact:true}).click();
+    await page.getByRole("button",{name:/^(Rotor|Coil)$/,exact:true}).click();
+    await page.getByText(/What it does:/).waitFor({state:"visible"});
+    await page.getByText("Inspect model geometry",{exact:true}).click();
     await page.getByRole("button",{name:"Hunyuan rotor mesh"}).click();
     await page.getByRole("button",{name:"MOVE RIGHT"}).click();
     await page.getByRole("button",{name:"ZOOM IN"}).click();
     await page.getByRole("button",{name:"DIVE INTO REALITY"}).click();
     await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
     assert.equal(await detail.count(),1);
+    await page.getByRole("button",{name:"INVENTION PICTURE",exact:true}).click();
+    await picture.waitFor({state:"visible"});
+    assert.equal(await picture.getAttribute("src"),original,"Picture identity survives all model views");
     assert.equal(await detail.getByText("Hunyuan3D mesh ready").count(),0);
     assert.equal(await page.locator('canvas[aria-label^="Rotatable, zoomable"]').count(),0,
       "Generic procedural substitute must never render");
-    console.log("PASS actual Hunyuan GLB path "+expectedId);
+    console.log("PASS fixture GLB interactions for "+expectedId);
   }
   for(const [index,id] of ["rotor","rover","modular","blend"].entries()){
     await page.getByRole("tab").nth(index).click();
@@ -197,7 +230,7 @@ try{
   await inspect("linear1");
   assert.equal(generated.length,5,"Only selected pathways generate Hunyuan input images");
   assert.equal(errors.length,0,errors.join(" | "));
-  console.log("PASS V1 browser: approved home, four pathway choices, real GLB bytes, same model in blueprint/explode/reassemble, native submesh controls, no invented procedural model, linear propulsion");
+  console.log("PASS V1 browser fixture checks: entry speech callback, hidden brief, four choices, preserved picture, GLB blueprint/explode/reassemble, component descriptions and geometry controls. Not live generation or audible playback acceptance.");
 } finally{
   await browser.close();
 }

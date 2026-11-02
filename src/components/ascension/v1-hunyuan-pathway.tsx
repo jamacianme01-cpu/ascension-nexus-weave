@@ -30,7 +30,9 @@ export function V1HunyuanPathway({
   const [mode,setMode]=useState<HunyuanMode>("assembled");
   const [parts,setParts]=useState<MeshPart[]>([]);
   const [meshIndex,setMeshIndex]=useState<number|null>(null);
-  const [tab,setTab]=useState<"description"|"labels">("description");
+  const [tab,setTab]=useState<"description"|"labels">("labels");
+  const [inspectModel,setInspectModel]=useState(false);
+  const [component,setComponent]=useState<number|null>(null);
   const [zoom,setZoom]=useState(1);
   const [rotation,setRotation]=useState(0);
   const [reset,setReset]=useState(0);
@@ -39,12 +41,12 @@ export function V1HunyuanPathway({
   const [generatorError,setGeneratorError]=useState("");
 
   useEffect(()=>{
-    setMode("assembled");setMeshIndex(null);setTab("description");
+    setMode("assembled");setMeshIndex(null);setTab("labels");setInspectModel(false);setComponent(null);
     setZoom(1);setRotation(0);setReset(0);setParts([]);setImmersive(false);
   },[path.id]);
   useEffect(()=>{
     const stored=modelCache.current.get(key);
-    if(stored){setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");return;}
+    if(stored){setPicture(imageCache.current.get(key)??null);setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");return;}
     let active=true;
     const controller=new AbortController();
     setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
@@ -117,7 +119,7 @@ export function V1HunyuanPathway({
     return()=>{document.body.style.overflow=overflow;window.removeEventListener("keydown",escape);};
   },[immersive]);
 
-  const changeView=(next:HunyuanMode)=>{setMode(next);};
+  const changeView=(next:HunyuanMode)=>{setInspectModel(true);setMode(next);};
   const inspect=(index:number)=>{
     setMeshIndex(index);setTab("labels");
     const mesh=parts[index];
@@ -136,7 +138,7 @@ export function V1HunyuanPathway({
       className="rounded-lg border border-gold/40 px-3 py-2 text-xs text-gold">ROTATE LEFT</button>
     <button type="button" onClick={()=>setRotation(v=>v+15)}
       className="rounded-lg border border-gold/40 px-3 py-2 text-xs text-gold">ROTATE RIGHT</button>
-    <button type="button" onClick={()=>{setZoom(1);setRotation(0);setReset(v=>v+1);}}
+    <button type="button" onClick={()=>{setZoom(1);setRotation(0);setMode("assembled");setReset(v=>v+1);}}
       className="rounded-lg border border-gold/40 px-3 py-2 text-xs text-gold">RESET</button>
   </div>;
   return <section className="rounded-2xl border border-gold/30 bg-[#04101cf5] p-4 sm:p-6"
@@ -145,8 +147,10 @@ export function V1HunyuanPathway({
     <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak}/>
     <p className="mb-4 max-w-4xl text-sm leading-6">{path.summary}</p>
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
+      {picture&&<button type="button" aria-pressed={!inspectModel} onClick={()=>setInspectModel(false)}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">INVENTION PICTURE</button>}
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
-        key={v} type="button" aria-pressed={mode===v} disabled={!bytes||(v==="dissect"&&parts.length<2)}
+        key={v} type="button" aria-pressed={inspectModel&&mode===v} disabled={!bytes||(v==="dissect"&&parts.length<2)}
         onClick={()=>changeView(v)}
         className={"rounded-lg border px-4 py-2 text-sm disabled:opacity-40 "+
           (mode===v?"border-primary bg-primary/20 text-primary":"border-gold/40 text-gold")}>
@@ -156,8 +160,8 @@ export function V1HunyuanPathway({
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold"
         onClick={()=>changeView("assembled")}>IMPLODE / REASSEMBLE</button>}
     </div>
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
-      <div className={immersive?"fixed inset-0 z-[200] flex flex-col bg-[#030d18] p-4":"flex min-w-0 flex-col gap-3"}>
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
+      <div className={immersive?"fixed inset-0 z-[200] flex flex-col bg-[#030d18] p-4 lg:pr-[320px]":"flex min-w-0 flex-col gap-3"}>
         {immersive&&<div className="mb-2 flex items-center justify-between">
           <h4 className="truncate text-gold">{path.title} · HUNYUAN3D</h4>
           <button type="button" onClick={()=>setImmersive(false)}
@@ -166,7 +170,7 @@ export function V1HunyuanPathway({
         <div className={"relative min-w-0 overflow-hidden rounded-xl border border-gold/25 bg-[#051727] "+
           (immersive?"flex-1 min-h-0":"h-[min(65vh,600px)] min-h-[360px]")}
           aria-label="Hunyuan3D real mesh viewer">
-          {bytes?<V1HunyuanWorkbench
+          {bytes&&inspectModel?<V1HunyuanWorkbench
             bytes={bytes} title={path.title} mode={mode} zoom={zoom}
             rotation={rotation} selected={meshIndex} move={move}
             reset={reset} onParts={setParts} onError={setGeneratorError} onSelect={inspect}/>:
@@ -174,24 +178,24 @@ export function V1HunyuanPathway({
               <img src={picture} alt={`Concept picture of ${path.title}`}
                 className="min-h-0 flex-1 w-full rounded-lg object-contain" />
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
-                <span>{working?status:failure||status}</span>
+                <span>{working?status:failure||"3D inspection is available when you choose a view."}</span>
                 {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
                   onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
               </div>
             </div>:
             <div role={failure?"alert":"status"} className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-              <p className="max-w-xl text-sm text-gold">{working?status:failure||status}</p>
+              <p className="max-w-xl text-sm text-gold">{working?status:failure||"3D inspection is available when you choose a view."}</p>
               {failure&&<button type="button" className="rounded-lg border border-gold/50 px-4 py-2 text-gold"
                 onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
             </div>}
-          {mode==="blueprint"&&bytes&&<div aria-hidden="true"
+          {inspectModel&&mode==="blueprint"&&bytes&&<div aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-3 grid grid-cols-3 text-center text-xs text-cyan-200">
             <span>TOP</span><span>FRONT</span><span>SIDE</span>
           </div>}
         </div>
         {generatorError&&<p role="alert" className="text-xs text-red-300">{generatorError}</p>}
-        {bytes&&buttons}
-        {bytes&&!immersive&&<button type="button" onClick={()=>setImmersive(true)}
+        {bytes&&inspectModel&&buttons}
+        {bytes&&!immersive&&<button type="button" onClick={()=>{setInspectModel(true);setImmersive(true);}}
           className="self-start rounded-xl border border-primary/60 px-4 py-2 text-sm text-primary">
           DIVE INTO REALITY
         </button>}
@@ -201,8 +205,10 @@ export function V1HunyuanPathway({
           {mode==="dissect"&&parts.length<2?" The generator returned a fused mesh that cannot honestly be dissected.":""}
         </p>
       </div>
-      {!immersive&&<aside className="min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4"
+      <aside className={"min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4 "+
+        (immersive?"fixed right-3 top-20 bottom-3 z-[210] w-[285px] overflow-auto max-lg:hidden":"")}
         aria-label="Hunyuan design description and parts">
+        {immersive&&<TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak} compact/>}
         <div className="mb-4 flex flex-wrap gap-2">
           {(["description","labels"] as const).map(v=><button key={v} type="button"
             aria-pressed={tab===v} onClick={()=>setTab(v)}
@@ -222,30 +228,30 @@ export function V1HunyuanPathway({
             <summary className="cursor-pointer text-gold">Engineering limits</summary>
             <ul className="list-disc pl-5">{path.tradeoffs.map((t,i)=><li key={i}>{t}</li>)}</ul>
           </details>}
-        </div>:<div className="space-y-2 text-sm">
-          <p className="text-xs text-foreground/65">Actual Hunyuan mesh elements ({parts.length}). Mesh names are not automatically engineering component identifications.</p>
-          {parts.map(p=><button type="button" key={p.meshIndex}
-            onClick={()=>inspect(p.meshIndex)} aria-pressed={meshIndex===p.meshIndex}
-            className={"block w-full rounded-lg border p-3 text-left "+
-              (meshIndex===p.meshIndex?"border-primary":"border-gold/30")}>{p.name}</button>)}
-          {meshIndex!==null&&<div className="mt-3 space-y-2 rounded-lg border border-primary/35 p-3">
-            <strong>{parts[meshIndex]?.name}</strong>
-            <p>WHAT: Hunyuan-generated submesh. WHERE: Positioned within the displayed 3D assembly.</p>
-            <p>DOES: Functional assignment is not established by the mesh alone.</p>
-            <div className="grid grid-cols-2 gap-2">
+        </div>:<div className="space-y-2 text-sm" aria-label="Design components">
+          {path.parts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
+            onClick={()=>{setComponent(i);onSpeak(p.name+". "+p.purpose+". "+p.location);}}
+            className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
+          {component!==null&&path.parts[component]&&<div className="rounded-lg border border-primary/35 p-3 space-y-2">
+            <strong>{path.parts[component]!.name}</strong>
+            <p>What it does: {path.parts[component]!.purpose}</p>
+            <p>Where it belongs: {path.parts[component]!.location}</p>
+          </div>}
+          {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
+          {parts.length>0&&<details className="mt-4">
+            <summary className="cursor-pointer text-gold">Inspect model geometry</summary>
+            <p className="my-2 text-xs text-foreground/65">Geometry names are not verified component identities.</p>
+            {parts.map(p=><button type="button" key={p.meshIndex} onClick={()=>{setInspectModel(true);inspect(p.meshIndex);}}
+              className="block w-full rounded-lg border border-gold/30 p-2 text-left">{p.name}</button>)}
+            {meshIndex!==null&&<div className="mt-3 grid grid-cols-2 gap-2">
               {([["LEFT",[-.15,0,0]],["RIGHT",[.15,0,0]],["UP",[0,.15,0]],["DOWN",[0,-.15,0]]] as [string,[number,number,number]][]).map(([label,delta])=>
                 <button key={label} type="button" onClick={()=>moveMesh(delta)}
                   className="rounded-md border border-gold/40 p-2 text-xs text-gold">MOVE {label}</button>)}
-            </div>
-          </div>}
-          {path.parts.length>0&&<details className="mt-4">
-            <summary className="cursor-pointer text-gold">Pathway-described components (not yet mapped to Hunyuan geometry)</summary>
-            {path.parts.map((p,i)=><div className="mt-2 rounded-lg border border-gold/20 p-3" key={i}>
-              <strong>{p.name}</strong><p>WHAT / DOES: {p.purpose}</p><p>WHERE: {p.location}</p>
-            </div>)}
+            </div>}
           </details>}
+
         </div>}
-      </aside>}
+      </aside>
     </div>
   </section>;
 }

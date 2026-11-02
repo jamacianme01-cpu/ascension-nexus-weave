@@ -26,8 +26,8 @@ const tests=[
     assert.match(ui,/\{selected && <section ref=\{designView\}/);
     assert.match(ui,/\[\.\.\.result\.pathways, result\.blend\]/);
     assert.match(ui,/setChoice\(index\)/);
-    assert.match(ui,/aria-label="Initial objective answer"/);
-    assert.match(ui,/>INITIAL ANSWER</);
+    assert.doesNotMatch(ui,/aria-label="Initial objective answer"/);
+    assert.doesNotMatch(ui,/>INITIAL ANSWER</);
   }],
   ["only Hunyuan GLB is mounted on selected V1 path",()=>{
     assert.match(ui,/return <V1HunyuanPathway/);
@@ -76,9 +76,9 @@ const tests=[
     assert.match(design,/<TreeGuide objective=\{objective\}/);
     assert.match(guide,/webkitSpeechRecognition/);
     assert.match(guide,/phase: "guide"/);
-    assert.match(design,/onClick=\{\(\)=>inspect\(p\.meshIndex\)\}/);
+    assert.match(design,/inspect\(p\.meshIndex\)/);
     assert.match(design,/onClick=\{\(\)=>moveMesh\(delta\)\}/);
-    assert.match(design,/Function.*assignment|Functional assignment/);
+    assert.match(design,/Geometry names are not verified component identities/);
   }],
   ["owner approval remains pending",()=>{
     assert.ok(checklist.includes("- [ ]"));

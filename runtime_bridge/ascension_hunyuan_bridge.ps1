@@ -4,6 +4,21 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# One supervisor per Windows machine. The named OS mutex survives script races
+# and is released when the owning process exits, including abnormal termination.
+$supervisorMutex = [System.Threading.Mutex]::new($false, 'Local\\ASCENSION_HUNYUAN_SUPERVISOR')
+$ownsSupervisor = $false
+try {
+  $ownsSupervisor = $supervisorMutex.WaitOne(0)
+} catch [System.Threading.AbandonedMutexException] {
+  $ownsSupervisor = $true
+}
+if (-not $ownsSupervisor) {
+  Write-Host 'ASCENSION Hunyuan supervisor is already running; duplicate launch skipped.'
+  $supervisorMutex.Dispose()
+  return
+}
+try {
 $python = Join-Path $HunyuanRoot 'python_standalone\python.exe'
 $worker = Join-Path $Repo 'runtime_bridge\hunyuan_model_worker.py'
 $logDir = Join-Path $Repo 'runtime_bridge\logs'
@@ -115,4 +130,9 @@ while ($true) {
   Start-BrowserBridge
   if (Test-Hunyuan) { Start-Worker }
   Start-Sleep -Seconds 15
+}
+
+} finally {
+  if ($ownsSupervisor) { $supervisorMutex.ReleaseMutex() }
+  $supervisorMutex.Dispose()
 }

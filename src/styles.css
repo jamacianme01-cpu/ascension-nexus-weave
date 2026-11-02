@@ -2,6 +2,7 @@
 @source "../src";
 @import "tw-animate-css";
 @import "./book-entry.css";
+@import "./tree-carousel.css";
 
 @custom-variant dark (&:is(.dark *));
 

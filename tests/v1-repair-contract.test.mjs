@@ -14,7 +14,7 @@ const tests=[
   ["original approved Tree and Book entry survives pathway work",()=>{
     assert.match(ui,/ascension-tree-behind-book-hq\.jpg/);
     assert.match(ui,/className="ascension-scene-hero"/);
-    assert.match(ui,/choice === null && <section aria-label="Engage ASCENSION"/);
+    assert.match(ui,/choice === null && !result && <section aria-label="Engage ASCENSION"/);
     assert.match(ui,/data-realities=\{choice !== null \? "true" : undefined\}/);
     assert.match(ui,/What do you want to accomplish\?/);
     assert.match(ui,/ENGAGE ASCENSION/);
@@ -26,6 +26,7 @@ const tests=[
     assert.match(ui,/\{selected && <section ref=\{designView\}/);
     assert.match(ui,/\[\.\.\.result\.pathways, result\.blend\]/);
     assert.match(ui,/setChoice\(index\)/);
+    assert.match(ui,/<TreePathwayCarousel/);
     assert.doesNotMatch(ui,/aria-label="Initial objective answer"/);
     assert.doesNotMatch(ui,/>INITIAL ANSWER</);
   }],

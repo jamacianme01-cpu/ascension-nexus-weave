@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { TreePathwayCarousel } from "@/components/ascension/tree-pathway-carousel";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
 import { availableTreeVoice } from "@/lib/ascension/tree-speech";
@@ -83,6 +84,7 @@ export function IndependentEngage() {
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
+  const [orbit, setOrbit] = useState(0);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const [voiceNotice, setVoiceNotice] = useState("");
@@ -229,7 +231,7 @@ export function IndependentEngage() {
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
-    setStage("idle"); setChoice(null);
+    setStage("idle"); setChoice(null);setOrbit(0);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -251,7 +253,7 @@ export function IndependentEngage() {
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}
     data-realities={choice !== null ? "true" : undefined}>
-    {choice === null && <section aria-label="Engage ASCENSION" className="ascension-command">
+    {choice === null && !result && <section aria-label="Engage ASCENSION" className="ascension-command">
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
@@ -272,14 +274,6 @@ export function IndependentEngage() {
       </div>
     </section>}
 
-    {choice === null && <div className="relative z-30 mx-auto max-w-6xl px-4">
-      <button type="button" onClick={() => { setTalking(true); void say(GREETING, () => setVoiceNotice(""), setVoiceNotice); }}
-        className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
-      <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}
-        pathway={{ title: "Your idea", summary: requested || objective, steps: [], parts: [] }}
-        enabled={talking} onSpeak={text => { if (talking) say(text); }} />
-      {voiceNotice && <p role="status" className="text-sm text-gold">{voiceNotice}</p>}
-    </div>}
     {loading && <section className="mx-auto mt-4 max-w-3xl p-5 text-center text-gold" role="status">
       Developing your pathways…
       <button type="button" className="ml-4 underline" onClick={() => {
@@ -310,26 +304,19 @@ export function IndependentEngage() {
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
         </div>
       </div>
-      <p className="text-sm text-foreground/80">{requested.split("\nBuild on the selected pathway:")[0]}</p>
-      <div role="tablist" aria-label="Choose a pathway" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {choices.map((p, index) => <button type="button" role="tab" aria-selected={false}
-          key={p.id} className={"min-h-40 rounded-xl border p-4 text-left transition-colors " +
-            (choice === index ? "border-primary bg-primary/15 text-primary" : "border-gold/30 bg-black/30 text-gold")}
-          onClick={() => {
-            setChoice(index); setRefinement("");
-            // The mounted design screen receives the viewport on the next frame.
-          }}>
-          {index === 3 && <span className="block text-xs tracking-wide">BLEND</span>}
-          {previews[pathwayVisualKey(requested, p)] && <img
-            src={previews[pathwayVisualKey(requested, p)]}
-            alt={p.title + " design preview"} className="mb-3 aspect-square w-full rounded-lg object-contain" />}
-          <strong className="mt-2 block text-base text-foreground">{p.title}</strong>
-          <span className="mt-3 block text-sm leading-6 text-foreground/80">
-            {p.summary.length > 190 ? p.summary.slice(0, 187).trimEnd() + "…" : p.summary}
-          </span>
-        </button>)}
-      </div>
+      <TreePathwayCarousel designs={choices.map(p => ({
+        id: p.id, title: p.title, summary: p.summary, image: previews[pathwayVisualKey(requested, p)],
+      }))} active={orbit % choices.length} onRotate={setOrbit}
+        onOpen={index => { setOrbit(index); setChoice(index); setRefinement(""); }} />
     </section>}
+    {choice === null && <div className="relative z-30 mx-auto max-w-6xl px-4">
+      <button type="button" onClick={() => { setTalking(true); void say(GREETING, () => setVoiceNotice(""), setVoiceNotice); }}
+        className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
+      <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}
+        pathway={{ title: "Your idea", summary: requested || objective, steps: [], parts: [] }}
+        enabled={talking} onSpeak={text => { if (talking) say(text); }} />
+      {voiceNotice && <p role="status" className="text-sm text-gold">{voiceNotice}</p>}
+    </div>}
     {selected && <section ref={designView} className="ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
       aria-label="Selected pathway design">
       <div className="flex items-center justify-between">

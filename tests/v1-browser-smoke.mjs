@@ -152,10 +152,31 @@ try{
   assert.equal(await page.getByText("INITIAL ANSWER",{exact:true}).count(),0);
   assert.equal(await page.getByText("THREE PATHWAYS + FOURTH BLEND",{exact:true}).count(),0);
   assert.equal(await page.getByRole("region",{name:"Initial objective answer"}).count(),0);
-  await entry.waitFor({state:"visible"});
+  await entry.waitFor({state:"hidden"});
+  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-desktop.png"});
+  await page.getByRole("button",{name:"Next pathway",exact:true}).click();
+  assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"),"true");
+  await page.getByRole("button",{name:"Previous pathway",exact:true}).click();
+  assert.equal(await page.getByRole("tab").first().getAttribute("aria-selected"),"true");
   assert.equal(await page.locator('img[alt^="Concept picture of"]').count(),0,
     "No selected-design picture is shown before selection");
 
+  if(process.env.ASCENSION_CAROUSEL_ONLY){
+    const carousel=page.getByRole("region",{name:"Pathways around the Tree of Knowledge"});
+    await carousel.focus();await page.keyboard.press("ArrowRight");
+    assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"),"true");
+    await page.waitForFunction(()=>document.activeElement?.getAttribute("data-design-index")==="1");
+    await page.setViewportSize({width:390,height:844});await page.waitForTimeout(450);
+    await carousel.screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-mobile.png"});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    await page.getByRole("tab").nth(1).click();
+    await page.getByRole("region",{name:"Selected pathway design"}).waitFor();
+    await page.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+    await carousel.waitFor();
+    assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"),"true","Back preserves carousel position");
+    assert.equal(errors.length,0,errors.join(" | "));
+    console.log("PASS Tree carousel: desktop/mobile, keyboard focus, four pathways, separate inspection screen and preserved return position");
+  }else{
   const detail=page.locator('section[aria-label="Selected pathway design"]');
   const canvas=page.locator('canvas[aria-label^="Hunyuan3D generated mesh"]');
   const stages=["BLUEPRINT","DISSECT / EXPLODE","IMPLODE / REASSEMBLE"];
@@ -238,6 +259,12 @@ try{
   assert.ok(generated.every(x=>x.view==="assembled"),
     "Blueprint and Dissect must never regenerate unrelated pictures");
 
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-mobile.png"});
+  await page.getByRole("button",{name:"Next pathway",exact:true}).click();
+  await page.getByRole("tab").filter({has:page.locator('[data-active=true]')}).count();
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),"Mobile carousel must not overflow horizontally");
+  await page.setViewportSize({width:1100,height:800});
   await page.getByRole("button",{name:"New objective"}).click();
   await page.locator("#objective").fill("make a linear propulsion engine");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
@@ -247,6 +274,7 @@ try{
   assert.equal(new Set(generated.map(x=>x.id)).size,8,"Each objective has four path-specific references, shared with selection");
   assert.equal(errors.length,0,errors.join(" | "));
   console.log("PASS V1 browser fixture checks: entry speech callback, hidden brief, four choices, preserved picture, GLB blueprint/explode/reassemble, component descriptions and geometry controls. Not live generation or audible playback acceptance.");
+  }
 } finally{
   await browser.close();
 }

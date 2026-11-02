@@ -5,7 +5,7 @@ import { TreePine } from "lucide-react";
  * The server answers from selected design context; it cannot claim a physical test.
  */
 type GuidePart = { name: string; purpose: string; location: string };
-type Exchange = { role: "user" | "assistant"; content: string };
+type Exchange = { role: "user" | "assistant"; content: string; selectedPart?: string };
 const conversations = new Map<string, Exchange[]>();
 const conversationListeners = new Set<() => void>();
 export type GuidePathway = {
@@ -60,7 +60,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     setConversation(conversations.get(objective) ?? []);
   }, [pathway.title, objective]);
 
-  async function ask(value: string, replace = false) {
+  async function ask(value: string, replace = false, selectionName?: string) {
     const text = value.trim();
     if (!text || (thinking && !replace) || text.length > 800) return;
     pending.current?.abort();
@@ -97,7 +97,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
         const reply = data.answer.trim();
         setAnswer(reply);
         const exchanges: Exchange[] = [...(conversations.get(objective) ?? []),
-          { role: "user", content: text }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
+          { role: "user", content: text, ...(selectionName ? { selectedPart: selectionName } : {}) }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
         conversations.set(objective, exchanges);
         if (conversations.size > 12) conversations.delete(conversations.keys().next().value!);
         conversationListeners.forEach(refresh => refresh());
@@ -113,7 +113,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   }
 
   useEffect(() => {
-    if (focusedPart) void ask(`Explain ${focusedPart.name}: how it works in this design, where it belongs, and what it connects to. Explain this component, not the surrounding scene.`, true);
+    if (focusedPart) void ask(`Explain ${focusedPart.name}: how it works in this design, where it belongs, and what it connects to. Explain this component, not the surrounding scene.`, true, focusedPart.name);
   }, [focusedPart?.name]);
 
   function listen() {
@@ -183,7 +183,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       <div className="mt-3 space-y-2" role="log" aria-label="Conversation with the Tree" aria-live="polite">
         {conversation.map((message, index) => <p key={index}
           className={"whitespace-pre-wrap leading-6 "+(message.role==="user"?"text-amber-100":"text-sky-100")}>
-          <span className="mr-2 text-xs opacity-70">{message.role==="user"?"You":"Tree"}</span>{message.content}</p>)}
+          <span className="mr-2 text-xs opacity-70">{message.selectedPart?"Selected part":message.role==="user"?"You":"Tree"}</span>{message.selectedPart ?? message.content}</p>)}
       </div>
     </>}
   </div>;

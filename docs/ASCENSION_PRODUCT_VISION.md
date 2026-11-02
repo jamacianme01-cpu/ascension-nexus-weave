@@ -1,4 +1,4 @@
-# ASCENSION product vision — owner confirmed November 2, 2026
+# ASCENSION product vision â€” owner confirmed November 2, 2026
 
 This owner-confirmed vision supersedes older conflicting presentation notes. Preserve existing ASCENSION architecture and the approved Tree-and-Book experience; extend the app rather than replacing it.
 

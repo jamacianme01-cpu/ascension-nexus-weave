@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { loadPathwayVisual } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
 
@@ -60,15 +61,7 @@ export function V1HunyuanPathway({
       let sourceImage=imageCache.current.get(key);
       if(!sourceImage) {
         setStatus("Preparing this selected pathway's reference picture…");
-        const response=await fetch("/api/public/ascension/independent",{
-          method:"POST",signal:controller.signal,
-          headers:{"content-type":"application/json"},
-          body:JSON.stringify({objective,phase:"picture",view:"assembled",pathway:path}),
-        });
-        const source=await response.json() as {image_url?:string;error?:string};
-        if(!response.ok)throw new Error(source.error||"Reference picture generation failed");
-        sourceImage=source.image_url;
-        if(!sourceImage?.match(validImage))throw new Error("ASCENSION did not return a usable selected invention picture.");
+        sourceImage=await loadPathwayVisual(objective,path,imageCache.current,controller.signal);
         if(!active)return;
         imageCache.current.set(key,sourceImage);
         setPicture(sourceImage);
@@ -147,8 +140,6 @@ export function V1HunyuanPathway({
     <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak}/>
     <p className="mb-4 max-w-4xl text-sm leading-6">{path.summary}</p>
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
-      {picture&&<button type="button" aria-pressed={!inspectModel} onClick={()=>setInspectModel(false)}
-        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">INVENTION PICTURE</button>}
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
         key={v} type="button" aria-pressed={inspectModel&&mode===v} disabled={!bytes||(v==="dissect"&&parts.length<2)}
         onClick={()=>changeView(v)}
@@ -195,6 +186,8 @@ export function V1HunyuanPathway({
         </div>
         {generatorError&&<p role="alert" className="text-xs text-red-300">{generatorError}</p>}
         {bytes&&inspectModel&&buttons}
+        {picture&&inspectModel&&<button type="button" onClick={()=>setInspectModel(false)}
+          className="self-start text-xs text-gold underline">Return to the design reference</button>}
         {bytes&&!immersive&&<button type="button" onClick={()=>{setInspectModel(true);setImmersive(true);}}
           className="self-start rounded-xl border border-primary/60 px-4 py-2 text-sm text-primary">
           DIVE INTO REALITY
@@ -230,12 +223,20 @@ export function V1HunyuanPathway({
           </details>}
         </div>:<div className="space-y-2 text-sm" aria-label="Design components">
           {path.parts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
-            onClick={()=>{setComponent(i);onSpeak(p.name+". "+p.purpose+". "+p.location);}}
+            onClick={()=>{
+              setComponent(i);
+              const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
+              const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name));
+              if(match){setInspectModel(true);setMode("assembled");setMeshIndex(match.meshIndex);}
+              else setMeshIndex(null);
+              onSpeak(p.name+". "+p.purpose+". "+p.location);
+            }}
             className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
           {component!==null&&path.parts[component]&&<div className="rounded-lg border border-primary/35 p-3 space-y-2">
             <strong>{path.parts[component]!.name}</strong>
             <p>What it does: {path.parts[component]!.purpose}</p>
             <p>Where it belongs: {path.parts[component]!.location}</p>
+            {meshIndex===null&&<p className="text-xs text-foreground/70">This component has not been located in the reconstruction. Its description is not a verified geometry mapping.</p>}
           </div>}
           {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
           {parts.length>0&&<details className="mt-4">

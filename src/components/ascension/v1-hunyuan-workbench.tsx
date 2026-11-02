@@ -246,7 +246,19 @@ export function V1HunyuanWorkbench({
     st.root.rotation.set(0,0,0);
     st.camera.position.set(5,4,7);st.controls.target.set(0,0,0);st.controls.update();
   },[reset]);
-  useEffect(()=>{if(host.current)host.current.dataset["selected"]=selected===null?"":String(selected);},[selected,revision]);
+  useEffect(()=>{
+    if(host.current)host.current.dataset["selected"]=selected===null?"":String(selected);
+    const st=live.current;
+    const mesh=selected===null?null:st?.meshes[selected]?.mesh;
+    if(!st||!mesh)return;
+    const bounds=new THREE.Box3().setFromObject(mesh);
+    const center=bounds.getCenter(new THREE.Vector3());
+    const distance=Math.max(1.7,bounds.getSize(new THREE.Vector3()).length()*1.6);
+    const direction=st.camera.position.clone().sub(st.controls.target).normalize();
+    st.controls.target.copy(center);
+    st.camera.position.copy(center).addScaledVector(direction,distance);
+    st.controls.update();
+  },[selected,revision]);
   useEffect(()=>{
     const st=live.current;if(!st||!move)return;
     const m=st.meshes[move.index];if(!m)return;

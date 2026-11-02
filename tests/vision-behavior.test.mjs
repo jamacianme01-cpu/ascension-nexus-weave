@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+async function module(path){const code=ts.transpileModule(readFileSync(new URL('../'+path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;return import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));}
+const {selectTreeVoice}=await module('src/lib/ascension/tree-speech.ts');
+const voice=(name,lang='en-US')=>({name,lang});
+assert.equal(selectTreeVoice([voice('Microsoft David'),voice('Microsoft Zira'),voice('Microsoft Aria Online (Natural)')]).name,'Microsoft Aria Online (Natural)');
+assert.equal(selectTreeVoice([voice('Microsoft David')]),null,'Do not substitute an unspecified male voice');
+const {loadPathwayVisual}=await module('src/lib/ascension/pathway-visual.ts');
+const original=globalThis.fetch;const cache=new Map();const requests=[];
+globalThis.fetch=async(_url,init)=>{requests.push(JSON.parse(init.body));return new Response(JSON.stringify({image_url:'data:image/png;base64,'+'A'.repeat(5000)}));};
+try{
+ const signal=new AbortController().signal;
+ const path={id:'rotor',title:'Rotor worker',summary:'A worker design',parts:[],steps:[]};
+ const first=loadPathwayVisual('worker bots',path,cache,signal);
+ const second=loadPathwayVisual('worker bots',path,cache,signal);
+ assert.equal(first,second,'Card and selected design share in-flight generation');
+ const image=await first;assert.equal(await second,image);assert.equal(requests.length,1);
+ assert.equal(await loadPathwayVisual('worker bots',path,cache,signal),image);assert.equal(requests.length,1,'Returning to a design reuses its reference');
+ await loadPathwayVisual('worker bots',{...path,id:'rover',title:'Ground worker'},cache,signal);assert.equal(requests.length,2,'Distinct pathways use distinct generation requests');
+ const stopped=new AbortController();stopped.abort();
+ await assert.rejects(loadPathwayVisual('cancelled',path,cache,stopped.signal));assert.equal(requests.length,2,'Cancelled queued work must not spend a generation request');
+}finally{globalThis.fetch=original;}
+console.log('PASS vision behavior: named woman voice, shared design identity, separate pathways, cached selection and cancellation');

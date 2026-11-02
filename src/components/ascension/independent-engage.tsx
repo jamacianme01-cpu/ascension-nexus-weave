@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
+import { availableTreeVoice } from "@/lib/ascension/tree-speech";
+import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -11,11 +13,17 @@ const GREETING = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're h
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
-function say(text: string, onStarted?: () => void) {
+async function say(text: string, onStarted?: () => void, onUnavailable?: (message: string) => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
   const synth = window.speechSynthesis;
   try { synth.cancel(); } catch { return; }
+  const voice = await availableTreeVoice(synth);
+  if (sequence !== speechSequence) return;
+  if (!voice) {
+    onUnavailable?.("A woman's English voice isn't available in this browser yet. The Tree's conversation is still available below.");
+    return;
+  }
   const chunks: string[] = [];
   let chunk = "";
   for (const word of text.trim().split(/\s+/)) {
@@ -35,8 +43,10 @@ function say(text: string, onStarted?: () => void) {
     }
     const words = new SpeechSynthesisUtterance(chunks[index++]!);
     activeUtterance = words;
-    words.rate = 0.93;
-    words.pitch = 0.98;
+    words.voice = voice;
+    words.lang = voice.lang;
+    words.rate = 1;
+    words.pitch = 1;
     words.onstart = () => onStarted?.();
     words.onend = next;
     words.onerror = next;
@@ -75,6 +85,8 @@ export function IndependentEngage() {
   const [choice, setChoice] = useState<number | null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
+  const [voiceNotice, setVoiceNotice] = useState("");
+  const [previews, setPreviews] = useState<Record<string, string>>({});
   const view = useRef<HTMLElement | null>(null);
   const designView = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -82,6 +94,20 @@ export function IndependentEngage() {
   const modelCache = useRef(new Map<string, ArrayBuffer>());
   const imageCache = useRef(new Map<string, string>());
   const welcomeStarted = useRef(false);
+  useEffect(() => {
+    setPreviews({});
+    if (!result) return;
+    const controller = new AbortController();
+    // The same references are reused when a design is opened; no second picture.
+    const start = window.setTimeout(() => {
+      for (const path of [...result.pathways, result.blend].filter(path => path.parts.length)) {
+        void loadPathwayVisual(requested, path, imageCache.current, controller.signal).then(image => {
+          if (!controller.signal.aborted) setPreviews(previous => ({ ...previous, [pathwayVisualKey(requested, path)]: image }));
+        }).catch(() => {}); // A missing preview never becomes a fabricated design.
+      }
+    }, 0);
+    return () => { window.clearTimeout(start); controller.abort(); };
+  }, [result, requested]);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
   useEffect(() => {
     // Tree and Book remain in place; the Tree speaks without a new entrance scene.
@@ -90,7 +116,7 @@ export function IndependentEngage() {
     let disposed = false;
     const tryWelcome = () => {
       if (disposed || welcomeStarted.current || document.hidden) return;
-      say(greeting, () => { welcomeStarted.current = true; });
+      void say(greeting, () => { welcomeStarted.current = true; setVoiceNotice(""); }, setVoiceNotice);
     };
     const attempt = window.setTimeout(tryWelcome, 280);
     window.addEventListener("pointerdown", tryWelcome, { capture: true });
@@ -247,11 +273,12 @@ export function IndependentEngage() {
     </section>}
 
     {choice === null && <div className="relative z-30 mx-auto max-w-6xl px-4">
-      <button type="button" onClick={() => { setTalking(true); say(GREETING); }}
+      <button type="button" onClick={() => { setTalking(true); void say(GREETING, () => setVoiceNotice(""), setVoiceNotice); }}
         className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
       <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}
         pathway={{ title: "Your idea", summary: requested || objective, steps: [], parts: [] }}
         enabled={talking} onSpeak={text => { if (talking) say(text); }} />
+      {voiceNotice && <p role="status" className="text-sm text-gold">{voiceNotice}</p>}
     </div>}
     {loading && <section className="mx-auto mt-4 max-w-3xl p-5 text-center text-gold" role="status">
       Developing your pathways…
@@ -293,6 +320,9 @@ export function IndependentEngage() {
             // The mounted design screen receives the viewport on the next frame.
           }}>
           {index === 3 && <span className="block text-xs tracking-wide">BLEND</span>}
+          {previews[pathwayVisualKey(requested, p)] && <img
+            src={previews[pathwayVisualKey(requested, p)]}
+            alt={p.title + " design preview"} className="mb-3 aspect-square w-full rounded-lg object-contain" />}
           <strong className="mt-2 block text-base text-foreground">{p.title}</strong>
           <span className="mt-3 block text-sm leading-6 text-foreground/80">
             {p.summary.length > 190 ? p.summary.slice(0, 187).trimEnd() + "…" : p.summary}

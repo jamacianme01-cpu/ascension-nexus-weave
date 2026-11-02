@@ -5,6 +5,8 @@ import { TreePine } from "lucide-react";
  * The server answers from selected design context; it cannot claim a physical test.
  */
 type GuidePart = { name: string; purpose: string; location: string };
+type Exchange = { role: "user" | "assistant"; content: string };
+const conversations = new Map<string, Exchange[]>();
 export type GuidePathway = {
   title: string;
   summary: string;
@@ -32,7 +34,8 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
+  const [conversation, setConversation] = useState<Exchange[]>(() => conversations.get(objective) ?? []);
   const [thinking, setThinking] = useState(false);
   const [listening, setListening] = useState(false);
   const [error, setError] = useState("");
@@ -45,6 +48,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     setError("");
     setQuestion("");
     setThinking(false);
+    setConversation(conversations.get(objective) ?? []);
   }, [pathway.title, objective]);
 
   async function ask(value: string) {
@@ -65,6 +69,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
           phase: "guide",
           objective,
           question: text,
+          history: (conversations.get(objective) ?? []).slice(-8),
           pathway: {
             title: pathway.title,
             summary: pathway.summary,
@@ -79,6 +84,12 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       if (!controller.signal.aborted) {
         const reply = data.answer.trim();
         setAnswer(reply);
+        const exchanges: Exchange[] = [...(conversations.get(objective) ?? []),
+          { role: "user", content: text }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
+        conversations.set(objective, exchanges);
+        if (conversations.size > 12) conversations.delete(conversations.keys().next().value!);
+        setConversation(exchanges);
+        setQuestion("");
         if (enabled) onSpeak(reply);
       }
     } catch (cause) {
@@ -130,12 +141,17 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
         className="rounded-full border border-amber-200/45 px-3 py-2 text-amber-100">HEAR AGAIN</button>}
     </div>
     {open && <>
-      <p className="mt-2 text-xs text-sky-100/80">Ask about this pathway, one of its parts, or a connection worth exploring.</p>
+      <p className="mt-2 text-xs text-sky-100/80">Let's work on it together. Ask a question or tell me what you'd like to change.</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {["What would you improve?", "Explain the key tradeoff"].map(prompt => <button type="button" key={prompt}
+          disabled={thinking} onClick={() => void ask(prompt)}
+          className="rounded-full border border-amber-200/30 px-3 py-1 text-xs text-amber-100 disabled:opacity-40">{prompt}</button>)}
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <input type="text" aria-label="Ask the Tree" value={question} maxLength={800}
           onChange={event => setQuestion(event.target.value)}
           onKeyDown={event => { if (event.key === "Enter") void ask(question); }}
-          placeholder="Ask the Tree about this design"
+          placeholder="Talk with the Tree"
           className="min-w-[10rem] flex-1 rounded-lg border border-amber-200/30 bg-[#07111d] px-3 py-2 text-foreground"/>
         <button type="button" onClick={listen} aria-pressed={listening}
           className="rounded-full border border-amber-200/45 px-3 py-2 text-amber-100">
@@ -147,7 +163,11 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
         </button>
       </div>
       {error && <p role="alert" className="mt-2 text-red-200">{error}</p>}
-      {answer && <p className="mt-3 whitespace-pre-wrap leading-6 text-sky-100" aria-live="polite">{answer}</p>}
+      <div className="mt-3 space-y-2" role="log" aria-label="Conversation with the Tree" aria-live="polite">
+        {conversation.map((message, index) => <p key={index}
+          className={"whitespace-pre-wrap leading-6 "+(message.role==="user"?"text-amber-100":"text-sky-100")}>
+          <span className="mr-2 text-xs opacity-70">{message.role==="user"?"You":"Tree"}</span>{message.content}</p>)}
+      </div>
     </>}
   </div>;
 }

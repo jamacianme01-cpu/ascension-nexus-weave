@@ -8,7 +8,7 @@ if (-not (Test-Path $bridge)) { throw "ASCENSION bridge not found: $bridge" }
 
 $taskName = 'ASCENSION Hunyuan Bridge'
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
-  '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $bridge + '"'
+  '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $bridge + '" -Repo "' + $Repo + '"'
 )
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 2) -ExecutionTimeLimit ([TimeSpan]::Zero)

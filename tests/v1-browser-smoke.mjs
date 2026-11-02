@@ -48,6 +48,7 @@ try{
   page.setDefaultTimeout(16000);
   const errors=[];
   const generated=[];
+  const guideRequests=[];
   page.on("pageerror",e=>errors.push(e.message));
   page.on("console",msg=>{if(msg.type()==="error")console.log("BROWSER ERROR: "+msg.text().slice(0,500));});
   const mockBytes=fixtureGlb();
@@ -80,7 +81,7 @@ try{
       return new Response("unrecognized route",{status:404});
     };
     Object.defineProperty(window,"speechSynthesis",{configurable:true,value:{
-      cancel(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
+      getVoices(){return [{name:"Microsoft Aria Online (Natural)",lang:"en-US"}]},cancel(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
         utterance.onstart?.();utterance.onend?.();
       });}
     }});
@@ -130,7 +131,7 @@ try{
       blend:{...path("blend","BLEND modular team","Coordinated drones with interchangeable tools.",droneParts),blend_reason:"Combined"},
       verified:false,contributors:["OpenAI"],unavailable:[],providerErrors:[],governance:"unverified"
     };
-    else if(phase==="guide")body={phase:"guide",answer:"Inspect the selected source geometry."};
+    else if(phase==="guide"){guideRequests.push(input);body={phase:"guide",answer:"Inspect the selected source geometry."};}
     else body={error:"Unexpected phase "+phase};
     await route.fulfill({status:body.error?503:200,contentType:"application/json",body:JSON.stringify(body)});
   });
@@ -153,7 +154,7 @@ try{
   assert.equal(await page.getByRole("region",{name:"Initial objective answer"}).count(),0);
   await entry.waitFor({state:"visible"});
   assert.equal(await page.locator('img[alt^="Concept picture of"]').count(),0,
-    "No image generated on first page");
+    "No selected-design picture is shown before selection");
 
   const detail=page.locator('section[aria-label="Selected pathway design"]');
   const canvas=page.locator('canvas[aria-label^="Hunyuan3D generated mesh"]');
@@ -194,6 +195,14 @@ try{
       "Reassemble must not regenerate another design");
     await page.waitForTimeout(200);
     assert.deepEqual(await canvas.screenshot(),assembledPixels,"Implosion must restore the original assembly");
+    if(expectedId==="rotor"){
+      const question=detail.getByRole("textbox",{name:"Ask the Tree"});
+      await question.fill("Why that rotor?");await detail.getByRole("button",{name:"ASK",exact:true}).click();
+      await detail.getByRole("log").getByText("Inspect the selected source geometry.",{exact:false}).waitFor();
+      await question.fill("What about endurance?");await detail.getByRole("button",{name:"ASK",exact:true}).click();
+      await page.waitForFunction(()=>[...document.querySelectorAll('[role="log"] p')].some(p=>p.textContent.includes("What about endurance?")));
+      assert.equal(guideRequests.at(-1).history[0].content,"Why that rotor?","Follow-ups retain conversation context");
+    }
     await page.getByRole("button",{name:"LABELS",exact:true}).click();
     await page.getByRole("button",{name:/^(Rotor|Coil)$/,exact:true}).click();
     await page.getByText(/What it does:/).waitFor({state:"visible"});
@@ -204,7 +213,7 @@ try{
     await page.getByRole("button",{name:"DIVE INTO REALITY"}).click();
     await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
     assert.equal(await detail.count(),1);
-    await page.getByRole("button",{name:"INVENTION PICTURE",exact:true}).click();
+    await page.getByRole("button",{name:"Return to the design reference",exact:true}).click();
     await picture.waitFor({state:"visible"});
     assert.equal(await picture.getAttribute("src"),original,"Picture identity survives all model views");
     assert.equal(await detail.getByText("Hunyuan3D mesh ready").count(),0);
@@ -218,7 +227,7 @@ try{
     await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
     await page.getByRole("tab").first().waitFor();
   }
-  assert.deepEqual(generated.map(x=>x.id),["rotor","rover","modular","blend"]);
+  assert.deepEqual([...new Set(generated.map(x=>x.id))].sort(),["blend","modular","rotor","rover"]);
   assert.ok(generated.every(x=>x.view==="assembled"),
     "Blueprint and Dissect must never regenerate unrelated pictures");
 
@@ -228,7 +237,7 @@ try{
   await page.getByRole("tab").first().waitFor();
   await page.getByRole("tab").first().click();
   await inspect("linear1");
-  assert.equal(generated.length,5,"Only selected pathways generate Hunyuan input images");
+  assert.equal(new Set(generated.map(x=>x.id)).size,8,"Each objective has four path-specific references, shared with selection");
   assert.equal(errors.length,0,errors.join(" | "));
   console.log("PASS V1 browser fixture checks: entry speech callback, hidden brief, four choices, preserved picture, GLB blueprint/explode/reassemble, component descriptions and geometry controls. Not live generation or audible playback acceptance.");
 } finally{

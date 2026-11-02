@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 # One supervisor per Windows machine. The named OS mutex survives script races
 # and is released when the owning process exits, including abnormal termination.
-$supervisorMutex = [System.Threading.Mutex]::new($false, 'Local\\ASCENSION_HUNYUAN_SUPERVISOR')
+$supervisorMutex = [System.Threading.Mutex]::new($false, 'Local\ASCENSION_HUNYUAN_SUPERVISOR')
 $ownsSupervisor = $false
 try {
   $ownsSupervisor = $supervisorMutex.WaitOne(0)
@@ -24,15 +24,12 @@ $worker = Join-Path $Repo 'runtime_bridge\hunyuan_model_worker.py'
 $logDir = Join-Path $Repo 'runtime_bridge\logs'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
-# Portable installations may use Hunyuan3D-2.1 instead of Hunyuan3D-2.
-# Locate the actual API script instead of silently failing at startup.
+# This owner's 8 GB GPU uses the already-cached 2.0 mini model.
+# Do not silently load the much larger 2.1 stack or download replacements.
 $apiCandidates = @(
-  (Join-Path $HunyuanRoot 'Hunyuan3D-2.1'),
-  (Join-Path $HunyuanRoot 'Hunyuan3D-2-vanilla'),
-  (Join-Path $HunyuanRoot 'Hunyuan3D-2')
+  (Join-Path $HunyuanRoot 'Hunyuan3D-2'),
+  (Join-Path $HunyuanRoot 'Hunyuan3D-2-vanilla')
 )
-$apiCandidates += @(Get-ChildItem -Path $HunyuanRoot -Directory -Filter 'Hunyuan3D-2*' -ErrorAction SilentlyContinue |
-  Sort-Object -Property Name -Descending | Select-Object -ExpandProperty FullName)
 $apiDir = $apiCandidates | Where-Object { Test-Path (Join-Path $_ 'api_server.py') } | Select-Object -First 1
 if (-not (Test-Path $python) -or -not (Test-Path $worker) -or -not $apiDir) {
   $message = "Hunyuan bridge missing python, worker, or API script. Python=$python Worker=$worker Root=$HunyuanRoot"
@@ -44,15 +41,9 @@ if (-not (Test-Path $python) -or -not (Test-Path $worker) -or -not $apiDir) {
 # Hunyuan3D-2.1's api_server.py cannot load Hunyuan3D-2mini (2.0) weights.
 # The mini weights belong to Hunyuan3D-2's API with its mini subfolder.
 $apiName = Split-Path $apiDir -Leaf
-if ($apiName -eq 'Hunyuan3D-2.1') {
-  $modelPath = 'tencent/Hunyuan3D-2.1'
-  $subfolder = 'hunyuan3d-dit-v2-1'
-} else {
-  $modelPath = 'tencent/Hunyuan3D-2mini'
-  $subfolder = 'hunyuan3d-dit-v2-mini'
-}
+$modelPath = 'tencent/Hunyuan3D-2mini'
 Write-Host ("ASCENSION Hunyuan selected API: " + $apiName)
-Write-Host ("ASCENSION Hunyuan matching weights: " + $modelPath + " / " + $subfolder)
+Write-Host ("ASCENSION Hunyuan matching weights: " + $modelPath)
 # The Windows portable distribution downloads model weights on first use when
 # missing from its HuggingFaceHub cache. That is not an indication of a crash.
 
@@ -73,9 +64,9 @@ function Start-Hunyuan {
   if ((Test-Hunyuan) -or (Test-HunyuanProcess)) { return }
   $env:HF_HUB_CACHE = Join-Path $HunyuanRoot 'HuggingFaceHub'
   $env:HY3DGEN_MODELS = Join-Path $HunyuanRoot 'HuggingFaceHub'
-  $env:PYTORCH_CUDA_ALLOC_CONF = 'expandable_segments:True'
+  $env:HF_HUB_OFFLINE = '1'
   Start-Process -FilePath $python -WorkingDirectory $apiDir -WindowStyle Hidden `
-    -ArgumentList '-s','api_server.py','--host','127.0.0.1','--port','8081','--model_path',$modelPath,'--subfolder',$subfolder `
+    -ArgumentList '-s','api_server.py','--host','127.0.0.1','--port','8081','--model_path',$modelPath,'--limit-model-concurrency','1' `
     -RedirectStandardOutput (Join-Path $logDir 'hunyuan-api.out.log') `
     -RedirectStandardError (Join-Path $logDir 'hunyuan-api.err.log')
 }

@@ -211,7 +211,14 @@ try{
     await page.getByRole("button",{name:"MOVE RIGHT"}).click();
     await page.getByRole("button",{name:"ZOOM IN"}).click();
     await page.getByRole("button",{name:"DIVE INTO REALITY"}).click();
+    if(expectedId==="rotor"){
+      const sidebar=detail.locator('aside');
+      await sidebar.getByRole("textbox",{name:"Ask the Tree"}).fill("Which mount fits?");
+      await sidebar.getByRole("button",{name:"ASK",exact:true}).click();
+      await sidebar.getByRole("log").getByText("Which mount fits?",{exact:false}).waitFor();
+    }
     await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
+    if(expectedId==="rotor")await detail.getByRole("log").getByText("Which mount fits?",{exact:false}).waitFor();
     assert.equal(await detail.count(),1);
     await page.getByRole("button",{name:"Return to the design reference",exact:true}).click();
     await picture.waitFor({state:"visible"});

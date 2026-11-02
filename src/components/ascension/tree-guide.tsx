@@ -7,6 +7,7 @@ import { TreePine } from "lucide-react";
 type GuidePart = { name: string; purpose: string; location: string };
 type Exchange = { role: "user" | "assistant"; content: string };
 const conversations = new Map<string, Exchange[]>();
+const conversationListeners = new Set<() => void>();
 export type GuidePathway = {
   title: string;
   summary: string;
@@ -41,6 +42,11 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   const [error, setError] = useState("");
   const pending = useRef<AbortController | null>(null);
   const microphone = useRef<VoiceRecognizer | null>(null);
+  useEffect(() => {
+    const refresh = () => setConversation(conversations.get(objective) ?? []);
+    conversationListeners.add(refresh);
+    return () => { conversationListeners.delete(refresh); };
+  }, [objective]);
   useEffect(() => () => { pending.current?.abort(); microphone.current?.stop(); }, []);
   useEffect(() => {
     pending.current?.abort();
@@ -88,6 +94,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
           { role: "user", content: text }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
         conversations.set(objective, exchanges);
         if (conversations.size > 12) conversations.delete(conversations.keys().next().value!);
+        conversationListeners.forEach(refresh => refresh());
         setConversation(exchanges);
         setQuestion("");
         if (enabled) onSpeak(reply);

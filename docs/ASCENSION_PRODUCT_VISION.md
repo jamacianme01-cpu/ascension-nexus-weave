@@ -33,3 +33,15 @@ The owner liked the visual pathway designs but observed that the Tree was disapp
 ## Crystal-orb pathways — owner correction, November 2
 
 The pathways are the crystal orbs on the Tree, not rectangular cards placed beside it. Each orb is a window onto its own design, like peering through a crystal ball at a possible destiny. Move between the orbs, reveal the focused design's title/description without covering the Tree, and choose an orb to open the existing pathway inspection page. Preserve the clear design reference; a coarse reconstruction must not silently replace it. Reconstruction inspection remains explicit and visibly separate from the reference until correspondence is established.
+
+## Owner correction: V1 inspection scope
+
+The owner explicitly approved the first-page Tree/orb layout, not the generated images or current inspection behavior. Preserve that first page. Do not present people, cityscapes, collages or unrelated environments as worker-bot designs. Component descriptions must concern the selected component and must not imply a location in the model without a real mapping. The guide needs the selected part and current view, not just the overall objective.
+
+Dive into Reality is NOT part of V1. The owner is still developing those capabilities with CLARITY. Remove the current fullscreen/Dive behavior from the V1 surface; this supersedes earlier notes mentioning Dive in V1.
+
+### Correction verification checkpoint
+
+The V1 surface no longer contains Dive into Reality or the associated fullscreen behavior. Description now follows the selected component. Guide requests carry the focused component, current view and whether a location mapping exists; unlocated geometry is not represented as observed. Image generation uses a short subject-first product brief rather than the entire system/workflow, and excludes outboard docking infrastructure from worker-bot previews. A real image-generation check returned one isolated multirotor without people or scenery; this is a bounded sample, not universal output validation or engineering verification.
+
+Part-linked views remain unresolved: the current Hunyuan route produces one fused surface, not a named component assembly. The inspected native CAD assembly kernel has a bounded two-component realization path; no worker-drone assembly was delivered through the active web route. No gray reconstruction, passing UI test or successful image request is recorded as completion of this capability.

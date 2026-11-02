@@ -22,3 +22,10 @@ try{
  await assert.rejects(loadPathwayVisual('cancelled',path,cache,stopped.signal));assert.equal(requests.length,2,'Cancelled queued work must not spend a generation request');
 }finally{globalThis.fetch=original;}
 console.log('PASS vision behavior: named woman voice, shared design identity, separate pathways, cached selection and cancellation');
+
+const {designImageBrief}=await module('src/lib/ascension/design-image-brief.ts');
+const brief=designImageBrief('make worker drones','Modular multirotor worker drone',['Airframe','Gripper','Docking and charging station']);
+assert.match(brief.prompt,/^One individual unmanned multirotor worker drone/);
+assert.doesNotMatch(brief.prompt,/station|people|human|city|fleet/i,'Positive prompt describes the object, not prohibited scene subjects');
+assert.match(brief.negative,/people/);assert.match(brief.negative,/city/);
+console.log('PASS image brief: subject first, selected mobility, no infrastructure or human cues in the positive prompt');

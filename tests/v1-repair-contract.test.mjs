@@ -51,7 +51,7 @@ const tests=[
     assert.match(glb,/explode=mode==="dissect" && st\.meshes\.length>1/);
     assert.match(design,/DISSECT \/ EXPLODE/);
     assert.match(design,/IMPLODE \/ REASSEMBLE/);
-    assert.match(design,/DIVE INTO REALITY/);
+    assert.doesNotMatch(design,/DIVE INTO REALITY/);
     assert.match(glb,/orthos\.forEach/);
     assert.doesNotMatch(design,/new V1ModelWorkbench/);
     assert.match(design,/generator returned a fused mesh/);

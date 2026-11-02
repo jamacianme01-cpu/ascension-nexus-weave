@@ -26,12 +26,15 @@ type VoiceRecognizer = {
   stop(): void;
 };
 
-export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false }: {
+export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false }: {
   objective: string;
   pathway: GuidePathway;
   enabled: boolean;
   onSpeak: (answer: string) => void;
   compact?: boolean;
+  focusedPart?: GuidePart | null;
+  view?: string;
+  partLocated?: boolean;
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -57,9 +60,9 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     setConversation(conversations.get(objective) ?? []);
   }, [pathway.title, objective]);
 
-  async function ask(value: string) {
+  async function ask(value: string, replace = false) {
     const text = value.trim();
-    if (!text || thinking || text.length > 800) return;
+    if (!text || (thinking && !replace) || text.length > 800) return;
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
@@ -81,6 +84,9 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
             summary: pathway.summary,
             steps: pathway.steps.slice(0, 8),
             parts: pathway.parts.slice(0, 12),
+            focused_part: focusedPart,
+            current_view: view,
+            part_located: partLocated,
           },
         }),
       });
@@ -105,6 +111,10 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       if (!controller.signal.aborted) setThinking(false);
     }
   }
+
+  useEffect(() => {
+    if (focusedPart) void ask(`Explain ${focusedPart.name}: how it works in this design, where it belongs, and what it connects to. Explain this component, not the surrounding scene.`, true);
+  }, [focusedPart?.name]);
 
   function listen() {
     if (listening) { microphone.current?.stop(); return; }
@@ -150,7 +160,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     {open && <>
       <p className="mt-2 text-xs text-sky-100/80">Let's work on it together. Ask a question or tell me what you'd like to change.</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {["What would you improve?", "Explain the key tradeoff"].map(prompt => <button type="button" key={prompt}
+        {(focusedPart ? [`How does ${focusedPart.name} connect?`, `How could we improve ${focusedPart.name}?`] : ["What would you improve?", "Explain the key tradeoff"]).map(prompt => <button type="button" key={prompt}
           disabled={thinking} onClick={() => void ask(prompt)}
           className="rounded-full border border-amber-200/30 px-3 py-1 text-xs text-amber-100 disabled:opacity-40">{prompt}</button>)}
       </div>

@@ -228,21 +228,23 @@ try{
       assert.equal(guideRequests.at(-1).history[0].content,"Why that rotor?","Follow-ups retain conversation context");
     }
     await page.getByRole("button",{name:"LABELS",exact:true}).click();
+    const focusedReply=page.waitForResponse(response=>{
+      if(!response.url().includes('/api/public/ascension/independent')||response.request().method()!=="POST")return false;
+      const input=response.request().postDataJSON();return input.phase==="guide"&&Boolean(input.pathway?.focused_part);
+    });
     await page.getByRole("button",{name:/^(Rotor|Coil)$/,exact:true}).click();
+    const focusedRequest=(await focusedReply).request().postDataJSON();
+    assert.match(focusedRequest.pathway.focused_part.name,/Rotor|Coil/);
+    assert.equal(focusedRequest.pathway.part_located,false,"Unnamed fixture geometry must not be claimed as a located component");
     await page.getByText(/What it does:/).waitFor({state:"visible"});
+    await page.getByRole("button",{name:"DESCRIPTION",exact:true}).click();
+    await detail.locator('aside').getByText(/Where it belongs in the design:/).waitFor();
+    await page.getByRole("button",{name:"LABELS",exact:true}).click();
     await page.getByText("Inspect model geometry",{exact:true}).click();
     await page.getByRole("button",{name:"Hunyuan rotor mesh"}).click();
     await page.getByRole("button",{name:"MOVE RIGHT"}).click();
     await page.getByRole("button",{name:"ZOOM IN"}).click();
-    await page.getByRole("button",{name:"DIVE INTO REALITY"}).click();
-    if(expectedId==="rotor"){
-      const sidebar=detail.locator('aside');
-      await sidebar.getByRole("textbox",{name:"Ask the Tree"}).fill("Which mount fits?");
-      await sidebar.getByRole("button",{name:"ASK",exact:true}).click();
-      await sidebar.getByRole("log").getByText("Which mount fits?",{exact:false}).waitFor();
-    }
-    await page.getByRole("button",{name:"CLOSE REALITY VIEW"}).click();
-    if(expectedId==="rotor")await detail.getByRole("log").getByText("Which mount fits?",{exact:false}).waitFor();
+    assert.equal(await page.getByRole("button",{name:"DIVE INTO REALITY"}).count(),0,"Dive belongs outside V1");
     assert.equal(await detail.count(),1);
     await page.getByRole("button",{name:"Return to the design reference",exact:true}).click();
     await picture.waitFor({state:"visible"});
@@ -257,6 +259,7 @@ try{
     await inspect(id);
     await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
     await page.getByRole("tab").first().waitFor();
+    if(process.env.ASCENSION_INSPECTION_ONLY)break;
   }
   assert.deepEqual([...new Set(generated.map(x=>x.id))].sort(),["blend","modular","rotor","rover"]);
   assert.ok(generated.every(x=>x.view==="assembled"),

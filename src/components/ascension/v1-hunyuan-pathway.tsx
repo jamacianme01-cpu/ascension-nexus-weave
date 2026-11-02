@@ -38,12 +38,11 @@ export function V1HunyuanPathway({
   const [rotation,setRotation]=useState(0);
   const [reset,setReset]=useState(0);
   const [move,setMove]=useState<{seq:number;index:number;delta:[number,number,number]}>();
-  const [immersive,setImmersive]=useState(false);
   const [generatorError,setGeneratorError]=useState("");
 
   useEffect(()=>{
     setMode("assembled");setMeshIndex(null);setTab("labels");setInspectModel(false);setComponent(null);
-    setZoom(1);setRotation(0);setReset(0);setParts([]);setImmersive(false);
+    setZoom(1);setRotation(0);setReset(0);setParts([]);
   },[path.id]);
   useEffect(()=>{
     const stored=modelCache.current.get(key);
@@ -103,14 +102,6 @@ export function V1HunyuanPathway({
     return()=>{active=false;controller.abort();};
   },[key,attempt,modelCache,imageCache]);
 
-  useEffect(()=>{
-    if(!immersive)return;
-    const overflow=document.body.style.overflow;
-    document.body.style.overflow="hidden";
-    const escape=(event:KeyboardEvent)=>{if(event.key==="Escape")setImmersive(false);};
-    window.addEventListener("keydown",escape);
-    return()=>{document.body.style.overflow=overflow;window.removeEventListener("keydown",escape);};
-  },[immersive]);
 
   const changeView=(next:HunyuanMode)=>{setInspectModel(true);setMode(next);};
   const inspect=(index:number)=>{
@@ -137,7 +128,8 @@ export function V1HunyuanPathway({
   return <section className="rounded-2xl border border-gold/30 bg-[#04101cf5] p-4 sm:p-6"
     aria-label="Selected Hunyuan 3D pathway">
     <h3 className="mb-2 text-xl text-gold">{path.title}</h3>
-    <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak}/>
+    <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak}
+      focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} partLocated={meshIndex!==null}/>
     <p className="mb-4 max-w-4xl text-sm leading-6">{path.summary}</p>
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
@@ -156,14 +148,9 @@ export function V1HunyuanPathway({
         onClick={()=>changeView("assembled")}>IMPLODE / REASSEMBLE</button>}
     </div>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
-      <div className={immersive?"fixed inset-0 z-[200] flex flex-col bg-[#030d18] p-4 lg:pr-[320px]":"flex min-w-0 flex-col gap-3"}>
-        {immersive&&<div className="mb-2 flex items-center justify-between">
-          <h4 className="truncate text-gold">{path.title} · HUNYUAN3D</h4>
-          <button type="button" onClick={()=>setImmersive(false)}
-            className="rounded-lg border border-gold/40 px-4 py-2 text-gold">CLOSE REALITY VIEW</button>
-        </div>}
+      <div className="flex min-w-0 flex-col gap-3">
         <div className={"relative min-w-0 overflow-hidden rounded-xl border border-gold/25 bg-[#051727] "+
-          (immersive?"flex-1 min-h-0":"h-[min(65vh,600px)] min-h-[360px]")}
+          "h-[min(65vh,600px)] min-h-[360px]"}
           aria-label="Hunyuan3D real mesh viewer">
           {bytes&&inspectModel?<V1HunyuanWorkbench
             bytes={bytes} title={path.title} mode={mode} zoom={zoom}
@@ -196,20 +183,14 @@ export function V1HunyuanPathway({
         {bytes&&inspectModel&&buttons}
         {picture&&inspectModel&&<button type="button" onClick={()=>setInspectModel(false)}
           className="self-start text-xs text-gold underline">Return to the design reference</button>}
-        {bytes&&!immersive&&<button type="button" onClick={()=>{setInspectModel(true);setImmersive(true);}}
-          className="self-start rounded-xl border border-primary/60 px-4 py-2 text-sm text-primary">
-          DIVE INTO REALITY
-        </button>}
         <p className="text-xs text-foreground/70">
           {bytes?"3D views use an unverified reconstruction. It may differ from the design reference; dimensions are not calibrated."
             :"Waiting for Hunyuan3D. No procedural or unrelated model is substituted."}
           {mode==="dissect"&&parts.length<2?" The generator returned a fused mesh that cannot honestly be dissected.":""}
         </p>
       </div>
-      <aside className={"min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4 "+
-        (immersive?"fixed right-3 top-20 bottom-3 z-[210] w-[285px] overflow-auto max-lg:hidden":"")}
+      <aside className="min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4"
         aria-label="Hunyuan design description and parts">
-        {immersive&&<TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak} compact/>}
         <div className="mb-4 flex flex-wrap gap-2">
           {(["description","labels"] as const).map(v=><button key={v} type="button"
             aria-pressed={tab===v} onClick={()=>setTab(v)}
@@ -219,16 +200,15 @@ export function V1HunyuanPathway({
           </button>)}
         </div>
         {tab==="description"?<div className="space-y-4 text-sm leading-6">
-          {path.blend_reason&&<p className="border-l-2 border-primary pl-3">{path.blend_reason}</p>}
-          <p>{path.summary}</p>
-          <h4 className="font-semibold text-gold">HOW IT WORKS</h4>
-          <ol className="list-decimal space-y-2 pl-5">
-            {path.steps.map((step,i)=><li key={i}>{step}</li>)}
-          </ol>
-          {path.tradeoffs.length>0&&<details>
-            <summary className="cursor-pointer text-gold">Engineering limits</summary>
-            <ul className="list-disc pl-5">{path.tradeoffs.map((t,i)=><li key={i}>{t}</li>)}</ul>
-          </details>}
+          {component!==null&&path.parts[component]?<>
+            <h4 className="font-semibold text-gold">{path.parts[component]!.name}</h4>
+            <p><strong>What it does: </strong>{path.parts[component]!.purpose}</p>
+            <p><strong>Where it belongs in the design: </strong>{path.parts[component]!.location}</p>
+            {meshIndex===null&&<p className="text-xs text-foreground/70">The component has not been located in this reconstruction.</p>}
+          </>:<>
+            <p>Choose a component from Labels to explore its function, intended location and connections with the Tree.</p>
+            <button type="button" onClick={()=>setTab("labels")} className="rounded-lg border border-gold/40 px-3 py-2 text-gold">Choose a component</button>
+          </>}
         </div>:<div className="space-y-2 text-sm" aria-label="Design components">
           {path.parts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
             onClick={()=>{
@@ -237,7 +217,7 @@ export function V1HunyuanPathway({
               const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name));
               if(match){setInspectModel(true);setMode("assembled");setMeshIndex(match.meshIndex);}
               else setMeshIndex(null);
-              onSpeak(p.name+". "+p.purpose+". "+p.location);
+
             }}
             className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
           {component!==null&&path.parts[component]&&<div className="rounded-lg border border-primary/35 p-3 space-y-2">

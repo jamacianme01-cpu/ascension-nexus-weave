@@ -289,7 +289,7 @@ export function IndependentEngage() {
       </div>
       <TreePathwayCarousel designs={choices.map(p => ({
         id: p.id, title: p.title, summary: p.summary,
-      }))} active={orbit % choices.length} onRotate={setOrbit}
+      }))} active={orbit % choices.length} onRotate={index=>{stopVoice();setOrbPreview(null);setOrbit(index);}}
         onOpen={hearPathway} />
       {previewPath && <div className="flex flex-wrap items-center justify-center gap-3" aria-label="Pathway introduction">
         <button type="button" onClick={()=>hearPathway(orbPreview!)}

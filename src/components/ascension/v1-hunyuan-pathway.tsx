@@ -29,6 +29,7 @@ export function V1HunyuanPathway({
   const [status,setStatus]=useState("Checking for the owner's local Hunyuan3D generator…");
   const [failure,setFailure]=useState("");
   const [attempt,setAttempt]=useState(0);
+  const [localRequested,setLocalRequested]=useState(false);
   const [mode,setMode]=useState<HunyuanMode>("assembled");
   const [parts,setParts]=useState<MeshPart[]>([]);
   const [meshIndex,setMeshIndex]=useState<number|null>(null);
@@ -66,6 +67,7 @@ export function V1HunyuanPathway({
         imageCache.current.set(key,sourceImage);
         setPicture(sourceImage);
       }
+      if(!localRequested){setStatus("Design reference ready");return;}
       const match=sourceImage.match(validImage);
       if(!match)throw new Error("The saved selected invention picture is invalid.");
       setStatus("Checking the owner's Hunyuan3D engine on this computer…");
@@ -101,7 +103,7 @@ export function V1HunyuanPathway({
       setFailure(formatError(e));setStatus("Hunyuan3D unavailable");
     }).finally(()=>{if(active)setWorking(false);});
     return()=>{active=false;controller.abort();};
-  },[key,attempt,modelCache,imageCache]);
+  },[key,attempt,localRequested,modelCache,imageCache]);
 
 
   const changeView=(next:HunyuanMode)=>{setInspectModel(true);setMode(next);};
@@ -129,8 +131,7 @@ export function V1HunyuanPathway({
   return <section className="rounded-2xl border border-gold/30 bg-[#04101cf5] p-4 sm:p-6"
     aria-label="Selected Hunyuan 3D pathway">
     <h3 className="mb-2 text-xl text-gold">{path.title}</h3>
-    <TreeGuide objective={objective} pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
-      focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} partLocated={meshIndex!==null}/>
+
     <p className="mb-4 max-w-4xl text-sm leading-6">{path.summary}</p>
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
@@ -141,6 +142,9 @@ export function V1HunyuanPathway({
           (mode===v?"border-primary bg-primary/20 text-primary":"border-gold/40 text-gold")}>
         {v==="assembled"?"ASSEMBLED":v==="blueprint"?"BLUEPRINT":"DISSECT / EXPLODE"}
       </button>)}
+      {!bytes&&<button type="button" disabled={working || localRequested && !failure}
+        onClick={()=>{setLocalRequested(true);setAttempt(v=>v+1);}}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">CONNECT LOCAL 3D</button>}
       {bytes&&<button type="button" aria-pressed={inspectModel&&mode==="assembled"}
         onClick={()=>changeView("assembled")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">3D VIEW</button>}
@@ -161,13 +165,13 @@ export function V1HunyuanPathway({
               <img src={picture} alt={`Concept picture of ${path.title}`}
                 className="min-h-0 flex-1 w-full rounded-lg object-contain" />
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
-                <span>{working?status:failure||"3D inspection is available when you choose a view."}</span>
+                <span>{working?status:failure||""}</span>
                 {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
                   onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
               </div>
             </div>:
             <div role={failure?"alert":"status"} className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-              <p className="max-w-xl text-sm text-gold">{working?status:failure||"3D inspection is available when you choose a view."}</p>
+              <p className="max-w-xl text-sm text-gold">{working?status:failure||""}</p>
               {failure&&<button type="button" className="rounded-lg border border-gold/50 px-4 py-2 text-gold"
                 onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
             </div>}
@@ -186,7 +190,7 @@ export function V1HunyuanPathway({
           className="self-start text-xs text-gold underline">Return to the design reference</button>}
         <p className="text-xs text-foreground/70">
           {bytes?"3D views use an unverified reconstruction. It may differ from the design reference; dimensions are not calibrated."
-            :"Waiting for Hunyuan3D. No procedural or unrelated model is substituted."}
+            :"Optional 3D uses a service on your computer. Connect local 3D only if you have it installed; your browser may ask for device access."}
           {mode==="dissect"&&parts.length<2?" The generator returned a fused mesh that cannot honestly be dissected.":""}
         </p>
       </div>
@@ -243,5 +247,7 @@ export function V1HunyuanPathway({
         </div>}
       </aside>
     </div>
+    <TreeGuide objective={objective} pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
+      focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} partLocated={meshIndex!==null}/>
   </section>;
 }

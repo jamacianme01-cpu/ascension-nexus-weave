@@ -81,7 +81,6 @@ export function IndependentEngage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
-  const [firstAnswer, setFirstAnswer] = useState("");
   const [pathwayError, setPathwayError] = useState("");
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
@@ -132,12 +131,12 @@ export function IndependentEngage() {
     };
   }, []);
 
-  async function generatePathways(text: string, answer: string, controller: AbortController, token: number) {
+  async function generatePathways(text: string, controller: AbortController, token: number) {
     setPathwayError("");
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: answer.slice(0, 6000) }),
+        body: JSON.stringify({ objective: text, phase: "pathways" }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();
@@ -176,26 +175,13 @@ export function IndependentEngage() {
     setError("");
     setPathwayError("");
     setResult(null);
-    setFirstAnswer("");
     setRefinement("");
     setChoice(null);
     setStage("processing");
     // ENGAGE is a user action, not a cue for unsolicited voice narration.
     try {
-      // Internal reasoning only: never narrate or render this essay to the user.
-      const response = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "initial" }),
-        signal: controller.signal,
-      });
-      const data: { phase?: string; answer?: string; error?: string } = await response.json();
-      if (!response.ok) throw new Error(data.error || "The answer engine did not complete.");
-      if (data.phase !== "initial" || !data.answer?.trim())
-        throw new Error("The answer engine returned no usable analysis.");
-      if (generation.current !== token) return;
-      const answer = data.answer.trim();
-      setFirstAnswer(answer);
-      await generatePathways(text, answer, controller, token);
+      // Generate the design alternatives directly; do not serialize a separate private essay first.
+      await generatePathways(text, controller, token);
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
         setError(cause instanceof Error ? cause.message : String(cause));
@@ -207,12 +193,12 @@ export function IndependentEngage() {
   }
 
   function retryPathways() {
-    if (loading || !firstAnswer || !requested) return;
+    if (loading || !requested) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
     setLoading(true); setStage("processing"); setPathwayError("");
-    void generatePathways(requested, firstAnswer, controller, token)
+    void generatePathways(requested, controller, token)
       .finally(() => { if (generation.current === token) setLoading(false); });
   }
 
@@ -231,7 +217,7 @@ export function IndependentEngage() {
     stopVoice();
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
-    setFirstAnswer(""); setRefinement(""); setPathwayError(""); setLoading(false);
+    setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);setOrbit(0);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }

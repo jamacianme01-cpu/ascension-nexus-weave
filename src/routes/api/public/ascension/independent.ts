@@ -176,6 +176,7 @@ async function build(objective: string, firstAnswerText = "") {
     structuredOutput: { name: "ascension_four_pathways", schema: outputSchema },
     system: [
       "You are drafting an ASCENSION creation result, not reporting execution or verification.",
+      "Analyze the objective's reference architecture, interacting modules, resources, constraints and provisional assumptions internally as part of this request, then return only the structured alternatives. A separate preliminary engineering essay is not required.",
       allConnected
         ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
         : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",

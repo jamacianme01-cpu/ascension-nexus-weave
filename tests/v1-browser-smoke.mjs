@@ -49,6 +49,7 @@ try{
   const errors=[];
   const generated=[];
   const guideRequests=[];
+  const creationPhases=[];
   page.on("pageerror",e=>errors.push(e.message));
   page.on("console",msg=>{if(msg.type()==="error")console.log("BROWSER ERROR: "+msg.text().slice(0,500));});
   const mockBytes=fixtureGlb();
@@ -104,6 +105,7 @@ try{
   await page.route("**/api/public/ascension/independent",async route=>{
     const req=route.request(),input=req.method()==="POST"?req.postDataJSON():{};
     const phase=req.method()==="GET"?"capability":input.phase;
+    if(phase==="initial" || phase==="pathways") creationPhases.push(phase);
     const linear=String(input.objective??"").includes("linear propulsion");
     let body;
     if(phase==="capability")body={picture_generation_enabled:true};
@@ -149,6 +151,7 @@ try{
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
   assert.equal(await page.getByRole("tab").count(),4);
+  assert.deepEqual(creationPhases,["pathways"],"ENGAGE must reveal choices after one synthesis request, without waiting for a preliminary essay");
   assert.equal(await page.getByText("INITIAL ANSWER",{exact:true}).count(),0);
   assert.equal(await page.getByText("THREE PATHWAYS + FOURTH BLEND",{exact:true}).count(),0);
   assert.equal(await page.getByRole("region",{name:"Initial objective answer"}).count(),0);
@@ -188,6 +191,10 @@ try{
     assert.ok(await nextStep.getByText("Dimensions remain unverified", {exact:true}).isVisible(), "Tradeoffs remain visible beside the plan");
     const picture=page.locator('img[alt^="Concept picture of"]');
     await picture.waitFor({state:"visible"});
+    if(await page.getByRole("button",{name:"CONNECT LOCAL 3D",exact:true}).count()){
+      if(expectedId==="rotor")assert.equal(await page.evaluate(()=>window.__localHunyuanCalls.length),0,"Opening a pathway must never probe the device before explicit connection");
+      await page.getByRole("button",{name:"CONNECT LOCAL 3D",exact:true}).click();
+    }
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).waitFor({state:"visible"});
     await page.waitForFunction(()=>{const b=[...document.querySelectorAll("button")].find(b=>b.textContent==="BLUEPRINT");return b&&!b.disabled;});
     assert.equal(await canvas.count(),0,"GLB arrival must not replace the invention picture");
@@ -255,6 +262,10 @@ try{
     assert.equal(await detail.count(),1);
     await page.getByRole("button",{name:"Return to the design reference",exact:true}).click();
     await picture.waitFor({state:"visible"});
+    if(await page.getByRole("button",{name:"CONNECT LOCAL 3D",exact:true}).count()){
+      if(expectedId==="rotor")assert.equal(await page.evaluate(()=>window.__localHunyuanCalls.length),0,"Opening a pathway must never probe the device before explicit connection");
+      await page.getByRole("button",{name:"CONNECT LOCAL 3D",exact:true}).click();
+    }
     assert.equal(await picture.getAttribute("src"),original,"Picture identity survives all model views");
     assert.equal(await detail.getByText("Hunyuan3D mesh ready").count(),0);
     assert.equal(await page.locator('canvas[aria-label^="Rotatable, zoomable"]').count(),0,

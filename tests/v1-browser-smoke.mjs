@@ -110,6 +110,7 @@ try{
     let body;
     if(phase==="capability")body={picture_generation_enabled:true};
     else if(phase==="initial")body={phase:"initial",answer:"Private engineering analysis"};
+    else if(phase==="locate")body={regions:linear?[]:[{part:0,polygon:[[.1,.1],[.3,.1],[.3,.3],[.1,.3]]}],verified:false};
     else if(phase==="picture"){
       generated.push({id:input.pathway?.id,view:input.view});
       body={image_url:"data:image/png;base64,"+mockImage,verified:false};
@@ -234,19 +235,26 @@ try{
     assert.ok(preserved);
     await page.getByRole("button",{name:"3D VIEW",exact:true}).click();
     await page.waitForTimeout(200);
-    const assembledPixels=await canvas.screenshot();
+    let assembledPixels=await canvas.screenshot();
+    await page.getByRole("button",{name:"TOP",exact:true}).click();
+    await page.waitForTimeout(200);
+    assert.ok(!(await canvas.screenshot()).equals(assembledPixels),"Top view changes the real model camera");
+    await page.getByRole("button",{name:"PERSPECTIVE",exact:true}).click();
+    await page.waitForTimeout(200);
+
+    assembledPixels=await canvas.screenshot();
     await page.getByRole("button",{name:"DISSECT / EXPLODE",exact:true}).click();
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="dissect"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__realMesh),true,
       "Dissect must reuse the actual Hunyuan GLB canvas");
     await page.waitForTimeout(200);
-    assert.notDeepEqual(await canvas.screenshot(),assembledPixels,"Explosion must actually separate geometry");
+    assert.ok(!(await canvas.screenshot()).equals(assembledPixels),"Explosion must actually separate geometry");
     await page.getByRole("button",{name:"IMPLODE / REASSEMBLE",exact:true}).click();
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="assembled"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__realMesh),true,
       "Reassemble must not regenerate another design");
     await page.waitForTimeout(200);
-    assert.deepEqual(await canvas.screenshot(),assembledPixels,"Implosion must restore the original assembly");
+    assert.ok((await canvas.screenshot()).equals(assembledPixels),"Implosion must restore the original assembly");
     if(expectedId==="rotor"){
       const question=detail.getByRole("textbox",{name:"Ask the Tree"});
       await question.fill("Why that rotor?");await detail.getByRole("button",{name:"ASK",exact:true}).click();
@@ -259,7 +267,6 @@ try{
       assert.ok(guideRequests.at(-1).alternatives.every(option => option.title && option.summary && option.tradeoffs.length), "Comparisons include each choice's actual tradeoffs");
       assert.deepEqual(guideRequests.at(-1).pathway.tradeoffs, ["Dimensions remain unverified"]);
     }
-    await page.getByRole("button",{name:"LABELS",exact:true}).click();
     const focusedReply=page.waitForResponse(response=>{
       if(!response.url().includes('/api/public/ascension/independent')||response.request().method()!=="POST")return false;
       const input=response.request().postDataJSON();return input.phase==="guide"&&Boolean(input.pathway?.focused_part);
@@ -267,11 +274,11 @@ try{
     await page.getByRole("button",{name:/^(Rotor|Coil)$/,exact:true}).click();
     const focusedRequest=(await focusedReply).request().postDataJSON();
     assert.match(focusedRequest.pathway.focused_part.name,/Rotor|Coil/);
-    assert.equal(focusedRequest.pathway.part_located,false,"Unnamed fixture geometry must not be claimed as a located component");
-    await page.getByText(/What it does:/).waitFor({state:"visible"});
-    await page.getByRole("button",{name:"DESCRIPTION",exact:true}).click();
-    await detail.locator('aside').getByText(/Where it belongs in the design:/).waitFor();
-    await page.getByRole("button",{name:"LABELS",exact:true}).click();
+    assert.equal(focusedRequest.pathway.part_located,expectedId!=="linear1","Image regions never imply a named geometry mapping");
+    assert.equal(focusedRequest.pathway.location_source,expectedId==="linear1"?"unlocated":"reference-image");
+    if(expectedId!=="linear1")await page.getByLabel("Image location of Rotor",{exact:true}).waitFor();
+    assert.equal(await page.getByRole("button",{name:"DESCRIPTION",exact:true}).count(),0,"Part explanation belongs to the spoken selection, not a separate tab");
+    assert.ok(await page.evaluate(()=>window.__treeSpeech.some(text=>text.includes("Inspect the selected source geometry."))),"Selected-part explanation is spoken");
     await page.getByText("Inspect model geometry",{exact:true}).click();
     await page.getByRole("button",{name:"Hunyuan rotor mesh"}).click();
     await page.getByRole("button",{name:"MOVE RIGHT"}).click();

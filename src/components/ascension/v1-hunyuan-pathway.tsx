@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { type DesignRegion } from "@/lib/ascension/design-regions";
 import { loadPathwayVisual } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
@@ -9,6 +10,7 @@ type Pathway={
   parts:Part[];blend_reason?:string;
 };
 type Cache={current:Map<string,ArrayBuffer>};
+const regionCache=new Map<string,DesignRegion[]>();
 const LOCAL="http://127.0.0.1:8082";
 const validImage=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/=]{4000,12000000})$/i;
 function formatError(reason:unknown){
@@ -33,17 +35,39 @@ export function V1HunyuanPathway({
   const [mode,setMode]=useState<HunyuanMode>("assembled");
   const [parts,setParts]=useState<MeshPart[]>([]);
   const [meshIndex,setMeshIndex]=useState<number|null>(null);
-  const [tab,setTab]=useState<"description"|"labels">("labels");
   const [inspectModel,setInspectModel]=useState(false);
   const [component,setComponent]=useState<number|null>(null);
+  const [partSelection,setPartSelection]=useState(0);
   const [zoom,setZoom]=useState(1);
   const [rotation,setRotation]=useState(0);
   const [reset,setReset]=useState(0);
   const [move,setMove]=useState<{seq:number;index:number;delta:[number,number,number]}>();
   const [generatorError,setGeneratorError]=useState("");
+  const [regions,setRegions]=useState<DesignRegion[]>([]);
+  const [locating,setLocating]=useState(false);
+  const [imageSize,setImageSize]=useState({width:1,height:1});
+  const [cameraView,setCameraView]=useState<"perspective"|"front"|"back"|"left"|"right"|"top">("perspective");
+  const imageRegions=component===null?[]:regions.filter(r=>r.part===component);
+  useEffect(()=>{
+    if(!picture)return;
+    const saved=regionCache.get(key);if(saved){setRegions(saved);return;}
+    const controller=new AbortController();let current=true;
+    setRegions([]);setLocating(true);
+    (async()=>{
+      const image=new Image();image.src=picture;await image.decode();
+      if(!current)return;
+      const scale=Math.min(1,1024/Math.max(image.naturalWidth,image.naturalHeight));
+      const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+      canvas.getContext("2d")!.drawImage(image,0,0,canvas.width,canvas.height);
+      const response=await fetch("/api/public/ascension/independent",{method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},body:JSON.stringify({phase:"locate",objective,image:canvas.toDataURL("image/jpeg",.85),parts:path.parts.slice(0,12).map(p=>p.name)})});
+      const data=await response.json();if(!response.ok||!Array.isArray(data.regions))return;
+      if(current){setRegions(data.regions);regionCache.set(key,data.regions);if(regionCache.size>12)regionCache.delete(regionCache.keys().next().value!);}
+    })().catch(()=>{}).finally(()=>{if(current)setLocating(false);});
+    return()=>{current=false;controller.abort();};
+  },[picture,key]);
 
   useEffect(()=>{
-    setMode("assembled");setMeshIndex(null);setTab("labels");setInspectModel(false);setComponent(null);
+    setMode("assembled");setMeshIndex(null);setInspectModel(false);setComponent(null);
     setZoom(1);setRotation(0);setReset(0);setParts([]);
   },[path.id]);
   useEffect(()=>{
@@ -108,7 +132,7 @@ export function V1HunyuanPathway({
 
   const changeView=(next:HunyuanMode)=>{setInspectModel(true);setMode(next);};
   const inspect=(index:number)=>{
-    setMeshIndex(index);setTab("labels");
+    setMeshIndex(index);
     const mesh=parts[index];
     if(mesh)onSpeak(mesh.name+". This is an actual submesh returned by Hunyuan3D. Its physical function cannot be inferred reliably from geometry alone.");
   };
@@ -125,7 +149,7 @@ export function V1HunyuanPathway({
       className="rounded-lg border border-gold/40 px-3 py-2 text-xs text-gold">ROTATE LEFT</button>
     <button type="button" onClick={()=>setRotation(v=>v+15)}
       className="rounded-lg border border-gold/40 px-3 py-2 text-xs text-gold">ROTATE RIGHT</button>
-    <button type="button" onClick={()=>{setZoom(1);setRotation(0);setMode("assembled");setReset(v=>v+1);}}
+    <button type="button" onClick={()=>{setZoom(1);setRotation(0);setCameraView("perspective");setMode("assembled");setReset(v=>v+1);}}
       className="rounded-lg border border-gold/40 px-3 py-2 text-xs text-gold">RESET</button>
   </div>;
   return <section className="rounded-2xl border border-gold/30 bg-[#04101cf5] p-4 sm:p-6"
@@ -159,11 +183,19 @@ export function V1HunyuanPathway({
           aria-label="Hunyuan3D real mesh viewer">
           {bytes&&inspectModel?<V1HunyuanWorkbench
             bytes={bytes} title={path.title} mode={mode} zoom={zoom}
-            rotation={rotation} selected={meshIndex} move={move}
+            rotation={rotation} cameraView={cameraView} selected={meshIndex} move={move}
             reset={reset} onParts={setParts} onError={setGeneratorError} onSelect={inspect}/>:
             picture?<div className="flex h-full min-h-0 flex-col gap-2 p-3">
-              <img src={picture} alt={`Concept picture of ${path.title}`}
-                className="min-h-0 flex-1 w-full rounded-lg object-contain" />
+              <div className="relative min-h-0 flex-1">
+                <img src={picture} alt={`Concept picture of ${path.title}`}
+                  onLoad={event=>setImageSize({width:event.currentTarget.naturalWidth,height:event.currentTarget.naturalHeight})}
+                  className="absolute inset-0 h-full w-full rounded-lg object-contain" />
+                {imageRegions.length>0&&<svg aria-label={`Image location of ${path.parts[component!]!.name}`} className="pointer-events-none absolute inset-0 h-full w-full"
+                  viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} preserveAspectRatio="xMidYMid meet">
+                  {imageRegions.map((region,index)=><polygon key={index} points={region.polygon.map(([x,y])=>`${x*imageSize.width},${y*imageSize.height}`).join(" ")}
+                    fill="#22d3ee55" stroke="#a5f3fc" strokeWidth="3" vectorEffect="non-scaling-stroke" />)}
+                </svg>}
+              </div>
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
                 <span>{working?status:failure||""}</span>
                 {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
@@ -185,6 +217,10 @@ export function V1HunyuanPathway({
           </div>}
         </div>
         {generatorError&&<p role="alert" className="text-xs text-red-300">{generatorError}</p>}
+        {bytes&&inspectModel&&<div className="flex flex-wrap gap-2" role="group" aria-label="View angles">
+          {(["perspective","front","back","left","right","top"] as const).map(view=><button type="button" key={view} aria-pressed={cameraView===view}
+            onClick={()=>{setMode("assembled");setCameraView(view);}} className="rounded-lg border border-gold/40 px-3 py-2 text-xs text-gold">{view.toUpperCase()}</button>)}
+        </div>}
         {bytes&&inspectModel&&buttons}
         {picture&&inspectModel&&<button type="button" onClick={()=>setInspectModel(false)}
           className="self-start text-xs text-gold underline">Return to the design reference</button>}
@@ -196,41 +232,21 @@ export function V1HunyuanPathway({
       </div>
       <aside className="min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4"
         aria-label="Hunyuan design description and parts">
-        <div className="mb-4 flex flex-wrap gap-2">
-          {(["description","labels"] as const).map(v=><button key={v} type="button"
-            aria-pressed={tab===v} onClick={()=>setTab(v)}
-            className={"rounded-lg border px-3 py-2 text-sm "+
-              (tab===v?"border-primary text-primary":"border-gold/40 text-gold")}>
-            {v.toUpperCase()}
-          </button>)}
-        </div>
-        {tab==="description"?<div className="space-y-4 text-sm leading-6">
-          {component!==null&&path.parts[component]?<>
-            <h4 className="font-semibold text-gold">{path.parts[component]!.name}</h4>
-            <p><strong>What it does: </strong>{path.parts[component]!.purpose}</p>
-            <p><strong>Where it belongs in the design: </strong>{path.parts[component]!.location}</p>
-            {meshIndex===null&&<p className="text-xs text-foreground/70">The component has not been located in this reconstruction.</p>}
-          </>:<>
-            <p>Choose a component from Labels to explore its function, intended location and connections with the Tree.</p>
-            <button type="button" onClick={()=>setTab("labels")} className="rounded-lg border border-gold/40 px-3 py-2 text-gold">Choose a component</button>
-          </>}
-        </div>:<div className="space-y-2 text-sm" aria-label="Design components">
+        <h4 className="mb-3 text-sm text-gold">PARTS</h4>
+        <div className="space-y-2 text-sm" aria-label="Design components">
           {path.parts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
             onClick={()=>{
-              setComponent(i);
+              setComponent(i);setPartSelection(value=>value+1);
               const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
               const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name));
               if(match){setInspectModel(true);setMode("assembled");setMeshIndex(match.meshIndex);}
-              else setMeshIndex(null);
-
+              else {setMeshIndex(null);setInspectModel(false);}
             }}
             className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
-          {component!==null&&path.parts[component]&&<div className="rounded-lg border border-primary/35 p-3 space-y-2">
-            <strong>{path.parts[component]!.name}</strong>
-            <p>What it does: {path.parts[component]!.purpose}</p>
-            <p>Where it belongs: {path.parts[component]!.location}</p>
-            {meshIndex===null&&<p className="text-xs text-foreground/70">This component has not been located in the reconstruction. Its description is not a verified geometry mapping.</p>}
-          </div>}
+          {locating&&<p role="status" className="text-xs text-gold">Locating visible parts in this picture…</p>}
+          {component!==null&&!inspectModel&&<p role="status" className="text-xs text-foreground/70">
+            {imageRegions.length?"Estimated part outline in the reference image.":locating?"Checking this part's visible location…":"This part is not visibly identified in the assembled picture."}
+          </p>}
           {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
           {parts.length>0&&<details className="mt-4">
             <summary className="cursor-pointer text-gold">Inspect model geometry</summary>
@@ -244,10 +260,10 @@ export function V1HunyuanPathway({
             </div>}
           </details>}
 
-        </div>}
+        </div>
       </aside>
     </div>
     <TreeGuide objective={objective} introduce pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
-      focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} partLocated={meshIndex!==null}/>
+      focusRevision={partSelection} focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":imageRegions.length?"reference-image":"unlocated"} partLocated={inspectModel?meshIndex!==null:imageRegions.length>0}/>
   </section>;
 }

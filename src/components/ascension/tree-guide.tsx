@@ -28,7 +28,7 @@ type VoiceRecognizer = {
   stop(): void;
 };
 
-export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false }: {
+export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0 }: {
   objective: string;
   pathway: GuidePathway;
   enabled: boolean;
@@ -39,6 +39,8 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   partLocated?: boolean;
   alternatives?: GuidePathway[];
   introduce?: boolean;
+  focusRevision?: number;
+  locationSource?: "reference-image"|"mesh"|"unlocated";
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -93,6 +95,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
             focused_part: focusedPart,
             current_view: view,
             part_located: partLocated,
+            location_source: locationSource,
           },
         }),
       });
@@ -124,7 +127,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
 
   useEffect(() => {
     if (focusedPart) void ask(`Explain ${focusedPart.name}: how it works in this design, where it belongs, and what it connects to. Explain this component, not the surrounding scene.`, true, focusedPart.name);
-  }, [focusedPart?.name]);
+  }, [focusedPart?.name,focusRevision]);
 
   useEffect(() => {
     if(!introduce || introduced.has(JSON.stringify([objective,pathway.title])))return;

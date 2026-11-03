@@ -12,6 +12,7 @@ type Props = {
   zoom: number;
   rotation: number;
   selected: number | null;
+  cameraView?: "perspective"|"front"|"back"|"left"|"right"|"top";
   move?: { seq: number; index: number; delta: [number,number,number] } | undefined;
   reset: number;
   onParts: (parts: MeshPart[]) => void;
@@ -38,7 +39,7 @@ type Runtime = {
  * Hunyuan may return a single fused mesh. We do not mislabel fake sub-components.
  */
 export function V1HunyuanWorkbench({
-  bytes,title,mode,zoom,rotation,selected,move,reset,onParts,onError,onSelect,
+  bytes,title,mode,zoom,rotation,selected,move,reset,cameraView="perspective",onParts,onError,onSelect,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const live = useRef<Runtime|null>(null);
@@ -259,6 +260,14 @@ export function V1HunyuanWorkbench({
     st.camera.position.copy(center).addScaledVector(direction,distance);
     st.controls.update();
   },[selected,revision]);
+  useEffect(()=>{
+    const st=live.current;if(!st)return;
+    const directions={perspective:[5,4,7],front:[0,0,1],back:[0,0,-1],left:[-1,0,0],right:[1,0,0],top:[0,1,.001]};
+    const bounds=new THREE.Box3().setFromObject(st.root),center=bounds.getCenter(new THREE.Vector3());
+    const direction=new THREE.Vector3(...directions[cameraView] as [number,number,number]).normalize();
+    const distance=Math.max(3,bounds.getSize(new THREE.Vector3()).length()*1.6);
+    st.controls.target.copy(center);st.camera.position.copy(center).addScaledVector(direction,distance);st.controls.update();
+  },[cameraView,revision]);
   useEffect(()=>{
     const st=live.current;if(!st||!move)return;
     const m=st.meshes[move.index];if(!m)return;

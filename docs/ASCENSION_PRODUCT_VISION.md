@@ -2,6 +2,12 @@
 
 ## Latest owner-approved sequence — November 3 (supersedes orb previews)
 
+### Part selection and V2 boundary — latest correction
+
+Selecting a part name should locate/highlight that part and speak its explanation in the same interaction, rather than requiring a separate Description screen. Showing a part operating in simulation is V2. Keep actual camera views of the same model in V1.
+
+Implementation distinction: reference-picture regions are inferred from the actual selected image, filtered for confidence and valid bounded outlines, and labeled estimated. They are not verified 3D component identities. Hidden/unidentifiable components receive no invented outline. Named-mesh selection still uses names supplied by the delivered model. Front/back/left/right/top controls change the loaded model's actual camera. These controls do not supply a hosted model when none exists; hosted segmented 3D remains unresolved.
+
 For V1, do not generate images on the Tree. Keep the Tree prominent with three distinct named pathway orbs and BLEND. The focused orb explains its possibility in text. Generated images inside orbs wait until V2.
 
 Clicking an orb first speaks a short introduction about that proposed design's capabilities and what it could work well with. Stay on the Tree so people can hear different possibilities before choosing. Do not automatically write out the description; an expandable transcript remains available when needed. ENTER PATHWAY then starts only that pathway's image generation and opens its inspection scene immediately, with clear progress and the Tree faintly behind it, as entering the Tree's world: Knowledgeverse. Knowledgeverse is this experience, not an extra navigation tab. The selected-path guide begins an intelligent, grounded explanation of that design's benefit, tradeoff, useful connection and practical first check. The conversation and image generation can proceed independently. Returning to a selected pathway reuses its saved image.

@@ -25,6 +25,7 @@ type MeshRecord = {
   homePosition: THREE.Vector3;
   originalMaterials: THREE.Material | THREE.Material[];
   blueprintMaterials: THREE.Material | THREE.Material[];
+  highlightMaterial: THREE.Material;
 };
 type Runtime = {
   scene: THREE.Scene; root: THREE.Group; renderer: THREE.WebGLRenderer;
@@ -172,6 +173,7 @@ export function V1HunyuanWorkbench({
             homePosition:item.position.clone(),
             originalMaterials:original,
             blueprintMaterials:blueprint,
+            highlightMaterial:new THREE.MeshStandardMaterial({color:0x44e5f5,emissive:0x08758a,emissiveIntensity:.7,side:THREE.DoubleSide}),
           });
         }
       });
@@ -198,6 +200,8 @@ export function V1HunyuanWorkbench({
       runtime.meshes.forEach(record=>{
         const paints=Array.isArray(record.blueprintMaterials)?record.blueprintMaterials:[record.blueprintMaterials];
         paints.forEach(p=>p.dispose());
+        record.highlightMaterial.dispose();
+        (Array.isArray(record.originalMaterials)?record.originalMaterials:[record.originalMaterials]).forEach(p=>p.dispose());
       });
       scene.traverse(item=>{
         if(item instanceof THREE.Mesh){
@@ -223,6 +227,7 @@ export function V1HunyuanWorkbench({
       mesh.position.copy(record.originalPosition);
       mesh.material=record.originalMaterials;
       if(blueprint)mesh.material=record.blueprintMaterials;
+      if(i===selected)mesh.material=record.highlightMaterial;
       if(explode){
         const world=new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
         const offset=world.clone();
@@ -232,7 +237,7 @@ export function V1HunyuanWorkbench({
         mesh.position.copy(mesh.parent!.worldToLocal(origin.add(offset)));
       }
     });
-  },[mode,bytes,revision]);
+  },[mode,bytes,revision,selected]);
 
   useEffect(()=>{
     const st=live.current;if(!st)return;

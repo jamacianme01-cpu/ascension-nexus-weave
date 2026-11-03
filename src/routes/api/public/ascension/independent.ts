@@ -364,8 +364,9 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
       // Inspections have their own quotas to prevent resource exhaustion.
       try {
         const raw = await request.text();
-        if (raw.length > 15000) return json({ error: "Objective too long." }, 413);
+        if (raw.length > 64000) return json({ error: "Objective too long." }, 413);
         const input = obj(JSON.parse(raw));
+        if(raw.length>15000 && input["phase"]!=="guide")return json({error:"Request too long."},413);
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
         if (input["phase"] === "initial") {

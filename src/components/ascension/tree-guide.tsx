@@ -5,7 +5,8 @@ import { TreePine } from "lucide-react";
  * The server answers from selected design context; it cannot claim a physical test.
  */
 type GuidePart = { name: string; purpose: string; location: string };
-type Exchange = { role: "user" | "assistant"; content: string; selectedPart?: string };
+type Exchange = { role: "user" | "assistant"; content: string; selectedPart?: string; selectedPathway?: string };
+const introduced = new Set<string>();
 const conversations = new Map<string, Exchange[]>();
 const conversationListeners = new Set<() => void>();
 export type GuidePathway = {
@@ -27,7 +28,7 @@ type VoiceRecognizer = {
   stop(): void;
 };
 
-export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [] }: {
+export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false }: {
   objective: string;
   pathway: GuidePathway;
   enabled: boolean;
@@ -37,6 +38,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   view?: string;
   partLocated?: boolean;
   alternatives?: GuidePathway[];
+  introduce?: boolean;
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -62,13 +64,13 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     setConversation(conversations.get(objective) ?? []);
   }, [pathway.title, objective]);
 
-  async function ask(value: string, replace = false, selectionName?: string) {
+  async function ask(value: string, replace = false, selectionName?: string, isPathway = false) {
     const text = value.trim();
     if (!text || (thinking && !replace) || text.length > 800) return;
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
-    setQuestion(text);
+    if(!selectionName)setQuestion(text);
     setThinking(true);
     setError("");
     try {
@@ -100,13 +102,17 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       if (!controller.signal.aborted) {
         const reply = data.answer.trim();
         setAnswer(reply);
+        if(isPathway){
+          introduced.add(JSON.stringify([objective,pathway.title]));
+          if(introduced.size>48)introduced.delete(introduced.values().next().value!);
+        }
         const exchanges: Exchange[] = [...(conversations.get(objective) ?? []),
-          { role: "user", content: text, ...(selectionName ? { selectedPart: selectionName } : {}) }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
+          { role: "user", content: text, ...(selectionName ? isPathway ? { selectedPathway: selectionName } : { selectedPart: selectionName } : {}) }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
         conversations.set(objective, exchanges);
         if (conversations.size > 12) conversations.delete(conversations.keys().next().value!);
         conversationListeners.forEach(refresh => refresh());
         setConversation(exchanges);
-        setQuestion("");
+        if(!selectionName)setQuestion(current=>current===text?"":current);
         if (enabled) onSpeak(reply);
       }
     } catch (cause) {
@@ -119,6 +125,13 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   useEffect(() => {
     if (focusedPart) void ask(`Explain ${focusedPart.name}: how it works in this design, where it belongs, and what it connects to. Explain this component, not the surrounding scene.`, true, focusedPart.name);
   }, [focusedPart?.name]);
+
+  useEffect(() => {
+    if(!introduce || introduced.has(JSON.stringify([objective,pathway.title])))return;
+    // Defer so StrictMode's discarded mount cannot send a duplicate introduction.
+    const timer=window.setTimeout(()=>void ask("Help me understand this selected pathway: explain its distinctive benefit, the main tradeoff, one useful connection I may not have considered, and a practical first check. Stay grounded in the supplied design.", true, pathway.title, true),0);
+    return()=>window.clearTimeout(timer);
+  },[introduce,objective,pathway.title]);
 
   function listen() {
     if (listening) { microphone.current?.stop(); return; }
@@ -187,7 +200,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       <div className="mt-3 space-y-2" role="log" aria-label="Conversation with the Tree" aria-live="polite">
         {conversation.map((message, index) => <p key={index}
           className={"whitespace-pre-wrap leading-6 "+(message.role==="user"?"text-amber-100":"text-sky-100")}>
-          <span className="mr-2 text-xs opacity-70">{message.selectedPart?"Selected part":message.role==="user"?"You":"Tree"}</span>{message.selectedPart ?? message.content}</p>)}
+          <span className="mr-2 text-xs opacity-70">{message.selectedPathway?"Selected pathway":message.selectedPart?"Selected part":message.role==="user"?"You":"Tree"}</span>{message.selectedPathway ?? message.selectedPart ?? message.content}</p>)}
       </div>
     </>}
   </div>;

@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from "react";
 
-type Design = { id: string; title: string; summary: string; image?: string | undefined };
+type Design = { id: string; title: string; summary: string };
 export function TreePathwayCarousel({ designs, active, onRotate, onOpen }: {
   designs: Design[]; active: number; onRotate: (index: number) => void; onOpen: (index: number) => void;
 }) {
@@ -38,8 +38,7 @@ export function TreePathwayCarousel({ designs, active, onRotate, onOpen }: {
           onPointerEnter={() => setPreviewed(index)} onPointerLeave={() => setPreviewed(null)}
           onFocus={() => setPreviewed(index)} onBlur={() => setPreviewed(null)}>
           <span className="tree-orb-window">
-            {design.image ? <img src={design.image} alt={`${design.title} design preview`} />
-              : <span className="tree-orb-forming" aria-hidden="true">✧</span>}
+            <span className="tree-orb-title">{design.title}</span>
           </span>
           <span className="tree-orb-glass" aria-hidden="true" />
           {index === designs.length - 1 && <span className="tree-orbit-blend">BLEND</span>}
@@ -49,7 +48,7 @@ export function TreePathwayCarousel({ designs, active, onRotate, onOpen }: {
     <div className="tree-orb-reading" aria-live="polite" aria-atomic="true">
       <strong>{focused?.title}</strong>
       <p>{focused?.summary}</p>
-      <span>{focused?.image ? "Choose an orb to explore this possibility" : "The design preview is forming inside its orb"}</span>
+      <span>Choose an orb to enter this possibility</span>
     </div>
     <div className="tree-carousel-navigation">
       <button type="button" onClick={() => rotate(-1)} aria-label="Previous pathway">←</button>

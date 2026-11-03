@@ -22,3 +22,8 @@
 .tree-carousel-navigation button{flex:none;width:44px;height:44px;border:1px solid #d1b26488;border-radius:50%;background:#061623b8;color:#e8cf8d;font-size:22px}
 @media(max-width:640px){.tree-pathway-carousel{height:690px;border-radius:16px}.tree-carousel-art{object-position:center top}.tree-orbit-card{width:clamp(88px,26vw,125px)}.tree-orb-window{inset:3px}.tree-orb-reading{bottom:105px;width:88%}.tree-orb-reading p{font-size:12px}.tree-orb-reading>span{font-size:10px}.tree-orbit-blend{font-size:8px}.tree-carousel-navigation{bottom:20px}.tree-orbit-glow{left:15%;right:15%}}
 @media(prefers-reduced-motion:reduce){.tree-orbit-card{transition:none}}
+
+.tree-orb-title{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;padding:12% 12% 15%;font-size:clamp(10px,1.2vw,14px);line-height:1.35;font-weight:500;text-align:center;color:#f9edc9;text-shadow:0 2px 5px #000;z-index:1}
+.ascension-knowledgeverse{position:relative;isolation:isolate}
+.ascension-world[data-realities="true"]::before{opacity:.16}
+.ascension-knowledgeverse>section{background-color:#04101cdd}

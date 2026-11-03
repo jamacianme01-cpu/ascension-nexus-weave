@@ -143,6 +143,8 @@ try{
   assert.equal(res?.status(),200);
   const hero=page.locator('img[src="/approved-scene/ascension-tree-behind-book-hq.jpg"]');
   await hero.waitFor();
+  for(const name of ["Glossary","Library Card","Inspect","Knowledgeverse"])
+    assert.equal(await page.locator("header").getByText(name,{exact:true}).count(),0,"V1 header excludes "+name);
   const entry=page.getByRole("region",{name:"Engage ASCENSION"});
   await entry.waitFor({state:"visible"});
   await page.getByRole("button",{name:"Hear the Tree",exact:true}).click();
@@ -150,6 +152,7 @@ try{
   await page.locator("#objective").fill("make worker drones");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
+  assert.equal(generated.length,0,"The Tree must not generate images before a pathway is selected");
   assert.equal(await page.getByRole("tab").count(),4);
   assert.deepEqual(creationPhases,["pathways"],"ENGAGE must reveal choices after one synthesis request, without waiting for a preliminary essay");
   assert.equal(await page.getByText("INITIAL ANSWER",{exact:true}).count(),0);
@@ -189,6 +192,8 @@ try{
     await nextStep.getByRole("heading", {name:"Your first steps"}).waitFor();
     assert.ok(await nextStep.locator("ol li").count() >= 2, "Selected pathway exposes its actual plan");
     assert.ok(await nextStep.getByText("Dimensions remain unverified", {exact:true}).isVisible(), "Tradeoffs remain visible beside the plan");
+    assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.ascension-world'),'::before').opacity),"0.16","The Tree becomes faint inside the selected world");
+    await detail.getByRole("log").getByText("Selected pathway",{exact:false}).last().waitFor();
     const picture=page.locator('img[alt^="Concept picture of"]');
     await picture.waitFor({state:"visible"});
     if(await page.getByRole("button",{name:"CONNECT LOCAL 3D",exact:true}).count()){
@@ -233,10 +238,11 @@ try{
     if(expectedId==="rotor"){
       const question=detail.getByRole("textbox",{name:"Ask the Tree"});
       await question.fill("Why that rotor?");await detail.getByRole("button",{name:"ASK",exact:true}).click();
-      await detail.getByRole("log").getByText("Inspect the selected source geometry.",{exact:false}).waitFor();
+      await detail.getByRole("log").getByText("Inspect the selected source geometry.",{exact:false}).last().waitFor();
+      await detail.getByRole("log").getByText("Why that rotor?",{exact:false}).waitFor();
       await question.fill("What about endurance?");await detail.getByRole("button",{name:"ASK",exact:true}).click();
       await page.waitForFunction(()=>[...document.querySelectorAll('[role="log"] p')].some(p=>p.textContent.includes("What about endurance?")));
-      assert.equal(guideRequests.at(-1).history[0].content,"Why that rotor?","Follow-ups retain conversation context");
+      assert.ok(guideRequests.at(-1).history.some(item=>item.content==="Why that rotor?"),"Follow-ups retain conversation context");
       assert.equal(guideRequests.at(-1).alternatives.length, 4, "Tree can compare every supplied pathway");
       assert.ok(guideRequests.at(-1).alternatives.every(option => option.title && option.summary && option.tradeoffs.length), "Comparisons include each choice's actual tradeoffs");
       assert.deepEqual(guideRequests.at(-1).pathway.tradeoffs, ["Dimensions remain unverified"]);
@@ -279,9 +285,15 @@ try{
     await page.getByRole("tab").first().waitFor();
     if(process.env.ASCENSION_INSPECTION_ONLY)break;
   }
-  assert.deepEqual([...new Set(generated.map(x=>x.id))].sort(),["blend","modular","rotor","rover"]);
+  assert.deepEqual([...new Set(generated.map(x=>x.id))].sort(),process.env.ASCENSION_INSPECTION_ONLY?["rotor"]:["blend","modular","rotor","rover"],"Only selected pathways request pictures");
   assert.ok(generated.every(x=>x.view==="assembled"),
     "Blueprint and Dissect must never regenerate unrelated pictures");
+  const imageCount = generated.length;
+  await page.getByRole("tab").first().click();
+  await page.locator('img[alt^="Concept picture of"]').waitFor();
+  assert.equal(generated.length,imageCount,"Returning to the chosen pathway reuses its image");
+  assert.equal(await detail.getByRole("textbox",{name:"Ask the Tree"}).inputValue(),"","Guide context must not appear as typed user text");
+  await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
 
   await page.setViewportSize({width:390,height:844});
   await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-mobile.png"});
@@ -295,8 +307,11 @@ try{
   await page.getByRole("tab").first().waitFor();
   await page.getByRole("tab").first().click();
   await inspect("linear1");
-  assert.equal(new Set(generated.map(x=>x.id)).size,8,"Each objective has four path-specific references, shared with selection");
+  assert.equal(new Set(generated.map(x=>x.id)).size,process.env.ASCENSION_INSPECTION_ONLY?2:5,"Only selected pathways across both objectives receive pictures");
   assert.equal(errors.length,0,errors.join(" | "));
+  await page.goto(new URL("/console",process.env.ASCENSION_BASE_URL||"http://127.0.0.1:4174/").href);
+  await page.locator("#objective").waitFor();
+  assert.equal(new URL(page.url()).pathname,"/","Old Inspect bookmarks return to public V1");
   console.log("PASS V1 browser fixture checks: entry speech callback, hidden brief, four choices, preserved picture, GLB blueprint/explode/reassemble, component descriptions and geometry controls. Not live generation or audible playback acceptance.");
   }
 } finally{

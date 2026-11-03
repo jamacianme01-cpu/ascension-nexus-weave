@@ -3,7 +3,6 @@ import { TreePathwayCarousel } from "@/components/ascension/tree-pathway-carouse
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
 import { availableTreeVoice } from "@/lib/ascension/tree-speech";
-import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -88,7 +87,6 @@ export function IndependentEngage() {
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const [voiceNotice, setVoiceNotice] = useState("");
-  const [previews, setPreviews] = useState<Record<string, string>>({});
   const view = useRef<HTMLElement | null>(null);
   const designView = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -96,20 +94,6 @@ export function IndependentEngage() {
   const modelCache = useRef(new Map<string, ArrayBuffer>());
   const imageCache = useRef(new Map<string, string>());
   const welcomeStarted = useRef(false);
-  useEffect(() => {
-    setPreviews({});
-    if (!result) return;
-    const controller = new AbortController();
-    // The same references are reused when a design is opened; no second picture.
-    const start = window.setTimeout(() => {
-      for (const path of [...result.pathways, result.blend].filter(path => path.parts.length)) {
-        void loadPathwayVisual(requested, path, imageCache.current, controller.signal).then(image => {
-          if (!controller.signal.aborted) setPreviews(previous => ({ ...previous, [pathwayVisualKey(requested, path)]: image }));
-        }).catch(() => {}); // A missing preview never becomes a fabricated design.
-      }
-    }, 0);
-    return () => { window.clearTimeout(start); controller.abort(); };
-  }, [result, requested]);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
   useEffect(() => {
     // Tree and Book remain in place; the Tree speaks without a new entrance scene.
@@ -292,7 +276,7 @@ export function IndependentEngage() {
         </div>
       </div>
       <TreePathwayCarousel designs={choices.map(p => ({
-        id: p.id, title: p.title, summary: p.summary, image: previews[pathwayVisualKey(requested, p)],
+        id: p.id, title: p.title, summary: p.summary,
       }))} active={orbit % choices.length} onRotate={setOrbit}
         onOpen={index => { setOrbit(index); setChoice(index); setRefinement(""); }} />
     </section>}
@@ -304,7 +288,7 @@ export function IndependentEngage() {
         alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
       {voiceNotice && <p role="status" className="text-sm text-gold">{voiceNotice}</p>}
     </div>}
-    {selected && <section ref={designView} className="ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
+    {selected && <section ref={designView} className="ascension-knowledgeverse ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
       aria-label="Selected pathway design">
       <div className="flex items-center justify-between">
         <button type="button" onClick={() => { stopVoice(); setChoice(null); }}

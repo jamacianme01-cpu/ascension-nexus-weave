@@ -1,5 +1,15 @@
 # ASCENSION product vision — owner confirmed November 2, 2026
 
+## Latest owner-approved sequence — November 3 (supersedes orb previews)
+
+For V1, do not generate images on the Tree. Keep the Tree prominent with three distinct named pathway orbs and BLEND. The focused orb explains its possibility in text. Generated images inside orbs wait until V2.
+
+Only selecting a pathway starts that pathway's image generation. Open its inspection scene immediately, with clear progress and the Tree faintly behind it, as entering the Tree's world: Knowledgeverse. Knowledgeverse is this experience, not an extra navigation tab. The selected-path guide begins an intelligent, grounded explanation of that design's benefit, tradeoff, useful connection and practical first check. The conversation and image generation can proceed independently. Returning to a selected pathway reuses its saved image.
+
+Public V1 excludes Knowledgeverse/Inspect navigation, demo/source badges, Library Card and Glossary controls. Legacy inspection links return to the approved entry; their underlying implementations are preserved. This does not turn demo records into real governed results or complete hosted 3D.
+
+The owner's generational productivity means starting with the simplest form of their inventions, releasing it and building successive generations upon it. It is not permission to redefine the approved V1 design or drop requested capabilities.
+
 ## Launch purpose — owner confirmed November 3
 
 People should leave with clarity: a meaningful choice and an idea they would not have reached on their own. The Tree, pathway orbs and selected design experience serve that purpose. Present distinct benefits and real tradeoffs, help the person weigh the supplied possibilities, and expose a practical first step that tests a key assumption. Keep the approved visual experience. This purpose does not establish launch readiness, payment readiness, governed-core execution or completed geometry capabilities.

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
+  redirect,
   Link,
   createRootRouteWithContext,
   useRouter,
@@ -100,6 +101,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
+  beforeLoad: ({ location }) => {
+    // Keep old inspection bookmarks out of the public V1 journey; preserve their implementation.
+    const legacy = ["/console", "/knowledgeverse", "/pathways", "/governance", "/ledger", "/live", "/objectives", "/architecture"];
+    if (legacy.some(path => location.pathname === path || location.pathname.startsWith(path + "/")))
+      throw redirect({ to: "/", replace: true });
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,

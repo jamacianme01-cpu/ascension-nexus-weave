@@ -61,7 +61,7 @@ export function V1HunyuanPathway({
       // Windows-only Hunyuan3D bridge cannot be reached from this browser.
       let sourceImage=imageCache.current.get(key);
       if(!sourceImage) {
-        setStatus("Preparing this selected pathway's reference picture…");
+        setStatus("Creating your selected design… You can explore its parts with the Tree while the image forms.");
         sourceImage=await loadPathwayVisual(objective,path,imageCache.current,controller.signal);
         if(!active)return;
         imageCache.current.set(key,sourceImage);
@@ -247,7 +247,7 @@ export function V1HunyuanPathway({
         </div>}
       </aside>
     </div>
-    <TreeGuide objective={objective} pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
+    <TreeGuide objective={objective} introduce pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
       focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} partLocated={meshIndex!==null}/>
   </section>;
 }

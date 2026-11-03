@@ -1,5 +1,13 @@
 # ASCENSION product vision — owner confirmed November 2, 2026
 
+## Selected picture and spoken brevity — November 3
+
+The owner said the explanation was on point but too long, and the wheeled hybrid picture did not match the selected centrally coordinated drone swarm. Image briefing must retain selected architecture: aerial drones must not become wheeled ground hybrids, and a selected swarm must not silently become one generic robot. Use selected title, summary and component names to determine mobility and coordination; do not inject application scenery into the product image. Keep the existing approved provider.
+
+Orb previews are bounded to a short summary; guide replies are limited to two sentences and 45 words. Automatic explanations remain spoken with an expandable transcript.
+
+Real image checks: the first revised brief produced an outdoor collage; a tighter studio brief produced three aerial drones without wheels but omitted the requested controller. This improves mobility/group depiction but does not establish reliable image-to-design fidelity. Do not claim the controller or all specified parts are represented merely because generation succeeds.
+
 ## Invention routing regression correction — November 3
 
 Worker-drone and other explicit invention requests must retain the selected-design picture viewer even if a provider incorrectly suggests guidance. Constrain recognized invention requests to design in the response schema and apply the same intent guard in the client. Finance guidance remains separate. Do not render the long tradeoff/action-plan panel on the invention screen. Automatic guide explanations are spoken, with an expandable transcript rather than a default essay. Keep the existing image-on-entry behavior and do not claim this completes 3D or labeling.

@@ -39,3 +39,16 @@ const {objectiveExperience}=await module('src/lib/ascension/objective-experience
 for(const objective of ['make worker drones','worker drones','design a swarm of drones coordinated by a central controller','build a finance app','make worker drones\nBuild on the selected pathway: Swarm Worker Drones'])assert.equal(objectiveExperience(objective,'guidance'),'design','A wrong provider suggestion cannot hide invention pictures: '+objective);
 assert.equal(objectiveExperience('I need help with my finances','design'),'guidance');
 console.log('PASS invention routing overrides misclassification while personal finance retains guidance');
+
+const swarmBrief=designImageBrief('make worker drones','Swarm Worker Drones Coordinated via Central Controller',['Multirotor airframe','Communication module','Central controller'],'Multiple aerial worker drones coordinated by a central controller for distributed tasks.');
+assert.match(swarmBrief.prompt,/^Three matching unmanned multirotor worker drone/);
+assert.match(swarmBrief.prompt,/central controller/);
+assert.match(swarmBrief.negative,/wheels/);
+assert.doesNotMatch(swarmBrief.negative,/fleet|swarm|multiple objects/,'Do not forbid the selected architecture');
+const groundBrief=designImageBrief('make worker drones','Tracked Ground Worker Robot',['Tracked chassis'],'A tracked ground robot for transport.');
+assert.match(groundBrief.prompt,/ground worker robot/);assert.doesNotMatch(groundBrief.negative,/wheels/);
+const {briefSpokenAnswer}=await module('src/lib/ascension/spoken-answer.ts');
+const spoken=briefSpokenAnswer('This design coordinates work across several drones. It could work well with shared task scheduling. A third sentence is unnecessary.');
+assert.equal(spoken,'This design coordinates work across several drones. It could work well with shared task scheduling.');
+assert.ok(briefSpokenAnswer('word '.repeat(100)).split(/\s+/).length<=45);
+console.log('PASS selected swarm/controller architecture, aerial wheel exclusion, and concise spoken turns');

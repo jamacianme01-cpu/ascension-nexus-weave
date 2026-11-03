@@ -134,7 +134,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   useEffect(() => {
     if(!introduce || introduced.has(JSON.stringify([objective,pathway.title])))return;
     // Defer so StrictMode's discarded mount cannot send a duplicate introduction.
-    const timer=window.setTimeout(()=>void ask(experience==="guidance"?"Help me use this approach in my real situation. Give one practical first action and ask the most useful question to tailor the next step. Do not invent my numbers or suggest building a financial app.":"Help me understand this selected pathway: explain its distinctive benefit, the main tradeoff, one useful connection I may not have considered, and a practical first check. Stay grounded in the supplied design.", true, pathway.title, true),0);
+    const timer=window.setTimeout(()=>void ask(experience==="guidance"?"Help me use this approach in my real situation. Give one practical first action and ask the most useful question to tailor the next step. Do not invent my numbers or suggest building a financial app.":"Briefly explain what this selected design can do and one useful connection it could work well with. Use two short sentences, at most 45 words. Do not give a work assignment or ask me to buy an existing drone.", true, pathway.title, true),0);
     return()=>window.clearTimeout(timer);
   },[introduce,objective,pathway.title,experience]);
 

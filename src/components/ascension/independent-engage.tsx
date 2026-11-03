@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TreePathwayCarousel } from "@/components/ascension/tree-pathway-carousel";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
+import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { objectiveExperience } from "@/lib/ascension/objective-experience";
 import { availableTreeVoice } from "@/lib/ascension/tree-speech";
 
@@ -219,8 +220,7 @@ export function IndependentEngage() {
   const experience=objectiveExperience(requested,result?.experience);
   const previewPath = orbPreview === null ? null : choices[orbPreview];
   const spokenPreview = (path: Pathway) => {
-    const brief = path.summary.split(/(?<=[.!?])\s+/).slice(0,2).join(" ").trim();
-    return path.title + ". " + (brief.length>550?brief.slice(0,550).replace(/\s+\S*$/,"")+"…":brief);
+    return path.title + ". " + briefSpokenAnswer(path.summary,32);
   };
   function hearPathway(index:number) {
     const path=choices[index];if(!path)return;

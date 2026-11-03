@@ -84,6 +84,7 @@ export function IndependentEngage() {
   const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
   const [orbit, setOrbit] = useState(0);
+  const [orbPreview,setOrbPreview]=useState<number|null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const [voiceNotice, setVoiceNotice] = useState("");
@@ -160,7 +161,7 @@ export function IndependentEngage() {
     setPathwayError("");
     setResult(null);
     setRefinement("");
-    setChoice(null);
+    setChoice(null);setOrbPreview(null);
     setStage("processing");
     // ENGAGE is a user action, not a cue for unsolicited voice narration.
     try {
@@ -202,12 +203,23 @@ export function IndependentEngage() {
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setRefinement(""); setPathwayError(""); setLoading(false);
-    setStage("idle"); setChoice(null);setOrbit(0);
+    setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   const choices = result ? [...result.pathways, result.blend] : [];
   const selected = choice === null ? null : choices[choice];
+  const previewPath = orbPreview === null ? null : choices[orbPreview];
+  const spokenPreview = (path: Pathway) => {
+    const brief = path.summary.split(/(?<=[.!?])\s+/).slice(0,2).join(" ").trim();
+    return path.title + ". " + (brief.length>550?brief.slice(0,550).replace(/\s+\S*$/,"")+"…":brief);
+  };
+  function hearPathway(index:number) {
+    const path=choices[index];if(!path)return;
+    setOrbit(index);setOrbPreview(index);setTalking(true);setVoiceNotice("");
+    void say(spokenPreview(path),()=>setVoiceNotice(""),setVoiceNotice);
+  }
+
 
   // Move the viewport only after React has mounted the destination screen.
   // The previous scrollTo inside the click ran before the cards disappeared.
@@ -278,7 +290,18 @@ export function IndependentEngage() {
       <TreePathwayCarousel designs={choices.map(p => ({
         id: p.id, title: p.title, summary: p.summary,
       }))} active={orbit % choices.length} onRotate={setOrbit}
-        onOpen={index => { setOrbit(index); setChoice(index); setRefinement(""); }} />
+        onOpen={hearPathway} />
+      {previewPath && <div className="flex flex-wrap items-center justify-center gap-3" aria-label="Pathway introduction">
+        <button type="button" onClick={()=>hearPathway(orbPreview!)}
+          className="rounded-full border border-gold/40 px-4 py-2 text-sm text-gold">HEAR AGAIN</button>
+        <button type="button" onClick={()=>{stopVoice();setChoice(orbPreview);setRefinement("");}}
+          className="rounded-full border border-primary/60 bg-primary/10 px-6 py-3 text-sm text-primary">ENTER PATHWAY</button>
+        <details className="w-full text-center text-xs text-foreground/70">
+          <summary className="cursor-pointer">Read introduction</summary>
+          <p className="mx-auto mt-2 max-w-xl leading-6">{spokenPreview(previewPath)}</p>
+        </details>
+        {voiceNotice && <p role="status" className="w-full text-center text-sm text-gold">{voiceNotice} You can read the introduction or enter the pathway.</p>}
+      </div>}
     </section>}
     {choice === null && <div className="relative z-30 mx-auto max-w-6xl px-4">
       <button type="button" onClick={() => { setTalking(true); void say(GREETING, () => setVoiceNotice(""), setVoiceNotice); }}

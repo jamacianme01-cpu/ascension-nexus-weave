@@ -32,7 +32,7 @@ export function TreePathwayCarousel({ designs, active, onRotate, onOpen }: {
           zIndex: index === active ? 3 : 2,
         } as CSSProperties;
         return <button type="button" key={design.id} role="tab" aria-selected={index === active}
-          aria-label={`Open ${design.title}`} className="tree-orbit-card" data-active={index === active} data-blend={index === designs.length - 1}
+          aria-label={`Hear about ${design.title}`} className="tree-orbit-card" data-active={index === active} data-blend={index === designs.length - 1}
           data-design-index={index} tabIndex={index === active ? 0 : -1}
           style={style} onClick={() => onOpen(index)}
           onPointerEnter={() => setPreviewed(index)} onPointerLeave={() => setPreviewed(null)}
@@ -47,8 +47,7 @@ export function TreePathwayCarousel({ designs, active, onRotate, onOpen }: {
     </div>
     <div className="tree-orb-reading" aria-live="polite" aria-atomic="true">
       <strong>{focused?.title}</strong>
-      <p>{focused?.summary}</p>
-      <span>Choose an orb to enter this possibility</span>
+      <span>Select an orb to hear what this design can do</span>
     </div>
     <div className="tree-carousel-navigation">
       <button type="button" onClick={() => rotate(-1)} aria-label="Previous pathway">←</button>

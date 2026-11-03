@@ -25,7 +25,7 @@ const tests=[
     assert.match(ui,/\{result && choice === null && <section/);
     assert.match(ui,/\{selected && <section ref=\{designView\}/);
     assert.match(ui,/\[\.\.\.result\.pathways, result\.blend\]/);
-    assert.match(ui,/setChoice\(index\)/);
+    assert.match(ui,/setChoice\(orbPreview\)/);
     assert.match(ui,/<TreePathwayCarousel/);
     assert.doesNotMatch(ui,/aria-label="Initial objective answer"/);
     assert.doesNotMatch(ui,/>INITIAL ANSWER</);

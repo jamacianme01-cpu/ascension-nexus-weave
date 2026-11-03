@@ -167,6 +167,18 @@ try{
   assert.equal(await page.locator('img[alt^="Concept picture of"]').count(),0,
     "No selected-design picture is shown before selection");
 
+  async function enterOrb(index){
+    const count=generated.length;
+    const orb=page.getByRole("tab").nth(index);
+    const title=(await orb.getAttribute("aria-label")).replace("Hear about ","");
+    await orb.click();
+    await page.getByRole("button",{name:"ENTER PATHWAY",exact:true}).waitFor();
+    await page.waitForFunction(title=>window.__treeSpeech.join(" ").includes(title),title);
+    assert.equal(generated.length,count,"Listening to an orb must not generate its image");
+    assert.equal(await page.getByRole("region",{name:"Selected pathway design"}).count(),0,"The orb speaks before entering the world");
+    await page.getByRole("button",{name:"ENTER PATHWAY",exact:true}).click();
+  }
+
   if(process.env.ASCENSION_CAROUSEL_ONLY){
     const carousel=page.getByRole("region",{name:"Pathways around the Tree of Knowledge"});
     await carousel.focus();await page.keyboard.press("ArrowRight");
@@ -175,7 +187,7 @@ try{
     await page.setViewportSize({width:390,height:844});await page.waitForTimeout(450);
     await carousel.screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-mobile.png"});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-    await page.getByRole("tab").nth(1).click();
+    await enterOrb(1);
     await page.getByRole("region",{name:"Selected pathway design"}).waitFor();
     await page.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
     await carousel.waitFor();
@@ -279,7 +291,7 @@ try{
     console.log("PASS fixture GLB interactions for "+expectedId);
   }
   for(const [index,id] of ["rotor","rover","modular","blend"].entries()){
-    await page.getByRole("tab").nth(index).click();
+    await enterOrb(index);
     await inspect(id);
     await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
     await page.getByRole("tab").first().waitFor();
@@ -289,7 +301,7 @@ try{
   assert.ok(generated.every(x=>x.view==="assembled"),
     "Blueprint and Dissect must never regenerate unrelated pictures");
   const imageCount = generated.length;
-  await page.getByRole("tab").first().click();
+  await enterOrb(0);
   await page.locator('img[alt^="Concept picture of"]').waitFor();
   assert.equal(generated.length,imageCount,"Returning to the chosen pathway reuses its image");
   assert.equal(await detail.getByRole("textbox",{name:"Ask the Tree"}).inputValue(),"","Guide context must not appear as typed user text");
@@ -305,7 +317,7 @@ try{
   await page.locator("#objective").fill("make a linear propulsion engine");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
-  await page.getByRole("tab").first().click();
+  await enterOrb(0);
   await inspect("linear1");
   assert.equal(new Set(generated.map(x=>x.id)).size,process.env.ASCENSION_INSPECTION_ONLY?2:5,"Only selected pathways across both objectives receive pictures");
   assert.equal(errors.length,0,errors.join(" | "));

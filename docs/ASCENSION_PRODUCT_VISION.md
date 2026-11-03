@@ -6,7 +6,7 @@
 
 Selecting a part name should locate/highlight that part and speak its explanation in the same interaction, rather than requiring a separate Description screen. Showing a part operating in simulation is V2. Keep actual camera views of the same model in V1.
 
-Implementation distinction: reference-picture location points are inferred from the actual selected image, filtered for confidence and valid coordinates, and labeled estimated. A live outline-generation check was inaccurate, so silhouettes are not supplied; a location ring points to an identified visible part. They are not verified 3D component identities. Hidden/unidentifiable components receive no invented location. Named-mesh selection still uses names supplied by the delivered model. Front/back/left/right/top controls change the loaded model's actual camera. These controls do not supply a hosted model when none exists; hosted segmented 3D remains unresolved.
+Implementation distinction: both outline and point localization failed real-image checks (including markers landing in blank background), so generated image locations were removed. No inferred map is shipped as actual component location. Named-mesh selection uses names supplied by the delivered model, illuminates that mesh and focuses the camera. Front/back/left/right/top controls change the loaded model's actual camera. These controls do not supply a hosted model when none exists. Accurate source-linked component mapping and hosted segmented 3D remain unresolved.
 
 For V1, do not generate images on the Tree. Keep the Tree prominent with three distinct named pathway orbs and BLEND. The focused orb explains its possibility in text. Generated images inside orbs wait until V2.
 

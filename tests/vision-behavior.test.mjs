@@ -30,9 +30,3 @@ assert.doesNotMatch(brief.prompt,/station|people|human|city|fleet/i,'Positive pr
 assert.match(brief.negative,/people/);assert.match(brief.negative,/city/);
 console.log('PASS image brief: subject first, selected mobility, no infrastructure or human cues in the positive prompt');
 
-const {parseDesignRegions}=await module('src/lib/ascension/design-regions.ts');
-const point=[.2,.2];
-assert.equal(parseDesignRegions({regions:[{part:0,confidence:.98,point}]},2).length,1);
-for(const region of [{part:5,confidence:.98,point},{part:0,confidence:.5,point},{part:0,confidence:NaN,point},{part:0,confidence:.98,point:[NaN,.5]},{part:0,confidence:.98,point:[1.5,.5]}])
- assert.equal(parseDesignRegions({regions:[region]},2).length,0,'Reject unsupported, uncertain or invalid locations');
-console.log('PASS image location validation: source indexes, confidence and finite coordinates');

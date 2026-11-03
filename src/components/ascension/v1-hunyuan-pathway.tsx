@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { type DesignRegion } from "@/lib/ascension/design-regions";
 import { loadPathwayVisual } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
@@ -10,7 +9,6 @@ type Pathway={
   parts:Part[];blend_reason?:string;
 };
 type Cache={current:Map<string,ArrayBuffer>};
-const regionCache=new Map<string,DesignRegion[]>();
 const LOCAL="http://127.0.0.1:8082";
 const validImage=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/=]{4000,12000000})$/i;
 function formatError(reason:unknown){
@@ -43,28 +41,7 @@ export function V1HunyuanPathway({
   const [reset,setReset]=useState(0);
   const [move,setMove]=useState<{seq:number;index:number;delta:[number,number,number]}>();
   const [generatorError,setGeneratorError]=useState("");
-  const [regions,setRegions]=useState<DesignRegion[]>([]);
-  const [locating,setLocating]=useState(false);
-  const [imageSize,setImageSize]=useState({width:1,height:1});
   const [cameraView,setCameraView]=useState<"perspective"|"front"|"back"|"left"|"right"|"top">("perspective");
-  const imageRegions=component===null?[]:regions.filter(r=>r.part===component);
-  useEffect(()=>{
-    if(!picture)return;
-    const saved=regionCache.get(key);if(saved){setRegions(saved);return;}
-    const controller=new AbortController();let current=true;
-    setRegions([]);setLocating(true);
-    (async()=>{
-      const image=new Image();image.src=picture;await image.decode();
-      if(!current)return;
-      const scale=Math.min(1,1024/Math.max(image.naturalWidth,image.naturalHeight));
-      const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
-      canvas.getContext("2d")!.drawImage(image,0,0,canvas.width,canvas.height);
-      const response=await fetch("/api/public/ascension/independent",{method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},body:JSON.stringify({phase:"locate",objective,image:canvas.toDataURL("image/jpeg",.85),parts:path.parts.slice(0,12).map(p=>p.name)})});
-      const data=await response.json();if(!response.ok||!Array.isArray(data.regions)||data.localization!=="visible-point")return;
-      if(current){setRegions(data.regions);regionCache.set(key,data.regions);if(regionCache.size>12)regionCache.delete(regionCache.keys().next().value!);}
-    })().catch(()=>{}).finally(()=>{if(current)setLocating(false);});
-    return()=>{current=false;controller.abort();};
-  },[picture,key]);
 
   useEffect(()=>{
     setMode("assembled");setMeshIndex(null);setInspectModel(false);setComponent(null);
@@ -186,16 +163,7 @@ export function V1HunyuanPathway({
             rotation={rotation} cameraView={cameraView} selected={meshIndex} move={move}
             reset={reset} onParts={setParts} onError={setGeneratorError} onSelect={inspect}/>:
             picture?<div className="flex h-full min-h-0 flex-col gap-2 p-3">
-              <div className="relative min-h-0 flex-1">
-                <img src={picture} alt={`Concept picture of ${path.title}`}
-                  onLoad={event=>setImageSize({width:event.currentTarget.naturalWidth,height:event.currentTarget.naturalHeight})}
-                  className="absolute inset-0 h-full w-full rounded-lg object-contain" />
-                {imageRegions.length>0&&<svg aria-label={`Image location of ${path.parts[component!]!.name}`} className="pointer-events-none absolute inset-0 h-full w-full"
-                  viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} preserveAspectRatio="xMidYMid meet">
-                  {imageRegions.map((region,index)=><circle key={index} cx={region.point[0]*imageSize.width} cy={region.point[1]*imageSize.height}
-                    r={Math.max(imageSize.width,imageSize.height)*.025} fill="#22d3ee55" stroke="#a5f3fc" strokeWidth="3" vectorEffect="non-scaling-stroke" />)}
-                </svg>}
-              </div>
+              <img src={picture} alt={`Concept picture of ${path.title}`} className="min-h-0 flex-1 w-full rounded-lg object-contain" />
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
                 <span>{working?status:failure||""}</span>
                 {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
@@ -243,10 +211,7 @@ export function V1HunyuanPathway({
               else {setMeshIndex(null);setInspectModel(false);}
             }}
             className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
-          {locating&&<p role="status" className="text-xs text-gold">Locating visible parts in this picture…</p>}
-          {component!==null&&!inspectModel&&<p role="status" className="text-xs text-foreground/70">
-            {imageRegions.length?"Estimated part location in the reference image.":locating?"Checking this part's visible location…":"This part is not visibly identified in the assembled picture."}
-          </p>}
+          {component!==null&&meshIndex===null&&<p role="status" className="text-xs text-foreground/70">This part has not been located in the displayed design.</p>}
           {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
           {parts.length>0&&<details className="mt-4">
             <summary className="cursor-pointer text-gold">Inspect model geometry</summary>
@@ -264,6 +229,6 @@ export function V1HunyuanPathway({
       </aside>
     </div>
     <TreeGuide objective={objective} introduce pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
-      focusRevision={partSelection} focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":imageRegions.length?"reference-image":"unlocated"} partLocated={inspectModel?meshIndex!==null:imageRegions.length>0}/>
+      focusRevision={partSelection} focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"} partLocated={inspectModel&&meshIndex!==null}/>
   </section>;
 }

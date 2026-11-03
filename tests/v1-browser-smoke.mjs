@@ -110,7 +110,6 @@ try{
     let body;
     if(phase==="capability")body={picture_generation_enabled:true};
     else if(phase==="initial")body={phase:"initial",answer:"Private engineering analysis"};
-    else if(phase==="locate")body={regions:linear?[]:[{part:0,point:[.2,.2]}],localization:"visible-point",verified:false};
     else if(phase==="picture"){
       generated.push({id:input.pathway?.id,view:input.view});
       body={image_url:"data:image/png;base64,"+mockImage,verified:false};
@@ -274,9 +273,8 @@ try{
     await page.getByRole("button",{name:/^(Rotor|Coil)$/,exact:true}).click();
     const focusedRequest=(await focusedReply).request().postDataJSON();
     assert.match(focusedRequest.pathway.focused_part.name,/Rotor|Coil/);
-    assert.equal(focusedRequest.pathway.part_located,expectedId!=="linear1","Image regions never imply a named geometry mapping");
-    assert.equal(focusedRequest.pathway.location_source,expectedId==="linear1"?"unlocated":"reference-image");
-    if(expectedId!=="linear1")await page.getByLabel("Image location of Rotor",{exact:true}).waitFor();
+    assert.equal(focusedRequest.pathway.part_located,false,"Unnamed geometry must not be treated as a located part");
+    assert.equal(focusedRequest.pathway.location_source,"unlocated");
     assert.equal(await page.getByRole("button",{name:"DESCRIPTION",exact:true}).count(),0,"Part explanation belongs to the spoken selection, not a separate tab");
     assert.ok(await page.evaluate(()=>window.__treeSpeech.some(text=>text.includes("Inspect the selected source geometry."))),"Selected-part explanation is spoken");
     await page.getByText("Inspect model geometry",{exact:true}).click();

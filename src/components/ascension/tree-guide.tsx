@@ -13,6 +13,7 @@ export type GuidePathway = {
   summary: string;
   steps: string[];
   parts: GuidePart[];
+  tradeoffs?: string[];
 };
 type VoiceResult = { transcript?: string };
 type VoiceRecognizer = {
@@ -26,7 +27,7 @@ type VoiceRecognizer = {
   stop(): void;
 };
 
-export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false }: {
+export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [] }: {
   objective: string;
   pathway: GuidePathway;
   enabled: boolean;
@@ -35,6 +36,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   focusedPart?: GuidePart | null;
   view?: string;
   partLocated?: boolean;
+  alternatives?: GuidePathway[];
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -78,11 +80,13 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
           phase: "guide",
           objective,
           question: text,
+          alternatives: alternatives.slice(0, 4).map(option => ({ title: option.title, summary: option.summary, tradeoffs: option.tradeoffs ?? [] })),
           history: (conversations.get(objective) ?? []).slice(-8),
           pathway: {
             title: pathway.title,
             summary: pathway.summary,
             steps: pathway.steps.slice(0, 8),
+            tradeoffs: pathway.tradeoffs ?? [],
             parts: pathway.parts.slice(0, 12),
             focused_part: focusedPart,
             current_view: view,
@@ -160,7 +164,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     {open && <>
       <p className="mt-2 text-xs text-sky-100/80">Let's work on it together. Ask a question or tell me what you'd like to change.</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {(focusedPart ? [`How does ${focusedPart.name} connect?`, `How could we improve ${focusedPart.name}?`] : ["What would you improve?", "Explain the key tradeoff"]).map(prompt => <button type="button" key={prompt}
+        {(focusedPart ? [`How does ${focusedPart.name} connect?`, `How could we improve ${focusedPart.name}?`] : (alternatives.length ? ["Help me choose between these pathways", "What could I be overlooking?", "What is my first practical step?"] : ["What would you improve?", "What is my first practical step?"])).map(prompt => <button type="button" key={prompt}
           disabled={thinking} onClick={() => void ask(prompt)}
           className="rounded-full border border-amber-200/30 px-3 py-1 text-xs text-amber-100 disabled:opacity-40">{prompt}</button>)}
       </div>

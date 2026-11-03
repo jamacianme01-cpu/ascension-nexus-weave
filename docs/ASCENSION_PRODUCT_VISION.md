@@ -1,5 +1,9 @@
 # ASCENSION product vision — owner confirmed November 2, 2026
 
+## Launch purpose — owner confirmed November 3
+
+People should leave with clarity: a meaningful choice and an idea they would not have reached on their own. The Tree, pathway orbs and selected design experience serve that purpose. Present distinct benefits and real tradeoffs, help the person weigh the supplied possibilities, and expose a practical first step that tests a key assumption. Keep the approved visual experience. This purpose does not establish launch readiness, payment readiness, governed-core execution or completed geometry capabilities.
+
 This owner-confirmed vision supersedes older conflicting presentation notes. Preserve existing ASCENSION architecture and the approved Tree-and-Book experience; extend the app rather than replacing it.
 
 The Tree is the star of the interface: prominent, alive and interactive. She is a warm, inviting woman-voiced collaborator who listens, remembers the objective and conversation, answers follow-ups, explains designs and makes relevant suggestions. She is not a passive narrator or a screen reader. A voice start callback alone is not proof of audible, natural playback.

@@ -182,6 +182,10 @@ try{
   const stages=["BLUEPRINT","DISSECT / EXPLODE","IMPLODE / REASSEMBLE"];
   async function inspect(expectedId){
     await detail.waitFor({state:"visible"});
+    const nextStep = detail.getByRole("region", {name:"Choose your next step"});
+    await nextStep.getByRole("heading", {name:"Your first steps"}).waitFor();
+    assert.ok(await nextStep.locator("ol li").count() >= 2, "Selected pathway exposes its actual plan");
+    assert.ok(await nextStep.getByText("Dimensions remain unverified", {exact:true}).isVisible(), "Tradeoffs remain visible beside the plan");
     const picture=page.locator('img[alt^="Concept picture of"]');
     await picture.waitFor({state:"visible"});
     await page.getByRole("button",{name:"BLUEPRINT",exact:true}).waitFor({state:"visible"});
@@ -226,6 +230,9 @@ try{
       await question.fill("What about endurance?");await detail.getByRole("button",{name:"ASK",exact:true}).click();
       await page.waitForFunction(()=>[...document.querySelectorAll('[role="log"] p')].some(p=>p.textContent.includes("What about endurance?")));
       assert.equal(guideRequests.at(-1).history[0].content,"Why that rotor?","Follow-ups retain conversation context");
+      assert.equal(guideRequests.at(-1).alternatives.length, 4, "Tree can compare every supplied pathway");
+      assert.ok(guideRequests.at(-1).alternatives.every(option => option.title && option.summary && option.tradeoffs.length), "Comparisons include each choice's actual tradeoffs");
+      assert.deepEqual(guideRequests.at(-1).pathway.tradeoffs, ["Dimensions remain unverified"]);
     }
     await page.getByRole("button",{name:"LABELS",exact:true}).click();
     const focusedReply=page.waitForResponse(response=>{

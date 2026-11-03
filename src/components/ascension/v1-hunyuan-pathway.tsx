@@ -16,10 +16,11 @@ function formatError(reason:unknown){
 }
 
 export function V1HunyuanPathway({
-  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,
+  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],
 }:{
   path:Pathway;objective:string;onSpeak:(text:string)=>void; speakingEnabled:boolean;modelCache:Cache;
   imageCache:{current:Map<string,string>};
+  alternatives?: Pathway[];
 }) {
   const key=JSON.stringify([objective,path.id,path.title,path.summary]);
   const [bytes,setBytes]=useState<ArrayBuffer|null>(null);
@@ -128,7 +129,7 @@ export function V1HunyuanPathway({
   return <section className="rounded-2xl border border-gold/30 bg-[#04101cf5] p-4 sm:p-6"
     aria-label="Selected Hunyuan 3D pathway">
     <h3 className="mb-2 text-xl text-gold">{path.title}</h3>
-    <TreeGuide objective={objective} pathway={path} enabled={speakingEnabled} onSpeak={onSpeak}
+    <TreeGuide objective={objective} pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
       focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} partLocated={meshIndex!==null}/>
     <p className="mb-4 max-w-4xl text-sm leading-6">{path.summary}</p>
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">

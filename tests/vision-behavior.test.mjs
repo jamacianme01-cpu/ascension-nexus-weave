@@ -30,3 +30,7 @@ assert.doesNotMatch(brief.prompt,/station|people|human|city|fleet/i,'Positive pr
 assert.match(brief.negative,/people/);assert.match(brief.negative,/city/);
 console.log('PASS image brief: subject first, selected mobility, no infrastructure or human cues in the positive prompt');
 
+const {isPersonalFinanceObjective}=await module('src/lib/ascension/objective-experience.ts');
+for(const goal of ['I need help with my finances','help me manage my money','I need help paying bills','financial advice','I need help with my finances\nBuild on the selected pathway: Budget plan'])assert.equal(isPersonalFinanceObjective(goal),true,goal);
+for(const goal of ['make worker drones','build a personal finance app','design a system to manage my finances','create budgeting software'])assert.equal(isPersonalFinanceObjective(goal),false,goal);
+console.log('PASS financial intent: personal guidance stays distinct from explicit product creation');

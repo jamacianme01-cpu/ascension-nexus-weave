@@ -1,6 +1,15 @@
 # ASCENSION product vision — owner confirmed November 2, 2026
 
+## Guidance requests — November 3 correction
+
+ASCENSION must follow the actual objective rather than interpret every request as an invention. "I need help with my finances" receives three distinct practical guidance approaches and BLEND, with the same spoken-orb selection. Entering one opens the Tree's contextual planning conversation, tradeoffs and next steps, with no generated invention picture, parts list, local-device connection or 3D controls. An explicit request to build financial software remains a design request. Financial guidance must not invent personal figures, imply bank access, request credentials, or assert current eligibility/rules without authoritative evidence.
+
 ## Latest owner-approved sequence — November 3 (supersedes orb previews)
+
+### Latest scope correction — 3D labeling
+
+The owner explicitly moved 3D labeling to V2, with the CLARITY app through the Knowledgeverse. This supersedes earlier statements treating unfinished 3D labeling as a V1 release requirement. Simulation of parts in use remains V2. Preserve the rest of the approved V1 experience. Integration details are not established by this direction, and no CLARITY connection is claimed.
+
 
 ### Part selection and V2 boundary — latest correction
 

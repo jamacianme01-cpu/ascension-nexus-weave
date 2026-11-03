@@ -107,6 +107,7 @@ try{
     const phase=req.method()==="GET"?"capability":input.phase;
     if(phase==="initial" || phase==="pathways") creationPhases.push(phase);
     const linear=String(input.objective??"").includes("linear propulsion");
+    const finance=String(input.objective??"").includes("my finances");
     let body;
     if(phase==="capability")body={picture_generation_enabled:true};
     else if(phase==="initial")body={phase:"initial",answer:"Private engineering analysis"};
@@ -114,7 +115,11 @@ try{
       generated.push({id:input.pathway?.id,view:input.view});
       body={image_url:"data:image/png;base64,"+mockImage,verified:false};
     }
-    else if(phase==="pathways")body=linear?{
+    else if(phase==="pathways")body=finance?{
+      experience:"guidance",introduction:"Financial choices",
+      pathways:[path("bills","Handle immediate bills","Start with essential bills and their due dates.",[]),path("budget","Steady your cash flow","Match regular income to necessary spending.",[]),path("priorities","Choose your money priorities","Compare priorities and a manageable next action.",[])],
+      blend:{...path("blend","Combine urgent relief and a steady plan","Address the next bill and create a sustainable spending plan.",[]),blend_reason:"Combine immediate and ongoing needs"}
+    }:linear?{
       introduction:"Design choices",
       pathways:[
         path("linear1","Three coil drive","Linear propulsion uses staged electromagnetic coils.",linearParts),
@@ -149,6 +154,25 @@ try{
   await entry.waitFor({state:"visible"});
   await page.getByRole("button",{name:"Hear the Tree",exact:true}).click();
   assert.ok(await page.evaluate(()=>window.__treeSpeech.some(s=>s.startsWith("Welcome to ASCENSION"))));
+  if(process.env.ASCENSION_FINANCE_ONLY){
+    await page.locator("#objective").fill("I need help with my finances");
+    await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
+    await page.getByRole("tab").first().waitFor();
+    await enterOrb(0);
+    await page.getByRole("region",{name:"Selected guidance pathway"}).waitFor();
+    await page.getByRole("log").getByText("Selected pathway",{exact:false}).last().waitFor();
+    assert.equal(generated.length,0,"Financial guidance must not request any picture");
+    assert.equal(await page.locator("canvas").count(),0);
+    assert.equal(await page.getByRole("button",{name:"CONNECT LOCAL 3D",exact:true}).count(),0);
+    assert.equal(await page.getByRole("button",{name:"BLUEPRINT",exact:true}).count(),0);
+    assert.equal(await page.getByRole("heading",{name:"PARTS",exact:true}).count(),0);
+    assert.equal(await page.evaluate(()=>window.__localHunyuanCalls.length),0,"Guidance cannot contact a local engine");
+    assert.equal(guideRequests.at(-1).pathway.experience,"guidance","The Tree receives the correct conversation context");
+    await page.getByRole("heading",{name:"Your first steps",exact:true}).waitFor();
+    await page.screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/finance-guidance-fixture.png",fullPage:true});
+    console.log("PASS finance guidance: four spoken choices, practical plan and guide, zero image/3D/local-device requests");
+    await browser.close();process.exit(0);
+  }
   await page.locator("#objective").fill("make worker drones");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();

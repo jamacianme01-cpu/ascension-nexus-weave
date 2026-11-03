@@ -28,7 +28,7 @@ type VoiceRecognizer = {
   stop(): void;
 };
 
-export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0 }: {
+export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0, experience = "design" }: {
   objective: string;
   pathway: GuidePathway;
   enabled: boolean;
@@ -40,6 +40,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   alternatives?: GuidePathway[];
   introduce?: boolean;
   focusRevision?: number;
+  experience?: "guidance" | "design";
   locationSource?: "reference-image"|"mesh"|"unlocated";
 }) {
   const [question, setQuestion] = useState("");
@@ -87,6 +88,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
           alternatives: alternatives.slice(0, 4).map(option => ({ title: option.title, summary: option.summary, tradeoffs: option.tradeoffs ?? [] })),
           history: (conversations.get(objective) ?? []).slice(-8),
           pathway: {
+            experience,
             title: pathway.title,
             summary: pathway.summary,
             steps: pathway.steps.slice(0, 8),
@@ -132,9 +134,9 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   useEffect(() => {
     if(!introduce || introduced.has(JSON.stringify([objective,pathway.title])))return;
     // Defer so StrictMode's discarded mount cannot send a duplicate introduction.
-    const timer=window.setTimeout(()=>void ask("Help me understand this selected pathway: explain its distinctive benefit, the main tradeoff, one useful connection I may not have considered, and a practical first check. Stay grounded in the supplied design.", true, pathway.title, true),0);
+    const timer=window.setTimeout(()=>void ask(experience==="guidance"?"Help me use this approach in my real situation. Give one practical first action and ask the most useful question to tailor the next step. Do not invent my numbers or suggest building a financial app.":"Help me understand this selected pathway: explain its distinctive benefit, the main tradeoff, one useful connection I may not have considered, and a practical first check. Stay grounded in the supplied design.", true, pathway.title, true),0);
     return()=>window.clearTimeout(timer);
-  },[introduce,objective,pathway.title]);
+  },[introduce,objective,pathway.title,experience]);
 
   function listen() {
     if (listening) { microphone.current?.stop(); return; }

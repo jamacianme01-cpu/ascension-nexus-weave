@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
+import { isPersonalFinanceObjective } from "@/lib/ascension/objective-experience";
 import { designImageBrief } from "@/lib/ascension/design-image-brief";
 
 /** Railway-owned public intake: never calls Supabase or claims governed execution. */
 type Part = { name: string; purpose: string; location: string };
 type Path = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
-type Output = { introduction: string; pathways: Path[]; blend: Path & { blend_reason: string } };
+type Output = { experience: "guidance" | "design"; introduction: string; pathways: Path[]; blend: Path & { blend_reason: string } };
 type Contributor = { provider: "OpenAI" | "Claude" | "Grok"; answer: string };
 const counters = new Map<string, { window: number; count: number }>();
 
@@ -69,7 +70,7 @@ function parseText(text: string): Output {
     !blend.title || blend.summary.length < 35 || blend.steps.length < 2 || !blend.blend_reason) {
     throw new Error("The answer was incomplete or the pathways were not distinct enough to display.");
   }
-  return { introduction: String(top["introduction"] ?? "").slice(0, 1800), pathways, blend };
+  return { experience: top["experience"] === "guidance" ? "guidance" : "design", introduction: String(top["introduction"] ?? "").slice(0, 1800), pathways, blend };
 }
 async function claude(objective: string): Promise<Contributor> {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -143,6 +144,7 @@ const pathwaySchema = {
 const outputSchema = {
   type: "object",
   properties: {
+    experience: { type: "string", enum: ["guidance", "design"] },
     introduction: { type: "string" },
     path_one: pathwaySchema,
     path_two: pathwaySchema,
@@ -154,7 +156,7 @@ const outputSchema = {
       additionalProperties: false,
     },
   },
-  required: ["introduction", "path_one", "path_two", "path_three", "blend"],
+  required: ["experience", "introduction", "path_one", "path_two", "path_three", "blend"],
   additionalProperties: false,
 };
 async function build(objective: string, firstAnswerText = "") {
@@ -175,15 +177,17 @@ async function build(objective: string, firstAnswerText = "") {
     timeoutMs: 28500,
     structuredOutput: { name: "ascension_four_pathways", schema: outputSchema },
     system: [
-      "You are drafting an ASCENSION creation result, not reporting execution or verification.",
-      "Analyze the objective's reference architecture, interacting modules, resources, constraints and provisional assumptions internally as part of this request, then return only the structured alternatives. A separate preliminary engineering essay is not required.",
+      "Help the person accomplish the actual objective. Do not force every request into an invention or software product. You are proposing options, not reporting execution or verification.",
+      "Set experience to guidance for requests for help, learning, planning, personal finances or decisions; set design only when the person actually asks to create or develop a product, device or software. All pathways must serve that intent. Guidance must have parts: [] and practical human actions, not software modules or app-building instructions.",
+      isPersonalFinanceObjective(objective) ? "This is PERSONAL FINANCIAL HELP. Set experience=guidance. Offer three distinct practical approaches and a blend for the person's money situation. Do not invent a financial app, account aggregator or mechanical system; do not default to linking accounts. Suggest a small useful action and ask only the most important missing question. Never invent income, expenses, eligibility, rates or guaranteed outcomes. Do not request bank credentials, account numbers or government identifiers. Do not assert current benefit, tax, legal or investment rules without authoritative current evidence; identify when such verification is needed." : "Preserve the actual intent: help and advice requests are not requests to build an app.",
+      "For guidance, consider real-world priorities, resources, constraints and useful next actions. For an actual design request, analyze the reference architecture and interacting modules internally. Return only the structured alternatives. A separate preliminary engineering essay is not required.",
       allConnected
         ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
         : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
-      "Return exactly one JSON object with required keys: introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
+      "Return exactly one JSON object with required keys: experience, introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",
-      "Write each summary as a short spoken introduction: two natural sentences, at most 60 words, explaining what this proposed design could do and what task or compatible system it could work well with. Ground capabilities in the design; never promise unverified performance. Keep detailed engineering in parts, steps and tradeoffs.",
+      "Write each summary as a short spoken introduction: two natural sentences, at most 60 words, explaining what this approach could help accomplish and when it fits. For a requested design, explain its capabilities and useful compatible systems. Ground capabilities in the design; never promise unverified performance. Keep detailed engineering in parts, steps and tradeoffs.",
       "For a physical invention, each path must propose a coherent device architecture with actual named subsystems, functional relationships, and a feasible operating sequence.",
       "For software, each path must propose how the actual requested product will work, not vague marketing copy or a generic productivity app.",
       "Do not tell the user to start by defining their purpose; make explicitly labeled provisional design assumptions when the request is short.",
@@ -195,6 +199,10 @@ async function build(objective: string, firstAnswerText = "") {
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
   });
   const result = parseText(response.text);
+  if(isPersonalFinanceObjective(objective))result.experience="guidance";
+  if(result.experience==="guidance"){
+    result.pathways.forEach(path=>{path.parts=[];});result.blend.parts=[];
+  }
   return {
     ...result,
     contributors: ["OpenAI", ...sources.map(s => s.provider)],
@@ -236,7 +244,8 @@ async function guide(objective: string, question: string, selected: Record<strin
     timeoutMs: 20000,
     system: [
       "You are the Tree of Knowledge: ASCENSION's welcoming, knowledgeable, practical design assistant.",
-      "Work WITH the person on the chosen invention. Speak directly, naturally and warmly, never like a narrator",
+      "Work WITH the person on the chosen approach. Speak directly, naturally and warmly, never like a narrator",
+      selected["experience"]==="guidance" ? "This is a GUIDANCE conversation, not an invention. Help the person use the selected approach in their real situation. Give one manageable next action and ask one focused question when needed. Do not describe software modules, generate pictures, recommend building an app, or imply account access. Never invent personal numbers or current financial eligibility/rules, and never request credentials or identifying account data." : "For a design, stay grounded in its supplied architecture.",
       "Use the recent conversation to understand follow-ups. Before a pathway is chosen, help explore the objective instead of demanding a selection.",
       "describing a mystical journey, giving inspirational slogans, or reciting the screen.",
       "FIRST answer the person's exact question with concrete, technically useful information grounded in the",
@@ -384,6 +393,7 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
           return json(await guide(objective, question, obj(input["pathway"]), input["history"], input["alternatives"]));
         }
         if (input["phase"] === "picture") {
+          if(isPersonalFinanceObjective(objective))return json({error:"Financial guidance does not require an invention picture."},400);
           if (!limit("image-ip:" + address, 24) || !limit("image-global", 120))
             return json({ error: "Image generation limit reached. No credits charged." }, 429);
           return json(await picture(objective, { ...obj(input["pathway"]), view: input["view"] }));

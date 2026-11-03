@@ -31,8 +31,8 @@ assert.match(brief.negative,/people/);assert.match(brief.negative,/city/);
 console.log('PASS image brief: subject first, selected mobility, no infrastructure or human cues in the positive prompt');
 
 const {parseDesignRegions}=await module('src/lib/ascension/design-regions.ts');
-const square=[[.1,.1],[.3,.1],[.3,.3],[.1,.3]];
-assert.equal(parseDesignRegions({regions:[{part:0,confidence:.95,polygon:square}]},2).length,1);
-for(const region of [{part:5,confidence:.95,polygon:square},{part:0,confidence:.5,polygon:square},{part:0,confidence:.95,polygon:[[0,0],[1,0],[1,1],[0,1]]},{part:0,confidence:.95,polygon:[[NaN,0],[.5,0],[.5,.5]]}])
- assert.equal(parseDesignRegions({regions:[region]},2).length,0,'Reject unsupported, uncertain, nonfinite or whole-object regions');
-console.log('PASS image region validation: source indexes, confidence, finite coordinates and bounded area');
+const point=[.2,.2];
+assert.equal(parseDesignRegions({regions:[{part:0,confidence:.98,point}]},2).length,1);
+for(const region of [{part:5,confidence:.98,point},{part:0,confidence:.5,point},{part:0,confidence:NaN,point},{part:0,confidence:.98,point:[NaN,.5]},{part:0,confidence:.98,point:[1.5,.5]}])
+ assert.equal(parseDesignRegions({regions:[region]},2).length,0,'Reject unsupported, uncertain or invalid locations');
+console.log('PASS image location validation: source indexes, confidence and finite coordinates');

@@ -60,7 +60,7 @@ export function V1HunyuanPathway({
       const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
       canvas.getContext("2d")!.drawImage(image,0,0,canvas.width,canvas.height);
       const response=await fetch("/api/public/ascension/independent",{method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},body:JSON.stringify({phase:"locate",objective,image:canvas.toDataURL("image/jpeg",.85),parts:path.parts.slice(0,12).map(p=>p.name)})});
-      const data=await response.json();if(!response.ok||!Array.isArray(data.regions))return;
+      const data=await response.json();if(!response.ok||!Array.isArray(data.regions)||data.localization!=="visible-point")return;
       if(current){setRegions(data.regions);regionCache.set(key,data.regions);if(regionCache.size>12)regionCache.delete(regionCache.keys().next().value!);}
     })().catch(()=>{}).finally(()=>{if(current)setLocating(false);});
     return()=>{current=false;controller.abort();};
@@ -192,8 +192,8 @@ export function V1HunyuanPathway({
                   className="absolute inset-0 h-full w-full rounded-lg object-contain" />
                 {imageRegions.length>0&&<svg aria-label={`Image location of ${path.parts[component!]!.name}`} className="pointer-events-none absolute inset-0 h-full w-full"
                   viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} preserveAspectRatio="xMidYMid meet">
-                  {imageRegions.map((region,index)=><polygon key={index} points={region.polygon.map(([x,y])=>`${x*imageSize.width},${y*imageSize.height}`).join(" ")}
-                    fill="#22d3ee55" stroke="#a5f3fc" strokeWidth="3" vectorEffect="non-scaling-stroke" />)}
+                  {imageRegions.map((region,index)=><circle key={index} cx={region.point[0]*imageSize.width} cy={region.point[1]*imageSize.height}
+                    r={Math.max(imageSize.width,imageSize.height)*.025} fill="#22d3ee55" stroke="#a5f3fc" strokeWidth="3" vectorEffect="non-scaling-stroke" />)}
                 </svg>}
               </div>
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
@@ -245,7 +245,7 @@ export function V1HunyuanPathway({
             className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
           {locating&&<p role="status" className="text-xs text-gold">Locating visible parts in this picture…</p>}
           {component!==null&&!inspectModel&&<p role="status" className="text-xs text-foreground/70">
-            {imageRegions.length?"Estimated part outline in the reference image.":locating?"Checking this part's visible location…":"This part is not visibly identified in the assembled picture."}
+            {imageRegions.length?"Estimated part location in the reference image.":locating?"Checking this part's visible location…":"This part is not visibly identified in the assembled picture."}
           </p>}
           {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
           {parts.length>0&&<details className="mt-4">

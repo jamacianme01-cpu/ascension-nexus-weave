@@ -110,7 +110,7 @@ try{
     let body;
     if(phase==="capability")body={picture_generation_enabled:true};
     else if(phase==="initial")body={phase:"initial",answer:"Private engineering analysis"};
-    else if(phase==="locate")body={regions:linear?[]:[{part:0,polygon:[[.1,.1],[.3,.1],[.3,.3],[.1,.3]]}],verified:false};
+    else if(phase==="locate")body={regions:linear?[]:[{part:0,point:[.2,.2]}],localization:"visible-point",verified:false};
     else if(phase==="picture"){
       generated.push({id:input.pathway?.id,view:input.view});
       body={image_url:"data:image/png;base64,"+mockImage,verified:false};

@@ -34,3 +34,8 @@ const {isPersonalFinanceObjective}=await module('src/lib/ascension/objective-exp
 for(const goal of ['I need help with my finances','help me manage my money','I need help paying bills','financial advice','I need help with my finances\nBuild on the selected pathway: Budget plan'])assert.equal(isPersonalFinanceObjective(goal),true,goal);
 for(const goal of ['make worker drones','build a personal finance app','design a system to manage my finances','create budgeting software'])assert.equal(isPersonalFinanceObjective(goal),false,goal);
 console.log('PASS financial intent: personal guidance stays distinct from explicit product creation');
+
+const {objectiveExperience}=await module('src/lib/ascension/objective-experience.ts');
+for(const objective of ['make worker drones','worker drones','design a swarm of drones coordinated by a central controller','build a finance app','make worker drones\nBuild on the selected pathway: Swarm Worker Drones'])assert.equal(objectiveExperience(objective,'guidance'),'design','A wrong provider suggestion cannot hide invention pictures: '+objective);
+assert.equal(objectiveExperience('I need help with my finances','design'),'guidance');
+console.log('PASS invention routing overrides misclassification while personal finance retains guidance');

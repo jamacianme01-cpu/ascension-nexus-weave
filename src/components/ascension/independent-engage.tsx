@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TreePathwayCarousel } from "@/components/ascension/tree-pathway-carousel";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
-import { isPersonalFinanceObjective } from "@/lib/ascension/objective-experience";
+import { objectiveExperience } from "@/lib/ascension/objective-experience";
 import { availableTreeVoice } from "@/lib/ascension/tree-speech";
 
 type Part = { name: string; purpose: string; location: string };
@@ -138,7 +138,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      if (talking) say(data.experience==="guidance"||isPersonalFinanceObjective(text)?"I've brought together a few ways forward. Hear an orb, then choose the approach you'd like us to work through.":"I've brought your designs together. Choose one and we'll explore how its parts work, or build on it together.");
+      if (talking) say(objectiveExperience(text,data.experience)==="guidance"?"I've brought together a few ways forward. Hear an orb, then choose the approach you'd like us to work through.":"I've brought your designs together. Choose one and we'll explore how its parts work, or build on it together.");
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.
       window.setTimeout(() => {
@@ -216,6 +216,7 @@ export function IndependentEngage() {
 
   const choices = result ? [...result.pathways, result.blend] : [];
   const selected = choice === null ? null : choices[choice];
+  const experience=objectiveExperience(requested,result?.experience);
   const previewPath = orbPreview === null ? null : choices[orbPreview];
   const spokenPreview = (path: Pathway) => {
     const brief = path.summary.split(/(?<=[.!?])\s+/).slice(0,2).join(" ").trim();
@@ -282,7 +283,7 @@ export function IndependentEngage() {
 
     {result && choice === null && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg text-gold">{result.experience==="guidance"||isPersonalFinanceObjective(requested)?"Explore your possibilities":"Explore your designs"}</h2>
+        <h2 className="text-lg text-gold">{objectiveExperience(requested,result.experience)==="guidance"?"Explore your possibilities":"Explore your designs"}</h2>
         <div className="flex flex-wrap gap-3 text-xs">
           <button type="button" onClick={() => {
             if (talking) stopVoice();
@@ -315,7 +316,7 @@ export function IndependentEngage() {
         className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
       <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}
         pathway={{ title: "Your idea", summary: requested || objective, steps: [], parts: [] }}
-        experience={isPersonalFinanceObjective(requested)?"guidance":result?.experience??"design"} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
+        experience={objectiveExperience(requested,result?.experience)} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
       {voiceNotice && <p role="status" className="text-sm text-gold">{voiceNotice}</p>}
     </div>}
     {selected && <section ref={designView} className="ascension-knowledgeverse ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
@@ -324,10 +325,10 @@ export function IndependentEngage() {
         <button type="button" onClick={() => { stopVoice(); setChoice(null); }}
           className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
       </div>
-        <PathwayView key={selected.id} experience={isPersonalFinanceObjective(requested)?"guidance":result?.experience??"design"} path={selected} alternatives={choices} objective={requested} modelCache={modelCache} imageCache={imageCache}
+        <PathwayView key={selected.id} experience={objectiveExperience(requested,result?.experience)} path={selected} alternatives={choices} objective={requested} modelCache={modelCache} imageCache={imageCache}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />
-        <section className="rounded-xl border border-gold/25 bg-[#051b2a]/95 p-4 sm:p-6" aria-label="Choose your next step">
+        {experience==="guidance"&&<section className="rounded-xl border border-gold/25 bg-[#051b2a]/95 p-4 sm:p-6" aria-label="Choose your next step">
           <h3 className="text-lg text-gold">Make this possibility yours</h3>
           {"blend_reason" in selected && <p className="mt-3 text-sm leading-6">{String(selected.blend_reason)}</p>}
           {selected.tradeoffs.length > 0 && <div className="mt-4">
@@ -343,7 +344,7 @@ export function IndependentEngage() {
             </ol>
           </div>}
           <p className="mt-4 text-xs text-foreground/70">A proposed direction to explore. Ask the Tree what to check before committing time or money.</p>
-        </section>
+        </section>}
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>
           <textarea id="pathway-refinement" rows={2} maxLength={900} value={refinement}

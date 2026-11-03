@@ -203,9 +203,15 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       </div>
       {error && <p role="alert" className="mt-2 text-red-200">{error}</p>}
       <div className="mt-3 space-y-2" role="log" aria-label="Conversation with the Tree" aria-live="polite">
-        {conversation.map((message, index) => <p key={index}
-          className={"whitespace-pre-wrap leading-6 "+(message.role==="user"?"text-amber-100":"text-sky-100")}>
-          <span className="mr-2 text-xs opacity-70">{message.selectedPathway?"Selected pathway":message.selectedPart?"Selected part":message.role==="user"?"You":"Tree"}</span>{message.selectedPathway ?? message.selectedPart ?? message.content}</p>)}
+        {conversation.map((message,index)=>{
+          const previous=conversation[index-1];
+          if(message.role==="assistant"&&(previous?.selectedPathway||previous?.selectedPart))return <details key={index} className="text-sky-100">
+            <summary className="cursor-pointer text-xs text-gold">Read spoken explanation</summary>
+            <p className="mt-2 whitespace-pre-wrap leading-6">{message.content}</p>
+          </details>;
+          return <p key={index} className={"whitespace-pre-wrap leading-6 "+(message.role==="user"?"text-amber-100":"text-sky-100")}>
+            <span className="mr-2 text-xs opacity-70">{message.selectedPathway?"Selected pathway":message.selectedPart?"Selected part":message.role==="user"?"You":"Tree"}</span>{message.selectedPathway ?? message.selectedPart ?? message.content}</p>;
+        })}
       </div>
     </>}
   </div>;

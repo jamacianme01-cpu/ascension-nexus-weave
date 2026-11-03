@@ -129,6 +129,7 @@ try{
       blend:{...path("linear4","BLEND propulsion","Integrated linear motor drive.",linearParts),blend_reason:"Combined"},
       verified:false,contributors:["OpenAI"],unavailable:[],providerErrors:[],governance:"unverified"
     }:{
+      experience:"guidance", // Deliberately wrong: the client must keep inventions in their viewer.
       introduction:"Design choices",
       pathways:[
         path("rotor","Rotorcraft Worker Drone","Four rotors carry a payload gripper.",droneParts),
@@ -224,10 +225,7 @@ try{
   const stages=["BLUEPRINT","DISSECT / EXPLODE","IMPLODE / REASSEMBLE"];
   async function inspect(expectedId){
     await detail.waitFor({state:"visible"});
-    const nextStep = detail.getByRole("region", {name:"Choose your next step"});
-    await nextStep.getByRole("heading", {name:"Your first steps"}).waitFor();
-    assert.ok(await nextStep.locator("ol li").count() >= 2, "Selected pathway exposes its actual plan");
-    assert.ok(await nextStep.getByText("Dimensions remain unverified", {exact:true}).isVisible(), "Tradeoffs remain visible beside the plan");
+    assert.equal(await detail.getByRole("region",{name:"Choose your next step"}).count(),0,"Inventions must not turn into a written action-plan panel");
     assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.ascension-world'),'::before').opacity),"0.16","The Tree becomes faint inside the selected world");
     await detail.getByRole("log").getByText("Selected pathway",{exact:false}).last().waitFor();
     const picture=page.locator('img[alt^="Concept picture of"]');

@@ -1,5 +1,9 @@
 # ASCENSION product vision — owner confirmed November 2, 2026
 
+## Invention routing regression correction — November 3
+
+Worker-drone and other explicit invention requests must retain the selected-design picture viewer even if a provider incorrectly suggests guidance. Constrain recognized invention requests to design in the response schema and apply the same intent guard in the client. Finance guidance remains separate. Do not render the long tradeoff/action-plan panel on the invention screen. Automatic guide explanations are spoken, with an expandable transcript rather than a default essay. Keep the existing image-on-entry behavior and do not claim this completes 3D or labeling.
+
 ## Guidance requests — November 3 correction
 
 ASCENSION must follow the actual objective rather than interpret every request as an invention. "I need help with my finances" receives three distinct practical guidance approaches and BLEND, with the same spoken-orb selection. Entering one opens the Tree's contextual planning conversation, tradeoffs and next steps, with no generated invention picture, parts list, local-device connection or 3D controls. An explicit request to build financial software remains a design request. Financial guidance must not invent personal figures, imply bank access, request credentials, or assert current eligibility/rules without authoritative evidence.

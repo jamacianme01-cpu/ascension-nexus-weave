@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
-import { isPersonalFinanceObjective } from "@/lib/ascension/objective-experience";
+import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience } from "@/lib/ascension/objective-experience";
 import { designImageBrief } from "@/lib/ascension/design-image-brief";
 
 /** Railway-owned public intake: never calls Supabase or claims governed execution. */
@@ -175,11 +175,13 @@ async function build(objective: string, firstAnswerText = "") {
   const allConnected = sources.length === 2;
   const response = await callOpenAIResponse({
     timeoutMs: 28500,
-    structuredOutput: { name: "ascension_four_pathways", schema: outputSchema },
+    structuredOutput: { name: "ascension_four_pathways", schema: {
+      ...outputSchema, properties:{...outputSchema.properties, experience:{type:"string",enum:isInventionObjective(objective)?["design"]:isPersonalFinanceObjective(objective)?["guidance"]:["design","guidance"]}},
+    } },
     system: [
       "Help the person accomplish the actual objective. Do not force every request into an invention or software product. You are proposing options, not reporting execution or verification.",
       "Set experience to guidance for requests for help, learning, planning, personal finances or decisions; set design only when the person actually asks to create or develop a product, device or software. All pathways must serve that intent. Guidance must have parts: [] and practical human actions, not software modules or app-building instructions.",
-      isPersonalFinanceObjective(objective) ? "This is PERSONAL FINANCIAL HELP. Set experience=guidance. Offer three distinct practical approaches and a blend for the person's money situation. Do not invent a financial app, account aggregator or mechanical system; do not default to linking accounts. Suggest a small useful action and ask only the most important missing question. Never invent income, expenses, eligibility, rates or guaranteed outcomes. Do not request bank credentials, account numbers or government identifiers. Do not assert current benefit, tax, legal or investment rules without authoritative current evidence; identify when such verification is needed." : "Preserve the actual intent: help and advice requests are not requests to build an app.",
+      isInventionObjective(objective) ? "This is an INVENTION DESIGN request, including short requests like make worker drones. Set experience=design. Propose concrete architectures with named physical components. Do the design work; do not substitute a personal action plan, tell the user to acquire existing drones, or classify it as guidance merely because the design involves coordination or a central controller." : isPersonalFinanceObjective(objective) ? "This is PERSONAL FINANCIAL HELP. Set experience=guidance. Offer three distinct practical approaches and a blend for the person's money situation. Do not invent a financial app, account aggregator or mechanical system; do not default to linking accounts. Suggest a small useful action and ask only the most important missing question. Never invent income, expenses, eligibility, rates or guaranteed outcomes. Do not request bank credentials, account numbers or government identifiers. Do not assert current benefit, tax, legal or investment rules without authoritative current evidence; identify when such verification is needed." : "Preserve the actual intent: help and advice requests are not requests to build an app.",
       "For guidance, consider real-world priorities, resources, constraints and useful next actions. For an actual design request, analyze the reference architecture and interacting modules internally. Return only the structured alternatives. A separate preliminary engineering essay is not required.",
       allConnected
         ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
@@ -199,7 +201,7 @@ async function build(objective: string, firstAnswerText = "") {
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
   });
   const result = parseText(response.text);
-  if(isPersonalFinanceObjective(objective))result.experience="guidance";
+  result.experience=objectiveExperience(objective,result.experience);
   if(result.experience==="guidance"){
     result.pathways.forEach(path=>{path.parts=[];});result.blend.parts=[];
   }
@@ -245,7 +247,7 @@ async function guide(objective: string, question: string, selected: Record<strin
     system: [
       "You are the Tree of Knowledge: ASCENSION's welcoming, knowledgeable, practical design assistant.",
       "Work WITH the person on the chosen approach. Speak directly, naturally and warmly, never like a narrator",
-      selected["experience"]==="guidance" ? "This is a GUIDANCE conversation, not an invention. Help the person use the selected approach in their real situation. Give one manageable next action and ask one focused question when needed. Do not describe software modules, generate pictures, recommend building an app, or imply account access. Never invent personal numbers or current financial eligibility/rules, and never request credentials or identifying account data." : "For a design, stay grounded in its supplied architecture.",
+      selected["experience"]==="guidance" ? "This is a GUIDANCE conversation, not an invention. Help the person use the selected approach in their real situation. Give one manageable next action and ask one focused question when needed. Do not describe software modules, generate pictures, recommend building an app, or imply account access. Never invent personal numbers or current financial eligibility/rules, and never request credentials or identifying account data." : "For an invention design, explain the supplied architecture and develop it with the person. Do not replace design work with instructions to buy or acquire existing drones or ask them to design the system themselves. Keep the spoken introduction brief and useful.",
       "Use the recent conversation to understand follow-ups. Before a pathway is chosen, help explore the objective instead of demanding a selection.",
       "describing a mystical journey, giving inspirational slogans, or reciting the screen.",
       "FIRST answer the person's exact question with concrete, technically useful information grounded in the",

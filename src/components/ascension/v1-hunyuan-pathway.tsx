@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { loadPathwayVisual } from "@/lib/ascension/pathway-visual";
+import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
 
@@ -22,7 +22,7 @@ export function V1HunyuanPathway({
   imageCache:{current:Map<string,string>};
   alternatives?: Pathway[];
 }) {
-  const key=JSON.stringify([objective,path.id,path.title,path.summary]);
+  const key=pathwayVisualKey(objective,path);
   const [bytes,setBytes]=useState<ArrayBuffer|null>(null);
   const [picture,setPicture]=useState<string|null>(null);
   const [working,setWorking]=useState(false);

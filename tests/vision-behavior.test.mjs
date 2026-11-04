@@ -76,6 +76,14 @@ const nonWorkerSwarm=designImageBrief(
 assert.match(nonWorkerSwarm.prompt,/^Three matching unmanned multirotor drones/,'Drone groups remain groups even when objective omits worker');
 assert.doesNotMatch(nonWorkerSwarm.prompt,/Charging station/,'Infrastructure must not appear as detached drone products');
 assert.match(nonWorkerSwarm.negative,/docking station/,'Exclude external base-station collage subjects');
+
+for(const sample of [brief,swarmBrief,groundBrief,monitoringBrief,nonWorkerSwarm]){
+  assert.ok(sample.prompt.split(/\s+/).length<=64,'Keep the selected design within the short SDXL prompt budget');
+  assert.ok(sample.prompt.length>50,'Preserve a substantive architecture brief');
+  assert.ok(sample.negative.length>20,'Keep negative conditioning for collages');
+}
+assert.match(monitoringBrief.prompt,/single aircraft/,'Critical single-machine specification must not be truncated');
+assert.match(swarmBrief.prompt,/central controller/,'Selected swarm controller must be in the first prompt segment');
 const {briefSpokenAnswer}=await module('src/lib/ascension/spoken-answer.ts');
 const spoken=briefSpokenAnswer('This design coordinates work across several drones. It could work well with shared task scheduling. A third sentence is unnecessary.');
 assert.equal(spoken,'This design coordinates work across several drones. It could work well with shared task scheduling.');

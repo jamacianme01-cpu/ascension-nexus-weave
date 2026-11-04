@@ -211,7 +211,13 @@ export function V1HunyuanPathway({
               else {setMeshIndex(null);setInspectModel(false);}
             }}
             className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
-          {component!==null&&meshIndex===null&&<p role="status" className="text-xs text-foreground/70">This part has not been located in the displayed design.</p>}
+          {component!==null&&path.parts[component]&&<div role="status" aria-label="Selected component explanation"
+            className="mt-3 rounded-lg border border-gold/30 bg-black/20 p-3">
+            <p className="font-medium text-gold">{path.parts[component].name}</p>
+            <p className="mt-2 text-sm"><span className="text-gold">What it does:</span> {path.parts[component].purpose || "Function not specified in this design."}</p>
+            <p className="mt-2 text-sm"><span className="text-gold">Where it belongs:</span> {path.parts[component].location || "Position not specified in this design."}</p>
+            {meshIndex===null&&<p className="mt-2 text-xs text-foreground/70">The selected part is not verified in the picture or 3D model.</p>}
+          </div>}
           {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
           {parts.length>0&&<details className="mt-4">
             <summary className="cursor-pointer text-gold">Inspect model geometry</summary>

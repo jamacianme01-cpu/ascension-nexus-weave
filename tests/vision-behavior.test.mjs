@@ -20,6 +20,12 @@ try{
  await loadPathwayVisual('worker bots',{...path,id:'rover',title:'Ground worker'},cache,signal);assert.equal(requests.length,2,'Distinct pathways use distinct generation requests');
  const stopped=new AbortController();stopped.abort();
  await assert.rejects(loadPathwayVisual('cancelled',path,cache,stopped.signal));assert.equal(requests.length,2,'Cancelled queued work must not spend a generation request');
+ const changedHardware={...path,parts:[{name:'Camera module',purpose:'Observation',location:'Front chassis'}]};
+ await loadPathwayVisual('worker bots',changedHardware,cache,signal);
+ assert.equal(requests.length,3,'Changing the physical parts must invalidate the old design picture');
+ const changedSteps={...changedHardware,steps:['Replace camera mounting geometry']};
+ await loadPathwayVisual('worker bots',changedSteps,cache,signal);
+ assert.equal(requests.length,4,'Changing assembly steps must invalidate the old design picture');
 }finally{globalThis.fetch=original;}
 console.log('PASS vision behavior: named woman voice, shared design identity, separate pathways, cached selection and cancellation');
 

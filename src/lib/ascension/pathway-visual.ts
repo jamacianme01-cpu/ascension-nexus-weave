@@ -1,6 +1,6 @@
 type VisualPath = { id: string; title: string; summary: string; parts: unknown[]; steps: string[] };
 export const pathwayVisualKey = (objective: string, path: VisualPath) =>
-  JSON.stringify([objective, path.id, path.title, path.summary]);
+  JSON.stringify([objective, path.id, path.title, path.summary, path.parts, path.steps]);
 const pending = new Map<string, Promise<string>>();
 let queue = Promise.resolve();
 let nextAllowed = 0;

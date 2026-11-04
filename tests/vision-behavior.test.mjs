@@ -54,7 +54,7 @@ assert.doesNotMatch(swarmBrief.negative,/fleet|swarm|multiple objects/,'Do not f
 const groundBrief=designImageBrief('make worker drones','Tracked Ground Worker Robot',['Tracked chassis'],'A tracked ground robot for transport.');
 assert.match(groundBrief.prompt,/ground worker robot/);assert.doesNotMatch(groundBrief.negative,/wheels/);
 
-assert.match(swarmBrief.prompt,/Exactly three IDENTICAL complete units/,'A real selected swarm must stay a matched fleet, not mixed vehicles');
+assert.match(swarmBrief.prompt,/Exactly three identical assembled units/i,'A real selected swarm must stay a matched fleet, not mixed vehicles');
 assert.match(swarmBrief.prompt,/Multiple aerial worker drones coordinated by a central controller/,'The selected pathway summary must reach the image generator');
 assert.match(swarmBrief.negative,/collage|montage/,'Reject montage rendering');
 const monitoringBrief=designImageBrief(

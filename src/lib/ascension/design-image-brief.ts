@@ -1,63 +1,51 @@
-/** Keep the selected pathway's identity and actual architecture in the approved free image route.
- * A generated image is still an unverified concept, never a technical assembly receipt.
+/** Short SDXL reference-image brief for an existing selected pathway.
+ * SDXL's CLIP encoders have bounded context: place the SUBJECT, count,
+ * mobility, architecture and visible hardware first. Do not pass an essay.
+ * Pictures remain unverified concepts, never engineering proof.
  */
 export function designImageBrief(objective: string, title: string, parts: string[], summary = "") {
-  const clean = (value: string, max: number) => value.replace(/\s+/g, " ").trim().slice(0, max);
+  const clean = (value: string, limit: number) => value.replace(/\s+/g, " ").trim().slice(0, limit);
   const selected = [title, summary, ...parts].join(" ");
   const worker = /\b(?:worker|labor|labour)\b.*\b(?:drone|bot|robot)/i.test(objective);
   const ground = /ground-based|ground robot|wheeled|tracked|rover|wheels|tires/i.test(selected);
   const hybrid = /\bhybrid\b/i.test(title) && ground && /aerial|fly|flight|rotor/i.test(selected);
   const aerial = !ground && /drone|aerial|multirotor|hexa|quad|flight|flying/i.test(selected + " " + objective);
-  // A 'central controller' may be a component of ONE aircraft. It does not
-  // imply a swarm. Require explicit multi-vehicle/team language.
-  const swarm = /\b(?:swarm|fleet|formation|squadron)\b|\b(?:multiple|several|three|coordinated|team of)\s+(?:\w+\s+){0,2}(?:drones?|robots?|bots?)\b/i.test(title + " " + summary) && /\b(?:drones?|robots?|bots?|aircraft|vehicles?)\b/i.test(title + " " + summary);
+  const swarm = /\b(?:swarm|fleet|formation|squadron)\b|\b(?:multiple|several|three|coordinated|team of)\s+(?:\w+\s+){0,2}(?:drones?|robots?|bots?)\b/i.test(title + " " + summary) &&
+    /\b(?:drones?|robots?|bots?|aircraft|vehicles?)\b/i.test(title + " " + summary);
   const aircraft = /hexacopter|hexa|six.rotor/i.test(selected) ? "hexacopter" :
     /quadcopter|quad|four.rotor/i.test(selected) ? "quadcopter" : "multirotor";
   const unit = hybrid ? (worker ? "aerial-and-ground hybrid worker robot" : "aerial-and-ground hybrid robot") :
     aerial ? "unmanned " + aircraft + (worker ? " worker drone" : " drone") :
     ground ? (worker ? "ground worker robot" : "ground robot") : (worker ? "worker robot" : "robot");
-  const subject = swarm
-    ? "Three matching " + unit + "s coordinated by one compact central controller"
-    : worker ? "One individual " + unit : "One complete " + clean(title, 100);
-
-  // Hardware names are structural constraints, not separate products to lay
-  // beside the design. Internal electronics need not be visible.
-  const visibleParts = parts
-    .map(part => clean(part, 100))
-    .filter(part => part && !/software|cloud|algorithm|network|firmware|subscription|database|web app/i.test(part))
-    .filter(part => !(worker || aerial || ground) || !/station|dock|charging pedestal|charging base/i.test(part))
-    .slice(0, 7);
-  // SDXL may truncate long text prompts. Put the exact subject and unit-count
-  // constraints before secondary engineering detail so they cannot be dropped.
-  const selectedSummary = clean(summary, 260);
-  const prompt = [
+  const subject = swarm ? "Three matching " + unit + "s coordinated by one compact central controller" :
+    worker ? "One individual " + unit : "One complete " + clean(title, 80);
+  // Named components are integral features, NOT additional isolated products.
+  const visibleParts = parts.map(p => clean(p, 44))
+    .filter(p => p && !/software|cloud|algorithm|network|firmware|database|web app/i.test(p))
+    .filter(p => !(worker || aerial || ground) || !/station|dock|charging pedestal|charging base/i.test(p))
+    .slice(0, 2);
+  const design = clean(summary, 120);
+  const brief = [
     subject + ".",
-    swarm
-      ? "Exactly three IDENTICAL complete units of this one selected model, arranged as a coherent matched team in one studio scene, with one compact central controller. Do not mix models, camera angles, or separate product illustrations."
-      : "Exactly ONE complete assembled machine. One chassis, one consistent physical design and one perspective. Do not duplicate the machine, stack different models or show alternate versions.",
-    "SELECTED DESIGN: " + clean(title, 100) + ". " + selectedSummary,
-    hybrid
-      ? "Both rotors and ground-drive hardware must belong to the SAME integrated hybrid machine."
-      : aerial
-        ? "Rotor propulsion and landing supports are part of the SAME aircraft; no wheels, ground rover or second drone."
-        : ground
-          ? "The selected ground mobility hardware is built into the robot; no aircraft or floating rotorcraft."
-          : "",
-    visibleParts.length
-      ? "Integrate these selected design components into the SAME assembly wherever externally visible: " + visibleParts.join("; ") + ". Internal electronics remain within the chassis, not isolated props, product boxes or accessories."
-      : "",
-    "A single uninterrupted product-design render, three-quarter camera view, centered with the entire assembly visible. Plain neutral studio background, soft even lighting.",
-    "Depict the stated physical architecture and intended purpose, not a stock generic drone. No alternate views, detached structures, cutaways, diagrams, labels, overlays or collage.",
+    swarm ? "Exactly three identical assembled units, one camera view." :
+      "Exactly ONE complete assembled machine, one camera view.",
+    clean(title, 75) + (design ? ": " + design : "") + ".",
+    visibleParts.length ? "Integrate " + visibleParts.join(" and ") + " into the same assembly." : "",
+    aerial ? "Rotor propulsion, no wheels." :
+      ground && !hybrid ? "Ground mobility, no flying drone." : "",
+    "Single three-quarter studio product render, plain gray background.",
   ].filter(Boolean).join(" ");
+  // Restrict length for the model's bounded text encoder; preserve the
+  // subject/count by truncating only the lower-priority tail.
+  const words = brief.split(/\s+/);
+  const prompt = words.slice(0, 64).join(" ");
   const negative = [
-    aerial ? "wheels, tires, wheeled chassis, car, ground rover, humanoid, android, biped, walking legs, cockpit, pilot" : "",
-    ground && !hybrid ? "airplane, flying drone, rotorcraft, hovering, helicopter" : "",
-    "people, person, human, crowd, operator, bystander, face, hands, city, building, skyline, landscape, vegetation, scenery, outdoors, grass, field, trees, forest, sky, warehouse",
-    "collage, grid, montage, split panels, mosaic, contact sheet, diptych, triptych, multiple angles, multiple viewpoints, before and after, side by side views, stacked drones, overlapping vehicles",
-    worker || aerial || ground ? "external docking station, charging base, spare parts table, storage case" : "",
-    "loose accessories, detached components, spare parts, floating pieces, product catalog, exploded view, boxed devices, unrelated products, text, watermark, diagram boxes",
-    swarm ? "mixed aircraft types, unmatched drones, nonidentical machines, multiple controllers" :
-      "fleet, swarm, two drones, three drones, duplicate robot, extra machine, multiple objects",
+    "collage, split panels, multiple viewpoints, duplicate products, stacked drones",
+    swarm ? "unmatched drones, mixed aircraft, extra controllers" :
+      "extra machine, duplicate robot, second drone, fleet, swarm",
+    aerial ? "wheels, tires, ground rover" : "",
+    ground && !hybrid ? "helicopter, hovering aircraft" : "",
+    "loose parts, detached accessories, docking station, people, city, landscape, text, watermark",
   ].filter(Boolean).join(", ");
   return { prompt, negative };
 }

@@ -10,26 +10,26 @@ export function designImageBrief(objective: string, title: string, parts: string
   const aerial = !ground && /drone|aerial|multirotor|hexa|quad|flight|flying/i.test(selected + " " + objective);
   // A 'central controller' may be a component of ONE aircraft. It does not
   // imply a swarm. Require explicit multi-vehicle/team language.
-  const swarm = /\b(?:swarm|fleet|formation|squadron)\b|\b(?:multiple|several|three|coordinated|team of)\s+(?:\w+\s+){0,2}(?:drones?|robots?|bots?)\b/i.test(title + " " + summary);
+  const swarm = /\b(?:swarm|fleet|formation|squadron)\b|\b(?:multiple|several|three|coordinated|team of)\s+(?:\w+\s+){0,2}(?:drones?|robots?|bots?)\b/i.test(title + " " + summary) && /\b(?:drones?|robots?|bots?|aircraft|vehicles?)\b/i.test(title + " " + summary);
   const aircraft = /hexacopter|hexa|six.rotor/i.test(selected) ? "hexacopter" :
     /quadcopter|quad|four.rotor/i.test(selected) ? "quadcopter" : "multirotor";
-  const unit = hybrid ? "aerial-and-ground hybrid worker robot" :
-    aerial ? "unmanned " + aircraft + " worker drone" :
-    ground ? "ground worker robot" : "worker robot";
-  const subject = worker
-    ? (swarm ? "Three matching " + unit + "s coordinated by one compact central controller" : "One individual " + unit)
-    : "One complete " + clean(title, 100);
+  const unit = hybrid ? (worker ? "aerial-and-ground hybrid worker robot" : "aerial-and-ground hybrid robot") :
+    aerial ? "unmanned " + aircraft + (worker ? " worker drone" : " drone") :
+    ground ? (worker ? "ground worker robot" : "ground robot") : (worker ? "worker robot" : "robot");
+  const subject = swarm
+    ? "Three matching " + unit + "s coordinated by one compact central controller"
+    : worker ? "One individual " + unit : "One complete " + clean(title, 100);
 
   // Hardware names are structural constraints, not separate products to lay
   // beside the design. Internal electronics need not be visible.
   const visibleParts = parts
     .map(part => clean(part, 100))
     .filter(part => part && !/software|cloud|algorithm|network|firmware|subscription|database|web app/i.test(part))
-    .filter(part => swarm || !/station|dock|charging pedestal|charging base/i.test(part))
+    .filter(part => !(worker || aerial || ground) || !/station|dock|charging pedestal|charging base/i.test(part))
     .slice(0, 7);
   // SDXL may truncate long text prompts. Put the exact subject and unit-count
   // constraints before secondary engineering detail so they cannot be dropped.
-  const selectedSummary = clean(summary, 360);
+  const selectedSummary = clean(summary, 260);
   const prompt = [
     subject + ".",
     swarm
@@ -54,6 +54,7 @@ export function designImageBrief(objective: string, title: string, parts: string
     ground && !hybrid ? "airplane, flying drone, rotorcraft, hovering, helicopter" : "",
     "people, person, human, crowd, operator, bystander, face, hands, city, building, skyline, landscape, vegetation, scenery, outdoors, grass, field, trees, forest, sky, warehouse",
     "collage, grid, montage, split panels, mosaic, contact sheet, diptych, triptych, multiple angles, multiple viewpoints, before and after, side by side views, stacked drones, overlapping vehicles",
+    worker || aerial || ground ? "external docking station, charging base, spare parts table, storage case" : "",
     "loose accessories, detached components, spare parts, floating pieces, product catalog, exploded view, boxed devices, unrelated products, text, watermark, diagram boxes",
     swarm ? "mixed aircraft types, unmatched drones, nonidentical machines, multiple controllers" :
       "fleet, swarm, two drones, three drones, duplicate robot, extra machine, multiple objects",

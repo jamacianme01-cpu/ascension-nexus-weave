@@ -45,7 +45,7 @@ export function designImageBrief(objective: string, title: string, parts: string
       ? "Integrate these selected design components into the SAME assembly wherever externally visible: " + visibleParts.join("; ") + ". Internal electronics remain within the chassis, not isolated props, product boxes or accessories."
       : "",
     "A single uninterrupted product-design render, three-quarter camera view, centered with the entire assembly visible. Plain neutral studio background, soft even lighting.",
-    "Depict the stated physical architecture and intended purpose, not a stock generic drone. No people, environment, multiple camera views, exploded components, cutaways, diagrams, labels, overlays or collage.",
+    "Depict the stated physical architecture and intended purpose, not a stock generic drone. No alternate views, detached structures, cutaways, diagrams, labels, overlays or collage.",
   ].filter(Boolean).join(" ");
   const negative = [
     aerial ? "wheels, tires, wheeled chassis, car, ground rover, humanoid, android, biped, walking legs, cockpit, pilot" : "",
@@ -53,7 +53,7 @@ export function designImageBrief(objective: string, title: string, parts: string
     "people, person, human, crowd, operator, bystander, face, hands, city, building, skyline, landscape, vegetation, scenery, outdoors, grass, field, trees, forest, sky, warehouse",
     "collage, grid, montage, split panels, mosaic, contact sheet, diptych, triptych, multiple angles, multiple viewpoints, before and after, side by side views, stacked drones, overlapping vehicles",
     "loose accessories, detached components, spare parts, floating pieces, product catalog, exploded view, boxed devices, unrelated products, text, watermark, diagram boxes",
-    swarm ? "mixed aircraft types, unmatched drones, nonidentical fleet, multiple controllers" :
+    swarm ? "mixed aircraft types, unmatched drones, nonidentical machines, multiple controllers" :
       "fleet, swarm, two drones, three drones, duplicate robot, extra machine, multiple objects",
   ].filter(Boolean).join(", ");
   return { prompt, negative };

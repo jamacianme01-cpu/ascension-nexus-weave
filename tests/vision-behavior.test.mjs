@@ -67,6 +67,15 @@ assert.match(monitoringBrief.prompt,/^One individual unmanned multirotor worker 
 assert.match(monitoringBrief.prompt,/single aircraft/,'Preserve pathway-specific visual architecture');
 assert.match(monitoringBrief.prompt,/same assembly/i,'Components must be integral rather than loose products');
 assert.match(monitoringBrief.negative,/duplicate robot|extra machine/,'Reject multiple disconnected aircraft on an individual pathway');
+const nonWorkerSwarm=designImageBrief(
+  'design an autonomous drone swarm',
+  'Coordinated search drone fleet',
+  ['Flight controller','Camera','Charging station'],
+  'Several matching drones communicate through a compact central controller.'
+);
+assert.match(nonWorkerSwarm.prompt,/^Three matching unmanned multirotor drones/,'Drone groups remain groups even when objective omits worker');
+assert.doesNotMatch(nonWorkerSwarm.prompt,/Charging station/,'Infrastructure must not appear as detached drone products');
+assert.match(nonWorkerSwarm.negative,/docking station/,'Exclude external base-station collage subjects');
 const {briefSpokenAnswer}=await module('src/lib/ascension/spoken-answer.ts');
 const spoken=briefSpokenAnswer('This design coordinates work across several drones. It could work well with shared task scheduling. A third sentence is unnecessary.');
 assert.equal(spoken,'This design coordinates work across several drones. It could work well with shared task scheduling.');

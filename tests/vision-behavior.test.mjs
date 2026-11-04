@@ -47,6 +47,20 @@ assert.match(swarmBrief.negative,/wheels/);
 assert.doesNotMatch(swarmBrief.negative,/fleet|swarm|multiple objects/,'Do not forbid the selected architecture');
 const groundBrief=designImageBrief('make worker drones','Tracked Ground Worker Robot',['Tracked chassis'],'A tracked ground robot for transport.');
 assert.match(groundBrief.prompt,/ground worker robot/);assert.doesNotMatch(groundBrief.negative,/wheels/);
+
+assert.match(swarmBrief.prompt,/Exactly three IDENTICAL complete units/,'A real selected swarm must stay a matched fleet, not mixed vehicles');
+assert.match(swarmBrief.prompt,/Multiple aerial worker drones coordinated by a central controller/,'The selected pathway summary must reach the image generator');
+assert.match(swarmBrief.negative,/collage|montage/,'Reject montage rendering');
+const monitoringBrief=designImageBrief(
+  'make worker drones',
+  'Safety Monitoring Drone with central controller',
+  ['High-resolution camera','Microphone array','GPS module','Rechargeable battery'],
+  'One multirotor drone observes a room and transmits alerts from a single aircraft.'
+);
+assert.match(monitoringBrief.prompt,/^One individual unmanned multirotor worker drone/,'A central controller inside one drone is not a swarm');
+assert.match(monitoringBrief.prompt,/single aircraft/,'Preserve pathway-specific visual architecture');
+assert.match(monitoringBrief.prompt,/same assembly/i,'Components must be integral rather than loose products');
+assert.match(monitoringBrief.negative,/duplicate robot|extra machine/,'Reject multiple disconnected aircraft on an individual pathway');
 const {briefSpokenAnswer}=await module('src/lib/ascension/spoken-answer.ts');
 const spoken=briefSpokenAnswer('This design coordinates work across several drones. It could work well with shared task scheduling. A third sentence is unnecessary.');
 assert.equal(spoken,'This design coordinates work across several drones. It could work well with shared task scheduling.');

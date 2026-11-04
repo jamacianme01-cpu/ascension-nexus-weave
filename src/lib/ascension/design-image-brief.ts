@@ -1,51 +1,132 @@
-/** Short SDXL reference-image brief for an existing selected pathway.
- * SDXL's CLIP encoders have bounded context: place the SUBJECT, count,
- * mobility, architecture and visible hardware first. Do not pass an essay.
- * Pictures remain unverified concepts, never engineering proof.
+/** Closed design identity for one selected pathway picture.
+ * SDXL paints every concrete noun it is given and drops tokens past its
+ * text-encoder limit. Pasting the pathway summary, or listing parts as
+ * separate products, is what turned one machine into collages, mixed
+ * aircraft, and disconnected components. The prompt is compiled only from
+ * this identity. The summary is used to classify the design, then omitted.
+ * A generated picture is still an unverified concept, not measured hardware.
  */
+export type DesignIdentity = {
+  count: 1 | 3;
+  mobility: "aerial" | "ground" | "hybrid" | "mechanism";
+  architecture: string;
+  subject: string;
+  prompt: string;
+  negative: string;
+};
+
+export function clipTokenEstimate(text: string): number {
+  const parts = text.toLowerCase().match(/[a-z0-9]+|[^a-z0-9\s]/g) ?? [];
+  let tokens = 0;
+  for (const part of parts) {
+    if (/[^a-z0-9]/.test(part)) tokens += 1;
+    else if (part.length > 16) tokens += 3;
+    else if (part.length > 9) tokens += 2;
+    else tokens += 1;
+  }
+  return tokens;
+}
+
+function bound(text: string, maxTokens: number): string {
+  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const kept = [...words];
+  while (kept.length > 4 && clipTokenEstimate(kept.join(" ")) > maxTokens) kept.pop();
+  return kept.join(" ");
+}
+
+function declaresGroup(text: string): boolean {
+  return /\b(?:swarm|fleet|formation|squadron)\b/i.test(text)
+    || (/\b(?:drones|robots|bots|aircraft|vehicles)\b/i.test(text)
+      && /\b(?:multiple|several|three|matching|identical|coordinated|team)\b/i.test(text));
+}
+
+function powerSources(text: string): string[] {
+  const found: string[] = [];
+  if (/electrohydraulic|electro-hydraulic|\bhydraulic\b/i.test(text)) found.push("hydraulic");
+  if (/\bpneumatic\b/i.test(text)) found.push("pneumatic");
+  if (/\belectromagnetic\b|\bmaglev\b/i.test(text)) found.push("electromagnetic");
+  return found;
+}
+function firstPower(text: string): string[] {
+  const indexed = [
+    { name: "hydraulic", at: text.search(/electrohydraulic|electro-hydraulic|\bhydraulic\b/i) },
+    { name: "pneumatic", at: text.search(/\bpneumatic\b/i) },
+    { name: "electromagnetic", at: text.search(/\belectromagnetic\b|\bmaglev\b/i) },
+  ].filter(item => item.at >= 0).sort((a, b) => a.at - b.at);
+  return indexed[0] ? [indexed[0].name] : [];
+}
+
+function titleSubject(title: string): string {
+  return title.replace(/\b(?:architecture|concept|approach|pathway|design)\b/gi, " ")
+    .replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+export function compileDesignIdentity(objective: string, title: string, parts: string[], summary = ""): DesignIdentity {
+  // Parts stay on the pathway record. Naming them in the prompt makes SDXL
+  // draw each one as its own product, which is the disconnected-component failure.
+  void parts;
+  const pathway = `${title} ${summary}`;
+  const lead = summary.split(/[.!?]/)[0] ?? "";
+  const titleGroup = declaresGroup(title);
+  const count: 1 | 3 = titleGroup || (declaresGroup(lead) && !(/\b(?:one|single|individual)\b/i.test(`${title} ${lead}`) && !titleGroup)) ? 3 : 1;
+  const ground = /\b(?:ground-based|ground robot|wheeled|tracked|rover|wheels|tires)\b/i.test(pathway);
+  const aerialSignal = /\b(?:drones?|aerial|multirotor|hexacopter|quadcopter|rotor|flying)\b/i.test(pathway);
+  const objectiveAerial = /\b(?:drones?|aerial|multirotor)\b/i.test(objective);
+  const hybrid = /\bhybrid\b/i.test(title) && ground && /aerial|fly|rotor/i.test(pathway);
+  const aerial = !ground && (aerialSignal || objectiveAerial);
+  const mobility: DesignIdentity["mobility"] = hybrid ? "hybrid" : aerial ? "aerial" : ground ? "ground" : "mechanism";
+  const worker = /\b(?:worker|labor|labour)\b/i.test(`${objective} ${title}`);
+  const aircraft = /hexacopter|\bhexa\b|six[- ]rotor/i.test(pathway) ? "hexacopter"
+    : /quadcopter|\bquad\b|four[- ]rotor/i.test(pathway) ? "quadcopter" : "multirotor";
+  const linearFamily = /\b(?:linear|rail)\b/i.test(`${pathway} ${objective}`)
+    && /\b(?:engine|propulsion|motor|accelerator|drive)\b/i.test(`${pathway} ${objective}`);
+  const titleHits = powerSources(title);
+  const leadHits = powerSources(lead);
+  const hits = titleHits.length ? titleHits
+    : leadHits.length >= 2 && /\b(?:blend|combin|integrat)/i.test(`${title} ${lead}`) ? leadHits
+    : firstPower(lead);
+  let architecture = "";
+  if (linearFamily && hits.length >= 2) architecture = "integrated linear propulsion";
+  else if (linearFamily && /electrohydraulic|electro-hydraulic/i.test(`${title} ${lead}`)) architecture = "electrohydraulic linear propulsion";
+  else if (linearFamily && hits.includes("hydraulic")) architecture = "hydraulic linear propulsion";
+  else if (linearFamily && hits.includes("pneumatic")) architecture = "pneumatic linear propulsion";
+  else if (linearFamily && hits.includes("electromagnetic")) architecture = "electromagnetic linear propulsion";
+  else if (linearFamily) architecture = "linear propulsion";
+  const railSubject: Record<string, string> = {
+    "electromagnetic linear propulsion": "long horizontal electromagnetic track with one sliding carriage",
+    "pneumatic linear propulsion": "long horizontal pneumatic cylinder driving one carriage",
+    "electrohydraulic linear propulsion": "long horizontal hydraulic ram driving one carriage",
+    "hydraulic linear propulsion": "long horizontal hydraulic cylinder driving one carriage",
+    "integrated linear propulsion": "long horizontal linear track with one sliding carriage",
+    "linear propulsion": "long horizontal linear track with one sliding carriage",
+  };
+  const subject = hybrid
+    ? (worker ? "aerial and ground hybrid worker robot" : "aerial and ground hybrid robot")
+    : aerial ? `unmanned ${aircraft}${worker ? " worker drone" : " drone"}`
+    : ground && (worker || /\brobot\b/i.test(pathway))
+      ? `${/tracked/i.test(pathway) ? "tracked" : "wheeled"} ground ${worker ? "worker " : ""}robot`
+      : railSubject[architecture] || titleSubject(title) || "machine";
+  const head = count === 3
+    ? `Exactly three identical ${subject}s in one group, single photograph`
+    : `One single ${subject}, one complete assembled machine, single photograph`;
+  const prompt = bound(`${head}, plain gray studio background`, 68);
+  const negative = bound([
+    "collage, split screen, triptych, multiple views, catalog sheet, exploded view",
+    count === 1 ? "two objects, three machines, duplicate product, extra machine, second vehicle" : "one aircraft, two aircraft, four aircraft, mismatched vehicles, mixed designs",
+    mobility === "aerial" ? "wheels, tires, ground rover, car" : "",
+    mobility === "ground" && !hybrid ? "helicopter, hovering aircraft, airplane" : "",
+    architecture === "electromagnetic linear propulsion" ? "pneumatic compressor, hydraulic pump, shop compressor" : "",
+    architecture === "pneumatic linear propulsion" ? "electric motor catalog, hydraulic pump, multiple compressors" : "",
+    architecture === "electrohydraulic linear propulsion" || architecture === "hydraulic linear propulsion" ? "pneumatic compressor, electric motor catalog" : "",
+    architecture ? "turbine, jet engine, rotary motor, motorcycle, wheel, car, vehicle" : "",
+    architecture === "integrated linear propulsion" ? "three different machines, comparison sheet, separate engines" : "",
+    "people, hands, text, watermark",
+    "loose parts, detached accessories, docking station, city, landscape, room",
+  ].filter(Boolean).join(", "), 74);
+  return { count, mobility, architecture, subject, prompt, negative };
+}
+
 export function designImageBrief(objective: string, title: string, parts: string[], summary = "") {
-  const clean = (value: string, limit: number) => value.replace(/\s+/g, " ").trim().slice(0, limit);
-  const selected = [title, summary, ...parts].join(" ");
-  const worker = /\b(?:worker|labor|labour)\b.*\b(?:drone|bot|robot)/i.test(objective);
-  const ground = /ground-based|ground robot|wheeled|tracked|rover|wheels|tires/i.test(selected);
-  const hybrid = /\bhybrid\b/i.test(title) && ground && /aerial|fly|flight|rotor/i.test(selected);
-  const aerial = !ground && /drone|aerial|multirotor|hexa|quad|flight|flying/i.test(selected + " " + objective);
-  const swarm = /\b(?:swarm|fleet|formation|squadron)\b|\b(?:multiple|several|three|coordinated|team of)\s+(?:\w+\s+){0,2}(?:drones?|robots?|bots?)\b/i.test(title + " " + summary) &&
-    /\b(?:drones?|robots?|bots?|aircraft|vehicles?)\b/i.test(title + " " + summary);
-  const aircraft = /hexacopter|hexa|six.rotor/i.test(selected) ? "hexacopter" :
-    /quadcopter|quad|four.rotor/i.test(selected) ? "quadcopter" : "multirotor";
-  const unit = hybrid ? (worker ? "aerial-and-ground hybrid worker robot" : "aerial-and-ground hybrid robot") :
-    aerial ? "unmanned " + aircraft + (worker ? " worker drone" : " drone") :
-    ground ? (worker ? "ground worker robot" : "ground robot") : (worker ? "worker robot" : "robot");
-  const subject = swarm ? "Three matching " + unit + "s coordinated by one compact central controller" :
-    worker ? "One individual " + unit : "One complete " + clean(title, 80);
-  // Named components are integral features, NOT additional isolated products.
-  const visibleParts = parts.map(p => clean(p, 44))
-    .filter(p => p && !/software|cloud|algorithm|network|firmware|database|web app/i.test(p))
-    .filter(p => !(worker || aerial || ground) || !/station|dock|charging pedestal|charging base/i.test(p))
-    .slice(0, 2);
-  const design = clean(summary, 120);
-  const brief = [
-    subject + ".",
-    swarm ? "Exactly three identical assembled units, one camera view." :
-      "Exactly ONE complete assembled machine, one camera view.",
-    clean(title, 75) + (design ? ": " + design : "") + ".",
-    visibleParts.length ? "Integrate " + visibleParts.join(" and ") + " into the same assembly." : "",
-    aerial ? "Rotor propulsion, no wheels." :
-      ground && !hybrid ? "Ground mobility, no flying drone." : "",
-    "Single three-quarter studio product render, plain gray background.",
-  ].filter(Boolean).join(" ");
-  // Restrict length for the model's bounded text encoder; preserve the
-  // subject/count by truncating only the lower-priority tail.
-  const words = brief.split(/\s+/);
-  const prompt = words.slice(0, 64).join(" ");
-  const negative = [
-    "collage, split panels, multiple viewpoints, duplicate products, stacked drones",
-    swarm ? "unmatched drones, mixed aircraft, extra controllers" :
-      "extra machine, duplicate robot, second drone, fleet, swarm",
-    aerial ? "wheels, tires, ground rover" : "",
-    ground && !hybrid ? "helicopter, hovering aircraft" : "",
-    "loose parts, detached accessories, docking station, people, city, landscape, text, watermark",
-  ].filter(Boolean).join(", ");
-  return { prompt, negative };
+  const identity = compileDesignIdentity(objective, title, parts, summary);
+  return { prompt: identity.prompt, negative: identity.negative };
 }

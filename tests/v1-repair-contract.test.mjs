@@ -72,6 +72,9 @@ const tests=[
     assert.match(route,/guide-ip/);
     assert.match(route,/image-ip/);
     assert.doesNotMatch(route,/limit\("global", 48\)/);
+    assert.match(route,/revisionDirective\(objective\)/);
+    assert.match(route,/assessImageBytes/);
+    assert.match(route,/!assessment\.ok/);
   }],
   ["Tree can speak and user can select actual submeshes",()=>{
     assert.match(design,/<TreeGuide objective=\{objective\}/);

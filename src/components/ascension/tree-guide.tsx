@@ -111,8 +111,9 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
           introduced.add(JSON.stringify([objective,pathway.title]));
           if(introduced.size>48)introduced.delete(introduced.values().next().value!);
         }
+        const remembered = selectionName ? (isPathway ? `Tell me about ${selectionName}` : `Explain ${selectionName}`) : text;
         const exchanges: Exchange[] = [...(conversations.get(objective) ?? []),
-          { role: "user", content: text, ...(selectionName ? isPathway ? { selectedPathway: selectionName } : { selectedPart: selectionName } : {}) }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
+          { role: "user", content: remembered, ...(selectionName ? isPathway ? { selectedPathway: selectionName } : { selectedPart: selectionName } : {}) }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
         conversations.set(objective, exchanges);
         if (conversations.size > 12) conversations.delete(conversations.keys().next().value!);
         conversationListeners.forEach(refresh => refresh());

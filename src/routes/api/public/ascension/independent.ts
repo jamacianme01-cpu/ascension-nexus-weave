@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
-import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience } from "@/lib/ascension/objective-experience";
+import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
-import { designImageBrief } from "@/lib/ascension/design-image-brief";
+import { compileDesignIdentity } from "@/lib/ascension/design-image-brief";
+import { assessImageBytes } from "@/lib/ascension/image-identity.server";
 
 /** Railway-owned public intake: never calls Supabase or claims governed execution. */
 type Part = { name: string; purpose: string; location: string };
@@ -162,6 +163,7 @@ const outputSchema = {
 };
 async function build(objective: string, firstAnswerText = "") {
   const providerStatus = configured();
+  const revision = revisionDirective(objective);
   if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
   const external = await Promise.allSettled([
     providerStatus.Claude ? claude(objective) : Promise.resolve(null),
@@ -183,6 +185,7 @@ async function build(objective: string, firstAnswerText = "") {
       "Help the person accomplish the actual objective. Do not force every request into an invention or software product. You are proposing options, not reporting execution or verification.",
       "Set experience to guidance for requests for help, learning, planning, personal finances or decisions; set design only when the person actually asks to create or develop a product, device or software. All pathways must serve that intent. Guidance must have parts: [] and practical human actions, not software modules or app-building instructions.",
       isInventionObjective(objective) ? "This is an INVENTION DESIGN request, including short requests like make worker drones. Set experience=design. Propose concrete architectures with named physical components. Do the design work; do not substitute a personal action plan, tell the user to acquire existing drones, or classify it as guidance merely because the design involves coordination or a central controller." : isPersonalFinanceObjective(objective) ? "This is PERSONAL FINANCIAL HELP. Set experience=guidance. Offer three distinct practical approaches and a blend for the person's money situation. Do not invent a financial app, account aggregator or mechanical system; do not default to linking accounts. Suggest a small useful action and ask only the most important missing question. Never invent income, expenses, eligibility, rates or guaranteed outcomes. Do not request bank credentials, account numbers or government identifiers. Do not assert current benefit, tax, legal or investment rules without authoritative current evidence; identify when such verification is needed." : "Preserve the actual intent: help and advice requests are not requests to build an app.",
+      revision,
       "For guidance, consider real-world priorities, resources, constraints and useful next actions. For an actual design request, analyze the reference architecture and interacting modules internally. Return only the structured alternatives. A separate preliminary engineering essay is not required.",
       allConnected
         ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
@@ -299,8 +302,8 @@ async function picture(objective: string, value: Record<string, unknown>) {
     .filter((part): part is Record<string, unknown> =>
       Boolean(part) && typeof part === "object" && !Array.isArray(part))
     .slice(0, 14).map(part => String(part["name"] ?? "").slice(0, 80)).filter(Boolean) : [];
-  const imageBrief = designImageBrief(objective, title, parts, summary);
-  const prompt = imageBrief.prompt;
+  const identity = compileDesignIdentity(objective, title, parts, summary);
+  const prompt = identity.prompt;
   // OVHcloud publicly documents SDXL as free with two anonymous requests
   // per minute. No paid API key, image purchase, or shared volunteer worker.
   if (!process.env["ASCENSION_IMAGE_ENDPOINT"]?.trim()) {
@@ -310,7 +313,7 @@ async function picture(objective: string, value: Record<string, unknown>) {
       headers: { "content-type": "application/json", "accept": "application/octet-stream" },
       body: JSON.stringify({
         prompt,
-        negative_prompt: imageBrief.negative,
+        negative_prompt: identity.negative,
       }),
     });
     if (!response.ok) {
@@ -328,10 +331,15 @@ async function picture(objective: string, value: Record<string, unknown>) {
     const webp = String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
       String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
     if (!png && !jpeg && !webp) throw new Error("Image provider returned no usable image.");
+    const assessment = assessImageBytes(bytes, { count: identity.count });
+    if (!assessment.ok) throw new Error(assessment.reason + " Wait about 30 seconds, then try this picture again.");
     return {
       image_url: "data:image/" + (png ? "png" : jpeg ? "jpeg" : "webp") + ";base64," +
         Buffer.from(bytes).toString("base64"),
       verified: false,
+      identity_check: assessment.checked ? "structural" : "unreadable",
+      design_subject: identity.subject,
+      design_count: identity.count,
       next_request_delay_ms: 31000,
     };
   }
@@ -344,7 +352,7 @@ async function picture(objective: string, value: Record<string, unknown>) {
   if (token) headers["authorization"] = "Bearer " + token;
   const response = await fetch(target.toString(), {
     method: "POST", headers, signal: AbortSignal.timeout(45000),
-    body: JSON.stringify({ prompt, objective, pathway: { title, summary } }),
+    body: JSON.stringify({ prompt, negative_prompt: identity.negative, objective, pathway: { title, summary } }),
   });
   if (!response.ok) throw new Error("ASCENSION image bridge HTTP " + response.status);
   const body = obj(await response.json());
@@ -359,7 +367,14 @@ async function picture(objective: string, value: Record<string, unknown>) {
       base64.startsWith("/9j/") ? "jpeg" :
         base64.startsWith("UklGR") ? "webp" : null;
   if (!mime) throw new Error("ASCENSION image bridge returned an unsupported image format.");
-  return { image_url: "data:image/" + mime + ";base64," + base64, verified: false };
+  const bridged = Buffer.from(base64, "base64");
+  const assessment = assessImageBytes(bridged, { count: identity.count });
+  if (!assessment.ok) throw new Error(assessment.reason + " Wait about 30 seconds, then try this picture again.");
+  return {
+    image_url: "data:image/" + mime + ";base64," + base64, verified: false,
+    identity_check: assessment.checked ? "structural" : "unreadable",
+    design_subject: identity.subject, design_count: identity.count,
+  };
 }
 
 export const Route = createFileRoute("/api/public/ascension/independent")({

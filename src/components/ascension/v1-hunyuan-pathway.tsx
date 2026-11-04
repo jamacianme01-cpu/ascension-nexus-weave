@@ -101,7 +101,8 @@ export function V1HunyuanPathway({
       setBytes(output);setStatus("Real Hunyuan3D model ready");setFailure("");
     })().catch(e=>{
       if(!active||controller.signal.aborted)return;
-      setFailure(formatError(e));setStatus("Hunyuan3D unavailable");
+      const message=formatError(e);
+      setFailure(message);setStatus(message);
     }).finally(()=>{if(active)setWorking(false);});
     return()=>{active=false;controller.abort();};
   },[key,attempt,localRequested,modelCache,imageCache]);
@@ -149,6 +150,7 @@ export function V1HunyuanPathway({
       {bytes&&<button type="button" aria-pressed={inspectModel&&mode==="assembled"}
         onClick={()=>changeView("assembled")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">3D VIEW</button>}
+      {!bytes&&<p className="basis-full text-xs text-foreground/70">Blueprint and Dissect stay off until a segmented 3D assembly is loaded. This picture is the design reference. Measured dimensions remain unresolved.</p>}
       {mode==="dissect"&&<button type="button"
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold"
         onClick={()=>changeView("assembled")}>IMPLODE / REASSEMBLE</button>}
@@ -167,13 +169,13 @@ export function V1HunyuanPathway({
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
                 <span>{working?status:failure||""}</span>
                 {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
-                  onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
+                  onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
               </div>
             </div>:
             <div role={failure?"alert":"status"} className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
               <p className="max-w-xl text-sm text-gold">{working?status:failure||""}</p>
               {failure&&<button type="button" className="rounded-lg border border-gold/50 px-4 py-2 text-gold"
-                onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
+                onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
             </div>}
           {inspectModel&&mode==="blueprint"&&bytes&&<div aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-3 grid grid-cols-3 text-center text-xs text-cyan-200">
@@ -216,7 +218,8 @@ export function V1HunyuanPathway({
             <p className="font-medium text-gold">{path.parts[component].name}</p>
             <p className="mt-2 text-sm"><span className="text-gold">What it does:</span> {path.parts[component].purpose || "Function not specified in this design."}</p>
             <p className="mt-2 text-sm"><span className="text-gold">Where it belongs:</span> {path.parts[component].location || "Position not specified in this design."}</p>
-            {meshIndex===null&&<p className="mt-2 text-xs text-foreground/70">The selected part is not verified in the picture or 3D model.</p>}
+            {meshIndex===null?<p className="mt-2 text-xs text-foreground/70">Planned placement only. This part has not been found in the picture or the 3D model.</p>
+              :<p className="mt-2 text-xs text-foreground/70">Found in the loaded model geometry. The planned placement above is still not a measured position.</p>}
           </div>}
           {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
           {parts.length>0&&<details className="mt-4">

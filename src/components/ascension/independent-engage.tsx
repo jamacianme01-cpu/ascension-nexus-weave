@@ -4,7 +4,7 @@ import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { objectiveExperience } from "@/lib/ascension/objective-experience";
-import { availableTreeVoice } from "@/lib/ascension/tree-speech";
+import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -15,15 +15,21 @@ const GREETING = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're h
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
-async function say(text: string, onStarted?: () => void, onUnavailable?: (message: string) => void) {
+function say(text: string, onStarted?: () => void, onUnavailable?: (message: string) => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
   const synth = window.speechSynthesis;
-  try { synth.cancel(); } catch { return; }
-  const voice = await availableTreeVoice(synth);
-  if (sequence !== speechSequence) return;
+  // Speak in the same turn as the click. Waiting for the voice list drops
+  // the browser's user-activation, so playback can "succeed" and stay silent.
+  const interrupted = synth.speaking || synth.pending;
+  try { synth.cancel(); synth.resume(); } catch { return; }
+  const listed = synth.getVoices?.() ?? [];
+  const voice = selectTreeVoice(listed);
   if (!voice) {
-    onUnavailable?.("A woman's English voice isn't available in this browser yet. The Tree's conversation is still available below.");
+    void availableTreeVoice(synth);
+    onUnavailable?.(listed.length
+      ? "A woman's English voice isn't available in this browser yet. The Tree's conversation is still available below."
+      : "The voice list is still loading. Tap Hear the Tree again in a moment.");
     return;
   }
   const chunks: string[] = [];
@@ -38,6 +44,7 @@ async function say(text: string, onStarted?: () => void, onUnavailable?: (messag
   }
   if (chunk) chunks.push(chunk);
   let index = 0;
+  let started = false;
   const next = () => {
     if (sequence !== speechSequence || index >= chunks.length) {
       if (sequence === speechSequence) activeUtterance = null;
@@ -49,12 +56,20 @@ async function say(text: string, onStarted?: () => void, onUnavailable?: (messag
     words.lang = voice.lang;
     words.rate = 1;
     words.pitch = 1;
-    words.onstart = () => onStarted?.();
+    words.onstart = () => { started = true; onStarted?.(); };
     words.onend = next;
-    words.onerror = next;
+    words.onerror = (event: Event) => {
+      if (sequence !== speechSequence) return;
+      const reason = "error" in event ? String((event as { error?: string }).error ?? "") : "";
+      if (reason === "canceled" || reason === "interrupted") return;
+      activeUtterance = null;
+      if (!started) onUnavailable?.("This browser blocked spoken playback. Tap Hear the Tree and I'll speak.");
+    };
     try { synth.speak(words); } catch { activeUtterance = null; }
   };
-  next();
+  // Chrome drops an utterance spoken in the same turn as cancel().
+  if (interrupted) window.setTimeout(next, 60);
+  else next();
 }
 function stopVoice() {
   speechSequence += 1;
@@ -114,11 +129,14 @@ export function IndependentEngage() {
       void say(greeting, () => { welcomeStarted.current = true; setVoiceNotice(""); }, setVoiceNotice);
     };
     const attempt = window.setTimeout(tryWelcome, 280);
+    const onVoices = () => { if (!welcomeStarted.current) tryWelcome(); };
+    window.speechSynthesis?.addEventListener?.("voiceschanged", onVoices);
     window.addEventListener("pointerdown", tryWelcome, { capture: true });
     window.addEventListener("keydown", tryWelcome, { capture: true });
     return () => {
       disposed = true;
       window.clearTimeout(attempt);
+      window.speechSynthesis?.removeEventListener?.("voiceschanged", onVoices);
       window.removeEventListener("pointerdown", tryWelcome, { capture: true });
       window.removeEventListener("keydown", tryWelcome, { capture: true });
     };

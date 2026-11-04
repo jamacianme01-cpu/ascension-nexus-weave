@@ -293,6 +293,14 @@ try{
       const input=response.request().postDataJSON();return input.phase==="guide"&&Boolean(input.pathway?.focused_part);
     });
     await page.getByRole("button",{name:/^(Rotor|Coil)$/,exact:true}).click();
+    const explanation=detail.getByRole("status",{name:"Selected component explanation"});
+    await explanation.waitFor();
+    const explanationText=await explanation.innerText();
+    assert.match(explanationText,/What it does:/,"Selecting a part shows its real designed purpose immediately");
+    assert.match(explanationText,/Where it belongs:/,"Selecting a part shows the intended design location");
+    assert.match(explanationText,/(Lift|Electromagnetic drive)/,"The explanation comes from the selected pathway, not invented geometry");
+    assert.match(explanationText,/(Airframe ends|Track)/,"Intended location is shown from pathway data");
+    assert.match(explanationText,/not verified in the picture/,"Unmapped pixels are not presented as located components");
     const focusedRequest=(await focusedReply).request().postDataJSON();
     assert.match(focusedRequest.pathway.focused_part.name,/Rotor|Coil/);
     assert.equal(focusedRequest.pathway.part_located,false,"Unnamed geometry must not be treated as a located part");

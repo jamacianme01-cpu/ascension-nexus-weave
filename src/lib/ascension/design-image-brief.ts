@@ -27,13 +27,15 @@ export function designImageBrief(objective: string, title: string, parts: string
     .filter(part => part && !/software|cloud|algorithm|network|firmware|subscription|database|web app/i.test(part))
     .filter(part => swarm || !/station|dock|charging pedestal|charging base/i.test(part))
     .slice(0, 7);
-  const selectedSummary = clean(summary, 650);
+  // SDXL may truncate long text prompts. Put the exact subject and unit-count
+  // constraints before secondary engineering detail so they cannot be dropped.
+  const selectedSummary = clean(summary, 360);
   const prompt = [
     subject + ".",
-    "SELECTED DESIGN: " + clean(title, 140) + ". " + selectedSummary,
     swarm
       ? "Exactly three IDENTICAL complete units of this one selected model, arranged as a coherent matched team in one studio scene, with one compact central controller. Do not mix models, camera angles, or separate product illustrations."
       : "Exactly ONE complete assembled machine. One chassis, one consistent physical design and one perspective. Do not duplicate the machine, stack different models or show alternate versions.",
+    "SELECTED DESIGN: " + clean(title, 100) + ". " + selectedSummary,
     hybrid
       ? "Both rotors and ground-drive hardware must belong to the SAME integrated hybrid machine."
       : aerial

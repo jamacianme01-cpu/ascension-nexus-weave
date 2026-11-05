@@ -56,6 +56,16 @@ function firstPower(text: string): string[] {
   return indexed[0] ? [indexed[0].name] : [];
 }
 
+function genericSubject(objective: string, title: string): string {
+  const named = titleSubject(title);
+  if (named.length > 3 && !/^(?:research|plan|guide|approach|idea|concept)$/i.test(named)) return named;
+  const line = (objective.split("\nBuild on the selected pathway:")[0] ?? objective)
+    .replace(/^(?:please\s+)?(?:make|build|create|design|develop|invent|engineer|construct)\s+(?:me\s+)?(?:an?\s+|the\s+)?/i, "")
+    .split(/[,.\n]/)[0] ?? "";
+  const words = line.replace(/\s+/g, " ").trim().split(" ").filter(Boolean).slice(0, 8);
+  return words.join(" ") || "assembled object";
+}
+
 function titleSubject(title: string): string {
   return title.replace(/\b(?:architecture|concept|approach|pathway|design)\b/gi, " ")
     .replace(/\s+/g, " ").trim().slice(0, 80);
@@ -100,12 +110,13 @@ export function compileDesignIdentity(objective: string, title: string, parts: s
     "integrated linear propulsion": "long horizontal linear track with one sliding carriage",
     "linear propulsion": "long horizontal linear track with one sliding carriage",
   };
-  const subject = hybrid
+  const specialized = hybrid
     ? (worker ? "aerial and ground hybrid worker robot" : "aerial and ground hybrid robot")
     : aerial ? `unmanned ${aircraft}${worker ? " worker drone" : " drone"}`
     : ground && (worker || /\brobot\b/i.test(pathway))
       ? `${/tracked/i.test(pathway) ? "tracked" : "wheeled"} ground ${worker ? "worker " : ""}robot`
-      : railSubject[architecture] || titleSubject(title) || "machine";
+      : railSubject[architecture] || "";
+  const subject = specialized || genericSubject(objective, title);
   const head = count === 3
     ? `Exactly three identical ${subject}s in one group, single photograph`
     : `One single ${subject}, one complete assembled machine, single photograph`;
@@ -120,6 +131,7 @@ export function compileDesignIdentity(objective: string, title: string, parts: s
     architecture === "electrohydraulic linear propulsion" || architecture === "hydraulic linear propulsion" ? "pneumatic compressor, electric motor catalog" : "",
     architecture ? "turbine, jet engine, rotary motor, motorcycle, wheel, car, vehicle" : "",
     architecture === "integrated linear propulsion" ? "three different machines, comparison sheet, separate engines" : "",
+    !specialized ? "diagram, schematic, instruction sheet, dimension lines, worksheet, research notes" : "",
     "people, hands, text, watermark",
     "loose parts, detached accessories, docking station, city, landscape, room",
   ].filter(Boolean).join(", "), 74);

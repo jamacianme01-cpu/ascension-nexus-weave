@@ -1,7 +1,8 @@
-/** Structural gate for a selected-design picture.
+/** Structural gate for every selected-design picture, whatever the object is.
  * Counts separated foreground masses and split layouts. It does not identify
- * parts, measure anything, or prove the picture is the right machine.
- * Callers must withhold the picture when ok is false.
+ * parts, measure anything, or prove the picture is the right object.
+ * Callers must withhold the picture when ok is false, and must not treat the
+ * opening screen as the result before a picture that passes this gate is shown.
  */
 export type IdentityExpectation = { count: 1 | 3 };
 export type IdentityAssessment = {

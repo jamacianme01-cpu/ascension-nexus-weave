@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { asCompletedDesignStep } from "@/lib/ascension/design-answer";
+import { asCompletedDesignStep, designPictureReady } from "@/lib/ascension/design-answer";
 import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
@@ -17,11 +17,12 @@ function formatError(reason:unknown){
 }
 
 export function V1HunyuanPathway({
-  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],
+  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],onPicture,
 }:{
   path:Pathway;objective:string;onSpeak:(text:string)=>void; speakingEnabled:boolean;modelCache:Cache;
   imageCache:{current:Map<string,string>};
   alternatives?: Pathway[];
+  onPicture?: (ready: boolean) => void;
 }) {
   const key=pathwayVisualKey(objective,path);
   const [bytes,setBytes]=useState<ArrayBuffer|null>(null);
@@ -50,7 +51,7 @@ export function V1HunyuanPathway({
   },[path.id]);
   useEffect(()=>{
     const stored=modelCache.current.get(key);
-    if(stored){setPicture(imageCache.current.get(key)??null);setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");return;}
+    if(stored){const cached=imageCache.current.get(key)??null;setPicture(cached);setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");onPicture?.(designPictureReady(cached));return;}
     let active=true;
     const controller=new AbortController();
     setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
@@ -68,6 +69,7 @@ export function V1HunyuanPathway({
         if(!active)return;
         imageCache.current.set(key,sourceImage);
         setPicture(sourceImage);
+        onPicture?.(designPictureReady(sourceImage));
       }
       if(!localRequested){setStatus("Design reference ready");return;}
       const match=sourceImage.match(validImage);
@@ -103,7 +105,7 @@ export function V1HunyuanPathway({
     })().catch(e=>{
       if(!active||controller.signal.aborted)return;
       const message=formatError(e);
-      setFailure(message);setStatus(message);
+      setFailure(message);setStatus(message);onPicture?.(false);
     }).finally(()=>{if(active)setWorking(false);});
     return()=>{active=false;controller.abort();};
   },[key,attempt,localRequested,modelCache,imageCache]);

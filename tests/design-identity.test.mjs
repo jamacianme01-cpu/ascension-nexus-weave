@@ -126,4 +126,18 @@ const gradient = canvas((gray, width) => {
   disc(gray, width, 48, 48, 18, 30);
 });
 assert.equal(assessRaster(gradient, 96, 96, { count: 1 }).ok, true, "a vertical studio gradient is not a split scene");
+const cabinet = compileDesignIdentity(
+  "Design a speaker box for a 15-inch subwoofer, dual voice coil, two round ports",
+  "Ported subwoofer cabinet",
+  ["Woofer", "Port"],
+  "One cabinet with the driver and two ports on the same face.",
+);
+assert.equal(cabinet.count, 1);
+assert.match(cabinet.prompt, /Ported subwoofer cabinet/);
+assert.match(cabinet.prompt, /one complete assembled/);
+assert.doesNotMatch(cabinet.prompt, /drone|jeep|watt|ohm|port length/i);
+assert.match(cabinet.negative, /diagram|schematic|instruction sheet/);
+const shelf = compileDesignIdentity("Build a bookshelf", "Wall bookshelf", [], "One bookcase.");
+assert.match(shelf.prompt, /Wall bookshelf/);
+assert.doesNotMatch(shelf.prompt, /drone/);
 console.log("PASS design identity: architecture lock, summary exclusion, and structural picture refusal");

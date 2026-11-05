@@ -41,9 +41,13 @@ for(const goal of ['I need help with my finances','help me manage my money','I n
 for(const goal of ['make worker drones','build a personal finance app','design a system to manage my finances','create budgeting software'])assert.equal(isPersonalFinanceObjective(goal),false,goal);
 console.log('PASS financial intent: personal guidance stays distinct from explicit product creation');
 
-const {objectiveExperience,revisionDirective}=await module('src/lib/ascension/objective-experience.ts');
+const {objectiveExperience,revisionDirective,isVisualDesignRequest}=await module('src/lib/ascension/objective-experience.ts');
 for(const objective of ['make worker drones','worker drones','design a swarm of drones coordinated by a central controller','build a finance app','make worker drones\nBuild on the selected pathway: Swarm Worker Drones'])assert.equal(objectiveExperience(objective,'guidance'),'design','A wrong provider suggestion cannot hide invention pictures: '+objective);
 assert.equal(objectiveExperience('I need help with my finances','design'),'guidance');
+assert.equal(objectiveExperience('Design a speaker box for a subwoofer','guidance'),'design');
+assert.equal(objectiveExperience('Build a bookshelf','guidance'),'design');
+assert.equal(isVisualDesignRequest('Construct a garden gate'), true);
+assert.equal(isVisualDesignRequest('I need help with my finances'), false);
 console.log('PASS invention routing overrides misclassification while personal finance retains guidance');
 assert.equal(revisionDirective('make worker drones'),'');
 assert.match(revisionDirective('make worker drones\nBuild on the selected pathway: Swarm Worker Drones\nPreserve these features: three aerial drones\nChange or improve: larger gripper'),/binding architecture/);

@@ -1,3 +1,8 @@
+/** The opening screen is not an answer. A design result is ready to show only after its picture is present. */
+export function designPictureReady(pictureUrl: string | null | undefined): boolean {
+  return Boolean(pictureUrl && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{4000,}/i.test(pictureUrl));
+}
+
 /** The public no-charge picture path.
  * A custom image endpoint can bill the owner, so it stays off until
  * ASCENSION_ALLOW_FREE_IMAGES is explicitly true. The anonymous SDXL route
@@ -9,7 +14,7 @@ export function freePictureEnabled(env: { allow?: string; endpoint?: string } = 
   return true;
 }
 
-const ASSIGNMENT = /^(?:please\s+)?(?:you(?:'d| would| should| need to| must)|the user should|start by|first(?:,| you should)?|next,?)?\s*(?:research|look up|study|read about|define|specify|identify|find out|investigate|survey|compare options for|shop for|go buy|acquire|purchase|choose your|decide your|figure out)(?:ing|s)?\b[:\s,-]*/i;
+const ASSIGNMENT = /^(?:please\s+)?(?:you(?:'d| would| should| need to| must)|the user should|start by|first(?:,| you should)?|next,?)?\s*(?:research|look up|study|read about|define|specify|identify|find out|investigate|survey|compare options for|shop for|go buy|acquire|purchase|choose your|decide your|figure out|calculate|measure|determine)(?:ing|s)?\b[:\s,-]*/i;
 
 /** A design step states a choice already made. It does not assign research. */
 export function asCompletedDesignStep(step: string): string {

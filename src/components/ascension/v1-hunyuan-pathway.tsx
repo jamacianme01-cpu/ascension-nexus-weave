@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { asCompletedDesignStep, designPictureReady } from "@/lib/ascension/design-answer";
 import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
@@ -16,17 +17,18 @@ function formatError(reason:unknown){
 }
 
 export function V1HunyuanPathway({
-  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],
+  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],onPicture,
 }:{
   path:Pathway;objective:string;onSpeak:(text:string)=>void; speakingEnabled:boolean;modelCache:Cache;
   imageCache:{current:Map<string,string>};
   alternatives?: Pathway[];
+  onPicture?: (ready: boolean) => void;
 }) {
   const key=pathwayVisualKey(objective,path);
   const [bytes,setBytes]=useState<ArrayBuffer|null>(null);
   const [picture,setPicture]=useState<string|null>(null);
   const [working,setWorking]=useState(false);
-  const [status,setStatus]=useState("Checking for the owner's local Hunyuan3D generator…");
+  const [status,setStatus]=useState("Drawing this design…");
   const [failure,setFailure]=useState("");
   const [attempt,setAttempt]=useState(0);
   const [localRequested,setLocalRequested]=useState(false);
@@ -49,7 +51,7 @@ export function V1HunyuanPathway({
   },[path.id]);
   useEffect(()=>{
     const stored=modelCache.current.get(key);
-    if(stored){setPicture(imageCache.current.get(key)??null);setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");return;}
+    if(stored){const cached=imageCache.current.get(key)??null;setPicture(cached);setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");onPicture?.(designPictureReady(cached));return;}
     let active=true;
     const controller=new AbortController();
     setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
@@ -67,6 +69,7 @@ export function V1HunyuanPathway({
         if(!active)return;
         imageCache.current.set(key,sourceImage);
         setPicture(sourceImage);
+        onPicture?.(designPictureReady(sourceImage));
       }
       if(!localRequested){setStatus("Design reference ready");return;}
       const match=sourceImage.match(validImage);
@@ -101,7 +104,8 @@ export function V1HunyuanPathway({
       setBytes(output);setStatus("Real Hunyuan3D model ready");setFailure("");
     })().catch(e=>{
       if(!active||controller.signal.aborted)return;
-      setFailure(formatError(e));setStatus("Hunyuan3D unavailable");
+      const message=formatError(e);
+      setFailure(message);setStatus(message);onPicture?.(false);
     }).finally(()=>{if(active)setWorking(false);});
     return()=>{active=false;controller.abort();};
   },[key,attempt,localRequested,modelCache,imageCache]);
@@ -134,6 +138,13 @@ export function V1HunyuanPathway({
     <h3 className="mb-2 text-xl text-gold">{path.title}</h3>
 
     <p className="mb-4 max-w-4xl text-sm leading-6">{path.summary}</p>
+    {path.steps.length>0 && <div className="mb-4 max-w-4xl">
+      <h4 className="text-sm text-gold">How this design works</h4>
+      <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6">
+        {path.steps.map((step,index)=><li key={index}>{asCompletedDesignStep(step)}</li>)}
+      </ol>
+      <p className="mt-2 text-xs text-foreground/70">These choices are already in the design. Measurements and physical tests remain unresolved.</p>
+    </div>}
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
         key={v} type="button" aria-pressed={v==="assembled"?!inspectModel:inspectModel&&mode===v}
@@ -149,6 +160,7 @@ export function V1HunyuanPathway({
       {bytes&&<button type="button" aria-pressed={inspectModel&&mode==="assembled"}
         onClick={()=>changeView("assembled")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">3D VIEW</button>}
+      {!bytes&&<p className="basis-full text-xs text-foreground/70">Blueprint and Dissect stay off until a segmented 3D assembly is loaded. This picture is the design reference. Measured dimensions remain unresolved.</p>}
       {mode==="dissect"&&<button type="button"
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold"
         onClick={()=>changeView("assembled")}>IMPLODE / REASSEMBLE</button>}
@@ -167,13 +179,13 @@ export function V1HunyuanPathway({
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
                 <span>{working?status:failure||""}</span>
                 {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
-                  onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
+                  onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
               </div>
             </div>:
             <div role={failure?"alert":"status"} className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
               <p className="max-w-xl text-sm text-gold">{working?status:failure||""}</p>
               {failure&&<button type="button" className="rounded-lg border border-gold/50 px-4 py-2 text-gold"
-                onClick={()=>setAttempt(v=>v+1)}>RECONNECT HUNYUAN3D</button>}
+                onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
             </div>}
           {inspectModel&&mode==="blueprint"&&bytes&&<div aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-3 grid grid-cols-3 text-center text-xs text-cyan-200">
@@ -216,7 +228,8 @@ export function V1HunyuanPathway({
             <p className="font-medium text-gold">{path.parts[component].name}</p>
             <p className="mt-2 text-sm"><span className="text-gold">What it does:</span> {path.parts[component].purpose || "Function not specified in this design."}</p>
             <p className="mt-2 text-sm"><span className="text-gold">Where it belongs:</span> {path.parts[component].location || "Position not specified in this design."}</p>
-            {meshIndex===null&&<p className="mt-2 text-xs text-foreground/70">The selected part is not verified in the picture or 3D model.</p>}
+            {meshIndex===null?<p className="mt-2 text-xs text-foreground/70">Planned placement only. This part has not been found in the picture or the 3D model.</p>
+              :<p className="mt-2 text-xs text-foreground/70">Found in the loaded model geometry. The planned placement above is still not a measured position.</p>}
           </div>}
           {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
           {parts.length>0&&<details className="mt-4">

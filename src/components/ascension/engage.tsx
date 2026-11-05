@@ -34,6 +34,9 @@ import {
   strings,
   type ObjectiveDelivery,
 } from "@/lib/ascension/result-model";
+import { asCompletedDesignStep, designPictureReady } from "@/lib/ascension/design-answer";
+import { isVisualDesignRequest } from "@/lib/ascension/objective-experience";
+import { loadPathwayVisual } from "@/lib/ascension/pathway-visual";
 import {
   editableEvidence, parentQuestionId, pathwayBlendInput, partBlendInput,
   readSavedQuestions, rememberQuestion, readBlendSelection, saveBlendSelection,
@@ -383,30 +386,43 @@ function statusText(run: ObjectiveRun, produced: boolean | null) {
   return run.status;
 }
 
-export /** Preview only imagery already present in the pathway result. Never invent a source image or charge for one on card render. */
-function PathwayPreview({ pathway }: { pathway: ObjectiveDelivery["pathways"][number] }) {
+export /** Show the selected design picture. A text list is not the answer. */
+function PathwayPreview({ pathway, objective, onPicture }: {
+  pathway: ObjectiveDelivery["pathways"][number];
+  objective: string;
+  onPicture?: (ready: boolean) => void;
+}) {
   const saved = pathway.generated_image_url;
-  const sketch = pathway.visual_svg;
-  const src = saved ?? (sketch ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sketch)}` : null);
+  const [drawn, setDrawn] = useState<string | null>(saved && designPictureReady(saved) ? saved : null);
+  useEffect(() => {
+    if (saved && designPictureReady(saved)) { setDrawn(saved); onPicture?.(true); return; }
+    if (!isVisualDesignRequest(objective)) { onPicture?.(false); return; }
+    const controller = new AbortController();
+    const cache = new Map<string, string>();
+    loadPathwayVisual(objective, {
+      id: pathway.id, title: pathway.label, summary: pathway.summary, parts: [], steps: pathway.steps,
+    }, cache, controller.signal).then(url => {
+      setDrawn(url);
+      onPicture?.(designPictureReady(url));
+    }).catch(() => onPicture?.(false));
+    return () => controller.abort();
+  }, [objective, pathway.id, pathway.label, pathway.summary, saved]);
+  const src = drawn ?? (pathway.visual_svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(pathway.visual_svg)}` : null);
   return (
-    <div className="relative mb-3 flex h-44 items-center justify-center overflow-hidden rounded-lg border border-primary/20 bg-void/55" aria-label={`Preview for ${pathway.label}`}>
+    <div className="relative mb-3 flex h-44 items-center justify-center overflow-hidden rounded-lg border border-primary/20 bg-void/55" aria-label={`Preview for ${pathway.label}`} data-design-ready={drawn ? "true" : undefined}>
       {src ? (
-        <img src={src} alt={`Preview of ${pathway.label}`} loading="lazy"
-          className="h-full w-full object-contain" />
+        <img src={src} alt={`Preview of ${pathway.label}`} className="h-full w-full object-contain" />
       ) : (
-        <p className="px-4 text-center text-xs text-muted-foreground">
-          Image preview not yet available. No paid image request was made.
-        </p>
+        <p className="px-4 text-center text-xs text-muted-foreground">Drawing this design…</p>
       )}
-      <span className="absolute bottom-2 left-2 rounded bg-void/85 px-2 py-1 text-[0.6rem] font-medium tracking-wide text-foreground/85">
-        {saved ? "SAVED SOURCE IMAGE" : sketch ? "CONCEPT PREVIEW · UNVERIFIED" : "IMAGE PENDING"}
-      </span>
     </div>
   );
 }
 
 function ResultContent({
   delivery,
+  objective,
+  onPicture,
   source,
   onInspect,
   canInspect = false,
@@ -417,6 +433,8 @@ function ResultContent({
   variableKey,
 }: {
   delivery: ObjectiveDelivery;
+  objective: string;
+  onPicture?: (ready: boolean) => void;
   source?: "governed" | "external_draft" | null;
   onInspect?: (pathway: ObjectiveDelivery["pathways"][number]) => void;
   canInspect?: boolean;
@@ -665,7 +683,7 @@ function ResultContent({
                 onKeyDown={canInspect && onInspect ? event => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(pathway); } } : undefined}
                 className={`rounded-xl border border-primary/25 bg-background/25 p-4 ${canInspect ? "cursor-pointer transition hover:border-primary/60 hover:bg-primary/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/45" : ""}`}
               >
-
+                <PathwayPreview pathway={pathway} objective={objective} onPicture={onPicture} />
                 <p className="text-[0.65rem] tracking-[0.16em] text-primary uppercase">
                   PATH {index + 1}
                   {pathway.spiral_form ? ` · ${cleanDisplayText(pathway.spiral_form)}` : ""}
@@ -679,7 +697,7 @@ function ResultContent({
                 {pathway.steps.length > 0 && (
                   <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-foreground/85">
                     {pathway.steps.map((step, stepIndex) => (
-                      <li key={stepIndex}>{cleanDisplayText(step)}</li>
+                      <li key={stepIndex}>{isVisualDesignRequest(objective) ? asCompletedDesignStep(cleanDisplayText(step)) : cleanDisplayText(step)}</li>
                     ))}
                   </ol>
                 )}
@@ -705,7 +723,7 @@ function ResultContent({
                 onKeyDown={canInspect && onInspect ? event => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(delivery.blend!); } } : undefined}
                 className={`rounded-xl border border-gold/40 bg-gold/[0.04] p-4 ${canInspect ? "cursor-pointer transition hover:border-gold/70 hover:bg-gold/[0.08] focus:outline-none focus:ring-2 focus:ring-gold/45" : ""}`}
               >
-
+                <PathwayPreview pathway={delivery.blend} objective={objective} onPicture={onPicture} />
                 <p className="text-[0.65rem] tracking-[0.16em] text-gold uppercase">BLEND</p>
                 <h3 className="mt-1 font-display text-xl text-foreground">
                   {cleanDisplayText(delivery.blend.label)}
@@ -716,7 +734,7 @@ function ResultContent({
                 {delivery.blend.steps.length > 0 && (
                   <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-foreground/85">
                     {delivery.blend.steps.map((step, stepIndex) => (
-                      <li key={stepIndex}>{cleanDisplayText(step)}</li>
+                      <li key={stepIndex}>{isVisualDesignRequest(objective) ? asCompletedDesignStep(cleanDisplayText(step)) : cleanDisplayText(step)}</li>
                     ))}
                   </ol>
                 )}
@@ -829,6 +847,7 @@ export function Engage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const sequenceTimers = useRef<number[]>([]);
   const burstRun = useRef<string | null>(null);
+  const [designShown, setDesignShown] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLElement>(null);
 
@@ -1166,6 +1185,7 @@ export function Engage() {
   useEffect(() => {
     if (!run) return;
     if (produced === true) {
+      if (isVisualDesignRequest(run.objective) && !designShown) return;
       if (burstRun.current === run.id) return;
       burstRun.current = run.id;
       sequenceTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -1192,7 +1212,7 @@ export function Engage() {
     setBookOpen(true);
     setRevealed(true);
     setBookSequence(run.status === "verified" && produced === null ? "processing" : "idle");
-  }, [run?.id, run?.status, produced]);
+  }, [run?.id, run?.status, run?.objective, produced, designShown]);
 
   const followUp = (kind: FollowUp) => {
     if (!run) return;
@@ -1621,6 +1641,8 @@ export function Engage() {
               )}
               <ResultContent
                 delivery={delivery}
+                objective={run.objective}
+                onPicture={(ready) => { if (ready) setDesignShown(true); }}
                 source={deliveryQuery.data?.source ?? null}
                 canInspect={immersiveChoices}
                 onInspect={inspectPathwayReality}

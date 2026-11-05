@@ -111,8 +111,9 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
           introduced.add(JSON.stringify([objective,pathway.title]));
           if(introduced.size>48)introduced.delete(introduced.values().next().value!);
         }
+        const remembered = selectionName ? (isPathway ? `Tell me about ${selectionName}` : `Explain ${selectionName}`) : text;
         const exchanges: Exchange[] = [...(conversations.get(objective) ?? []),
-          { role: "user", content: text, ...(selectionName ? isPathway ? { selectedPathway: selectionName } : { selectedPart: selectionName } : {}) }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
+          { role: "user", content: remembered, ...(selectionName ? isPathway ? { selectedPathway: selectionName } : { selectedPart: selectionName } : {}) }, { role: "assistant", content: reply }].slice(-12) as Exchange[];
         conversations.set(objective, exchanges);
         if (conversations.size > 12) conversations.delete(conversations.keys().next().value!);
         conversationListeners.forEach(refresh => refresh());
@@ -134,7 +135,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   useEffect(() => {
     if(!introduce || introduced.has(JSON.stringify([objective,pathway.title])))return;
     // Defer so StrictMode's discarded mount cannot send a duplicate introduction.
-    const timer=window.setTimeout(()=>void ask(experience==="guidance"?"Help me use this approach in my real situation. Give one practical first action and ask the most useful question to tailor the next step. Do not invent my numbers or suggest building a financial app.":"Briefly explain what this selected design can do and one useful connection it could work well with. Use two short sentences, at most 45 words. Do not give a work assignment or ask me to buy an existing drone.", true, pathway.title, true),0);
+    const timer=window.setTimeout(()=>void ask(experience==="guidance"?"Help me use this approach in my real situation. Give one practical first action and ask the most useful question to tailor the next step. Do not invent my numbers or suggest building a financial app.":"Explain the design already on screen: what it is and how its main parts work together. Use two short sentences, at most 45 words. Do not assign research or ask me to specify the design.", true, pathway.title, true),0);
     return()=>window.clearTimeout(timer);
   },[introduce,objective,pathway.title,experience]);
 
@@ -182,7 +183,11 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     {open && <>
       <p className="mt-2 text-xs text-sky-100/80">Let's work on it together. Ask a question or tell me what you'd like to change.</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {(focusedPart ? [`How does ${focusedPart.name} connect?`, `How could we improve ${focusedPart.name}?`] : (alternatives.length ? ["Help me choose between these pathways", "What could I be overlooking?", "What is my first practical step?"] : ["What would you improve?", "What is my first practical step?"])).map(prompt => <button type="button" key={prompt}
+        {(focusedPart ? [`How does ${focusedPart.name} connect?`, `What should we change about ${focusedPart.name}?`] : experience==="guidance"
+          ? (alternatives.length ? ["Help me choose between these pathways", "What could I be overlooking?", "What is my first practical step?"] : ["What would you improve?", "What is my first practical step?"])
+          : pathway.steps.length===0 && pathway.parts.length===0
+            ? ["Which design matches what I asked?", "How do these designs differ?", "What has already been decided?"]
+            : ["How does this design work?", "What should we change in this design?", "How do these parts connect?"]).map(prompt => <button type="button" key={prompt}
           disabled={thinking} onClick={() => void ask(prompt)}
           className="rounded-full border border-amber-200/30 px-3 py-1 text-xs text-amber-100 disabled:opacity-40">{prompt}</button>)}
       </div>

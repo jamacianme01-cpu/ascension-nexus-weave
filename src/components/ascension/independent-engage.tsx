@@ -4,7 +4,7 @@ import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { objectiveExperience } from "@/lib/ascension/objective-experience";
-import { availableTreeVoice } from "@/lib/ascension/tree-speech";
+import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
@@ -15,15 +15,21 @@ const GREETING = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're h
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
-async function say(text: string, onStarted?: () => void, onUnavailable?: (message: string) => void) {
+function say(text: string, onStarted?: () => void, onUnavailable?: (message: string) => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
   const synth = window.speechSynthesis;
-  try { synth.cancel(); } catch { return; }
-  const voice = await availableTreeVoice(synth);
-  if (sequence !== speechSequence) return;
+  // Speak in the same turn as the click. Waiting for the voice list drops
+  // the browser's user-activation, so playback can "succeed" and stay silent.
+  const interrupted = synth.speaking || synth.pending;
+  try { synth.cancel(); synth.resume(); } catch { return; }
+  const listed = synth.getVoices?.() ?? [];
+  const voice = selectTreeVoice(listed);
   if (!voice) {
-    onUnavailable?.("A woman's English voice isn't available in this browser yet. The Tree's conversation is still available below.");
+    void availableTreeVoice(synth);
+    onUnavailable?.(listed.length
+      ? "A woman's English voice isn't available in this browser yet. The Tree's conversation is still available below."
+      : "The voice list is still loading. Tap Hear the Tree again in a moment.");
     return;
   }
   const chunks: string[] = [];
@@ -38,6 +44,7 @@ async function say(text: string, onStarted?: () => void, onUnavailable?: (messag
   }
   if (chunk) chunks.push(chunk);
   let index = 0;
+  let started = false;
   const next = () => {
     if (sequence !== speechSequence || index >= chunks.length) {
       if (sequence === speechSequence) activeUtterance = null;
@@ -49,12 +56,20 @@ async function say(text: string, onStarted?: () => void, onUnavailable?: (messag
     words.lang = voice.lang;
     words.rate = 1;
     words.pitch = 1;
-    words.onstart = () => onStarted?.();
+    words.onstart = () => { started = true; onStarted?.(); };
     words.onend = next;
-    words.onerror = next;
+    words.onerror = (event: Event) => {
+      if (sequence !== speechSequence) return;
+      const reason = "error" in event ? String((event as { error?: string }).error ?? "") : "";
+      if (reason === "canceled" || reason === "interrupted") return;
+      activeUtterance = null;
+      if (!started) onUnavailable?.("This browser blocked spoken playback. Tap Hear the Tree and I'll speak.");
+    };
     try { synth.speak(words); } catch { activeUtterance = null; }
   };
-  next();
+  // Chrome drops an utterance spoken in the same turn as cancel().
+  if (interrupted) window.setTimeout(next, 60);
+  else next();
 }
 function stopVoice() {
   speechSequence += 1;
@@ -70,6 +85,7 @@ function PathwayView(props: {
   speakingEnabled: boolean;
   alternatives: Pathway[];
   experience?: "guidance" | "design";
+  onPicture?: (ready: boolean) => void;
 }) {
   if(props.experience==="guidance")return <section className="rounded-2xl border border-gold/30 bg-[#04101cdd] p-4 sm:p-6" aria-label="Selected guidance pathway">
     <h3 className="mb-3 text-xl text-gold">{props.path.title}</h3>
@@ -78,7 +94,7 @@ function PathwayView(props: {
   </section>;
   return <V1HunyuanPathway
     path={props.path} alternatives={props.alternatives} objective={props.objective} modelCache={props.modelCache} imageCache={props.imageCache}
-    onSpeak={props.onSpeak} speakingEnabled={props.speakingEnabled} />;
+    onSpeak={props.onSpeak} speakingEnabled={props.speakingEnabled} onPicture={props.onPicture} />;
 }
 
 /** Hosted Tree entry. The first model answer is backend context, not a public essay. */
@@ -96,6 +112,8 @@ export function IndependentEngage() {
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const [voiceNotice, setVoiceNotice] = useState("");
+  const [designPicture, setDesignPicture] = useState(false);
+  const [designSettled, setDesignSettled] = useState(false);
   const view = useRef<HTMLElement | null>(null);
   const designView = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -114,11 +132,14 @@ export function IndependentEngage() {
       void say(greeting, () => { welcomeStarted.current = true; setVoiceNotice(""); }, setVoiceNotice);
     };
     const attempt = window.setTimeout(tryWelcome, 280);
+    const onVoices = () => { if (!welcomeStarted.current) tryWelcome(); };
+    window.speechSynthesis?.addEventListener?.("voiceschanged", onVoices);
     window.addEventListener("pointerdown", tryWelcome, { capture: true });
     window.addEventListener("keydown", tryWelcome, { capture: true });
     return () => {
       disposed = true;
       window.clearTimeout(attempt);
+      window.speechSynthesis?.removeEventListener?.("voiceschanged", onVoices);
       window.removeEventListener("pointerdown", tryWelcome, { capture: true });
       window.removeEventListener("keydown", tryWelcome, { capture: true });
     };
@@ -169,7 +190,7 @@ export function IndependentEngage() {
     setPathwayError("");
     setResult(null);
     setRefinement("");
-    setChoice(null);setOrbPreview(null);
+    setChoice(null);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
     setStage("processing");
     // ENGAGE is a user action, not a cue for unsolicited voice narration.
     try {
@@ -211,7 +232,7 @@ export function IndependentEngage() {
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setRefinement(""); setPathwayError(""); setLoading(false);
-    setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);
+    setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -233,17 +254,20 @@ export function IndependentEngage() {
   // The previous scrollTo inside the click ran before the cards disappeared.
   useEffect(() => {
     if (!result) return;
+    // Leave the opening screen in place until the selected design has actually loaded.
+    if (choice !== null && experience === "design" && !designSettled) return;
     const frame = window.requestAnimationFrame(() => {
       (choice === null ? view.current : designView.current)?.scrollIntoView({
         behavior: "instant", block: "start",
       });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [choice]);
+  }, [choice, result, designSettled, experience]);
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}
-    data-realities={choice !== null ? "true" : undefined}>
+    data-realities={choice !== null ? "true" : undefined}
+    data-design-ready={designPicture ? "true" : undefined}>
     {choice === null && !result && <section aria-label="Engage ASCENSION" className="ascension-command">
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
@@ -302,7 +326,7 @@ export function IndependentEngage() {
       {previewPath && <div className="flex flex-wrap items-center justify-center gap-3" aria-label="Pathway introduction">
         <button type="button" onClick={()=>hearPathway(orbPreview!)}
           className="rounded-full border border-gold/40 px-4 py-2 text-sm text-gold">HEAR AGAIN</button>
-        <button type="button" onClick={()=>{stopVoice();setChoice(orbPreview);setRefinement("");}}
+        <button type="button" onClick={()=>{stopVoice();setDesignPicture(false);setDesignSettled(false);setChoice(orbPreview);setRefinement("");}}
           className="rounded-full border border-primary/60 bg-primary/10 px-6 py-3 text-sm text-primary">ENTER PATHWAY</button>
         <details className="w-full text-center text-xs text-foreground/70">
           <summary className="cursor-pointer">Read introduction</summary>
@@ -322,10 +346,11 @@ export function IndependentEngage() {
     {selected && <section ref={designView} className="ascension-knowledgeverse ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
       aria-label="Selected pathway design">
       <div className="flex items-center justify-between">
-        <button type="button" onClick={() => { stopVoice(); setChoice(null); }}
+        <button type="button" onClick={() => { stopVoice(); setDesignPicture(false); setDesignSettled(false); setChoice(null); }}
           className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
       </div>
         <PathwayView key={selected.id} experience={objectiveExperience(requested,result?.experience)} path={selected} alternatives={choices} objective={requested} modelCache={modelCache} imageCache={imageCache}
+          onPicture={(ready) => { setDesignPicture(ready); setDesignSettled(true); }}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />
         {experience==="guidance"&&<section className="rounded-xl border border-gold/25 bg-[#051b2a]/95 p-4 sm:p-6" aria-label="Choose your next step">

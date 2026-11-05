@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { TreePathwayCarousel } from "@/components/ascension/tree-pathway-carousel";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
+import { asCompletedDesignStep } from "@/lib/ascension/design-answer";
+import { loadPathwayVisual } from "@/lib/ascension/pathway-visual";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { objectiveExperience } from "@/lib/ascension/objective-experience";
 import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech";
@@ -114,6 +116,7 @@ export function IndependentEngage() {
   const [voiceNotice, setVoiceNotice] = useState("");
   const [designPicture, setDesignPicture] = useState(false);
   const [designSettled, setDesignSettled] = useState(false);
+  const [answerPicture, setAnswerPicture] = useState<string | null>(null);
   const view = useRef<HTMLElement | null>(null);
   const designView = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -122,6 +125,15 @@ export function IndependentEngage() {
   const imageCache = useRef(new Map<string, string>());
   const welcomeStarted = useRef(false);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
+  useEffect(() => {
+    if (!result || objectiveExperience(requested, result.experience) !== "design") return;
+    const controller = new AbortController();
+    setAnswerPicture(null);
+    loadPathwayVisual(requested, result.blend, imageCache.current, controller.signal)
+      .then((url) => { if (!controller.signal.aborted) setAnswerPicture(url); })
+      .catch(() => { if (!controller.signal.aborted) setAnswerPicture(null); });
+    return () => controller.abort();
+  }, [result, requested]);
   useEffect(() => {
     // Tree and Book remain in place; the Tree speaks without a new entrance scene.
     // When a browser blocks autoplay, retry in the first genuine user interaction.
@@ -190,7 +202,7 @@ export function IndependentEngage() {
     setPathwayError("");
     setResult(null);
     setRefinement("");
-    setChoice(null);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
+    setChoice(null);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);setAnswerPicture(null);
     setStage("processing");
     // ENGAGE is a user action, not a cue for unsolicited voice narration.
     try {
@@ -232,7 +244,7 @@ export function IndependentEngage() {
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setRefinement(""); setPathwayError(""); setLoading(false);
-    setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
+    setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);setAnswerPicture(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -319,6 +331,18 @@ export function IndependentEngage() {
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
         </div>
       </div>
+      {experience === "design" && <figure className="overflow-hidden rounded-xl border border-primary/30 bg-void/50" data-design-ready={answerPicture ? "true" : undefined}>
+        {answerPicture
+          ? <img src={answerPicture} alt={result.blend.title} className="max-h-[28rem] w-full object-contain" />
+          : <p className="p-6 text-center text-sm text-gold" role="status">Drawing this design…</p>}
+        <figcaption className="space-y-3 p-4">
+          <h3 className="text-lg text-gold">{result.blend.title}</h3>
+          <p className="text-sm leading-6">{result.blend.summary}</p>
+          {result.blend.steps.length > 0 && <ol className="list-decimal space-y-2 pl-5 text-sm leading-6">
+            {result.blend.steps.map((step, index) => <li key={index}>{asCompletedDesignStep(step)}</li>)}
+          </ol>}
+        </figcaption>
+      </figure>}
       <TreePathwayCarousel designs={choices.map(p => ({
         id: p.id, title: p.title, summary: p.summary,
       }))} active={orbit % choices.length} onRotate={index=>{stopVoice();setOrbPreview(null);setOrbit(index);}}

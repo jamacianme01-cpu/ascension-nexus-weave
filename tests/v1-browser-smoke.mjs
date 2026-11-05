@@ -177,7 +177,8 @@ try{
   await page.locator("#objective").fill("make worker drones");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
-  assert.equal(generated.length,0,"The Tree must not generate images before a pathway is selected");
+  await page.locator('img[alt^="Concept picture of"]').first().waitFor();
+  assert.ok(generated.some(item=>item.id==="blend"),"The finished design picture loads with the answer");
   assert.equal(await page.getByRole("tab").count(),4);
   assert.deepEqual(creationPhases,["pathways"],"ENGAGE must reveal choices after one synthesis request, without waiting for a preliminary essay");
   assert.equal(await page.getByText("INITIAL ANSWER",{exact:true}).count(),0);
@@ -189,9 +190,6 @@ try{
   assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"),"true");
   await page.getByRole("button",{name:"Previous pathway",exact:true}).click();
   assert.equal(await page.getByRole("tab").first().getAttribute("aria-selected"),"true");
-  assert.equal(await page.locator('img[alt^="Concept picture of"]').count(),0,
-    "No selected-design picture is shown before selection");
-
   async function enterOrb(index){
     const count=generated.length;
     const orb=page.getByRole("tab").nth(index);
@@ -354,7 +352,7 @@ try{
   await page.getByRole("tab").first().waitFor();
   await enterOrb(0);
   await inspect("linear1");
-  assert.equal(new Set(generated.map(x=>x.id)).size,process.env.ASCENSION_INSPECTION_ONLY?2:5,"Only selected pathways across both objectives receive pictures");
+  assert.equal(new Set(generated.map(x=>x.id)).size,process.env.ASCENSION_INSPECTION_ONLY?4:6,"The finished blend and each opened pathway receive pictures");
   assert.equal(errors.length,0,errors.join(" | "));
   await page.goto(new URL("/console",process.env.ASCENSION_BASE_URL||"http://127.0.0.1:4174/").href);
   await page.locator("#objective").waitFor();

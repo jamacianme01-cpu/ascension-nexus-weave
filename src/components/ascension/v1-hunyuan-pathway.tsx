@@ -169,6 +169,7 @@ export function V1HunyuanPathway({
     </div>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
       <div className="flex min-w-0 flex-col gap-3">
+        {picture && <img src={picture} alt={`Concept picture of ${path.title}`} className="max-h-72 w-full rounded-xl border border-primary/30 bg-black/30 object-contain" />}
         <div className={"relative min-w-0 overflow-hidden rounded-xl border border-gold/25 bg-[#051727] "+
           "h-[min(65vh,600px)] min-h-[360px]"}
           aria-label="Hunyuan3D real mesh viewer">
@@ -176,16 +177,8 @@ export function V1HunyuanPathway({
             bytes={bytes} title={path.title} mode={mode} zoom={zoom}
             rotation={rotation} cameraView={cameraView} selected={meshIndex} move={move}
             reset={reset} onParts={setParts} onError={setGeneratorError} onSelect={inspect}/>:
-            picture?<div className="flex h-full min-h-0 flex-col gap-2 p-3">
-              <img src={picture} alt={`Concept picture of ${path.title}`} className="min-h-0 flex-1 w-full rounded-lg object-contain" />
-              <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
-                <span>{working?status:failure||""}</span>
-                {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
-                  onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
-              </div>
-            </div>:
             <div role={failure?"alert":"status"} className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-              <p className="max-w-xl text-sm text-gold">{working?status:failure||""}</p>
+              <p className="max-w-xl text-sm text-gold">{working?status:failure||"The design picture is above. The 3D model opens in this frame."}</p>
               {failure&&<button type="button" className="rounded-lg border border-gold/50 px-4 py-2 text-gold"
                 onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
             </div>}

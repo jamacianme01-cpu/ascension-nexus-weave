@@ -40,6 +40,10 @@ const tests=[
     assert.match(design,/sourceImage\.match\(validImage\)/);
     assert.match(design,/imageCache\.current\.set\(key,sourceImage\)/);
     assert.match(design,/picture\?<div/);
+    assert.match(design,/How this design works/);
+    assert.match(design,/asCompletedDesignStep/);
+    assert.match(route,/freePictureEnabled/);
+    assert.match(route,/fetchFreeImage/);
     assert.match(design,/loadPathwayVisual\(objective,path,imageCache\.current,controller\.signal\)/);
     assert.match(design,/const generated=await fetch\(LOCAL\+"\/generate"/);
     assert.match(design,/modelCache\.current\.set\(key,output\)/);

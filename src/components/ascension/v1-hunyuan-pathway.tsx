@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { asCompletedDesignStep } from "@/lib/ascension/design-answer";
 import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
@@ -26,7 +27,7 @@ export function V1HunyuanPathway({
   const [bytes,setBytes]=useState<ArrayBuffer|null>(null);
   const [picture,setPicture]=useState<string|null>(null);
   const [working,setWorking]=useState(false);
-  const [status,setStatus]=useState("Checking for the owner's local Hunyuan3D generator…");
+  const [status,setStatus]=useState("Drawing this design…");
   const [failure,setFailure]=useState("");
   const [attempt,setAttempt]=useState(0);
   const [localRequested,setLocalRequested]=useState(false);
@@ -135,6 +136,13 @@ export function V1HunyuanPathway({
     <h3 className="mb-2 text-xl text-gold">{path.title}</h3>
 
     <p className="mb-4 max-w-4xl text-sm leading-6">{path.summary}</p>
+    {path.steps.length>0 && <div className="mb-4 max-w-4xl">
+      <h4 className="text-sm text-gold">How this design works</h4>
+      <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6">
+        {path.steps.map((step,index)=><li key={index}>{asCompletedDesignStep(step)}</li>)}
+      </ol>
+      <p className="mt-2 text-xs text-foreground/70">These choices are already in the design. Measurements and physical tests remain unresolved.</p>
+    </div>}
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
         key={v} type="button" aria-pressed={v==="assembled"?!inspectModel:inspectModel&&mode===v}

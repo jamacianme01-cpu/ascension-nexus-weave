@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TreePathwayCarousel } from "@/components/ascension/tree-pathway-carousel";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
+import { pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { objectiveExperience } from "@/lib/ascension/objective-experience";
 import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech";
@@ -114,6 +115,7 @@ export function IndependentEngage() {
   const [voiceNotice, setVoiceNotice] = useState("");
   const [designPicture, setDesignPicture] = useState(false);
   const [designSettled, setDesignSettled] = useState(false);
+  const [answerPicture, setAnswerPicture] = useState<string | null>(null);
   const view = useRef<HTMLElement | null>(null);
   const designView = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -190,7 +192,7 @@ export function IndependentEngage() {
     setPathwayError("");
     setResult(null);
     setRefinement("");
-    setChoice(null);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
+    setChoice(null);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);setAnswerPicture(null);
     setStage("processing");
     // ENGAGE is a user action, not a cue for unsolicited voice narration.
     try {
@@ -232,7 +234,7 @@ export function IndependentEngage() {
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
     setRefinement(""); setPathwayError(""); setLoading(false);
-    setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
+    setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);setAnswerPicture(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -319,6 +321,13 @@ export function IndependentEngage() {
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
         </div>
       </div>
+      {experience === "design" && <div data-design-ready={answerPicture ? "true" : undefined}>
+        <PathwayView experience="design" path={result.blend} alternatives={choices} objective={requested}
+          modelCache={modelCache} imageCache={imageCache}
+          onPicture={(ready) => { if (ready) setAnswerPicture(imageCache.current.get(pathwayVisualKey(requested, result.blend)) ?? "shown"); }}
+          speakingEnabled={talking}
+          onSpeak={text => { if (talking) say(text); }} />
+      </div>}
       <TreePathwayCarousel designs={choices.map(p => ({
         id: p.id, title: p.title, summary: p.summary,
       }))} active={orbit % choices.length} onRotate={index=>{stopVoice();setOrbPreview(null);setOrbit(index);}}

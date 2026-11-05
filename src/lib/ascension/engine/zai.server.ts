@@ -6,6 +6,8 @@
  * Z.AI and Lovable keys are ignored even if present in env.
  */
 
+import { request as httpRequest } from "node:http";
+
 export class ZaiEngineError extends Error {
   constructor(message: string, public status?: number) {
     super(message);
@@ -25,6 +27,7 @@ interface CallZaiOptions {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+  jsonSchema?: Record<string, unknown>;
   system?: string;
   user?: string;
   knowledgeQuery?: string;
@@ -39,6 +42,37 @@ function parseResult(text: string): Record<string, unknown> | null {
     const parsed = JSON.parse(cleaned);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
   } catch { return null; }
+}
+function postLocalJson(url: string, body: unknown, timeoutMs: number): Promise<Record<string, any>> {
+  const target = new URL(url);
+  const payload = Buffer.from(JSON.stringify(body));
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({
+      hostname: target.hostname,
+      port: target.port,
+      path: target.pathname,
+      method: "POST",
+      headers: { "content-type": "application/json", "content-length": String(payload.length) },
+    }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      res.on("end", () => {
+        const raw = Buffer.concat(chunks).toString("utf8");
+        let parsed: Record<string, any> = {};
+        try { parsed = raw ? JSON.parse(raw) : {}; } catch { parsed = {}; }
+        if ((res.statusCode ?? 500) >= 300) {
+          reject(new ZaiEngineError("Local answer provider failed with HTTP " + res.statusCode + ". No result was fabricated.", res.statusCode ?? 500));
+          return;
+        }
+        resolve(parsed);
+      });
+    });
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new ZaiEngineError("Local answer provider timed out. No result was fabricated.", 503));
+    });
+    req.on("error", (error) => reject(error instanceof ZaiEngineError ? error : new ZaiEngineError("Local answer provider failed: " + error.message + " No result was fabricated.", 503)));
+    req.end(payload);
+  });
 }
 export function callZai(input: CallZaiOptions): Promise<InferenceResult>;
 export function callZai(system: string, user: string, options?: CallZaiOptions): Promise<string>;
@@ -74,7 +108,9 @@ export async function callZai(input: CallZaiOptions | string, user?: string, opt
           ],
           temperature,
           max_tokens: maxTokens,
-          response_format: options.jsonMode ? { type: 'json_object' } : undefined,
+          response_format: options.jsonSchema
+            ? { type: "json_schema", json_schema: { name: "ascension_result", strict: true, schema: options.jsonSchema } }
+            : options.jsonMode ? { type: 'json_object' } : undefined,
         }),
       });
       if (res.ok) {
@@ -105,7 +141,9 @@ export async function callZai(input: CallZaiOptions | string, user?: string, opt
           provider: { zdr: true, data_collection: "deny", max_price: { prompt: 0, completion: 0 } },
           temperature,
           max_tokens: maxTokens,
-          response_format: options.jsonMode ? { type: "json_object" } : undefined,
+          response_format: options.jsonSchema
+            ? { type: "json_schema", json_schema: { name: "ascension_result", strict: true, schema: options.jsonSchema } }
+            : options.jsonMode ? { type: "json_object" } : undefined,
         }),
       });
       if (res.ok) {
@@ -121,25 +159,24 @@ export async function callZai(input: CallZaiOptions | string, user?: string, opt
   // 3. Local LLM endpoint
   if (process.env.LOCAL_LLM_BASE_URL) {
     try {
-      const base = process.env.LOCAL_LLM_BASE_URL.replace(/\/$/, '');
-      const res = await fetch(`${base}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-          temperature,
-          max_tokens: maxTokens,
-        }),
-      });
-      // local servers vary; try OpenAI-style first
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.choices?.[0]?.message?.content;
-        if (text) return output(text);
-      }
-    } catch {
-      // fall through
+      const base = process.env.LOCAL_LLM_BASE_URL.replace(/\/$/, "");
+      const root = base.replace(/\/v1$/, "");
+      const endpoint = root.endsWith("/v1") ? `${root}/chat/completions` : `${root}/api/chat`;
+      const localModel = process.env.LOCAL_LLM_MODEL?.trim() || model;
+      const data = await postLocalJson(endpoint, {
+        model: localModel,
+        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+        stream: false,
+        format: options.jsonSchema ?? (options.jsonMode ? "json" : undefined),
+        options: { temperature, num_predict: maxTokens },
+      }, 15 * 60 * 1000);
+      const text = data.message?.content ?? data.choices?.[0]?.message?.content;
+      if (text) return output(text);
+      throw new ZaiEngineError("Local answer provider returned no text. No result was fabricated.", 503);
+    } catch (error) {
+      if (error instanceof ZaiEngineError) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ZaiEngineError("Local answer provider failed: " + message + " No result was fabricated.", 503);
     }
   }
 

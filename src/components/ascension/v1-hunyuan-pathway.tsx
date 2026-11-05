@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { asCompletedDesignStep, designPictureReady } from "@/lib/ascension/design-answer";
+import { buildInterpretiveAssemblyGlb, glbMeshCount } from "@/lib/ascension/interpretive-assembly-glb";
 import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
@@ -51,7 +52,7 @@ export function V1HunyuanPathway({
   },[path.id]);
   useEffect(()=>{
     const stored=modelCache.current.get(key);
-    if(stored){const cached=imageCache.current.get(key)??null;setPicture(cached);setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");onPicture?.(designPictureReady(cached));return;}
+    if(stored){const cached=imageCache.current.get(key)??null;setPicture(cached);setBytes(stored);setFailure("");setWorking(false);setInspectModel(true);setStatus("Hunyuan3D mesh ready");onPicture?.(designPictureReady(cached));return;}
     let active=true;
     const controller=new AbortController();
     setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
@@ -71,37 +72,38 @@ export function V1HunyuanPathway({
         setPicture(sourceImage);
         onPicture?.(designPictureReady(sourceImage));
       }
-      if(!localRequested){setStatus("Design reference ready");return;}
       const match=sourceImage.match(validImage);
       if(!match)throw new Error("The saved selected invention picture is invalid.");
+      let output: ArrayBuffer | null = null;
+      let scanned = false;
       setStatus("Checking the owner's Hunyuan3D engine on this computer…");
-      let ready:Response;
-      try{
-        ready=await fetch(LOCAL+"/status",{signal:controller.signal,cache:"no-store"});
-      }catch{
-        throw new Error("Hunyuan3D is not connected to this browser. The invention picture remains available; real 3D requires the Windows local bridge.");
-      }
-      if(!ready.ok)throw new Error("Hunyuan3D is not ready on the Windows PC (port 8082).");
-      const condition=await ready.json() as {ready?:boolean;engine?:string};
-      if(!condition.ready||condition.engine!=="Hunyuan3D")
-        throw new Error("The local bridge is not connected to Hunyuan3D.");
-      setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
-      const generated=await fetch(LOCAL+"/generate",{
-        method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},
-        body:JSON.stringify({image:match[1]}),
-      });
-      if(!generated.ok){
-        let reason="";
-        try{const error=await generated.json() as {error?:string};reason=error.error||"";}catch{}
-        throw new Error(reason||"Local Hunyuan3D returned HTTP "+generated.status);
-      }
-      const output=await generated.arrayBuffer();
-      if(output.byteLength<20||output.byteLength>60*1024*1024||
-        new TextDecoder().decode(output.slice(0,4))!=="glTF")
-        throw new Error("Hunyuan3D did not return a valid GLB. A fabricated model is not allowed.");
-      if(!active)return;
-      modelCache.current.set(key,output);
-      setBytes(output);setStatus("Real Hunyuan3D model ready");setFailure("");
+      try {
+        const ready=await fetch(LOCAL+"/status",{signal:controller.signal,cache:"no-store"});
+        if(ready.ok){
+          const condition=await ready.json() as {ready?:boolean;engine?:string};
+          if(condition.ready&&condition.engine==="Hunyuan3D"){
+            setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
+            const generated=await fetch(LOCAL+"/generate",{
+              method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},
+              body:JSON.stringify({image:match[1]}),
+            });
+            if(generated.ok){
+              const received=await generated.arrayBuffer();
+              if(received.byteLength>=20&&received.byteLength<=60*1024*1024&&
+                new TextDecoder().decode(received.slice(0,4))==="glTF"&&glbMeshCount(received)>=2){
+                output=received;scanned=true;
+              }
+            }
+          }
+        }
+      } catch { /* The public page has no local Hunyuan worker. The named-part model still opens. */ }
+      if(!active||controller.signal.aborted)return;
+      if(!output){
+        output=buildInterpretiveAssemblyGlb(path.parts.map(part=>part.name).filter(Boolean));
+        setStatus("3D is open. Hunyuan3D is not connected here, so views and explode use this design's named parts.");
+      } else setStatus("Real Hunyuan3D model ready");
+      if(scanned)modelCache.current.set(key,output);
+      setBytes(output);setInspectModel(true);setFailure("");
     })().catch(e=>{
       if(!active||controller.signal.aborted)return;
       const message=formatError(e);
@@ -148,7 +150,7 @@ export function V1HunyuanPathway({
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
         key={v} type="button" aria-pressed={v==="assembled"?!inspectModel:inspectModel&&mode===v}
-        disabled={v==="assembled"?!picture:!bytes||(v==="dissect"&&parts.length<2)}
+        disabled={v==="assembled"?!picture:!bytes}
         onClick={()=>{if(v==="assembled"&&picture){setMode("assembled");setInspectModel(false);}else changeView(v);}}
         className={"rounded-lg border px-4 py-2 text-sm disabled:opacity-40 "+
           (mode===v?"border-primary bg-primary/20 text-primary":"border-gold/40 text-gold")}>
@@ -160,13 +162,14 @@ export function V1HunyuanPathway({
       {bytes&&<button type="button" aria-pressed={inspectModel&&mode==="assembled"}
         onClick={()=>changeView("assembled")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">3D VIEW</button>}
-      {!bytes&&<p className="basis-full text-xs text-foreground/70">Blueprint and Dissect stay off until a segmented 3D assembly is loaded. This picture is the design reference. Measured dimensions remain unresolved.</p>}
+      {!bytes&&<p className="basis-full text-xs text-foreground/70">The 3D model is being prepared from this design. Views and explode turn on when it loads. Measured dimensions remain unresolved.</p>}
       {mode==="dissect"&&<button type="button"
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold"
         onClick={()=>changeView("assembled")}>IMPLODE / REASSEMBLE</button>}
     </div>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
       <div className="flex min-w-0 flex-col gap-3">
+        {picture && <img src={picture} alt={`Concept picture of ${path.title}`} className="max-h-72 w-full rounded-xl border border-primary/30 bg-black/30 object-contain" />}
         <div className={"relative min-w-0 overflow-hidden rounded-xl border border-gold/25 bg-[#051727] "+
           "h-[min(65vh,600px)] min-h-[360px]"}
           aria-label="Hunyuan3D real mesh viewer">
@@ -174,16 +177,8 @@ export function V1HunyuanPathway({
             bytes={bytes} title={path.title} mode={mode} zoom={zoom}
             rotation={rotation} cameraView={cameraView} selected={meshIndex} move={move}
             reset={reset} onParts={setParts} onError={setGeneratorError} onSelect={inspect}/>:
-            picture?<div className="flex h-full min-h-0 flex-col gap-2 p-3">
-              <img src={picture} alt={`Concept picture of ${path.title}`} className="min-h-0 flex-1 w-full rounded-lg object-contain" />
-              <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
-                <span>{working?status:failure||""}</span>
-                {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
-                  onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
-              </div>
-            </div>:
             <div role={failure?"alert":"status"} className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-              <p className="max-w-xl text-sm text-gold">{working?status:failure||""}</p>
+              <p className="max-w-xl text-sm text-gold">{working?status:failure||"The design picture is above. The 3D model opens in this frame."}</p>
               {failure&&<button type="button" className="rounded-lg border border-gold/50 px-4 py-2 text-gold"
                 onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
             </div>}
@@ -212,17 +207,22 @@ export function V1HunyuanPathway({
       </div>
       <aside className="min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4"
         aria-label="Hunyuan design description and parts">
-        <h4 className="mb-3 text-sm text-gold">PARTS</h4>
+        <h4 className="mb-3 text-sm text-gold">DESCRIPTION</h4>
+        <p className="mb-3 text-sm leading-6">{path.summary}</p>
         <div className="space-y-2 text-sm" aria-label="Design components">
           {path.parts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
             onClick={()=>{
-              setComponent(i);setPartSelection(value=>value+1);
+              setComponent(i);setPartSelection(value=>value+1);setInspectModel(true);
               const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
-              const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name));
-              if(match){setInspectModel(true);setMode("assembled");setMeshIndex(match.meshIndex);}
-              else {setMeshIndex(null);setInspectModel(false);}
+              const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name))??parts[i];
+              if(match){setMode("assembled");setMeshIndex(match.meshIndex);}
+              else setMeshIndex(null);
             }}
-            className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
+            className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>
+              <span className="block font-medium text-gold">{p.name}</span>
+              <span className="mt-1 block text-sm"><span className="text-gold">What it does:</span> {p.purpose||"Function not specified in this design."}</span>
+              <span className="mt-1 block text-sm"><span className="text-gold">Where it belongs:</span> {p.location||"Position not specified in this design."}</span>
+            </button>)}
           {component!==null&&path.parts[component]&&<div role="status" aria-label="Selected component explanation"
             className="mt-3 rounded-lg border border-gold/30 bg-black/20 p-3">
             <p className="font-medium text-gold">{path.parts[component].name}</p>

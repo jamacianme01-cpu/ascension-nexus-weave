@@ -6,6 +6,8 @@ import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { compileDesignIdentity } from "@/lib/ascension/design-image-brief";
 import { asCompletedDesignStep, freePictureEnabled } from "@/lib/ascension/design-answer";
 import { assessImageBytes } from "@/lib/ascension/image-identity.server";
+import { cargoDesignBrief, lookupVehicleCargo } from "@/lib/ascension/vehicle-cargo";
+import { isReportablePictureWatch, judgePictureWatch, type PictureGenerator, type PictureWatch } from "@/lib/ascension/picture-watchdog";
 
 /** Railway-owned public intake: never calls Supabase or claims governed execution. */
 type Part = { name: string; purpose: string; location: string };
@@ -209,10 +211,14 @@ async function build(objective: string, firstAnswerText = "") {
   const providerStatus = configured();
   const revision = revisionDirective(objective);
   if (!answerRoute()) throw new Error(MISSING_PROVIDER);
-  const external = await Promise.allSettled([
-    providerStatus.Claude ? claude(objective) : Promise.resolve(null),
-    providerStatus.Grok ? grok(objective) : Promise.resolve(null),
+  const [external, vehicleCargo] = await Promise.all([
+    Promise.allSettled([
+      providerStatus.Claude ? claude(objective) : Promise.resolve(null),
+      providerStatus.Grok ? grok(objective) : Promise.resolve(null),
+    ]),
+    lookupVehicleCargo(objective),
   ]);
+  const cargoBrief = vehicleCargo ? cargoDesignBrief(vehicleCargo) : "";
   const sources: Contributor[] = [];
   const errors: string[] = [];
   for (const [i, result] of external.entries()) {
@@ -240,7 +246,8 @@ async function build(objective: string, firstAnswerText = "") {
       "Provide substantive, objective-specific alternatives. Do not repeat the same proposal or swap only superficial labels. Each summary should make its distinctive benefit and suitable use clear. Include a useful less-obvious approach only when grounded in the objective; do not force novelty. For guidance, the first step can be one small action. For a design, steps describe the machine already designed, not a research assignment. Tradeoffs must explain what is gained and sacrificed.",
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",
     ].join(" "),
-    "OBJECTIVE (user wording is authoritative):\n" + objective +
+      "OBJECTIVE (user wording is authoritative):\n" + objective +
+      (cargoBrief ? "\n" + cargoBrief : "") +
       (firstAnswerText ? "\nINITIAL USER-FACING ANSWER TO BUILD ON (unverified):\n" + firstAnswerText.slice(0, 9000) : "") +
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
     28500,
@@ -262,6 +269,7 @@ async function build(objective: string, firstAnswerText = "") {
     verified: false,
     governance: "ASCENSION's local Meaning Elements, Spiral, Outcome Predictor, Guardian and AutoSync were not invoked by this hosted result.",
     persistence: "This hosted route does not use Supabase and does not persist objectives on the server.",
+    vehicle_cargo: vehicleCargo,
   };
 }
 
@@ -337,6 +345,38 @@ function ownImageConfigured() {
     endpoint: process.env["ASCENSION_IMAGE_ENDPOINT"],
   });
 }
+/** Design pictures call Grok Imagine first. A failed Grok response falls through to the free picture. */
+async function fetchGrokImage(prompt: string): Promise<Uint8Array> {
+  const key = process.env["XAI_API_KEY"]?.trim();
+  if (!key) throw new Error("Grok image generator has no XAI_API_KEY.");
+  const response = await fetch("https://api.x.ai/v1/images/generations", {
+    method: "POST",
+    signal: AbortSignal.timeout(25000),
+    headers: { "content-type": "application/json", authorization: "Bearer " + key },
+    body: JSON.stringify({
+      model: process.env["ASCENSION_GROK_IMAGE_MODEL"]?.trim() || "grok-imagine-image-2.0",
+      prompt: prompt.slice(0, 3800),
+      n: 1,
+      quality: "low",
+      response_format: "b64_json",
+    }),
+  });
+  if (!response.ok) throw new Error("Grok image HTTP " + response.status);
+  const body = obj(await response.json());
+  const first = Array.isArray(body["data"]) ? obj(body["data"][0]) : {};
+  const encoded = String(first["b64_json"] ?? "").trim();
+  const bytes = encoded
+    ? new Uint8Array(Buffer.from(encoded, "base64"))
+    : String(first["url"] ?? "").startsWith("https://")
+      ? new Uint8Array(await (await fetch(String(first["url"]), { signal: AbortSignal.timeout(15000) })).arrayBuffer())
+      : null;
+  if (!bytes || bytes.length < 4000 || bytes.length > 9_000_000) throw new Error("Grok image generator returned no picture.");
+  const png = bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71;
+  const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  const webp = String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+  if (!png && !jpeg && !webp) throw new Error("Grok image generator returned no picture.");
+  return bytes;
+}
 async function fetchFreeImage(prompt: string, negative: string): Promise<Uint8Array> {
   const response = await fetch(FREE_SDXL_ENDPOINT, {
     method: "POST",
@@ -361,6 +401,22 @@ async function fetchFreeImage(prompt: string, negative: string): Promise<Uint8Ar
   if (!png && !jpeg && !webp) throw new Error("Image provider returned no usable image.");
   return bytes;
 }
+async function timePicture(generator: PictureGenerator, run: () => Promise<Uint8Array | null>): Promise<{ value: Uint8Array | null; watch: PictureWatch }> {
+  const started = Date.now();
+  let value: Uint8Array | null = null;
+  let stalled = false;
+  try {
+    value = await run();
+  } catch (cause) {
+    stalled = /timeout|abort|quiet/i.test(cause instanceof Error ? cause.message : String(cause));
+  }
+  return {
+    value,
+    watch: judgePictureWatch({
+      generator, elapsedMs: Date.now() - started, pictureProduced: value != null, stalled,
+    }),
+  };
+}
 async function picture(objective: string, value: Record<string, unknown>) {
   // Existing owner-configurable image bridge only. Never trigger paid image API
   // calls or substitute stock/placeholder images for the selected invention.
@@ -376,19 +432,34 @@ async function picture(objective: string, value: Record<string, unknown>) {
     .slice(0, 14).map(part => String(part["name"] ?? "").slice(0, 80)).filter(Boolean) : [];
   const identity = compileDesignIdentity(objective, title, parts, summary);
   const prompt = identity.prompt;
-  // OVHcloud publicly documents SDXL as free with two anonymous requests
-  // per minute. No paid API key, image purchase, or shared volunteer worker.
+  // Grok Imagine is the design-picture call. The free generator runs only after Grok returns no picture.
   if (!process.env["ASCENSION_IMAGE_ENDPOINT"]?.trim()) {
-    let bytes = await fetchFreeImage(prompt, identity.negative);
+    const watches: PictureWatch[] = [];
+    const grokAttempt = await timePicture("Grok", () => fetchGrokImage(prompt));
+    watches.push(grokAttempt.watch);
+    let bytes = grokAttempt.value;
+    let source: PictureGenerator = grokAttempt.value ? "Grok" : "Free image";
+    if (!bytes) {
+      const freeAttempt = await timePicture("Free image", () => fetchFreeImage(prompt, identity.negative));
+      watches.push(freeAttempt.watch);
+      bytes = freeAttempt.value;
+      source = "Free image";
+    }
+    if (!bytes) throw new Error(watches.map((watch) => watch.message).join(" ") || "No picture was produced.");
     let assessment = assessImageBytes(bytes, { count: identity.count });
     if (!assessment.ok) {
       try {
-        const retry = await fetchFreeImage(prompt, identity.negative);
-        const second = assessImageBytes(retry, { count: identity.count });
-        if (second.ok) { bytes = retry; assessment = second; }
+        const retry = await timePicture("Free image", () => fetchFreeImage(prompt, identity.negative));
+        if (retry) {
+          watches.push(retry.watch);
+          if (retry.value) {
+            const second = assessImageBytes(retry.value, { count: identity.count });
+            if (second.ok) { bytes = retry.value; assessment = second; source = "Free image"; }
+          }
+        }
       } catch { /* Keep the first picture's reason when the retry cannot be drawn. */ }
     }
-    if (!assessment.ok) throw new Error(assessment.reason + " Wait about 30 seconds, then try this picture again.");
+    if (!assessment.ok) throw new Error(watches.map((watch) => watch.message).join(" ") + " " + assessment.reason);
     const png = bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71;
     const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
     return {
@@ -398,7 +469,9 @@ async function picture(objective: string, value: Record<string, unknown>) {
       identity_check: assessment.checked ? "structural" : "unreadable",
       design_subject: identity.subject,
       design_count: identity.count,
-      next_request_delay_ms: 31000,
+      picture_generator: source,
+      picture_watch: watches.filter(isReportablePictureWatch),
+      next_request_delay_ms: source === "Grok" ? 0 : 31000,
     };
   }
   const target = new URL(process.env["ASCENSION_IMAGE_ENDPOINT"]!.trim());

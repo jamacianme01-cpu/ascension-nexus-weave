@@ -39,12 +39,18 @@ const tests=[
     assert.match(design,/Hunyuan3D is creating one real 3D GLB/);
     assert.match(design,/sourceImage\.match\(validImage\)/);
     assert.match(design,/imageCache\.current\.set\(key,sourceImage\)/);
-    assert.match(design,/picture\?<div/);
+    assert.match(design,/picture && <img/);
+    assert.match(design,/picture&&inspectModel&&<div/);
     assert.match(design,/How this design works/);
     assert.match(design,/asCompletedDesignStep/);
     assert.match(route,/freePictureEnabled/);
+    assert.match(route,/timePicture\("Grok", \(\) => fetchGrokImage\(prompt\)\)/);
+    assert.ok(route.indexOf('timePicture("Grok", () => fetchGrokImage(prompt))') < route.indexOf('timePicture("Free image"'));
+    assert.match(route,/lookupVehicleCargo\(objective\)/);
+    assert.match(route,/judgePictureWatch/);
+    assert.match(route,/grok-imagine-image-2\.0/);
     assert.match(route,/fetchFreeImage/);
-    assert.match(design,/loadPathwayVisual\(objective,path,imageCache\.current,controller\.signal\)/);
+    assert.match(design,/loadPathwayVisual\(objective,path,imageCache\.current,controller\.signal,notes=>/);
     assert.match(design,/const generated=await fetch\(LOCAL\+"\/generate"/);
     assert.match(design,/modelCache\.current\.set\(key,output\)/);
   }],

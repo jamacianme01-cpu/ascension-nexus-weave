@@ -10,7 +10,8 @@ import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
 type Result = { experience?: "guidance" | "design"; introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string };
-  contributors: string[]; unavailable: string[]; providerErrors: string[]; mode: string; verified: false; governance: string; persistence: string };
+  contributors: string[]; unavailable: string[]; providerErrors: string[]; mode: string; verified: false; governance: string; persistence: string;
+  vehicle_cargo?: { vehicle: string; lookup: "ok" | "failed"; error: string | null; constraints: string[] } | null };
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 const GREETING = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're here. What would you like to create? I'll help you work through it.";
 
@@ -321,6 +322,11 @@ export function IndependentEngage() {
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
         </div>
       </div>
+      {result.vehicle_cargo && <p role="status" className="text-sm text-gold">
+        {result.vehicle_cargo.lookup === "ok"
+          ? `${result.vehicle_cargo.vehicle} cargo specs were fetched before this design. ${result.vehicle_cargo.constraints[0] ?? ""}`
+          : `${result.vehicle_cargo.vehicle} cargo lookup failed: ${result.vehicle_cargo.error ?? "no spec page"}. No cargo dimensions were invented.`}
+      </p>}
       {experience === "design" && <div data-design-ready={answerPicture ? "true" : undefined}>
         <PathwayView experience="design" path={result.blend} alternatives={choices} objective={requested}
           modelCache={modelCache} imageCache={imageCache}

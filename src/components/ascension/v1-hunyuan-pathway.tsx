@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { asCompletedDesignStep, designPictureReady } from "@/lib/ascension/design-answer";
 import { buildInterpretiveAssemblyGlb, glbMeshCount } from "@/lib/ascension/interpretive-assembly-glb";
 import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
+import { judgePictureWatch, type PictureWatch } from "@/lib/ascension/picture-watchdog";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
 
@@ -31,6 +32,7 @@ export function V1HunyuanPathway({
   const [working,setWorking]=useState(false);
   const [status,setStatus]=useState("Drawing this design…");
   const [failure,setFailure]=useState("");
+  const [watchLines,setWatchLines]=useState<string[]>([]);
   const [attempt,setAttempt]=useState(0);
   const [localRequested,setLocalRequested]=useState(false);
   const [mode,setMode]=useState<HunyuanMode>("assembled");
@@ -55,7 +57,7 @@ export function V1HunyuanPathway({
     if(stored){const cached=imageCache.current.get(key)??null;setPicture(cached);setBytes(stored);setFailure("");setWorking(false);setInspectModel(true);setStatus("Hunyuan3D mesh ready");onPicture?.(designPictureReady(cached));return;}
     let active=true;
     const controller=new AbortController();
-    setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
+    setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWatchLines([]);setWorking(true);setParts([]);
     (async()=>{
       // React StrictMode replays mount effects during development. Defer one tick
       // so a discarded mount never spends a second image-generation request.
@@ -66,7 +68,9 @@ export function V1HunyuanPathway({
       let sourceImage=imageCache.current.get(key);
       if(!sourceImage) {
         setStatus("Creating your selected design… You can explore its parts with the Tree while the image forms.");
-        sourceImage=await loadPathwayVisual(objective,path,imageCache.current,controller.signal);
+        sourceImage=await loadPathwayVisual(objective,path,imageCache.current,controller.signal,notes=>{
+          if(active)setWatchLines(notes.map(note=>note.message));
+        });
         if(!active)return;
         imageCache.current.set(key,sourceImage);
         setPicture(sourceImage);
@@ -77,6 +81,7 @@ export function V1HunyuanPathway({
       let output: ArrayBuffer | null = null;
       let scanned = false;
       setStatus("Checking the owner's Hunyuan3D engine on this computer…");
+      const hunyuanStarted=Date.now();
       try {
         const ready=await fetch(LOCAL+"/status",{signal:controller.signal,cache:"no-store"});
         if(ready.ok){
@@ -96,7 +101,15 @@ export function V1HunyuanPathway({
             }
           }
         }
-      } catch { /* The public page has no local Hunyuan worker. The named-part model still opens. */ }
+      } catch (cause) {
+        const message=formatError(cause);
+        if(active && !controller.signal.aborted && /timeout|quiet/i.test(message)){
+          const watch:PictureWatch=judgePictureWatch({
+            generator:"Hunyuan3D", elapsedMs:Date.now()-hunyuanStarted, pictureProduced:false, stalled:true,
+          });
+          setWatchLines(lines=>[...lines,watch.message]);
+        }
+      }
       if(!active||controller.signal.aborted)return;
       if(!output){
         output=buildInterpretiveAssemblyGlb(path.parts.map(part=>part.name).filter(Boolean));
@@ -169,6 +182,9 @@ export function V1HunyuanPathway({
     </div>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
       <div className="flex min-w-0 flex-col gap-3">
+        {watchLines.length>0&&<div role="alert" className="rounded-xl border border-amber-300/50 p-3 text-sm text-amber-100">
+          {watchLines.map(line=><p key={line}>{line}</p>)}
+        </div>}
         {picture && <img src={picture} alt={`Concept picture of ${path.title}`} className="max-h-72 w-full rounded-xl border border-primary/30 bg-black/30 object-contain" />}
         <div className={"relative min-w-0 overflow-hidden rounded-xl border border-gold/25 bg-[#051727] "+
           "h-[min(65vh,600px)] min-h-[360px]"}

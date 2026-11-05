@@ -7,12 +7,14 @@ export function isPersonalFinanceObjective(objective: string): boolean {
 
 const CREATE = /\b(?:make|build|create|design|develop|invent|engineer|construct)\b/i;
 const NAMED_PRODUCT = /\b(?:drones?|robots?|bots?|devices?|machines?|engines?|vehicles?|inventions?|apps?|applications?|software|hardware|platforms?|tools?|systems?)\b/i;
+const ENCLOSURE = /\b(?:subwoofers?|speakers?|enclosures?|speaker boxes?|ported boxes?)\b/i;
 const ASKING_FOR_HELP = /\b(?:help|advice|repair|fix|troubleshoot|learn|explain|choose|compare)\b/i;
 
 /** Any request to make something is a design, whatever the object is. */
 export function isVisualDesignRequest(objective: string): boolean {
   const original = objective.split("\nBuild on the selected pathway:")[0] ?? objective;
   if (CREATE.test(original)) return true;
+  if (ENCLOSURE.test(original) && !ASKING_FOR_HELP.test(original)) return true;
   return NAMED_PRODUCT.test(original) && !ASKING_FOR_HELP.test(original);
 }
 export function isInventionObjective(objective: string): boolean {

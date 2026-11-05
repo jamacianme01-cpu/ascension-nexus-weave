@@ -45,6 +45,7 @@ const {objectiveExperience,revisionDirective,isVisualDesignRequest}=await module
 for(const objective of ['make worker drones','worker drones','design a swarm of drones coordinated by a central controller','build a finance app','make worker drones\nBuild on the selected pathway: Swarm Worker Drones'])assert.equal(objectiveExperience(objective,'guidance'),'design','A wrong provider suggestion cannot hide invention pictures: '+objective);
 assert.equal(objectiveExperience('I need help with my finances','design'),'guidance');
 assert.equal(objectiveExperience('Design a speaker box for a subwoofer','guidance'),'design');
+assert.equal(objectiveExperience('one 15-inch ZVX subwoofer, 2 ohm, for a 2016 Jeep Renegade','guidance'),'design');
 assert.equal(objectiveExperience('Build a bookshelf','guidance'),'design');
 assert.equal(isVisualDesignRequest('Construct a garden gate'), true);
 assert.equal(isVisualDesignRequest('I need help with my finances'), false);

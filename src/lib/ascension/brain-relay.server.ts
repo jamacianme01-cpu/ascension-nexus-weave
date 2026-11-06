@@ -25,8 +25,8 @@ const queue: string[] = [];
 const browserResults = new Map<string, {
   createdAt: number; result: JobReply | null;
 }>();
-const BROWSER_JOB_TIMEOUT = 9 * 60_000;
-const BROWSER_RESULT_RETENTION = 12 * 60_000;
+const BROWSER_JOB_TIMEOUT = 20 * 60_000;
+const BROWSER_RESULT_RETENTION = 25 * 60_000;
 let lastPoll = 0;
 function pruneBrowserResults() {
   const cutoff = Date.now() - BROWSER_RESULT_RETENTION;
@@ -101,7 +101,7 @@ export function enqueueBrowserBrainJob(input: Record<string, unknown>): JobReply
     jobs.delete(id);
     const item = browserResults.get(id);
     if (item) item.result = {
-      status: 504, body: { error: "The older computer did not complete pathways within nine minutes. No substitute answer was generated." },
+      status: 504, body: { error: "The older computer did not complete pathways within twenty minutes. No substitute answer was generated." },
     };
   }, BROWSER_JOB_TIMEOUT);
   jobs.set(id, {

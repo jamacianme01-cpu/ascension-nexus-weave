@@ -67,7 +67,50 @@ try {
   assert.equal(publicReply.status,200);
   assert.deepEqual(await publicReply.json(),answer,
     "The browser must receive the worker's answer, not a fabricated hosted result");
-  console.log("PASS LIVE Nitro remote-brain relay: offline fails closed, paired worker claims objective, replies delivered exactly.");
+  // 3D is now routed to this same old-computer worker, never localhost
+  // on the browser device or the former second computer.
+  const statusPromise=get("/api/public/ascension/brain-3d/status");
+  let statusJob=null;
+  for(let i=0;i<30;i++){
+    await sleep(100);
+    statusJob=(await (await get("/api/public/ascension/brain-worker",{headers})).json()).job;
+    if(statusJob)break;
+  }
+  assert.equal(statusJob.input.__brain_operation,"hunyuan_status");
+  const statusReply={engine:"Hunyuan3D",ready:true,source:"owner-local"};
+  const statusReport=await get("/api/public/ascension/brain-worker",{
+    method:"POST",headers:{...headers,"content-type":"application/json"},
+    body:JSON.stringify({id:statusJob.id,status:200,body:statusReply}),
+  });
+  assert.equal(statusReport.status,200);
+  assert.deepEqual(await (await statusPromise).json(),statusReply);
+
+  const reference="A".repeat(4800);
+  const glb=Buffer.alloc(64,0);
+  glb.write("glTF",0);
+  const glbPromise=get("/api/public/ascension/brain-3d/generate",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({image:reference}),
+  });
+  let glbJob=null;
+  for(let i=0;i<30;i++){
+    await sleep(100);
+    glbJob=(await (await get("/api/public/ascension/brain-worker",{headers})).json()).job;
+    if(glbJob)break;
+  }
+  assert.equal(glbJob.input.__brain_operation,"hunyuan_generate");
+  assert.equal(glbJob.input.image,reference);
+  const glbReport=await get("/api/public/ascension/brain-worker",{
+    method:"POST",headers:{...headers,"content-type":"application/json"},
+    body:JSON.stringify({id:glbJob.id,status:200,body:{glb_base64:glb.toString("base64")}}),
+  });
+  assert.equal(glbReport.status,200);
+  const binary=await glbPromise;
+  assert.equal(binary.status,200);
+  assert.equal(binary.headers.get("content-type"),"model/gltf-binary");
+  assert.deepEqual(Buffer.from(await binary.arrayBuffer()),glb);
+
+  console.log("PASS LIVE Nitro old-PC relay: ENGAGE and 3D transport, offline fails closed and no browser-local GPU dependency.");
 } finally {
   runtime.kill("SIGTERM");
   await sleep(300);

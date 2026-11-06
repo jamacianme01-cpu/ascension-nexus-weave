@@ -74,7 +74,7 @@ async function deliver(job) {
         method: "POST",
         headers: { "content-type": "application/json", "origin": local },
         body: JSON.stringify(job.input),
-        signal: AbortSignal.timeout(100_000),
+        signal: AbortSignal.timeout(job.input.phase === "pathways" ? 505_000 : 100_000),
       });
       status = response.status;
       const raw = await response.text();

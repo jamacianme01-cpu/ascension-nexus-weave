@@ -30,7 +30,7 @@ $files=@(
  'src/lib/ascension/design-answer.ts',
  'src/components/ascension/independent-engage.tsx'
 )
-$markers=@('maxPredict','ascension-v1-video-repair-20261106','MAX_PARALLEL = 2','Strip only duplicate list numbers','Enter the selected pathway immediately')
+$markers=@('maxPredict','ascension-v1-cpu-job-lifecycle-20261106','for (let i = 0; i < 570; i++)','Strip only duplicate list numbers','Enter the selected pathway immediately')
 $base='https://raw.githubusercontent.com/jamacianme01-cpu/ascension-nexus-weave/repair/v1-pathway-entry-20261029/'
 $tmp=Join-Path $env:TEMP ('ascension-transport-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp -Force|Out-Null
@@ -95,7 +95,7 @@ $ready=$false
 for($i=0;$i -lt 45;$i++){
   try{
     $local=Invoke-RestMethod 'http://127.0.0.1:8080/api/public/ascension/independent' -TimeoutSec 3
-    if($local.local_brain_configured -eq $true -and $local.local_build_signature -eq 'ascension-v1-video-repair-20261106'){$ready=$true;break}
+    if($local.local_brain_configured -eq $true -and $local.local_build_signature -eq 'ascension-v1-cpu-job-lifecycle-20261106'){$ready=$true;break}
   }catch{}
   Start-Sleep -Milliseconds 500
 }
@@ -132,4 +132,4 @@ if(!$activeWorker){
   throw 'New worker did not confirm its local engine; website polling alone is not proof.'
 }
 Write-Host 'WORKER PROCESS VERIFIED: True'
-Write-Host 'V1 transport, spoken Tree limits, honest steps and selected-page navigation installed; design/image/3D verification remains.'
+Write-Host 'V1 CPU pathway lifecycle and website transport installed; all four pathway outputs and picture/3D remain to be verified.'

@@ -127,7 +127,7 @@ async function firstAnswer(objective: string) {
   });
   const answer = response.text.trim();
   if (answer.length < 45) throw new Error("The provider returned an incomplete initial answer.");
-  return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: "OpenAI", verified: false };
+  return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: localBrainConfigured() ? "Local ASCENSION brain" : "OpenAI", verified: false };
 }
 /** Exact structural contract: the model cannot silently return two pathways instead of three. */
 const componentSchema = {

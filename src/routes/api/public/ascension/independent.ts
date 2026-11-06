@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { randomUUID } from "node:crypto";
-import { callAscensionAnswer, localBrainConfigured } from "@/lib/ascension/engine/local-answer.server";
-import { remoteBrainEnabled, isBrainOnline, sendToBrain, enqueueBrowserBrainJob, browserBrainJobResult } from "@/lib/ascension/brain-relay.server";
+import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { compileDesignIdentity } from "@/lib/ascension/design-image-brief";
@@ -16,14 +14,10 @@ type Contributor = { provider: "OpenAI" | "Claude" | "Grok"; answer: string };
 const counters = new Map<string, { window: number; count: number }>();
 
 function configured() {
-  const local = localBrainConfigured();
-  // On the designated brain computer, no other PC or hosted answer provider
-  // may silently answer the user's objectives, even if an old key remains.
   return {
-    Local: local,
-    OpenAI: !local && Boolean(process.env["OPENAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true"),
-    Claude: !local && Boolean(process.env["ANTHROPIC_API_KEY"]?.trim()),
-    Grok: !local && Boolean(process.env["XAI_API_KEY"]?.trim()),
+    OpenAI: Boolean(process.env["OPENAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true"),
+    Claude: Boolean(process.env["ANTHROPIC_API_KEY"]?.trim()),
+    Grok: Boolean(process.env["XAI_API_KEY"]?.trim()),
   };
 }
 function json(value: unknown, status = 200): Response {
@@ -111,8 +105,8 @@ async function grok(objective: string): Promise<Contributor> {
 }
 /** A useful, readable first answer is independent of pathway JSON parsing. */
 async function firstAnswer(objective: string) {
-  if (!configured().Local && !configured().OpenAI) throw new Error("ASCENSION local answer engine is not configured.");
-  const response = await callAscensionAnswer({
+  if (!configured().OpenAI) throw new Error("OpenAI is not configured for the first answer.");
+  const response = await callOpenAIResponse({
     timeoutMs: 26000,
     system: [
       "Prepare an INTERNAL invention-engineering brief, not prose to display to the user.",
@@ -128,7 +122,7 @@ async function firstAnswer(objective: string) {
   });
   const answer = response.text.trim();
   if (answer.length < 45) throw new Error("The provider returned an incomplete initial answer.");
-  return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: localBrainConfigured() ? "Local ASCENSION brain" : "OpenAI", verified: false };
+  return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: "OpenAI", verified: false };
 }
 /** Exact structural contract: the model cannot silently return two pathways instead of three. */
 const componentSchema = {
@@ -171,7 +165,7 @@ const outputSchema = {
 async function build(objective: string, firstAnswerText = "") {
   const providerStatus = configured();
   const revision = revisionDirective(objective);
-  if (!providerStatus.Local && !providerStatus.OpenAI) throw new Error("ASCENSION local brain is not configured on this server. No result was fabricated.");
+  if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
   const external = await Promise.allSettled([
     providerStatus.Claude ? claude(objective) : Promise.resolve(null),
     providerStatus.Grok ? grok(objective) : Promise.resolve(null),
@@ -183,31 +177,20 @@ async function build(objective: string, firstAnswerText = "") {
     if (result.status === "rejected") errors.push((i === 0 ? "Claude" : "Grok") + " did not respond");
   }
   const allConnected = sources.length === 2;
-  const response = await callAscensionAnswer({
-    timeoutMs: providerStatus.Local ? 450000 : 28500,
+  const response = await callOpenAIResponse({
+    timeoutMs: 28500,
     structuredOutput: { name: "ascension_four_pathways", schema: {
       ...outputSchema, properties:{...outputSchema.properties, experience:{type:"string",enum:isInventionObjective(objective)?["design"]:isPersonalFinanceObjective(objective)?["guidance"]:["design","guidance"]}},
     } },
-    system: providerStatus.Local ? [
-      "You are ASCENSION's locally running invention-design engine. Accomplish the user's exact objective without changing its meaning.",
-      "Return ONLY valid JSON satisfying the supplied schema. Exact keys: experience,introduction,path_one,path_two,path_three,blend.",
-      "The three pathways must use three genuinely different working architectures or operating mechanisms, not Basic/Advanced/Hybrid labels for nearly the same machine. For each, state how it moves, operates, and connects its components. The fourth BLEND combines compatible strengths and rejects incompatible parts.",
-      "Set experience=design for making or building an object, device or software, otherwise guidance. Never fabricate measurements, evidence, physical tests, images or governed engine execution.",
-      "For every pathway set id p1, p2, p3 respectively. Each title names its distinctive mechanism. Give a substantive summary, 3 concrete unnumbered design steps that explain the mechanism and operating sequence, 1 or 2 real tradeoffs, and 2 or 3 interacting named components with specific functions and intended positions for designs (empty parts for guidance).",
-      "BLEND has id blend, the same fields, and a specific blend_reason. Every summary describes the actual design or practical method, not an assignment to research something.",
-      "Use concise technically meaningful design decisions. Do not issue tasks such as choose a material, integrate propellers, research a component, determine a layout or make a plan; specify a concrete provisional material, count, mechanism or layout instead, clearly marking unknown measurements. Never number the steps inside JSON because the interface numbers them. Do not invent proof of physical construction, measured dimensions or tests. Make intended component positions agree with the mechanism; never claim a position was observed in an image.",
-      isInventionObjective(objective) ? "This is an invention objective: set experience=design and describe workable physical or software architectures with connected components." : "",
-      isPersonalFinanceObjective(objective) ? "This is personal financial guidance: use practical financial alternatives, no fictional amounts or claims, no software invention." : "",
-      revision,
-    ].filter(Boolean).join(" ") : [
+    system: [
       "Help the person accomplish the actual objective. Do not force every request into an invention or software product. You are proposing options, not reporting execution or verification.",
       "Set experience to guidance for requests for help, learning, planning, personal finances or decisions. Set experience to design whenever the person asks to make, build, or design something, whatever the object is. All pathways must serve that intent. Guidance must have parts: [] and practical human actions, not software modules or app-building instructions. A design answer states decisions already made and is shown with its picture.",
       isInventionObjective(objective) ? "This is a DESIGN request for whatever object the person asked to make. Set experience=design. Propose concrete built designs with the decisions already made: arrangement, counts, sizes, and how it works. Do not substitute a research assignment, a shopping list, or a request that the person specify the design." : isPersonalFinanceObjective(objective) ? "This is PERSONAL FINANCIAL HELP. Set experience=guidance. Offer three distinct practical approaches and a blend for the person's money situation. Do not invent a financial app, account aggregator or mechanical system; do not default to linking accounts. Suggest a small useful action and ask only the most important missing question. Never invent income, expenses, eligibility, rates or guaranteed outcomes. Do not request bank credentials, account numbers or government identifiers. Do not assert current benefit, tax, legal or investment rules without authoritative current evidence; identify when such verification is needed." : "Preserve the actual intent: help and advice requests are not requests to build an app.",
       revision,
       "For guidance, consider real-world priorities, resources, constraints and useful next actions. For an actual design request, analyze the reference architecture and interacting modules internally. Return only the structured alternatives. A separate preliminary engineering essay is not required.",
       allConnected
-        ? "Use three actual provider contributions, preserving their provenance. path_one is your own independently developed approach, informed by the objective. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
-        : providerStatus.Local ? "The designated local ASCENSION model is responding. Generate three genuinely distinct local-model proposals and a reasoned BLEND. Never pretend OpenAI, Claude, Grok, Spiral, Guardian, or AutoSync contributed when they were not called." : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
+        ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
+        : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
       "Return exactly one JSON object with required keys: experience, introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",
@@ -232,19 +215,19 @@ async function build(objective: string, firstAnswerText = "") {
   }
   return {
     ...result,
-    contributors: [providerStatus.Local ? "Local ASCENSION brain" : "OpenAI", ...sources.map(s => s.provider)],
+    contributors: ["OpenAI", ...sources.map(s => s.provider)],
     unavailable: ["Claude", "Grok"].filter(provider => !sources.some(s => s.provider === provider)),
     providerErrors: errors,
-    mode: providerStatus.Local ? (allConnected ? "local-plus-independent-providers" : "local-brain-provisional") : allConnected ? "three-provider-synthesis" : "openai-only-provisional",
+    mode: allConnected ? "three-provider-synthesis" : "openai-only-provisional",
     verified: false,
-    governance: "Local model generation is not proof that governed Meaning Elements, Spiral, Outcome Predictor, Guardian or AutoSync executed.",
+    governance: "ASCENSION's local Meaning Elements, Spiral, Outcome Predictor, Guardian and AutoSync were not invoked by this hosted result.",
     persistence: "This hosted route does not use Supabase and does not persist objectives on the server.",
   };
 }
 
 /** The Tree is a contextual guide, not a static greeting or a second pathway generator. */
 async function guide(objective: string, question: string, selected: Record<string, unknown>, history: unknown = [], alternatives: unknown = []) {
-  if (!configured().Local && !configured().OpenAI) throw new Error("The Tree local knowledge provider is not configured.");
+  if (!configured().OpenAI) throw new Error("The Tree's knowledge provider is not connected.");
   const title = String(selected["title"] ?? "").trim().slice(0, 140);
   const summary = String(selected["summary"] ?? "").trim().slice(0, 1600) || objective;
   const conversation = Array.isArray(history) ? history.slice(-8).map(item => obj(item))
@@ -267,11 +250,8 @@ async function guide(objective: string, question: string, selected: Record<strin
   const focused = obj(selected["focused_part"]);
   const focusedPart = parts.find(part => part.name === String(focused["name"] ?? "")) ?? null;
   const currentView = ["assembled", "blueprint", "dissect"].includes(String(selected["current_view"])) ? selected["current_view"] : "assembled";
-  const response = await callAscensionAnswer({
-    // Local CPU responses are brief, but prefill can take longer than 20s.
-    // Cap predicted words instead of timing out the Tree's spoken explanation.
-    timeoutMs: localBrainConfigured() ? 45000 : 20000,
-    maxPredict: 180,
+  const response = await callOpenAIResponse({
+    timeoutMs: 20000,
     system: [
       "You are the Tree of Knowledge: ASCENSION's welcoming, knowledgeable, practical design assistant.",
       "Work WITH the person on the chosen approach. Speak directly, naturally and warmly, never like a narrator",
@@ -416,68 +396,10 @@ async function picture(objective: string, value: Record<string, unknown>) {
   };
 }
 
-// Local GORDONS jobs run independently of the request lifecycle: Nitro may
-// terminate an HTTP request before its CPU has generated all four pathways.
-// All inference stays on the designated computer. No hosted fallback.
-type LocalPathwayJob = {
-  createdAt: number;
-  result: { status: number; body: unknown } | null;
-};
-const localPathwayJobs = new Map<string, LocalPathwayJob>();
-// Serialize structured pathway synthesis on the single designated CPU.
-// Two simultaneous Ollama generations starved each other and outlived the
-// cloud queue deadline. Tree explanations and image transport remain separate.
-let localPathwaySerial: Promise<void> = Promise.resolve();
-function pruneLocalPathwayJobs() {
-  for (const [id, job] of localPathwayJobs) {
-    if (Date.now() - job.createdAt > 25 * 60_000) localPathwayJobs.delete(id);
-  }
-}
-function localPathwayStatus(id: string): Response {
-  pruneLocalPathwayJobs();
-  if (!/^[a-f0-9-]{36}$/.test(id)) return json({ error: "Invalid local pathway job ID." }, 400);
-  const job = localPathwayJobs.get(id);
-  if (!job) return json({ error: "Local pathway job expired or not found." }, 404);
-  return job.result ? json(job.result.body, job.result.status) : json({ status: "processing" }, 202);
-}
-function beginLocalPathways(objective: string, prior: string): Response {
-  pruneLocalPathwayJobs();
-  if (!localBrainConfigured()) return json({ error: "Ollama is not configured on GORDONS." }, 503);
-  if (Array.from(localPathwayJobs.values()).filter(job => !job.result).length >= 2)
-    return json({ error: "The local ASCENSION brain is already processing two objectives." }, 429);
-  const id = randomUUID();
-  const job: LocalPathwayJob = { createdAt: Date.now(), result: null };
-  localPathwayJobs.set(id, job);
-  // The loopback Ollama call proceeds after this HTTP response is sent.
-  // One structured generation at a time on GORDONS prevents CPU contention.
-  const generation = localPathwaySerial.then(() => build(objective, prior));
-  localPathwaySerial = generation.then(() => undefined, () => undefined);
-  void generation.then(
-    result => { job.result = { status: 200, body: result }; },
-    error => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error("[ASCENSION local pathways] " + message.slice(0, 600));
-      job.result = { status: 503, body: { error: message.slice(0, 400) } };
-    },
-  );
-  return json({ local_brain_job_id: id, status: "processing" }, 202);
-}
-
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
-    GET: async ({ request }) => {
-      const localId = new URL(request.url).searchParams.get("local_brain_job");
-      if (localId && localBrainConfigured() && !remoteBrainEnabled()) return localPathwayStatus(localId);
-      const jobId = new URL(request.url).searchParams.get("brain_job");
-      if (jobId && remoteBrainEnabled()) {
-        const reply = browserBrainJobResult(jobId);
-        return json(reply.body, reply.status);
-      }
-      return json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-        brain_mode: remoteBrainEnabled() ? "designated-old-pc" : localBrainConfigured() ? "same-computer" : "hosted",
-        brain_connected: remoteBrainEnabled() ? isBrainOnline() : false,
-        local_brain_configured: localBrainConfigured(), local_build_signature: localBrainConfigured() ? "ascension-v1-cpu-job-lifecycle-20261106" : null, governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." });
-    },
+    GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
+      governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");
@@ -495,30 +417,6 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         if(raw.length>15000 && input["phase"]!=="guide")return json({error:"Request too long."},413);
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
-        if (remoteBrainEnabled()) {
-          // The website is only a transport. The designated older computer
-          // executes ALL current V1 answer phases; never fall back to a
-          // Railway-hosted model when that computer is disconnected.
-          const phase = String(input["phase"] ?? "pathways");
-          if (!["pathways", "initial", "guide", "picture"].includes(phase))
-            return json({ error: "Unsupported ASCENSION phase." }, 400);
-          if (phase === "guide" && (typeof input["question"] !== "string" ||
-              input["question"].trim().length < 3 || input["question"].length > 800))
-            return json({ error: "Ask a question between 3 and 800 characters." }, 400);
-          if (phase === "picture" && isPersonalFinanceObjective(objective))
-            return json({ error: "Financial guidance does not require an invention picture." }, 400);
-          if (!limit("brain:"+phase+":global", phase==="guide"?240:48) ||
-              !limit("brain:"+phase+":ip:"+address, phase==="guide"?48:12))
-            return json({ error: "ASCENSION local brain request limit reached." }, 429);
-          // The V1 browser can poll while a slower old-PC CPU builds all four
-          // pathways. No Railway request or relay socket must stay open.
-          if (phase === "pathways" && request.headers.get("prefer") === "respond-async") {
-            const queued = enqueueBrowserBrainJob(input);
-            return json(queued.body, queued.status);
-          }
-          const reply = await sendToBrain(input);
-          return json(reply.body, reply.status);
-        }
         if (input["phase"] === "initial") {
           if (!limit("objective-global", 48) || !limit("objective-ip:" + address, 12))
             return json({ error: "Too many objectives. Try again later." }, 429);
@@ -540,8 +438,6 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         if (!limit("pathway-global", 48) || !limit("pathway-ip:" + address, 12))
           return json({ error: "Too many objectives. Try again later." }, 429);
         const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
-        if (localBrainConfigured() && request.headers.get("prefer") === "respond-async")
-          return beginLocalPathways(objective, prior);
         return json(await build(objective, prior));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to generate a response.";

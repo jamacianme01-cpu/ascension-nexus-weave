@@ -25,8 +25,6 @@ ALLOWED_ORIGINS = frozenset({
     "https://ascensionweave.app",
     "http://localhost:4174",
     "http://127.0.0.1:4174",
-    "http://127.0.0.1:8080",
-    "http://localhost:8080",
 })
 LOCK = threading.Lock()
 

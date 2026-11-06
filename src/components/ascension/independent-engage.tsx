@@ -275,15 +275,16 @@ export function IndependentEngage() {
   // The previous scrollTo inside the click ran before the cards disappeared.
   useEffect(() => {
     if (!result) return;
-    // Leave the opening screen in place until the selected design has actually loaded.
-    if (choice !== null && experience === "design" && !designSettled) return;
+    // Enter the selected pathway immediately. Waiting for a slow picture
+    // previously left the user stranded on the pathway screen for a minute.
+    // The actual picture continues loading inside its selected design view.
     const frame = window.requestAnimationFrame(() => {
       (choice === null ? view.current : designView.current)?.scrollIntoView({
         behavior: "instant", block: "start",
       });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [choice, result, designSettled, experience]);
+  }, [choice, result]);
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none"
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}

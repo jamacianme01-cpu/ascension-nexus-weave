@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { randomUUID } from "node:crypto";
 import { callAscensionAnswer, localBrainConfigured } from "@/lib/ascension/engine/local-answer.server";
 import { remoteBrainEnabled, isBrainOnline, sendToBrain, enqueueBrowserBrainJob, browserBrainJobResult } from "@/lib/ascension/brain-relay.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
@@ -412,9 +413,51 @@ async function picture(objective: string, value: Record<string, unknown>) {
   };
 }
 
+// Local GORDONS jobs run independently of the request lifecycle: Nitro may
+// terminate an HTTP request before its CPU has generated all four pathways.
+// All inference stays on the designated computer. No hosted fallback.
+type LocalPathwayJob = {
+  createdAt: number;
+  result: { status: number; body: unknown } | null;
+};
+const localPathwayJobs = new Map<string, LocalPathwayJob>();
+function pruneLocalPathwayJobs() {
+  for (const [id, job] of localPathwayJobs) {
+    if (Date.now() - job.createdAt > 12 * 60_000) localPathwayJobs.delete(id);
+  }
+}
+function localPathwayStatus(id: string): Response {
+  pruneLocalPathwayJobs();
+  if (!/^[a-f0-9-]{36}$/.test(id)) return json({ error: "Invalid local pathway job ID." }, 400);
+  const job = localPathwayJobs.get(id);
+  if (!job) return json({ error: "Local pathway job expired or not found." }, 404);
+  return job.result ? json(job.result.body, job.result.status) : json({ status: "processing" }, 202);
+}
+function beginLocalPathways(objective: string, prior: string): Response {
+  pruneLocalPathwayJobs();
+  if (!localBrainConfigured()) return json({ error: "Ollama is not configured on GORDONS." }, 503);
+  if (Array.from(localPathwayJobs.values()).filter(job => !job.result).length >= 2)
+    return json({ error: "The local ASCENSION brain is already processing two objectives." }, 429);
+  const id = randomUUID();
+  const job: LocalPathwayJob = { createdAt: Date.now(), result: null };
+  localPathwayJobs.set(id, job);
+  // The loopback Ollama call proceeds after this HTTP response is sent.
+  void build(objective, prior).then(
+    result => { job.result = { status: 200, body: result }; },
+    error => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[ASCENSION local pathways] " + message.slice(0, 600));
+      job.result = { status: 503, body: { error: message.slice(0, 400) } };
+    },
+  );
+  return json({ local_brain_job_id: id, status: "processing" }, 202);
+}
+
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async ({ request }) => {
+      const localId = new URL(request.url).searchParams.get("local_brain_job");
+      if (localId && localBrainConfigured() && !remoteBrainEnabled()) return localPathwayStatus(localId);
       const jobId = new URL(request.url).searchParams.get("brain_job");
       if (jobId && remoteBrainEnabled()) {
         const reply = browserBrainJobResult(jobId);
@@ -423,7 +466,7 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
       return json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
         brain_mode: remoteBrainEnabled() ? "designated-old-pc" : localBrainConfigured() ? "same-computer" : "hosted",
         brain_connected: remoteBrainEnabled() ? isBrainOnline() : false,
-        local_brain_configured: localBrainConfigured(), governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." });
+        local_brain_configured: localBrainConfigured(), local_build_signature: localBrainConfigured() ? "cpu-pathways-streamed-polling-v2" : null, governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." });
     },
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
@@ -487,6 +530,8 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         if (!limit("pathway-global", 48) || !limit("pathway-ip:" + address, 12))
           return json({ error: "Too many objectives. Try again later." }, 429);
         const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
+        if (localBrainConfigured() && request.headers.get("prefer") === "respond-async")
+          return beginLocalPathways(objective, prior);
         return json(await build(objective, prior));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to generate a response.";

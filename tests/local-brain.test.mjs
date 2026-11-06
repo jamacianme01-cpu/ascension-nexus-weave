@@ -17,12 +17,15 @@ try {
     assert.equal(request.method, "POST");
     const body = JSON.parse(request.body);
     assert.equal(body.model, "qwen3:4b");
-    assert.equal(body.stream, false);
+    assert.equal(body.stream, true, "Structured pathways must stream to avoid 30-second idle timeouts");
     assert.equal(body.think, false);
     assert.equal(body.messages[0].role, "system");
     assert.equal(body.messages[1].content, "Create a worker drone");
     assert.deepEqual(body.format, { type: "object", properties: { pathways: { type: "array" } } });
-    return new Response(JSON.stringify({done:true,done_reason:"stop",message:{role:"assistant",content:'{"pathways":[]}'}}),{status:200});
+    return new Response([
+      JSON.stringify({done:false,message:{role:"assistant",content:'{"pathways"'}}),
+      JSON.stringify({done:true,done_reason:"stop",message:{role:"assistant",content:':[]}'}}),
+    ].join("\n") + "\n",{status:200,headers:{"content-type":"application/x-ndjson"}});
   };
   const answer = await callAscensionAnswer({
     system: "Develop the invention",
@@ -56,6 +59,11 @@ try {
   );
   const route = readFileSync("src/routes/api/public/ascension/independent.ts", "utf8");
   assert.match(route,/callAscensionAnswer\(\{/,"V1 must use the ASCENSION local brain adapter");
+  assert.match(route, /beginLocalPathways\(objective, prior\)/,
+    "Local pathways must run beyond the request lifecycle with polling");
+  const worker = readFileSync("scripts/brain-worker.mjs", "utf8");
+  assert.match(worker, /local_brain_job/,
+    "Old computer must poll local pathway jobs instead of timing out HTTP");
   assert.match(route,/Local ASCENSION brain/,"Provenance must identify local rather than cloud inference");
   console.log("PASS ASCENSION local-brain boundary: loopback model, structured output, identity provenance and no remote-PC inference.");
 } finally {

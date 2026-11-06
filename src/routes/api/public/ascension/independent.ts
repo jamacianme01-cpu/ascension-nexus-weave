@@ -14,11 +14,14 @@ type Contributor = { provider: "OpenAI" | "Claude" | "Grok"; answer: string };
 const counters = new Map<string, { window: number; count: number }>();
 
 function configured() {
+  const local = localBrainConfigured();
+  // On the designated brain computer, no other PC or hosted answer provider
+  // may silently answer the user's objectives, even if an old key remains.
   return {
-    Local: localBrainConfigured(),
-    OpenAI: Boolean(process.env["OPENAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true"),
-    Claude: Boolean(process.env["ANTHROPIC_API_KEY"]?.trim()),
-    Grok: Boolean(process.env["XAI_API_KEY"]?.trim()),
+    Local: local,
+    OpenAI: !local && Boolean(process.env["OPENAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true"),
+    Claude: !local && Boolean(process.env["ANTHROPIC_API_KEY"]?.trim()),
+    Grok: !local && Boolean(process.env["XAI_API_KEY"]?.trim()),
   };
 }
 function json(value: unknown, status = 200): Response {

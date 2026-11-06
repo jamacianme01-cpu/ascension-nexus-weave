@@ -125,12 +125,26 @@ async function deliver(job) {
 
 await ensureLocalBrain();
 process.stdout.write("ASCENSION old-computer brain: LOCAL ENGINE VERIFIED; outbound web relay starting.\n");
+// The previous single await deliver(job) serialized 60-second image requests,
+// 20-second Tree replies, and pathway generation. Only two independent jobs
+// may run simultaneously to protect this older computer.
+const inFlight = new Set();
+const MAX_PARALLEL = 2;
 while (running) {
   try {
+    if (inFlight.size >= MAX_PARALLEL) {
+      await Promise.race(inFlight);
+      continue;
+    }
     const job = await poll();
     if (job) {
-      await deliver(job);
-      process.stdout.write("ASCENSION brain: request processed on this computer.\n");
+      const task = deliver(job).then(() => {
+        process.stdout.write("ASCENSION brain: request processed on this computer.\n");
+      }).catch((cause) => {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        process.stderr.write("ASCENSION brain job: " + message.slice(0, 360) + "\n");
+      }).finally(() => { inFlight.delete(task); });
+      inFlight.add(task);
     } else {
       await sleep(1500);
     }
@@ -142,3 +156,4 @@ while (running) {
     await sleep(4000);
   }
 }
+await Promise.allSettled([...inFlight]);

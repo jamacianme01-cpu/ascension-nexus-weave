@@ -33,6 +33,7 @@ if (!$model) { throw 'No supported local answer model installed. No model was do
 
 $env:LOCAL_LLM_BASE_URL='http://127.0.0.1:11434/v1'
 $env:LOCAL_LLM_MODEL=$model
+$env:ASCENSION_REMOTE_BRAIN_ENABLED='false'
 $env:ASCENSION_ALLOW_OPENAI_AI='false'
 $env:ASCENSION_ALLOW_PAID_DRAFTS='false'
 $env:ASCENSION_ALLOW_LOVABLE_AI='false'
@@ -59,7 +60,39 @@ try {
   if (Get-Command bun -ErrorAction SilentlyContinue) { & bun run build }
   else { & npm run build }
   if ($LASTEXITCODE -ne 0) { throw 'ASCENSION build failed.' }
-  Write-Host 'Starting local ASCENSION server. Test on this PC at http://127.0.0.1:'$Port
-  & node '.output/server/index.mjs'
-  if ($LASTEXITCODE -ne 0) { throw ('ASCENSION server exited with code ' + $LASTEXITCODE) }
+  # Start server on THIS machine; the worker connects OUTBOUND to Railway.
+  # No other PC is assigned any intelligence role.
+  $localServer='http://127.0.0.1:' + $Port + '/api/public/ascension/independent'
+  $logs=Join-Path $env:LOCALAPPDATA 'ASCENSION\\BrainLogs'
+  New-Item -ItemType Directory -Force -Path $logs | Out-Null
+  $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'
+  $serverOut=Join-Path $logs ("brain-server-$stamp.out.log")
+  $serverErr=Join-Path $logs ("brain-server-$stamp.err.log")
+  $exists=[bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+  if (!$exists) {
+    Start-Process -FilePath (Get-Command node).Source -ArgumentList '.output/server/index.mjs' -WorkingDirectory $Repo -WindowStyle Hidden -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr | Out-Null
+  }
+  $ready=$false
+  for($i=0;$i -lt 36;$i++){
+    try {
+      $response=Invoke-RestMethod -Uri $localServer -TimeoutSec 3
+      if($response.providers.Local -eq $true -and $response.brain_mode -eq 'same-computer') { $ready=$true; break }
+    } catch {}
+    Start-Sleep -Milliseconds 500
+  }
+  if (!$ready) {
+    if (Test-Path $serverErr) { Get-Content $serverErr -Tail 15 }
+    throw 'ASCENSION V1 server did not verify the local PC Ollama engine.'
+  }
+  Write-Host ('LOCAL ASCENSION BRAIN READY: http://127.0.0.1:' + $Port)
+  $pair=[Environment]::GetEnvironmentVariable('ASCENSION_REMOTE_BRAIN_KEY','User')
+  if (!$pair) { $pair=$env:ASCENSION_REMOTE_BRAIN_KEY }
+  if (!$pair -or $pair.Length -lt 48) {
+    Write-Host 'CLOUD CONNECTION NOT PAIRED. Local ASCENSION is running; no hosted inference substituted.'
+    return
+  }
+  $env:ASCENSION_REMOTE_BRAIN_KEY=$pair
+  Write-Host 'Connecting the Railway interface OUTBOUND to this same computer...'
+  & node 'scripts/brain-worker.mjs'
+  if ($LASTEXITCODE -ne 0) { throw ('Outbound brain worker exited with code ' + $LASTEXITCODE) }
 } finally { Pop-Location }

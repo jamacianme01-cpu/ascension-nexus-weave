@@ -87,7 +87,7 @@ try{
       return new Response("unrecognized route",{status:404});
     };
     Object.defineProperty(window,"speechSynthesis",{configurable:true,value:{
-      getVoices(){return [{name:"Microsoft Aria Online (Natural)",lang:"en-US"}]},cancel(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
+      getVoices(){return [{name:"Microsoft Aria Online (Natural)",lang:"en-US"}]},cancel(){},resume(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
         utterance.onstart?.();utterance.onend?.();
       });}
     }});

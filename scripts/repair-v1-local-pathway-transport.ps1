@@ -26,9 +26,11 @@ if(!$model){throw 'No previously installed ASCENSION-compatible local model is a
 $files=@(
  'src/lib/ascension/engine/local-answer.server.ts',
  'src/routes/api/public/ascension/independent.ts',
- 'scripts/brain-worker.mjs'
+ 'scripts/brain-worker.mjs',
+ 'src/lib/ascension/design-answer.ts',
+ 'src/components/ascension/independent-engage.tsx'
 )
-$markers=@('Ollama returned no pathway response stream','cpu-pathways-streamed-polling-v2','local_brain_job')
+$markers=@('maxPredict','ascension-v1-video-repair-20261106','MAX_PARALLEL = 2','Strip only duplicate list numbers','Enter the selected pathway immediately')
 $base='https://raw.githubusercontent.com/jamacianme01-cpu/ascension-nexus-weave/repair/v1-pathway-entry-20261029/'
 $tmp=Join-Path $env:TEMP ('ascension-transport-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp -Force|Out-Null
@@ -93,7 +95,7 @@ $ready=$false
 for($i=0;$i -lt 45;$i++){
   try{
     $local=Invoke-RestMethod 'http://127.0.0.1:8080/api/public/ascension/independent' -TimeoutSec 3
-    if($local.local_brain_configured -eq $true -and $local.local_build_signature -eq 'cpu-pathways-streamed-polling-v2'){$ready=$true;break}
+    if($local.local_brain_configured -eq $true -and $local.local_build_signature -eq 'ascension-v1-video-repair-20261106'){$ready=$true;break}
   }catch{}
   Start-Sleep -Milliseconds 500
 }
@@ -116,4 +118,18 @@ if(!$online){
   throw 'Local brain updated, but the website has not verified the new worker connection.'
 }
 Write-Host 'WEBSITE CONNECTED: True'
-Write-Host 'Local streamed pathway polling installed; full four-pathway generation remains to be tested.'
+$workerOut=Join-Path $logs ("transport-worker-$stamp.out.log")
+$activeWorker=$false
+for($i=0;$i -lt 20;$i++){
+  if((Test-Path $workerOut) -and
+    (Select-String -LiteralPath $workerOut -Pattern 'LOCAL ENGINE VERIFIED' -SimpleMatch -Quiet)){
+    $activeWorker=$true;break
+  }
+  Start-Sleep -Milliseconds 500
+}
+if(!$activeWorker){
+  if(Test-Path $workerErr){Get-Content $workerErr -Tail 15}
+  throw 'New worker did not confirm its local engine; website polling alone is not proof.'
+}
+Write-Host 'WORKER PROCESS VERIFIED: True'
+Write-Host 'V1 transport, spoken Tree limits, honest steps and selected-page navigation installed; design/image/3D verification remains.'

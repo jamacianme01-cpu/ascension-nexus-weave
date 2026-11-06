@@ -149,12 +149,33 @@ export function IndependentEngage() {
     setPathwayError("");
     try {
       const response = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST", headers: { "content-type": "application/json", "prefer": "respond-async" },
         body: JSON.stringify({ objective: text, phase: "pathways" }),
         signal: controller.signal,
       });
-      const data: Result & { error?: string } = await response.json();
+      let data: Result & { error?: string; brain_job_id?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "Pathway synthesis did not complete.");
+      // The older PC may need several minutes to generate four actual
+      // structured pathways. Poll the result; preserve the approved V1 view.
+      if (response.status === 202) {
+        const jobId = data.brain_job_id;
+        if (!jobId || !/^[a-f0-9-]{36}$/.test(jobId))
+          throw new Error("ASCENSION brain did not return a valid pathway job.");
+        let finished = false;
+        for (let attempt = 0; attempt < 300; attempt++) {
+          if (controller.signal.aborted || generation.current !== token) return;
+          await new Promise<void>(resolve => window.setTimeout(resolve, 2000));
+          if (controller.signal.aborted || generation.current !== token) return;
+          const poll = await fetch("/api/public/ascension/independent?brain_job=" +
+            encodeURIComponent(jobId), { signal: controller.signal, cache: "no-store" });
+          data = await poll.json();
+          if (poll.status === 202) continue;
+          if (!poll.ok) throw new Error(data.error || "ASCENSION old-computer pathway job failed.");
+          finished = true;
+          break;
+        }
+        if (!finished) throw new Error("The older computer did not finish pathways. Retry pathways.");
+      }
       if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend)
         throw new Error("The answer engine did not deliver three pathways and a blend.");
       if (generation.current !== token) return;

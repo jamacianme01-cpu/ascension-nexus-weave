@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { chromium } from "playwright";
+
+const screenshotDir = process.env.ASCENSION_SCREENSHOT_DIR || join(tmpdir(), "ascension-v1-screenshots");
+mkdirSync(screenshotDir, { recursive: true });
 
 // Two physically distinct named triangles make a valid GLB; unlike a picture,
 // its identity and vertices can be checked across every inspection view.
@@ -82,7 +88,7 @@ try{
       return new Response("unrecognized route",{status:404});
     };
     Object.defineProperty(window,"speechSynthesis",{configurable:true,value:{
-      getVoices(){return [{name:"Microsoft Aria Online (Natural)",lang:"en-US"}]},cancel(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
+      getVoices(){return [{name:"Microsoft Aria Online (Natural)",lang:"en-US"}]},cancel(){},resume(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
         utterance.onstart?.();utterance.onend?.();
       });}
     }});
@@ -170,7 +176,7 @@ try{
     assert.equal(await page.evaluate(()=>window.__localHunyuanCalls.length),0,"Guidance cannot contact a local engine");
     assert.equal(guideRequests.at(-1).pathway.experience,"guidance","The Tree receives the correct conversation context");
     await page.getByRole("heading",{name:"Your first steps",exact:true}).waitFor();
-    await page.screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/finance-guidance-fixture.png",fullPage:true});
+    await page.screenshot({path:join(screenshotDir,"finance-guidance-fixture.png"),fullPage:true});
     console.log("PASS finance guidance: four spoken choices, practical plan and guide, zero image/3D/local-device requests");
     await browser.close();process.exit(0);
   }
@@ -184,7 +190,7 @@ try{
   assert.equal(await page.getByText("THREE PATHWAYS + FOURTH BLEND",{exact:true}).count(),0);
   assert.equal(await page.getByRole("region",{name:"Initial objective answer"}).count(),0);
   await entry.waitFor({state:"hidden"});
-  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-desktop.png"});
+  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:join(screenshotDir,"carousel-desktop.png")});
   await page.getByRole("button",{name:"Next pathway",exact:true}).click();
   assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"),"true");
   await page.getByRole("button",{name:"Previous pathway",exact:true}).click();
@@ -210,7 +216,7 @@ try{
     assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"),"true");
     await page.waitForFunction(()=>document.activeElement?.getAttribute("data-design-index")==="1");
     await page.setViewportSize({width:390,height:844});await page.waitForTimeout(450);
-    await carousel.screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-mobile.png"});
+    await carousel.screenshot({path:join(screenshotDir,"carousel-mobile.png")});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     await enterOrb(1);
     await page.getByRole("region",{name:"Selected pathway design"}).waitFor();
@@ -251,7 +257,7 @@ try{
       errors: errors.slice(-4),
     }));
     await page.waitForTimeout(200);
-    await canvas.screenshot({path:(process.env.ASCENSION_SCREENSHOT_DIR||"C:/Users/Gordo/.codex/tmp/ascension-feedback-check")+"/blueprint-"+expectedId+".png"});
+    await canvas.screenshot({path:join(screenshotDir,"blueprint-"+expectedId+".png")});
     const preserved=await canvas.evaluate(el=>{window.__realMesh=el;return el.width>200;});
     assert.ok(preserved);
     await page.getByRole("button",{name:"3D VIEW",exact:true}).click();
@@ -343,7 +349,7 @@ try{
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
 
   await page.setViewportSize({width:390,height:844});
-  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-mobile.png"});
+  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:join(screenshotDir,"carousel-mobile.png")});
   await page.getByRole("button",{name:"Next pathway",exact:true}).click();
   await page.getByRole("tab").filter({has:page.locator('[data-active=true]')}).count();
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),"Mobile carousel must not overflow horizontally");

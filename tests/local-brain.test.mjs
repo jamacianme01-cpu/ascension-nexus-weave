@@ -66,6 +66,10 @@ try {
   const screenSource = readFileSync("src/components/ascension/independent-engage.tsx", "utf8");
   assert.doesNotMatch(screenSource, /if \(choice !== null && experience === "design" && !designSettled\) return/,
     "Selected pathway must open immediately, even while its real picture loads.");
+  assert.match(screenSource, /local_brain_job_id\?: string/,
+    "Skytech must recognize asynchronous local pathway IDs.");
+  assert.match(screenSource, /localJob \? "local_brain_job" : "brain_job"/,
+    "Skytech must poll local jobs while Railway continues polling cloud-relayed jobs.");
 
   process.env.LOCAL_LLM_BASE_URL = "http://192.168.0.87:11434/v1";
   await assert.rejects(

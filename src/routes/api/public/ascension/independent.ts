@@ -424,9 +424,13 @@ type LocalPathwayJob = {
   result: { status: number; body: unknown } | null;
 };
 const localPathwayJobs = new Map<string, LocalPathwayJob>();
+// Serialize structured pathway synthesis on the single designated CPU.
+// Two simultaneous Ollama generations starved each other and outlived the
+// cloud queue deadline. Tree explanations and image transport remain separate.
+let localPathwaySerial: Promise<void> = Promise.resolve();
 function pruneLocalPathwayJobs() {
   for (const [id, job] of localPathwayJobs) {
-    if (Date.now() - job.createdAt > 12 * 60_000) localPathwayJobs.delete(id);
+    if (Date.now() - job.createdAt > 25 * 60_000) localPathwayJobs.delete(id);
   }
 }
 function localPathwayStatus(id: string): Response {
@@ -445,7 +449,10 @@ function beginLocalPathways(objective: string, prior: string): Response {
   const job: LocalPathwayJob = { createdAt: Date.now(), result: null };
   localPathwayJobs.set(id, job);
   // The loopback Ollama call proceeds after this HTTP response is sent.
-  void build(objective, prior).then(
+  // One structured generation at a time on GORDONS prevents CPU contention.
+  const generation = localPathwaySerial.then(() => build(objective, prior));
+  localPathwaySerial = generation.then(() => undefined, () => undefined);
+  void generation.then(
     result => { job.result = { status: 200, body: result }; },
     error => {
       const message = error instanceof Error ? error.message : String(error);

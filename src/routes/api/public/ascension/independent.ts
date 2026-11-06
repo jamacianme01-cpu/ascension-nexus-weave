@@ -469,7 +469,7 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
       return json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
         brain_mode: remoteBrainEnabled() ? "designated-old-pc" : localBrainConfigured() ? "same-computer" : "hosted",
         brain_connected: remoteBrainEnabled() ? isBrainOnline() : false,
-        local_brain_configured: localBrainConfigured(), local_build_signature: localBrainConfigured() ? "cpu-pathways-streamed-polling-v2" : null, governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." });
+        local_brain_configured: localBrainConfigured(), local_build_signature: localBrainConfigured() ? "ascension-v1-video-repair-20261106" : null, governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." });
     },
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");

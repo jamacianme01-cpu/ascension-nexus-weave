@@ -70,17 +70,45 @@ async function deliver(job) {
         catch { body = { error: "Old-PC Hunyuan returned unreadable status." }; status = 502; }
       }
     } else {
+      const localPathways = job.input.phase === "pathways";
       const response = await fetch(local + "/api/public/ascension/independent", {
         method: "POST",
-        headers: { "content-type": "application/json", "origin": local },
+        headers: { "content-type": "application/json", "origin": local,
+          ...(localPathways ? { "prefer": "respond-async" } : {}) },
         body: JSON.stringify(job.input),
-        signal: AbortSignal.timeout(job.input.phase === "pathways" ? 505_000 : 100_000),
+        signal: AbortSignal.timeout(100_000),
       });
       status = response.status;
       const raw = await response.text();
       if (raw.length > 12_800_000) throw new Error("Old-PC result exceeded relay size limit.");
       try { body = JSON.parse(raw); }
       catch { body = { error: "Old-PC engine returned invalid JSON." }; status = 502; }
+      // A CPU Ollama model may take minutes. Do not keep a single Nitro HTTP
+      // request open: poll this very same old PC for its actual answer.
+      if (localPathways && status === 202) {
+        const id = body?.local_brain_job_id;
+        if (typeof id !== "string" || !/^[a-f0-9-]{36}$/.test(id))
+          throw new Error("Local ASCENSION server returned an invalid pathway job ID.");
+        let complete = false;
+        for (let i = 0; i < 250; i++) {
+          await sleep(2000);
+          const outcome = await fetch(local +
+            "/api/public/ascension/independent?local_brain_job=" +
+            encodeURIComponent(id), { signal: AbortSignal.timeout(15_000) });
+          status = outcome.status;
+          const result = await outcome.text();
+          if (result.length > 12_800_000) throw new Error("Local pathway output exceeds maximum relay size.");
+          try { body = JSON.parse(result); }
+          catch { throw new Error("The old-PC pathway polling response was not JSON."); }
+          if (status === 202) continue;
+          complete = true;
+          break;
+        }
+        if (!complete) {
+          status = 504;
+          body = { error: "The old computer did not complete the four pathways within the local generation deadline." };
+        }
+      }
     }
   } catch (cause) {
     status = 503;

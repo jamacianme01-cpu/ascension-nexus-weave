@@ -90,7 +90,7 @@ async function deliver(job) {
         if (typeof id !== "string" || !/^[a-f0-9-]{36}$/.test(id))
           throw new Error("Local ASCENSION server returned an invalid pathway job ID.");
         let complete = false;
-        for (let i = 0; i < 250; i++) {
+        for (let i = 0; i < 570; i++) {
           await sleep(2000);
           const outcome = await fetch(local +
             "/api/public/ascension/independent?local_brain_job=" +
@@ -106,7 +106,7 @@ async function deliver(job) {
         }
         if (!complete) {
           status = 504;
-          body = { error: "The old computer did not complete the four pathways within the local generation deadline." };
+          body = { error: "The old computer did not complete the four pathways within the extended local generation deadline." };
         }
       }
     }

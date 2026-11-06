@@ -12,7 +12,7 @@ type Pathway={
   parts:Part[];blend_reason?:string;
 };
 type Cache={current:Map<string,ArrayBuffer>};
-const LOCAL="http://127.0.0.1:8082";
+const LOCAL=String((import.meta as {env?:Record<string,string|undefined>}).env?.VITE_HUNYUAN3D_ENDPOINT||"http://127.0.0.1:8082").replace(/\/$/,"");
 const validImage=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/=]{4000,12000000})$/i;
 function formatError(reason:unknown){
   return reason instanceof Error?reason.message:String(reason);

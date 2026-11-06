@@ -1,9 +1,9 @@
 """ASCENSION local Hunyuan3D model worker.
 
-Polls the secured web model queue, downloads each pathway's hidden generated
-reference image, sends it to the local Hunyuan3D API, uploads the returned GLB
-through a short-lived signed upload URL, and reports completion. No cloud
-service can call localhost; this process is the bridge.
+Polls the model queue on this same PC, downloads each pathway's hidden
+generated reference image, sends it to Hunyuan3D on 127.0.0.1:8081, uploads
+the returned GLB, and reports completion. ASCENSION_MODEL_QUEUE_URL and
+ASCENSION_HUNYUAN_URL override those defaults.
 """
 
 from __future__ import annotations
@@ -23,8 +23,11 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-DEFAULT_QUEUE_URL = "https://ascensionweave.app/api/public/ascension/model-queue"
-DEFAULT_HUNYUAN_URL = "http://127.0.0.1:8081/generate"
+DEFAULT_QUEUE_URL = os.environ.get(
+    "ASCENSION_MODEL_QUEUE_URL",
+    "http://127.0.0.1:3000/api/public/ascension/model-queue",
+)
+DEFAULT_HUNYUAN_URL = os.environ.get("ASCENSION_HUNYUAN_URL", "http://127.0.0.1:8081/generate")
 
 
 def _token() -> str:

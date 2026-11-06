@@ -1,37 +1,42 @@
-"""Loopback-only Hunyuan3D bridge for the approved ASCENSION browser app.
+"""Loopback-only Hunyuan3D bridge for the ASCENSION app on this same PC.
 
-Runs on the owner's Windows PC alongside Hunyuan3D at 127.0.0.1:8081.
-The public Railway server never reaches localhost or sees generated GLB bytes.
-Only approved ASCENSION origins can initiate generation.
-No paid API, Supabase secret, token, or cloud worker is required.
+The web server, this bridge, and Hunyuan3D all run on one machine.
+Hunyuan3D stays at 127.0.0.1:8081. The browser on this PC calls 127.0.0.1:8082.
+ASCENSION_HUNYUAN_URL can point the generate call elsewhere.
+ASCENSION_BROWSER_ORIGINS can add comma-separated browser origins.
 """
 from __future__ import annotations
 
 import base64
 import json
+import os
 import socket
 import threading
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse
 
 HOST = "127.0.0.1"
 PORT = 8082
-HUNYUAN = "http://127.0.0.1:8081/generate"
+HUNYUAN = os.environ.get("ASCENSION_HUNYUAN_URL", "http://127.0.0.1:8081/generate")
 MAX_POST = 14 * 1024 * 1024
 MAX_GLB = 60 * 1024 * 1024
+_hunyuan = urlparse(HUNYUAN)
+HUNYUAN_HOST = _hunyuan.hostname or "127.0.0.1"
+HUNYUAN_PORT = _hunyuan.port or 8081
 ALLOWED_ORIGINS = frozenset({
-    "https://ascension-nexus-weave-production.up.railway.app",
-    "https://ascensionweave.app",
-    "http://localhost:4174",
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
     "http://127.0.0.1:4174",
-})
+    "http://localhost:4174",
+} | {item.strip() for item in os.environ.get("ASCENSION_BROWSER_ORIGINS", "").split(",") if item.strip()})
 LOCK = threading.Lock()
 
 
 def hunyuan_is_up() -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 8081), timeout=1):
+        with socket.create_connection((HUNYUAN_HOST, HUNYUAN_PORT), timeout=1):
             return True
     except OSError:
         return False

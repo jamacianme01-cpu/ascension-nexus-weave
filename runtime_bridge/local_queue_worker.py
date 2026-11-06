@@ -13,8 +13,13 @@ import socket
 import time
 from pathlib import Path
 
-from .cloud_queue_worker import CloudQueueWorker, QueueClient, DEFAULT_QUEUE_URL
+from .cloud_queue_worker import CloudQueueWorker, QueueClient
 from .local_answer import generate_local_draft
+
+DEFAULT_QUEUE_URL = os.getenv(
+    "ASCENSION_QUEUE_URL",
+    "http://127.0.0.1:3000/api/public/ascension/execution-queue",
+)
 
 
 class LocalAnswerWorker(CloudQueueWorker):
@@ -42,7 +47,7 @@ class LocalAnswerWorker(CloudQueueWorker):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=str(Path(__file__).resolve().parent / "state" / "live"))
-    parser.add_argument("--queue-url", default=os.getenv("ASCENSION_QUEUE_URL", DEFAULT_QUEUE_URL))
+    parser.add_argument("--queue-url", default=DEFAULT_QUEUE_URL)
     parser.add_argument("--runner", default=os.getenv("ASCENSION_QUEUE_RUNNER", socket.gethostname()))
     parser.add_argument("--poll-seconds", type=float, default=3.0)
     parser.add_argument("--once", action="store_true")

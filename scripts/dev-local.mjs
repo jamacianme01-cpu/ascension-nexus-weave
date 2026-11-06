@@ -130,7 +130,7 @@ export async function connectAnswerEngine(
   }
   if (!Array.isArray(models))
     throw new Error(
-      "No local answer engine is reachable. Open https://ascensionweave.app to use the hosted engine, or start your installed Ollama engine and run this command again.",
+      "No local answer engine is reachable at http://127.0.0.1:11434. Start Ollama on this PC and run this command again.",
     );
   const names = models.map((model) => model.name);
   const requested =
@@ -144,7 +144,7 @@ export async function connectAnswerEngine(
   const chosen = installedModelName(requested, names);
   if (!chosen)
     throw new Error(
-      "Ollama is running, but the required answer model is not installed. No model was downloaded. Use https://ascensionweave.app for the hosted engine.",
+      "Ollama is running on this PC, but the required answer model is not installed. No model was downloaded.",
     );
   env.LOCAL_LLM_BASE_URL = "http://127.0.0.1:11434/v1";
   env.LOCAL_LLM_MODEL = chosen;

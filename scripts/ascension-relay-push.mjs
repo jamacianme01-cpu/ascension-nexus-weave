@@ -16,13 +16,15 @@
  *
  * Options (environment variables):
  *   ASCENSION_GATEWAY_URL   default http://localhost:8765
- *   ASCENSION_RELAY_URL     default https://ascensionweave.app/api/public/ascension/relay
+ *   ASCENSION_SITE_URL      default http://127.0.0.1:3000
+ *   ASCENSION_RELAY_URL     default <site>/api/public/ascension/relay
  *   ASCENSION_PUSH_INTERVAL seconds; when set, keeps pushing on that interval
  */
 
+const SITE = (process.env.ASCENSION_SITE_URL ?? "http://127.0.0.1:3000").replace(/\/+$/, "");
 const GATEWAY = (process.env.ASCENSION_GATEWAY_URL ?? "http://localhost:8765").replace(/\/+$/, "");
 const RELAY = (
-  process.env.ASCENSION_RELAY_URL ?? "https://ascensionweave.app/api/public/ascension/relay"
+  process.env.ASCENSION_RELAY_URL ?? `${SITE}/api/public/ascension/relay`
 ).replace(/\/+$/, "");
 const TOKEN = process.env.ASCENSION_PUBLISH_TOKEN;
 const INTERVAL = Number(process.env.ASCENSION_PUSH_INTERVAL ?? 0);

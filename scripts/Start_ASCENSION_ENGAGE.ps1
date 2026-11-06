@@ -71,7 +71,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host 'APP SOURCE PRODUCED. Starting paired, governed execution hub.'
-Write-Host 'Now open https://ascensionweave.app/live and ENGAGE one new software objective.'
+$site = if ($env:ASCENSION_SITE_URL) { $env:ASCENSION_SITE_URL.TrimEnd('/') } else { 'http://127.0.0.1:3000' }
+Write-Host "Now open $site and ENGAGE one new software objective."
 Write-Host 'Leave this PowerShell window running. Ctrl+C stops the worker.'
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $hub
 if ($LASTEXITCODE -ne 0) {

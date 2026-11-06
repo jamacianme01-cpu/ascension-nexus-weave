@@ -20,7 +20,7 @@ import re
 SURFACES = ("/snapshot", "/status", "/knowledgeverse", "/pathways",
             "/governance", "/outcomes", "/galaxy-bridges", "/manifestation",
             "/ledger", "/chamber")
-SITE = "https://ascensionweave.app"
+SITE = os.environ.get("ASCENSION_SITE_URL", "http://127.0.0.1:3000").rstrip("/")
 
 
 def observe(gateway, path):

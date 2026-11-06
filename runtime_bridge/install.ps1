@@ -67,7 +67,8 @@ while ($true) {
 }
 while ($true) {
     try {
-        & python -B -u -m ASCENSION_CORE.local_queue_worker --root (Join-Path $runtimeRepo 'ASCENSION_CORE\state\live') --queue-url 'https://ascensionweave.app/api/public/ascension/execution-queue' 2>&1 | Out-File -FilePath (Join-Path $logDir 'local_answer_worker.log') -Append
+        $queueUrl = if ($env:ASCENSION_QUEUE_URL) { $env:ASCENSION_QUEUE_URL } else { 'http://127.0.0.1:3000/api/public/ascension/execution-queue' }
+        & python -B -u -m ASCENSION_CORE.local_queue_worker --root (Join-Path $runtimeRepo 'ASCENSION_CORE\state\live') --queue-url $queueUrl 2>&1 | Out-File -FilePath (Join-Path $logDir 'local_answer_worker.log') -Append
     } catch {
         $_ | Out-File -FilePath (Join-Path $logDir 'local_answer_worker.log') -Append
     }

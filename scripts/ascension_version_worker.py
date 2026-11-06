@@ -11,6 +11,7 @@ import argparse
 from difflib import SequenceMatcher
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -18,7 +19,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-SITE = "https://ascensionweave.app/api/public/ascension/output-versions"
+SITE = os.environ.get(
+    "ASCENSION_OUTPUT_VERSIONS_URL",
+    os.environ.get("ASCENSION_SITE_URL", "http://127.0.0.1:3000").rstrip("/")
+    + "/api/public/ascension/output-versions",
+)
 
 
 def request_json(url: str, key: str, body: dict | None = None) -> dict:

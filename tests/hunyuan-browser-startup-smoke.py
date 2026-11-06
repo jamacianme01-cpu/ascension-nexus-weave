@@ -21,7 +21,7 @@ proc = subprocess.Popen(
     stderr=subprocess.PIPE,
     text=True,
 )
-origin = "https://ascension-nexus-weave-production.up.railway.app"
+origin = "http://127.0.0.1:3000"
 try:
     for _ in range(45):
         if proc.poll() is not None:
@@ -62,7 +62,22 @@ try:
         assert response.status == 204, response.status
         assert response.headers.get("Access-Control-Allow-Origin") == origin
         assert response.headers.get("Access-Control-Allow-Private-Network") == "true"
-    print("PASS approved HTTPS origin can preflight against localhost bridge")
+    print("PASS same-machine origin can preflight against localhost bridge")
+    denied = urllib.request.Request(
+        "http://127.0.0.1:8082/generate",
+        method="OPTIONS",
+        headers={
+            "Origin": "https://ascensionweave.app",
+            "Host": "127.0.0.1:8082",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    try:
+        urllib.request.urlopen(denied, timeout=3)
+        raise RuntimeError("Remote site origin was accepted by the same-machine bridge")
+    except urllib.error.HTTPError as error:
+        assert error.code == 403, error.code
+    print("PASS remote site origin is refused unless ASCENSION_BROWSER_ORIGINS adds it")
 finally:
     proc.terminate()
     try:

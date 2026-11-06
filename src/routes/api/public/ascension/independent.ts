@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callAscensionAnswer, localBrainConfigured } from "@/lib/ascension/engine/local-answer.server";
-import { remoteBrainEnabled, isBrainOnline, sendToBrain } from "@/lib/ascension/brain-relay.server";
+import { remoteBrainEnabled, isBrainOnline, sendToBrain, enqueueBrowserBrainJob, browserBrainJobResult } from "@/lib/ascension/brain-relay.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { compileDesignIdentity } from "@/lib/ascension/design-image-brief";
@@ -403,10 +403,17 @@ async function picture(objective: string, value: Record<string, unknown>) {
 
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
-    GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      brain_mode: remoteBrainEnabled() ? "designated-old-pc" : localBrainConfigured() ? "same-computer" : "hosted",
-      brain_connected: remoteBrainEnabled() ? isBrainOnline() : false,
-      local_brain_configured: localBrainConfigured(), governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." }),
+    GET: async ({ request }) => {
+      const jobId = new URL(request.url).searchParams.get("brain_job");
+      if (jobId && remoteBrainEnabled()) {
+        const reply = browserBrainJobResult(jobId);
+        return json(reply.body, reply.status);
+      }
+      return json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
+        brain_mode: remoteBrainEnabled() ? "designated-old-pc" : localBrainConfigured() ? "same-computer" : "hosted",
+        brain_connected: remoteBrainEnabled() ? isBrainOnline() : false,
+        local_brain_configured: localBrainConfigured(), governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." });
+    },
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");
@@ -439,6 +446,12 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
           if (!limit("brain:"+phase+":global", phase==="guide"?240:48) ||
               !limit("brain:"+phase+":ip:"+address, phase==="guide"?48:12))
             return json({ error: "ASCENSION local brain request limit reached." }, 429);
+          // The V1 browser can poll while a slower old-PC CPU builds all four
+          // pathways. No Railway request or relay socket must stay open.
+          if (phase === "pathways" && request.headers.get("prefer") === "respond-async") {
+            const queued = enqueueBrowserBrainJob(input);
+            return json(queued.body, queued.status);
+          }
           const reply = await sendToBrain(input);
           return json(reply.body, reply.status);
         }

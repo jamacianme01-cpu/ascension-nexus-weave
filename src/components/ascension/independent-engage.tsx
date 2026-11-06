@@ -153,12 +153,13 @@ export function IndependentEngage() {
         body: JSON.stringify({ objective: text, phase: "pathways" }),
         signal: controller.signal,
       });
-      let data: Result & { error?: string; brain_job_id?: string } = await response.json();
+      let data: Result & { error?: string; brain_job_id?: string; local_brain_job_id?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "Pathway synthesis did not complete.");
       // The older PC may need several minutes to generate four actual
       // structured pathways. Poll the result; preserve the approved V1 view.
       if (response.status === 202) {
-        const jobId = data.brain_job_id;
+        const localJob = Boolean(data.local_brain_job_id && !data.brain_job_id);
+        const jobId = data.brain_job_id || data.local_brain_job_id;
         if (!jobId || !/^[a-f0-9-]{36}$/.test(jobId))
           throw new Error("ASCENSION brain did not return a valid pathway job.");
         let finished = false;
@@ -166,7 +167,8 @@ export function IndependentEngage() {
           if (controller.signal.aborted || generation.current !== token) return;
           await new Promise<void>(resolve => window.setTimeout(resolve, 2000));
           if (controller.signal.aborted || generation.current !== token) return;
-          const poll = await fetch("/api/public/ascension/independent?brain_job=" +
+          const poll = await fetch("/api/public/ascension/independent?" +
+            (localJob ? "local_brain_job" : "brain_job") + "=" +
             encodeURIComponent(jobId), { signal: controller.signal, cache: "no-store" });
           data = await poll.json();
           if (poll.status === 202) continue;

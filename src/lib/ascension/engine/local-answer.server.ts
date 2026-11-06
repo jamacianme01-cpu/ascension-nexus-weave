@@ -26,7 +26,7 @@ function localEndpoint(): URL {
   return new URL("/api/chat", base);
 }
 
-export async function callAscensionAnswer(input: RequestInput): Promise<OpenAIAnswer> {
+export async function callAscensionAnswer(input: RequestInput & { maxPredict?: number }): Promise<OpenAIAnswer> {
   if (!localBrainConfigured()) return callOpenAIResponse(input);
   if (input.imageDataUrl || input.webSearch) {
     throw new Error("The local brain has no verified vision/web-search tool for this request.");
@@ -54,7 +54,7 @@ export async function callAscensionAnswer(input: RequestInput): Promise<OpenAIAn
           { role: "user", content: input.user },
         ],
         ...(input.structuredOutput ? { format: input.structuredOutput.schema } : {}),
-        options: { temperature: 0.25, num_predict: structured ? 2700 : 900 },
+        options: { temperature: 0.25, num_predict: structured ? 2700 : Math.max(64, Math.min(900, input.maxPredict ?? 900)) },
       }),
     });
   } catch (cause) {

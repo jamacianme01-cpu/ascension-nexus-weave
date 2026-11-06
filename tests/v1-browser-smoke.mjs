@@ -65,7 +65,7 @@ try{
     const realFetch=window.fetch.bind(window);
     window.fetch=async(input,init)=>{
       const url=typeof input==="string"?input:input instanceof Request?input.url:String(input);
-      if(!url.startsWith("http://127.0.0.1:8082/"))return realFetch(input,init);
+      if(!url.startsWith("/api/public/ascension/brain-3d/"))return realFetch(input,init);
       window.__localHunyuanCalls.push(url);
       if(url.endsWith("/status"))
         return new Response(JSON.stringify({ready:true,engine:"Hunyuan3D",source:"owner-local"}),{

@@ -91,6 +91,19 @@ try {
   const worker = readFileSync("scripts/brain-worker.mjs", "utf8");
   assert.match(worker, /local_brain_job/,
     "Old computer must poll local pathway jobs instead of timing out HTTP");
+
+  assert.match(route, /localPathwaySerial\.then\(\(\) => build\(objective, prior\)\)/,
+    "Old computer must serialize expensive structured Ollama generation.");
+  assert.match(route, /ascension-v1-cpu-job-lifecycle-20261106/,
+    "Local server must expose a new runtime signature for this repair.");
+  const relay = readFileSync("src/lib/ascension/brain-relay.server.ts", "utf8");
+  assert.match(relay, /BROWSER_JOB_TIMEOUT = 20 \* 60_000/,
+    "Railway must not delete a genuine old-CPU job at nine minutes.");
+  assert.match(worker, /for \(let i = 0; i < 570; i\+\+\)/,
+    "The old-PC worker must retain results until before the cloud deadline.");
+  assert.match(screenSource, /for \(let attempt = 0; attempt < 600; attempt\+\+\)/,
+    "The browser must not stop polling a still-valid pathway job after ten minutes.");
+
   assert.match(route,/Local ASCENSION brain/,"Provenance must identify local rather than cloud inference");
   console.log("PASS ASCENSION local-brain boundary: loopback model, structured output, identity provenance and no remote-PC inference.");
 } finally {

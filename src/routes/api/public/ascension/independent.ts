@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callAscensionAnswer, localBrainConfigured } from "@/lib/ascension/engine/local-answer.server";
+import { remoteBrainEnabled, isBrainOnline, sendToBrain } from "@/lib/ascension/brain-relay.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { compileDesignIdentity } from "@/lib/ascension/design-image-brief";
@@ -403,6 +404,8 @@ async function picture(objective: string, value: Record<string, unknown>) {
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
+      brain_mode: remoteBrainEnabled() ? "designated-old-pc" : localBrainConfigured() ? "same-computer" : "hosted",
+      brain_connected: remoteBrainEnabled() ? isBrainOnline() : false,
       local_brain_configured: localBrainConfigured(), governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
@@ -421,6 +424,24 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         if(raw.length>15000 && input["phase"]!=="guide")return json({error:"Request too long."},413);
         const objective = String(input["objective"] ?? "").trim();
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
+        if (remoteBrainEnabled()) {
+          // The website is only a transport. The designated older computer
+          // executes ALL current V1 answer phases; never fall back to a
+          // Railway-hosted model when that computer is disconnected.
+          const phase = String(input["phase"] ?? "pathways");
+          if (!["pathways", "initial", "guide", "picture"].includes(phase))
+            return json({ error: "Unsupported ASCENSION phase." }, 400);
+          if (phase === "guide" && (typeof input["question"] !== "string" ||
+              input["question"].trim().length < 3 || input["question"].length > 800))
+            return json({ error: "Ask a question between 3 and 800 characters." }, 400);
+          if (phase === "picture" && isPersonalFinanceObjective(objective))
+            return json({ error: "Financial guidance does not require an invention picture." }, 400);
+          if (!limit("brain:"+phase+":global", phase==="guide"?240:48) ||
+              !limit("brain:"+phase+":ip:"+address, phase==="guide"?48:12))
+            return json({ error: "ASCENSION local brain request limit reached." }, 429);
+          const reply = await sendToBrain(input);
+          return json(reply.body, reply.status);
+        }
         if (input["phase"] === "initial") {
           if (!limit("objective-global", 48) || !limit("objective-ip:" + address, 12))
             return json({ error: "Too many objectives. Try again later." }, 429);

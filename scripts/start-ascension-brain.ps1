@@ -52,10 +52,12 @@ Push-Location $Repo
 try {
   if (!(Test-Path (Join-Path $Repo 'node_modules'))) {
     Write-Host 'Installing existing repository dependencies...'
-    & npm ci
+    if (Get-Command bun -ErrorAction SilentlyContinue) { & bun install --frozen-lockfile }
+    else { & npm install --no-package-lock }
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
   }
-  & npm run build
+  if (Get-Command bun -ErrorAction SilentlyContinue) { & bun run build }
+  else { & npm run build }
   if ($LASTEXITCODE -ne 0) { throw 'ASCENSION build failed.' }
   Write-Host 'Starting local ASCENSION server. Test on this PC at http://127.0.0.1:'$Port
   & node '.output/server/index.mjs'

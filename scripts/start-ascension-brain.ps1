@@ -39,9 +39,10 @@ $env:ASCENSION_ALLOW_PAID_DRAFTS='false'
 $env:ASCENSION_ALLOW_LOVABLE_AI='false'
 $env:ASCENSION_ALLOW_PAID_IMAGES='false'
 $env:PORT=[string]$Port
-# Bind to the designated PC's network only. No public cloud relay or tunnel.
-$env:HOST='0.0.0.0'
-$env:NITRO_HOST='0.0.0.0'
+# Bind ONLY to this PC. Railway reaches it through the outbound worker,
+# never through a direct inbound LAN or public network listener.
+$env:HOST='127.0.0.1'
+$env:NITRO_HOST='127.0.0.1'
 $env:NITRO_PORT=[string]$Port
 
 Write-Host ('ASCENSION BRAIN PC: ' + $env:COMPUTERNAME)

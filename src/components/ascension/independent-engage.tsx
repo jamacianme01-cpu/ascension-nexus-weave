@@ -162,7 +162,7 @@ export function IndependentEngage() {
         if (!jobId || !/^[a-f0-9-]{36}$/.test(jobId))
           throw new Error("ASCENSION brain did not return a valid pathway job.");
         let finished = false;
-        for (let attempt = 0; attempt < 300; attempt++) {
+        for (let attempt = 0; attempt < 600; attempt++) {
           if (controller.signal.aborted || generation.current !== token) return;
           await new Promise<void>(resolve => window.setTimeout(resolve, 2000));
           if (controller.signal.aborted || generation.current !== token) return;

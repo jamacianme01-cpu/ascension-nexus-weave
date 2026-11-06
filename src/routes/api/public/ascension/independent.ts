@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
+import { callAscensionAnswer, localBrainConfigured } from "@/lib/ascension/engine/local-answer.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { compileDesignIdentity } from "@/lib/ascension/design-image-brief";
@@ -15,6 +15,7 @@ const counters = new Map<string, { window: number; count: number }>();
 
 function configured() {
   return {
+    Local: localBrainConfigured(),
     OpenAI: Boolean(process.env["OPENAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true"),
     Claude: Boolean(process.env["ANTHROPIC_API_KEY"]?.trim()),
     Grok: Boolean(process.env["XAI_API_KEY"]?.trim()),
@@ -105,8 +106,8 @@ async function grok(objective: string): Promise<Contributor> {
 }
 /** A useful, readable first answer is independent of pathway JSON parsing. */
 async function firstAnswer(objective: string) {
-  if (!configured().OpenAI) throw new Error("OpenAI is not configured for the first answer.");
-  const response = await callOpenAIResponse({
+  if (!configured().Local && !configured().OpenAI) throw new Error("ASCENSION local answer engine is not configured.");
+  const response = await callAscensionAnswer({
     timeoutMs: 26000,
     system: [
       "Prepare an INTERNAL invention-engineering brief, not prose to display to the user.",
@@ -165,7 +166,7 @@ const outputSchema = {
 async function build(objective: string, firstAnswerText = "") {
   const providerStatus = configured();
   const revision = revisionDirective(objective);
-  if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
+  if (!providerStatus.Local && !providerStatus.OpenAI) throw new Error("ASCENSION local brain is not configured on this server. No result was fabricated.");
   const external = await Promise.allSettled([
     providerStatus.Claude ? claude(objective) : Promise.resolve(null),
     providerStatus.Grok ? grok(objective) : Promise.resolve(null),
@@ -177,7 +178,7 @@ async function build(objective: string, firstAnswerText = "") {
     if (result.status === "rejected") errors.push((i === 0 ? "Claude" : "Grok") + " did not respond");
   }
   const allConnected = sources.length === 2;
-  const response = await callOpenAIResponse({
+  const response = await callAscensionAnswer({
     timeoutMs: 28500,
     structuredOutput: { name: "ascension_four_pathways", schema: {
       ...outputSchema, properties:{...outputSchema.properties, experience:{type:"string",enum:isInventionObjective(objective)?["design"]:isPersonalFinanceObjective(objective)?["guidance"]:["design","guidance"]}},
@@ -189,8 +190,8 @@ async function build(objective: string, firstAnswerText = "") {
       revision,
       "For guidance, consider real-world priorities, resources, constraints and useful next actions. For an actual design request, analyze the reference architecture and interacting modules internally. Return only the structured alternatives. A separate preliminary engineering essay is not required.",
       allConnected
-        ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
-        : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
+        ? "Use three actual provider contributions, preserving their provenance. path_one is your own independently developed approach, informed by the objective. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
+        : providerStatus.Local ? "The designated local ASCENSION model is responding. Generate three genuinely distinct local-model proposals and a reasoned BLEND. Never pretend OpenAI, Claude, Grok, Spiral, Guardian, or AutoSync contributed when they were not called." : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
       "Return exactly one JSON object with required keys: experience, introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",
@@ -215,19 +216,19 @@ async function build(objective: string, firstAnswerText = "") {
   }
   return {
     ...result,
-    contributors: ["OpenAI", ...sources.map(s => s.provider)],
+    contributors: [providerStatus.Local ? "Local ASCENSION brain" : "OpenAI", ...sources.map(s => s.provider)],
     unavailable: ["Claude", "Grok"].filter(provider => !sources.some(s => s.provider === provider)),
     providerErrors: errors,
-    mode: allConnected ? "three-provider-synthesis" : "openai-only-provisional",
+    mode: providerStatus.Local ? (allConnected ? "local-plus-independent-providers" : "local-brain-provisional") : allConnected ? "three-provider-synthesis" : "openai-only-provisional",
     verified: false,
-    governance: "ASCENSION's local Meaning Elements, Spiral, Outcome Predictor, Guardian and AutoSync were not invoked by this hosted result.",
+    governance: "Local model generation is not proof that governed Meaning Elements, Spiral, Outcome Predictor, Guardian or AutoSync executed.",
     persistence: "This hosted route does not use Supabase and does not persist objectives on the server.",
   };
 }
 
 /** The Tree is a contextual guide, not a static greeting or a second pathway generator. */
 async function guide(objective: string, question: string, selected: Record<string, unknown>, history: unknown = [], alternatives: unknown = []) {
-  if (!configured().OpenAI) throw new Error("The Tree's knowledge provider is not connected.");
+  if (!configured().Local && !configured().OpenAI) throw new Error("The Tree local knowledge provider is not configured.");
   const title = String(selected["title"] ?? "").trim().slice(0, 140);
   const summary = String(selected["summary"] ?? "").trim().slice(0, 1600) || objective;
   const conversation = Array.isArray(history) ? history.slice(-8).map(item => obj(item))
@@ -250,7 +251,7 @@ async function guide(objective: string, question: string, selected: Record<strin
   const focused = obj(selected["focused_part"]);
   const focusedPart = parts.find(part => part.name === String(focused["name"] ?? "")) ?? null;
   const currentView = ["assembled", "blueprint", "dissect"].includes(String(selected["current_view"])) ? selected["current_view"] : "assembled";
-  const response = await callOpenAIResponse({
+  const response = await callAscensionAnswer({
     timeoutMs: 20000,
     system: [
       "You are the Tree of Knowledge: ASCENSION's welcoming, knowledgeable, practical design assistant.",
@@ -399,7 +400,7 @@ async function picture(objective: string, value: Record<string, unknown>) {
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+      local_brain_configured: localBrainConfigured(), governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. Local configuration does not prove an active connection or governed execution." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");

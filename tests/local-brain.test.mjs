@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { callAscensionAnswer, localBrainConfigured } from "../src/lib/ascension/engine/local-answer.server.ts";
+import { asCompletedDesignStep } from "../src/lib/ascension/design-answer.ts";
 
 const priorBase = process.env.LOCAL_LLM_BASE_URL;
 const priorModel = process.env.LOCAL_LLM_MODEL;
@@ -39,6 +40,32 @@ try {
   assert.equal(answer.model, "local:qwen3:4b");
   assert.deepEqual(answer.sources, []);
   assert.equal(calls, 1);
+
+  // The spoken Tree is short; the full pathway answer retains its larger
+  // token budget, and source steps never acquire fabricated "completed" work.
+  globalThis.fetch = async (_url, request) => {
+    const body = JSON.parse(request.body);
+    assert.equal(body.stream, false);
+    assert.equal(body.options.num_predict, 180);
+    return new Response(JSON.stringify({
+      done: true, done_reason: "stop",
+      message: { role: "assistant", content: "The base carries the drive motors." },
+    }), { status: 200 });
+  };
+  const guide = await callAscensionAnswer({
+    system: "Explain the part", user: "How does it work?",
+    maxPredict: 180, timeoutMs: 45000,
+  });
+  assert.match(guide.text, /drive motors/);
+  assert.equal(asCompletedDesignStep("1. The rotor sits above the frame."), "The rotor sits above the frame.");
+  assert.equal(asCompletedDesignStep("Choose a material"), "Choose a material",
+    "Never pretend an unfinished engineering choice was made.");
+  const workerSource = readFileSync("scripts/brain-worker.mjs", "utf8");
+  assert.match(workerSource, /const MAX_PARALLEL = 2/,
+    "Image requests must not block the Tree behind a single synchronous worker.");
+  const screenSource = readFileSync("src/components/ascension/independent-engage.tsx", "utf8");
+  assert.doesNotMatch(screenSource, /if \(choice !== null && experience === "design" && !designSettled\) return/,
+    "Selected pathway must open immediately, even while its real picture loads.");
 
   process.env.LOCAL_LLM_BASE_URL = "http://192.168.0.87:11434/v1";
   await assert.rejects(

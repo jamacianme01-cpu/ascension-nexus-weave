@@ -268,7 +268,10 @@ async function guide(objective: string, question: string, selected: Record<strin
   const focusedPart = parts.find(part => part.name === String(focused["name"] ?? "")) ?? null;
   const currentView = ["assembled", "blueprint", "dissect"].includes(String(selected["current_view"])) ? selected["current_view"] : "assembled";
   const response = await callAscensionAnswer({
-    timeoutMs: 20000,
+    // Local CPU responses are brief, but prefill can take longer than 20s.
+    // Cap predicted words instead of timing out the Tree's spoken explanation.
+    timeoutMs: localBrainConfigured() ? 45000 : 20000,
+    maxPredict: 180,
     system: [
       "You are the Tree of Knowledge: ASCENSION's welcoming, knowledgeable, practical design assistant.",
       "Work WITH the person on the chosen approach. Speak directly, naturally and warmly, never like a narrator",

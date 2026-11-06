@@ -42,17 +42,46 @@ async function deliver(job) {
   await ensureLocalBrain();
   let status = 503, body = { error: "The designated old-PC engine did not respond." };
   try {
-    const response = await fetch(local + "/api/public/ascension/independent", {
-      method: "POST",
-      headers: { "content-type": "application/json", "origin": local },
-      body: JSON.stringify(job.input),
-      signal: AbortSignal.timeout(100_000),
-    });
-    status = response.status;
-    const raw = await response.text();
-    if (raw.length > 12_800_000) throw new Error("Old-PC result exceeded relay size limit.");
-    try { body = JSON.parse(raw); }
-    catch { body = { error: "Old-PC engine returned invalid JSON." }; status = 502; }
+    const operation = job.input.__brain_operation;
+    if (operation === "hunyuan_status" || operation === "hunyuan_generate") {
+      // Only the owner's local Hunyuan engine is used. Never connect to a
+      // viewer's laptop or the previous second computer.
+      const isGenerate = operation === "hunyuan_generate";
+      const image = job.input.image;
+      if (isGenerate && (typeof image !== "string" || image.length < 4000 ||
+          image.length > 12_000_000 || !/^[A-Za-z0-9+/=]+$/.test(image)))
+        throw new Error("Invalid Hunyuan reference image.");
+      const response = await fetch("http://127.0.0.1:8082/" +
+        (isGenerate ? "generate" : "status"), {
+        method: isGenerate ? "POST" : "GET",
+        headers: { origin: "http://127.0.0.1:8080", ...(isGenerate ? { "content-type": "application/json" } : {}) },
+        ...(isGenerate ? { body: JSON.stringify({ image }) } : {}),
+        signal: AbortSignal.timeout(isGenerate ? 100_000 : 7_000),
+      });
+      status = response.status;
+      if (isGenerate && response.ok) {
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (bytes.length < 20 || bytes.length > 9_000_000 ||
+            bytes.subarray(0, 4).toString("utf8") !== "glTF")
+          throw new Error("Old-PC Hunyuan returned no bounded GLB.");
+        body = { glb_base64: bytes.toString("base64") };
+      } else {
+        try { body = await response.json(); }
+        catch { body = { error: "Old-PC Hunyuan returned unreadable status." }; status = 502; }
+      }
+    } else {
+      const response = await fetch(local + "/api/public/ascension/independent", {
+        method: "POST",
+        headers: { "content-type": "application/json", "origin": local },
+        body: JSON.stringify(job.input),
+        signal: AbortSignal.timeout(100_000),
+      });
+      status = response.status;
+      const raw = await response.text();
+      if (raw.length > 12_800_000) throw new Error("Old-PC result exceeded relay size limit.");
+      try { body = JSON.parse(raw); }
+      catch { body = { error: "Old-PC engine returned invalid JSON." }; status = 502; }
+    }
   } catch (cause) {
     status = 503;
     body = { error: "Old-PC execution failed: " + (cause instanceof Error ? cause.message : String(cause)).slice(0,240) };

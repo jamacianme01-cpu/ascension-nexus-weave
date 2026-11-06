@@ -14,13 +14,15 @@ export function freePictureEnabled(env: { allow?: string; endpoint?: string } = 
   return true;
 }
 
-/** Keep a generated design decision verbatim. The previous helper falsely
- * converted "choose a material" into "this design already uses a material,"
- * which claimed a decision had been made when the engine made none.
- * Strip only duplicate list numbers; the ordered list owns its numbering.
- */
+const ASSIGNMENT = /^(?:please\s+)?(?:you(?:'d| would| should| need to| must)|the user should|start by|first(?:,| you should)?|next,?)?\s*(?:research|look up|study|read about|define|specify|identify|find out|investigate|survey|compare options for|shop for|go buy|acquire|purchase|choose your|decide your|figure out|calculate|measure|determine)(?:ing|s)?\b[:\s,-]*/i;
+
+/** A design step states a choice already made. It does not assign research. */
 export function asCompletedDesignStep(step: string): string {
-  return step.replace(/\s+/g, " ").trim().replace(
-    /^(?:step\s+)?\d{1,2}\s*[.)\-:]\s*/i, "",
-  ).trim();
+  const text = step.replace(/\s+/g, " ").trim();
+  if (!ASSIGNMENT.test(text)) return text;
+  const rest = text.replace(ASSIGNMENT, "").replace(/^[\s,:.-]+/, "").replace(/[?.!]+$/, "").trim();
+  if (rest.length < 8 || /^(?:your |the )?(?:requirements|design|it|this|system)\b/i.test(rest))
+    return "This design already includes a provisional choice here. Measured values stay unresolved.";
+  const body = rest.charAt(0).toLowerCase() + rest.slice(1);
+  return `This design already uses ${body}.`;
 }

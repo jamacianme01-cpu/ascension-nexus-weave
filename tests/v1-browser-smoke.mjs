@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { chromium } from "playwright";
+
 const screenshotDir = process.env.ASCENSION_SCREENSHOT_DIR || join(tmpdir(), "ascension-v1-screenshots");
-mkdirSync(screenshotDir,{recursive:true});
+mkdirSync(screenshotDir, { recursive: true });
 
 // Two physically distinct named triangles make a valid GLB; unlike a picture,
 // its identity and vertices can be checked across every inspection view.
@@ -70,7 +71,7 @@ try{
     const realFetch=window.fetch.bind(window);
     window.fetch=async(input,init)=>{
       const url=typeof input==="string"?input:input instanceof Request?input.url:String(input);
-      if(!url.startsWith("/api/public/ascension/brain-3d/"))return realFetch(input,init);
+      if(!url.startsWith("http://127.0.0.1:8082/"))return realFetch(input,init);
       window.__localHunyuanCalls.push(url);
       if(url.endsWith("/status"))
         return new Response(JSON.stringify({ready:true,engine:"Hunyuan3D",source:"owner-local"}),{

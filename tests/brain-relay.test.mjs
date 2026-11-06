@@ -110,6 +110,40 @@ try {
   assert.equal(binary.headers.get("content-type"),"model/gltf-binary");
   assert.deepEqual(Buffer.from(await binary.arrayBuffer()),glb);
 
+  // The new asynchronous pathway contract must not block a Railway HTTP
+  // request while the older CPU runs, and must return exactly the worker reply.
+  const asyncStart=await get("/api/public/ascension/independent",{
+    method:"POST",headers:{"content-type":"application/json","prefer":"respond-async"},
+    body:JSON.stringify({objective:"make worker drones",phase:"pathways"}),
+  });
+  assert.equal(asyncStart.status,202);
+  const queued=await asyncStart.json();
+  assert.match(queued.brain_job_id,/^[a-f0-9-]{36}$/);
+  const pollingPath="/api/public/ascension/independent?brain_job="+queued.brain_job_id;
+  const pending=await get(pollingPath);
+  assert.equal(pending.status,202);
+
+  let asyncJob=null;
+  for(let i=0;i<30;i++){
+    await sleep(100);
+    asyncJob=(await (await get("/api/public/ascension/brain-worker",{headers})).json()).job;
+    if(asyncJob)break;
+  }
+  assert.ok(asyncJob,"The older computer must claim the asynchronous pathway request");
+  assert.deepEqual(asyncJob.input,{objective:"make worker drones",phase:"pathways"});
+  const asyncAnswer={phase:"pathways",pathways:[
+    {id:"p1",title:"First"}, {id:"p2",title:"Second"}, {id:"p3",title:"Third"},
+  ],blend:{id:"blend",title:"Fourth"}};
+  const ack=await get("/api/public/ascension/brain-worker",{
+    method:"POST",headers:{...headers,"content-type":"application/json"},
+    body:JSON.stringify({id:asyncJob.id,status:200,body:asyncAnswer}),
+  });
+  assert.equal(ack.status,200);
+  const finished=await get(pollingPath);
+  assert.equal(finished.status,200);
+  assert.deepEqual(await finished.json(),asyncAnswer,
+    "Polling must return the real local PC pathway data without fabrication");
+  console.log("PASS LIVE Nitro async four-pathways relay, old-PC worker and progress polling.");
   console.log("PASS LIVE Nitro old-PC relay: ENGAGE and 3D transport, offline fails closed and no browser-local GPU dependency.");
 } finally {
   runtime.kill("SIGTERM");

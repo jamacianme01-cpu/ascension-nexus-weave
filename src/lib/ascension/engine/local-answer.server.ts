@@ -36,7 +36,7 @@ export async function callAscensionAnswer(input: RequestInput): Promise<OpenAIAn
   try {
     response = await fetch(localEndpoint(), {
       method: "POST",
-      signal: AbortSignal.timeout(Math.max(8_000, Math.min(180_000, input.timeoutMs ?? 120_000))),
+      signal: AbortSignal.timeout(Math.max(8_000, Math.min(480_000, input.timeoutMs ?? 120_000))),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         model,
@@ -47,7 +47,9 @@ export async function callAscensionAnswer(input: RequestInput): Promise<OpenAIAn
           { role: "user", content: input.user },
         ],
         ...(input.structuredOutput ? { format: input.structuredOutput.schema } : {}),
-        options: { temperature: 0.25, num_predict: 6500 },
+        // A small local CPU model must complete the full 3 + BLEND
+        // instead of spending minutes predicting unnecessary extra tokens.
+        options: { temperature: 0.25, num_predict: input.structuredOutput ? 2700 : 900 },
       }),
     });
   } catch (cause) {

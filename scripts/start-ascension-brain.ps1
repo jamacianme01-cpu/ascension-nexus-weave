@@ -49,6 +49,19 @@ Write-Host ('LOCAL MODEL: ' + $model)
 Write-Host ('OLLAMA: ' + $env:LOCAL_LLM_BASE_URL)
 Write-Host ('APP PORT: ' + $Port)
 Write-Host 'Cloud answer providers disabled. Existing source remains unchanged.'
+# 3D is also assigned to this same PC. Never fall back to another device.
+$hunyuanRoot='C:\AI\HY3D2\Hunyuan3D2_WinPortable'
+$hunyuanLaunch=Join-Path $Repo 'runtime_bridge\start_hunyuan_now.ps1'
+if ((Test-Path (Join-Path $hunyuanRoot 'python_standalone\python.exe')) -and
+    (Test-Path $hunyuanLaunch)) {
+  try {
+    & $hunyuanLaunch -Repo $Repo -HunyuanRoot $hunyuanRoot
+  } catch {
+    Write-Warning ('LOCAL 3D NOT READY: ' + $_.Exception.Message)
+  }
+} else {
+  Write-Host 'LOCAL 3D NOT INSTALLED ON THIS BRAIN PC. No second computer will be used.'
+}
 Push-Location $Repo
 try {
   if (!(Test-Path (Join-Path $Repo 'node_modules'))) {

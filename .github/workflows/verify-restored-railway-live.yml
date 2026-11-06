@@ -41,3 +41,38 @@ jobs:
           assert.equal(new Set(names).size,4,"Four named choices must be distinct");
           console.log("PASS RESTORED LIVE ENGAGE: three pathways plus BLEND");
           NODE
+
+      - name: Verify all four restored browser pathways open (no mocked ENGAGE)
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { chromium } from "playwright";
+          const browser=await chromium.launch({args:["--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]});
+          try{
+            const page=await browser.newPage({viewport:{width:1100,height:800},reducedMotion:"reduce"});
+            page.setDefaultTimeout(30000);
+            await page.goto("https://ascension-nexus-weave-production.up.railway.app/",{waitUntil:"domcontentloaded",timeout:30000});
+            const field=page.locator("#objective");
+            await field.fill("make a worker drone");
+            await page.getByRole("button",{name:"ENGAGE ASCENSION",exact:true}).click();
+            await page.getByRole("tab").first().waitFor({timeout:100000});
+            const tabs=page.getByRole("tab");
+            assert.equal(await tabs.count(),4,"Three approaches and BLEND must render in browser");
+            for(let i=0;i<4;i++){
+              await tabs.nth(i).click();
+              const enter=page.getByRole("button",{name:"ENTER PATHWAY",exact:true});
+              await enter.waitFor({state:"visible",timeout:20000});
+              await enter.click();
+              const panel=page.getByRole("region",{name:"Selected pathway design"});
+              await panel.waitFor({state:"visible",timeout:20000});
+              console.log("BROWSER OPENED PATHWAY",i+1, (await panel.innerText()).slice(0,180).replace(/\\s+/g," "));
+              await panel.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
+              await page.getByRole("tab").first().waitFor({state:"visible",timeout:15000});
+            }
+            console.log("PASS RESTORED LIVE BROWSER: all four pathway inspection screens open");
+          }finally{
+            await browser.close();
+          }
+          NODE

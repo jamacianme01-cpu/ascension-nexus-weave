@@ -32,6 +32,7 @@ jobs:
       - run: bun tests/vision-behavior.test.mjs
       - run: bun tests/design-identity.test.mjs
       - run: bun tests/local-brain.test.mjs
+      - run: node tests/brain-relay.test.mjs
       - name: Browser acceptance against the original V1 experience
         run: |
           npm install --no-save playwright

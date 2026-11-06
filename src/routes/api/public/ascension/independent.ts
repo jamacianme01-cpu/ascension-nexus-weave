@@ -183,11 +183,22 @@ async function build(objective: string, firstAnswerText = "") {
   }
   const allConnected = sources.length === 2;
   const response = await callAscensionAnswer({
-    timeoutMs: 28500,
+    timeoutMs: providerStatus.Local ? 450000 : 28500,
     structuredOutput: { name: "ascension_four_pathways", schema: {
       ...outputSchema, properties:{...outputSchema.properties, experience:{type:"string",enum:isInventionObjective(objective)?["design"]:isPersonalFinanceObjective(objective)?["guidance"]:["design","guidance"]}},
     } },
-    system: [
+    system: providerStatus.Local ? [
+      "You are ASCENSION's locally running invention-design engine. Accomplish the user's exact objective without changing its meaning.",
+      "Return ONLY valid JSON satisfying the supplied schema. Exact keys: experience,introduction,path_one,path_two,path_three,blend.",
+      "The three pathways must be meaningfully DIFFERENT complete approaches. The fourth BLEND combines compatible strengths and explains tradeoffs.",
+      "Set experience=design for making or building an object, device or software, otherwise guidance. Never fabricate measurements, evidence, physical tests, images or governed engine execution.",
+      "For every pathway set id p1, p2, p3 respectively, title, a substantive summary longer than 35 characters, 2 or 3 concrete steps, 1 or 2 tradeoffs, and 1 or 2 actual components with name, purpose, location for designs (empty parts for guidance).",
+      "BLEND has id blend, the same fields, and a specific blend_reason. Every summary describes the actual design or practical method, not an assignment to research something.",
+      "Use concise direct sentences and technically meaningful choices; do not omit any required field, repeat alternative titles, or replace the user's goal with generic app advice.",
+      isInventionObjective(objective) ? "This is an invention objective: set experience=design and describe workable physical or software architectures with connected components." : "",
+      isPersonalFinanceObjective(objective) ? "This is personal financial guidance: use practical financial alternatives, no fictional amounts or claims, no software invention." : "",
+      revision,
+    ].filter(Boolean).join(" ") : [
       "Help the person accomplish the actual objective. Do not force every request into an invention or software product. You are proposing options, not reporting execution or verification.",
       "Set experience to guidance for requests for help, learning, planning, personal finances or decisions. Set experience to design whenever the person asks to make, build, or design something, whatever the object is. All pathways must serve that intent. Guidance must have parts: [] and practical human actions, not software modules or app-building instructions. A design answer states decisions already made and is shown with its picture.",
       isInventionObjective(objective) ? "This is a DESIGN request for whatever object the person asked to make. Set experience=design. Propose concrete built designs with the decisions already made: arrangement, counts, sizes, and how it works. Do not substitute a research assignment, a shopping list, or a request that the person specify the design." : isPersonalFinanceObjective(objective) ? "This is PERSONAL FINANCIAL HELP. Set experience=guidance. Offer three distinct practical approaches and a blend for the person's money situation. Do not invent a financial app, account aggregator or mechanical system; do not default to linking accounts. Suggest a small useful action and ask only the most important missing question. Never invent income, expenses, eligibility, rates or guaranteed outcomes. Do not request bank credentials, account numbers or government identifiers. Do not assert current benefit, tax, legal or investment rules without authoritative current evidence; identify when such verification is needed." : "Preserve the actual intent: help and advice requests are not requests to build an app.",

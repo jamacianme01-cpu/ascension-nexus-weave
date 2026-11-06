@@ -10,7 +10,7 @@ type Pathway={
   parts:Part[];blend_reason?:string;
 };
 type Cache={current:Map<string,ArrayBuffer>};
-const LOCAL="http://127.0.0.1:8082";
+const LOCAL="/api/public/ascension/brain-3d";
 const validImage=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/=]{4000,12000000})$/i;
 function formatError(reason:unknown){
   return reason instanceof Error?reason.message:String(reason);
@@ -79,12 +79,12 @@ export function V1HunyuanPathway({
       try{
         ready=await fetch(LOCAL+"/status",{signal:controller.signal,cache:"no-store"});
       }catch{
-        throw new Error("Hunyuan3D is not connected to this browser. The invention picture remains available; real 3D requires the Windows local bridge.");
+        throw new Error("Hunyuan3D is not connected on the designated ASCENSION brain computer.");
       }
-      if(!ready.ok)throw new Error("Hunyuan3D is not ready on the Windows PC (port 8082).");
+      if(!ready.ok)throw new Error("Hunyuan3D is not ready on the designated older computer.");
       const condition=await ready.json() as {ready?:boolean;engine?:string};
       if(!condition.ready||condition.engine!=="Hunyuan3D")
-        throw new Error("The local bridge is not connected to Hunyuan3D.");
+        throw new Error("The designated ASCENSION brain is not connected to Hunyuan3D.");
       setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
       const generated=await fetch(LOCAL+"/generate",{
         method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},
@@ -206,7 +206,7 @@ export function V1HunyuanPathway({
           className="self-start text-xs text-gold underline">Return to the design reference</button>}
         <p className="text-xs text-foreground/70">
           {bytes?"3D views use an unverified reconstruction. It may differ from the design reference; dimensions are not calibrated."
-            :"Optional 3D uses a service on your computer. Connect local 3D only if you have it installed; your browser may ask for device access."}
+            :"Optional 3D is generated on the designated ASCENSION brain computer, not on this viewing device."}
           {mode==="dissect"&&parts.length<2?" The generator returned a fused mesh that cannot honestly be dissected.":""}
         </p>
       </div>

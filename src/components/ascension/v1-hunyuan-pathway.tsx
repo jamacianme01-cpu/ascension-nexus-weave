@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { asCompletedDesignStep, designPictureReady } from "@/lib/ascension/design-answer";
+import { compileSelectedPathwayDesign } from "@/lib/ascension/design-image-brief";
 import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
@@ -24,6 +25,8 @@ export function V1HunyuanPathway({
   alternatives?: Pathway[];
   onPicture?: (ready: boolean) => void;
 }) {
+  const selectedDesign=compileSelectedPathwayDesign(objective,path.title,path.parts,path.summary);
+  const designParts=selectedDesign.parts;
   const key=pathwayVisualKey(objective,path);
   const [bytes,setBytes]=useState<ArrayBuffer|null>(null);
   const [picture,setPicture]=useState<string|null>(null);
@@ -214,7 +217,7 @@ export function V1HunyuanPathway({
         aria-label="Hunyuan design description and parts">
         <h4 className="mb-3 text-sm text-gold">PARTS</h4>
         <div className="space-y-2 text-sm" aria-label="Design components">
-          {path.parts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
+          {designParts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
             onClick={()=>{
               setComponent(i);setPartSelection(value=>value+1);
               const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
@@ -223,11 +226,11 @@ export function V1HunyuanPathway({
               else {setMeshIndex(null);setInspectModel(false);}
             }}
             className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
-          {component!==null&&path.parts[component]&&<div role="status" aria-label="Selected component explanation"
+          {component!==null&&designParts[component]&&<div role="status" aria-label="Selected component explanation"
             className="mt-3 rounded-lg border border-gold/30 bg-black/20 p-3">
-            <p className="font-medium text-gold">{path.parts[component].name}</p>
-            <p className="mt-2 text-sm"><span className="text-gold">What it does:</span> {path.parts[component].purpose || "Function not specified in this design."}</p>
-            <p className="mt-2 text-sm"><span className="text-gold">Where it belongs:</span> {path.parts[component].location || "Position not specified in this design."}</p>
+            <p className="font-medium text-gold">{designParts[component].name}</p>
+            <p className="mt-2 text-sm"><span className="text-gold">What it does:</span> {designParts[component].purpose || "Function not specified in this design."}</p>
+            <p className="mt-2 text-sm"><span className="text-gold">Where it belongs:</span> {designParts[component].location || "Position not specified in this design."}</p>
             {meshIndex===null?<p className="mt-2 text-xs text-foreground/70">Planned placement only. This part has not been found in the picture or the 3D model.</p>
               :<p className="mt-2 text-xs text-foreground/70">Found in the loaded model geometry. The planned placement above is still not a measured position.</p>}
           </div>}
@@ -248,6 +251,6 @@ export function V1HunyuanPathway({
       </aside>
     </div>
     <TreeGuide objective={objective} introduce pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
-      focusRevision={partSelection} focusedPart={component===null?null:path.parts[component]??null} view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"} partLocated={inspectModel&&meshIndex!==null}/>
+      focusRevision={partSelection} focusedPart={component===null?null:designParts[component]??null} view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"} partLocated={inspectModel&&meshIndex!==null}/>
   </section>;
 }

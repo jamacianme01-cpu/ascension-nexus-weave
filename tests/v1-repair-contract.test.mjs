@@ -55,6 +55,11 @@ const tests=[
     assert.match(glb,/explode=mode==="dissect" && st\.meshes\.length>1/);
     assert.match(design,/DISSECT \/ EXPLODE/);
     assert.match(design,/IMPLODE \/ REASSEMBLE/);
+    assert.match(design,/buildInterpretiveAssemblyGlb/);
+    assert.match(design,/IMPLODE \/ REASSEMBLE<\/button>/);
+    assert.match(design,/aria-label="Where parts are"/);
+    assert.match(design,/aria-label="Where this part is"/);
+    assert.doesNotMatch(design,/mode==="dissect"&&<button/);
     assert.doesNotMatch(design,/DIVE INTO REALITY/);
     assert.match(glb,/orthos\.forEach/);
     assert.doesNotMatch(design,/new V1ModelWorkbench/);
@@ -77,6 +82,7 @@ const tests=[
     assert.match(route,/image-ip/);
     assert.doesNotMatch(route,/limit\("global", 48\)/);
     assert.match(route,/revisionDirective\(objective\)/);
+    assert.match(route,/not a professor/);
     assert.match(route,/assessImageBytes/);
     assert.match(route,/!assessment\.ok/);
   }],

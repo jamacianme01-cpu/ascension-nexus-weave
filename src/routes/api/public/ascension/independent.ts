@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
-import { compileDesignIdentity } from "@/lib/ascension/design-image-brief";
+import { compileSelectedPathwayDesign } from "@/lib/ascension/design-image-brief";
 import { asCompletedDesignStep, freePictureEnabled } from "@/lib/ascension/design-answer";
 import { assessImageBytes } from "@/lib/ascension/image-identity.server";
 
@@ -334,8 +334,14 @@ async function picture(objective: string, value: Record<string, unknown>) {
   const parts = Array.isArray(value["parts"]) ? value["parts"]
     .filter((part): part is Record<string, unknown> =>
       Boolean(part) && typeof part === "object" && !Array.isArray(part))
-    .slice(0, 14).map(part => String(part["name"] ?? "").slice(0, 80)).filter(Boolean) : [];
-  const identity = compileDesignIdentity(objective, title, parts, summary);
+    .slice(0, 12).map(part => ({
+      name: String(part["name"] ?? "").slice(0, 100),
+      purpose: String(part["purpose"] ?? "").slice(0, 360),
+      location: String(part["location"] ?? "").slice(0, 240),
+    })).filter(part => part.name.trim()) : [];
+  // The exact selected pathway's structured parts feed both image conditioning
+  // and the on-screen part list; no new parts or dimensions are inferred.
+  const identity = compileSelectedPathwayDesign(objective, title, parts, summary);
   const prompt = identity.prompt;
   // OVHcloud publicly documents SDXL as free with two anonymous requests
   // per minute. No paid API key, image purchase, or shared volunteer worker.

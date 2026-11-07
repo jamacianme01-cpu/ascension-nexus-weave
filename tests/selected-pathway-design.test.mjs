@@ -1,75 +1,133 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
-const source = readFileSync(new URL("../src/lib/ascension/design-image-brief.ts", import.meta.url), "utf8");
-const output = ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const { compileSelectedPathwayDesign, clipTokenEstimate } =
-  await import("data:text/javascript;base64," + Buffer.from(output).toString("base64"));
-const parts = [
-  { name:"Flight camera", purpose:"Visual observation", location:"Front fuselage" },
-  { name:"Robotic gripper", purpose:"Move a small payload", location:"Underside" },
-  { name:"Rechargeable battery", purpose:"Onboard power", location:"Inside sealed body" },
-  { name:"Docking station", purpose:"Recharge when parked", location:"Separate home base" },
+const source=readFileSync(new URL("../src/lib/ascension/design-image-brief.ts",import.meta.url),"utf8");
+const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {compileSelectedPathwayDesign,clipTokenEstimate}=
+  await import("data:text/javascript;base64,"+Buffer.from(compiled).toString("base64"));
+const cases=[
+  {
+    objective:"Design a dual round-port subwoofer enclosure",
+    title:"Ported subwoofer cabinet",
+    parts:[
+      {name:"15-inch woofer",purpose:"Reproduce bass",location:"Front panel"},
+      {name:"Two 6-inch round ports",purpose:"Tune bass response",location:"Top face"},
+      {name:"Internal bracing",purpose:"Strengthen cabinet",location:"Inside enclosure"},
+    ],
+    summary:"A single cabinet with an exposed woofer and two round top ports.",
+    visible:["15-inch woofer at Front panel","Two 6-inch round ports at Top face"],
+    absent:["Internal bracing at Inside enclosure"],
+    subject:"Ported subwoofer cabinet",
+  },
+  {
+    objective:"Create a compact monitoring box for a bedroom",
+    title:"Passive room monitoring enclosure",
+    parts:[
+      {name:"Thermal window",purpose:"Sense heat",location:"Front surface"},
+      {name:"Speaker grille",purpose:"Voice check-in",location:"Right side"},
+      {name:"Battery backup",purpose:"Power during outages",location:"Internal tray"},
+    ],
+    summary:"One wall-mounted monitoring device.",
+    visible:["Thermal window at Front surface","Speaker grille at Right side"],
+    absent:["Battery backup at Internal tray"],
+    subject:"Passive room monitoring enclosure",
+  },
+  {
+    objective:"Invent climate-control clothing",
+    title:"Wearable temperature-regulating jacket",
+    parts:[
+      {name:"Air vents",purpose:"Distribute air",location:"On the outer sleeves"},
+      {name:"Control pad",purpose:"Select comfort",location:"Left cuff"},
+      {name:"Microcontroller",purpose:"Temperature control",location:"Inside lining"},
+    ],
+    summary:"A jacket with integrated ventilation.",
+    visible:["Air vents at On the outer sleeves","Control pad at Left cuff"],
+    absent:["Microcontroller at Inside lining"],
+    subject:"Wearable temperature-regulating jacket",
+  },
+  {
+    objective:"Design a linear propulsion machine",
+    title:"Electromagnetic rail propulsion engine",
+    parts:[
+      {name:"Sliding carriage",purpose:"Moves the payload",location:"Top rail surface"},
+      {name:"Rail stator",purpose:"Creates a field",location:"Inside rail base"},
+    ],
+    summary:"A single electromagnetic linear propulsion mechanism.",
+    visible:["Sliding carriage at Top rail surface"],
+    absent:["Rail stator at Inside rail base"],
+    subject:"Electromagnetic rail propulsion engine",
+  },
+  {
+    objective:"Build a garden bookshelf",
+    title:"Modular wall bookshelf",
+    parts:[
+      {name:"Two side brackets",purpose:"Support shelves",location:"Outer left and right sides"},
+      {name:"Shelves",purpose:"Hold books",location:"Front face"},
+    ],
+    summary:"A complete wall-mounted bookshelf.",
+    visible:["Two side brackets at Outer left and right sides","Shelves at Front face"],
+    absent:[],
+    subject:"Modular wall bookshelf",
+  },
+  {
+    objective:"Design a solar charging station",
+    title:"Portable solar charging cabinet",
+    parts:[
+      {name:"Solar panel",purpose:"Generate electricity",location:"Top face"},
+      {name:"Battery",purpose:"Store electricity",location:"Inside casing"},
+    ],
+    summary:"A complete portable electrical power station.",
+    visible:["Solar panel at Top face"],
+    absent:["Battery at Inside casing"],
+    subject:"Portable solar charging cabinet",
+  },
+  {
+    objective:"Make worker drones",
+    title:"Hexacopter Worker Drone",
+    parts:[
+      {name:"Camera",purpose:"Observation",location:"Front fuselage"},
+      {name:"Gripper",purpose:"Manipulate objects",location:"Underside"},
+    ],
+    summary:"Single flying worker machine with six rotors.",
+    visible:["Camera at Front fuselage","Gripper at Underside"],
+    absent:[],
+    subject:"Hexacopter Worker Drone",
+  },
 ];
-const quad = compileSelectedPathwayDesign(
-  "make a worker drone for people with dementia",
-  "Quadcopter Home Safety Worker Drone",
-  parts,
-  "Four rotors survey the home for hazards while one gripper handles lightweight objects.",
-);
-assert.equal(quad.count,1);
-assert.equal(quad.rotorCount,4);
-assert.deepEqual(quad.parts,parts,"The displayed design parts must come directly from the selected pathway");
-assert.match(quad.prompt,/One single quadcopter drone/i);
-assert.match(quad.prompt,/exactly 4 rotor units attached to one central airframe/i);
-assert.match(quad.prompt,/front-mounted camera built into the same fuselage/i);
-assert.match(quad.prompt,/underbody robotic gripper attached to the same fuselage/i);
-assert.doesNotMatch(quad.prompt,/docking station|rechargeable battery|separate home base|hazards|dementia/i,
-  "Internal components and detached facilities stay in the design record, not as separate rendered objects.");
-assert.match(quad.negative,/loose accessories|loose parts/i);
-assert.match(quad.negative,/stacked airframes/i);
-const hex = compileSelectedPathwayDesign("make a worker drone","Hexacopter Worker Drone",parts,
-  "Six-rotor airframe with its own onboard camera.");
-assert.equal(hex.rotorCount,6);
-assert.match(hex.prompt,/exactly 6 rotor units/i);
-assert.doesNotMatch(hex.prompt,/exactly 4 rotor units/i);
-const fixed = compileSelectedPathwayDesign("make a drone","Fixed-Wing Drone with Robotic Arm",parts,
-  "A long range winged aircraft monitors the home environment.");
-assert.equal(fixed.rotorCount,null);
-assert.match(fixed.prompt,/fixed-wing unmanned drone/i);
-assert.match(fixed.prompt,/two rigid wings joined to one fuselage/i);
-assert.doesNotMatch(fixed.prompt,/multirotor|six rotor units|quadrotor/i);
-assert.match(fixed.prompt,/gripper attached/i);
-const walker = compileSelectedPathwayDesign("make a worker drone","Walking Hexapod Drone",parts,
-  "A six-legged ground walker moves over rough terrain.");
-assert.equal(walker.rotorCount,null);
-assert.match(walker.prompt,/six-legged walking ground robot/i);
-assert.match(walker.prompt,/six articulated legs attached to one chassis/i);
-assert.doesNotMatch(walker.prompt,/propeller aircraft|multirotor/i);
-const monitor = compileSelectedPathwayDesign("make monitoring drones",
-  "Safety Monitoring Drone",[
-    {name:"Gas sensor",purpose:"Detect leaks",location:"Internal front chassis"},
-    {name:"Thermal sensor",purpose:"Detect heat",location:"Body"},
-    {name:"Battery",purpose:"Power",location:"Inside body"},
-  ],"A single flying drone scans household safety.");
-assert.equal(monitor.count,1);
-assert.deepEqual(monitor.parts.map(part=>part.name),["Gas sensor","Thermal sensor","Battery"]);
-assert.doesNotMatch(monitor.prompt,/gas sensor|thermal sensor|battery|household safety/i,
-  "Internal sensors are not falsely shown as located visible hardware.");
-const changed = compileSelectedPathwayDesign("make a worker drone","Quadcopter Home Safety Worker Drone",
-  parts.filter(part=>part.name!=="Robotic gripper"),"Four rotors survey the home for hazards.");
-assert.doesNotMatch(changed.prompt,/gripper/i,"Removed physical parts cannot remain in the picture brief.");
-assert.notEqual(quad.prompt,changed.prompt);
-for(const spec of [quad,hex,fixed,walker,monitor,changed]){
-  assert.ok(clipTokenEstimate(spec.prompt)<=72,spec.prompt);
-  assert.ok(spec.prompt.length>45,spec.prompt);
-  assert.ok(spec.negative.length>20,spec.negative);
+for(const entry of cases){
+  const spec=compileSelectedPathwayDesign(entry.objective,entry.title,entry.parts,entry.summary);
+  assert.equal(spec.subject,entry.subject,entry.title+" must stay the selected invention");
+  assert.deepEqual(spec.parts,entry.parts,"Parts shown must come from the same selected pathway");
+  for(const visible of entry.visible)
+    assert.ok(spec.visibleAssemblies.includes(visible),entry.title+": missing "+visible);
+  for(const hidden of entry.absent)
+    assert.ok(!spec.visibleAssemblies.includes(hidden),entry.title+": hidden part treated as visible "+hidden);
+  assert.match(spec.prompt,/one complete assembled/i);
+  assert.match(spec.prompt,/neutral gray studio background/i);
+  assert.ok(clipTokenEstimate(spec.prompt)<=72,entry.title+": prompt exceeds legacy free provider token limit: "+spec.prompt);
+  assert.ok(spec.negative.length>30,entry.title);
 }
-const route = readFileSync(new URL("../src/routes/api/public/ascension/independent.ts",import.meta.url),"utf8");
-const panel = readFileSync(new URL("../src/components/ascension/v1-hunyuan-pathway.tsx",import.meta.url),"utf8");
+for(const entry of cases.filter(c=>!/drone/i.test(c.title))){
+  const spec=compileSelectedPathwayDesign(entry.objective,entry.title,entry.parts,entry.summary);
+  assert.doesNotMatch(spec.prompt,/drone|hexacopter|quadcopter|rotor unit|gripper attached to fuselage/i,
+    "Non-drone inventions must never acquire drone parts: "+entry.title);
+}
+const original=cases[0];
+const changed=compileSelectedPathwayDesign(original.objective,original.title,
+  original.parts.filter(p=>p.name!=="Two 6-inch round ports"),original.summary);
+assert.doesNotMatch(changed.prompt,/two 6-inch round ports/i,"Removed hardware must not stay in the picture brief");
+const group=compileSelectedPathwayDesign(
+  "Design a fleet of monitoring robots","Coordinated monitoring robot fleet",[],
+  "Several matching monitoring robots share tasks.");
+assert.equal(group.count,3);
+assert.match(group.prompt,/exactly three matching/i);
+
+const route=readFileSync(new URL("../src/routes/api/public/ascension/independent.ts",import.meta.url),"utf8");
+const panel=readFileSync(new URL("../src/components/ascension/v1-hunyuan-pathway.tsx",import.meta.url),"utf8");
 assert.match(route,/compileSelectedPathwayDesign\(objective, title, parts, summary\)/);
 assert.match(panel,/compileSelectedPathwayDesign\(objective,path\.title,path\.parts,path\.summary\)/);
 assert.match(panel,/designParts\.map\(\(p,i\)/);
 assert.match(panel,/designParts\[component\]/);
-assert.match(panel,/Part has not been found|has not been found in the picture or the 3D model/i);
-console.log("PASS selected-pathway design: exact parts, geometry-constrained attached features, and one shared image/panel source.");
+assert.doesNotMatch(route,/generateGrokAssemblyImage|grokImagesEnabled|ASCENSION_ALLOW_GROK_IMAGES/);
+assert.doesNotMatch(route,/https:\/\/api\.x\.ai\/v1\/images\/generations/);
+console.log("PASS universal ASCENSION invention design: 7 domains, matching parts, no drone bias, no paid Grok image generator");

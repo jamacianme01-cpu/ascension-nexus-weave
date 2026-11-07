@@ -3,7 +3,8 @@ import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { compileSelectedPathwayDesign } from "@/lib/ascension/design-image-brief";
-import { asCompletedDesignStep, freePictureEnabled } from "@/lib/ascension/design-answer";
+import { asCompletedDesignStep } from "@/lib/ascension/design-answer";
+import { grokImagesEnabled, grokAssemblyPrompt, generateGrokAssemblyImage } from "@/lib/ascension/grok-image.server";
 import { assessImageBytes } from "@/lib/ascension/image-identity.server";
 
 /** Railway-owned public intake: never calls Supabase or claims governed execution. */
@@ -289,44 +290,18 @@ async function guide(objective: string, question: string, selected: Record<strin
 /** Produce a real image for the selected pathway, never substitute diagram boxes.
  * A separate owner-controlled switch prevents surprise image-generation charges.
  */
-const FREE_SDXL_ENDPOINT = "https://stable-diffusion-xl.endpoints.kepler.ai.cloud.ovh.net/api/text2image";
 function ownImageConfigured() {
-  // Anonymous SDXL is on so a selected design can show its picture.
-  // A custom endpoint can bill the owner, so that bridge stays opt-in.
-  return freePictureEnabled({
-    allow: process.env["ASCENSION_ALLOW_FREE_IMAGES"],
-    endpoint: process.env["ASCENSION_IMAGE_ENDPOINT"],
+  // Two independent requirements prevent unexpected paid API calls:
+  // the private xAI API key and the owner's explicit image-cost enablement.
+  return grokImagesEnabled({
+    key: process.env["XAI_API_KEY"],
+    allow: process.env["ASCENSION_ALLOW_GROK_IMAGES"],
   });
 }
-async function fetchFreeImage(prompt: string, negative: string): Promise<Uint8Array> {
-  const response = await fetch(FREE_SDXL_ENDPOINT, {
-    method: "POST",
-    signal: AbortSignal.timeout(110000),
-    headers: { "content-type": "application/json", "accept": "application/octet-stream" },
-    body: JSON.stringify({ prompt, negative_prompt: negative }),
-  });
-  if (!response.ok) {
-    if (response.status === 429)
-      throw new Error("Free image generation is temporarily rate-limited. Retry shortly.");
-    throw new Error("Free image engine HTTP " + response.status);
-  }
-  if (Number(response.headers.get("content-length") || 0) > 9_000_000)
-    throw new Error("Image provider returned an oversized picture.");
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length < 4000 || bytes.length > 9_000_000)
-    throw new Error("Image provider returned an invalid image size.");
-  const png = bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71;
-  const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
-  const webp = String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
-    String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
-  if (!png && !jpeg && !webp) throw new Error("Image provider returned no usable image.");
-  return bytes;
-}
+
 async function picture(objective: string, value: Record<string, unknown>) {
-  // Existing owner-configurable image bridge only. Never trigger paid image API
-  // calls or substitute stock/placeholder images for the selected invention.
   if (!ownImageConfigured())
-    throw new Error("ASCENSION's image engine is not connected. No picture was fabricated or purchased.");
+    throw new Error("Grok Imagine pictures are not enabled. Configure a server-side XAI_API_KEY and set ASCENSION_ALLOW_GROK_IMAGES=true to authorize paid image requests. No other image provider was used.");
   const title = String(value["title"] ?? "").trim().slice(0, 140);
   const summary = String(value["summary"] ?? "").trim().slice(0, 1400);
   if (!title || summary.length < 30)
@@ -339,66 +314,22 @@ async function picture(objective: string, value: Record<string, unknown>) {
       purpose: String(part["purpose"] ?? "").slice(0, 360),
       location: String(part["location"] ?? "").slice(0, 240),
     })).filter(part => part.name.trim()) : [];
-  // The exact selected pathway's structured parts feed both image conditioning
-  // and the on-screen part list; no new parts or dimensions are inferred.
-  const identity = compileSelectedPathwayDesign(objective, title, parts, summary);
-  const prompt = identity.prompt;
-  // OVHcloud publicly documents SDXL as free with two anonymous requests
-  // per minute. No paid API key, image purchase, or shared volunteer worker.
-  if (!process.env["ASCENSION_IMAGE_ENDPOINT"]?.trim()) {
-    let bytes = await fetchFreeImage(prompt, identity.negative);
-    let assessment = assessImageBytes(bytes, { count: identity.count });
-    if (!assessment.ok) {
-      try {
-        const retry = await fetchFreeImage(prompt, identity.negative);
-        const second = assessImageBytes(retry, { count: identity.count });
-        if (second.ok) { bytes = retry; assessment = second; }
-      } catch { /* Keep the first picture's reason when the retry cannot be drawn. */ }
-    }
-    if (!assessment.ok) throw new Error(assessment.reason + " Wait about 30 seconds, then try this picture again.");
-    const png = bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71;
-    const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
-    return {
-      image_url: "data:image/" + (png ? "png" : jpeg ? "jpeg" : "webp") + ";base64," +
-        Buffer.from(bytes).toString("base64"),
-      verified: false,
-      identity_check: assessment.checked ? "structural" : "unreadable",
-      design_subject: identity.subject,
-      design_count: identity.count,
-      next_request_delay_ms: 31000,
-    };
-  }
-  const target = new URL(process.env["ASCENSION_IMAGE_ENDPOINT"]!.trim());
-  const loopback = ["localhost", "127.0.0.1", "::1"].includes(target.hostname);
-  if (target.protocol !== "https:" && !(loopback && target.protocol === "http:"))
-    throw new Error("The approved image bridge must use HTTPS or local loopback.");
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  const token = process.env["ASCENSION_IMAGE_TOKEN"]?.trim();
-  if (token) headers["authorization"] = "Bearer " + token;
-  const response = await fetch(target.toString(), {
-    method: "POST", headers, signal: AbortSignal.timeout(45000),
-    body: JSON.stringify({ prompt, negative_prompt: identity.negative, objective, pathway: { title, summary } }),
-  });
-  if (!response.ok) throw new Error("ASCENSION image bridge HTTP " + response.status);
-  const body = obj(await response.json());
-  const first = Array.isArray(body["data"]) ? obj(body["data"][0]) : {};
-  const input = String(first["b64_json"] ?? body["image_base64"] ?? body["image_url"] ?? "").trim();
-  const match = input.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/i);
-  const base64 = match ? match[2]! : input;
-  if (!/^[A-Za-z0-9+/=]+$/.test(base64) || base64.length < 4000 || base64.length > 12_000_000)
-    throw new Error("ASCENSION image bridge did not return valid bounded image data.");
-  const mime = match ? match[1]!.toLowerCase() :
-    base64.startsWith("iVBORw0KGgo") ? "png" :
-      base64.startsWith("/9j/") ? "jpeg" :
-        base64.startsWith("UklGR") ? "webp" : null;
-  if (!mime) throw new Error("ASCENSION image bridge returned an unsupported image format.");
-  const bridged = Buffer.from(base64, "base64");
-  const assessment = assessImageBytes(bridged, { count: identity.count });
-  if (!assessment.ok) throw new Error(assessment.reason + " Wait about 30 seconds, then try this picture again.");
+  // A single design record feeds the displayed parts and the actual Grok
+  // assembly drawing. No substitute image engine or provider-generated parts.
+  const selected = compileSelectedPathwayDesign(objective, title, parts, summary);
+  const prompt = grokAssemblyPrompt(objective, title, summary, selected);
+  // One billed image maximum per button press, no automatic paid retry.
+  const generated = await generateGrokAssemblyImage(prompt, process.env["XAI_API_KEY"]!);
+  const assessment = assessImageBytes(generated.bytes, { count: selected.count });
+  if (!assessment.ok)
+    throw new Error(assessment.reason + " Grok image was withheld; no automatic paid retry was made.");
   return {
-    image_url: "data:image/" + mime + ";base64," + base64, verified: false,
+    image_url: generated.imageUrl,
+    image_provider: "grok-imagine-image-2.0",
+    verified: false,
     identity_check: assessment.checked ? "structural" : "unreadable",
-    design_subject: identity.subject, design_count: identity.count,
+    design_subject: selected.subject,
+    design_count: selected.count,
   };
 }
 

@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - repair/v1-selected-design-identity-20261107
+      - repair/v1-grok-image-generator-20261107
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,5 +23,7 @@ jobs:
         run: bun tests/design-identity.test.mjs && bun tests/vision-behavior.test.mjs
       - name: Verify one selected pathway specification serves picture and parts
         run: bun tests/selected-pathway-design.test.mjs
+      - name: Verify Grok-only selected-image generator with mocked API, no charges
+        run: bun tests/grok-image.test.mjs
       - name: Preserve V1 interface and inspection contracts
         run: bun tests/v1-repair-contract.test.mjs && bun tests/creation-source-context.test.mjs

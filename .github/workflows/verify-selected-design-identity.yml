@@ -1,0 +1,26 @@
+name: ASCENSION selected design identity verification
+on:
+  push:
+    branches:
+      - repair/v1-selected-design-identity-20261107
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  selected-design:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --no-save
+      - name: Compile the complete restored V1
+        run: bun run build
+      - name: Verify existing selected-design and image-boundary tests
+        run: bun tests/design-identity.test.mjs && bun tests/vision-behavior.test.mjs
+      - name: Verify one selected pathway specification serves picture and parts
+        run: bun tests/selected-pathway-design.test.mjs
+      - name: Preserve V1 interface and inspection contracts
+        run: bun tests/v1-repair-contract.test.mjs && bun tests/creation-source-context.test.mjs

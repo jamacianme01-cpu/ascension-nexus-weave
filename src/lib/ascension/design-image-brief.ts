@@ -142,3 +142,95 @@ export function designImageBrief(objective: string, title: string, parts: string
   const identity = compileDesignIdentity(objective, title, parts, summary);
   return { prompt: identity.prompt, negative: identity.negative };
 }
+
+
+/** One selected pathway is the source of both the displayed parts list and the
+ * assembled-picture request. No extra components or dimensions are invented.
+ * Only externally visible, attached assemblies are described to the raster
+ * generator. Internal parts remain listed but cannot be called visible.
+ * A raster result remains an unverified concept even with this conditioning.
+ */
+export type SelectedDesignPart = { name: string; purpose: string; location: string };
+export type SelectedPathwayDesign = DesignIdentity & {
+  parts: SelectedDesignPart[];
+  rotorCount: 4 | 6 | 8 | null;
+  visibleAssemblies: string[];
+};
+
+function rotorTopology(text: string): 4 | 6 | 8 | null {
+  if (/\b(?:octocopter|octa(?:copter|rotor)|eight[- ]rotor|8[- ]rotor)\b/i.test(text)) return 8;
+  if (/\b(?:hexacopter|hexa(?:copter|rotor)|six[- ]rotor|6[- ]rotor)\b/i.test(text)) return 6;
+  if (/\b(?:quadcopter|quad(?:copter|rotor)|four[- ]rotor|4[- ]rotor)\b/i.test(text)) return 4;
+  return null;
+}
+
+export function compileSelectedPathwayDesign(
+  objective: string,
+  title: string,
+  suppliedParts: readonly SelectedDesignPart[],
+  summary = "",
+): SelectedPathwayDesign {
+  // Keep the provider's exact selected part names, functions and locations.
+  const parts = suppliedParts.filter(part => Boolean(part) &&
+    typeof part.name === "string" && part.name.trim().length > 0 &&
+    typeof part.purpose === "string" && typeof part.location === "string")
+    .slice(0, 12).map(part => ({
+      name: part.name.slice(0, 100),
+      purpose: part.purpose.slice(0, 360),
+      location: part.location.slice(0, 240),
+    }));
+  const base = compileDesignIdentity(objective, title, parts.map(part => part.name), summary);
+  const fixedWing = /\b(?:fixed[- ]wing|fixed wing|glider|winged aircraft)\b/i.test(title) ||
+    (/\b(?:fixed[- ]wing|fixed wing)\b/i.test(summary) && !/\b(?:rotorcraft|quadcopter|hexacopter)\b/i.test(title));
+  const walking = /\b(?:hexapod|walking robot|walking drone|six[- ]legged)\b/i.test(title) ||
+    (/\b(?:hexapod|six[- ]legged)\b/i.test(summary) && !/\b(?:quadcopter|hexacopter)\b/i.test(title));
+  const rotorCount = fixedWing || walking ? null : rotorTopology(title) ?? rotorTopology(summary);
+  const isDrone = /\b(?:drone|aerial|unmanned|aircraft|rotor|quadcopter|hexacopter|octocopter)\b/i
+    .test(title + " " + summary);
+  const subject = fixedWing ? "fixed-wing unmanned drone" :
+    walking ? "six-legged walking ground robot" :
+    rotorCount === 8 ? "octocopter drone" :
+    rotorCount === 6 ? "hexacopter drone" :
+    rotorCount === 4 ? "quadcopter drone" : base.subject;
+  const visibleAssemblies: string[] = [];
+  if (fixedWing) visibleAssemblies.push("two rigid wings joined to one fuselage");
+  else if (walking) visibleAssemblies.push("six articulated legs attached to one chassis");
+  else if (rotorCount) visibleAssemblies.push("exactly " + rotorCount + " rotor units attached to one central airframe");
+  else if (isDrone && base.mobility === "aerial") visibleAssemblies.push("rotors attached to one central airframe");
+
+  // Integrate only explicitly selected, physically attached visible components.
+  // Never turn a charging base, battery, gas sensor or radio module into an
+  // unrelated second product just because it appears in the parts list.
+  const external = parts.filter(part => !/\b(?:docking|charging station|base station|charger)\b/i.test(part.name));
+  const camera = external.find(part => /\b(?:camera|imaging camera|vision camera)\b/i.test(part.name));
+  const grip = external.find(part => /\b(?:gripper|manipulator|robotic arm|claw)\b/i.test(part.name));
+  const legs = external.find(part => /\b(?:landing gear|landing leg|landing skid|terrain[- ]assist leg)\b/i.test(part.name));
+  if (camera) {
+    const rear = /\b(?:rear|back|tail)\b/i.test(camera.location);
+    const top = /\b(?:top|upper|roof)\b/i.test(camera.location);
+    visibleAssemblies.push((rear ? "rear" : top ? "top" : /\b(?:front|nose|forward)\b/i.test(camera.location) ? "front" : "body") +
+      "-mounted camera built into the same " + (walking ? "chassis" : "fuselage"));
+  }
+  if (grip) {
+    const under = /\b(?:underside|underbody|bottom|underneath|belly|below)\b/i.test(grip.location);
+    visibleAssemblies.push((under ? "underbody " : "") + "robotic gripper attached to the same " +
+      (walking ? "chassis" : "fuselage"));
+  }
+  if (legs && !walking) visibleAssemblies.push("landing legs attached below the same airframe");
+
+  const head = base.count === 3
+    ? "Exactly three identical " + subject + "s in one group, single photograph"
+    : "One single " + subject + ", one complete assembled machine, single photograph";
+  // Retain the dominant shape and at most two secondary visible subassemblies
+  // within SDXL's short text-encoder budget.
+  const shape = visibleAssemblies.slice(0, 3);
+  const prompt = bound([head, ...shape, "plain gray studio background"].join(", "), 68);
+  const negative = bound([
+    base.negative,
+    fixedWing ? "multirotor helicopter, extra propeller assemblies" : "",
+    walking ? "flying helicopter, propeller aircraft" : "",
+    rotorCount ? "wrong rotor count, extra rotors, stacked airframes" : "",
+    "floating loose accessories, detached camera, separate gripper",
+  ].filter(Boolean).join(", "), 74);
+  return { ...base, subject, rotorCount, parts, visibleAssemblies, prompt, negative };
+}

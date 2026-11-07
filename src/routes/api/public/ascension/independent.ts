@@ -368,7 +368,8 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         }
         if (input["phase"] === "picture") {
           if(isPersonalFinanceObjective(objective))return json({error:"Financial guidance does not require an invention picture."},400);
-          if (!limit("image-ip:" + address, 24) || !limit("image-global", 120))
+          // Paid Grok images: limit the maximum billable public requests per server hour.
+          if (!limit("image-ip:" + address, 8) || !limit("image-global", 16))
             return json({ error: "Image generation limit reached. No credits charged." }, 429);
           return json(await picture(objective, { ...obj(input["pathway"]), view: input["view"] }));
         }

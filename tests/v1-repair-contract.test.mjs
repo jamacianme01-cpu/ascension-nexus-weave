@@ -42,8 +42,11 @@ const tests=[
     assert.match(design,/picture\?<div/);
     assert.match(design,/How this design works/);
     assert.match(design,/asCompletedDesignStep/);
-    assert.match(route,/freePictureEnabled/);
-    assert.match(route,/fetchFreeImage/);
+    assert.match(route,/grokImagesEnabled/);
+    assert.match(route,/ASCENSION_ALLOW_GROK_IMAGES/);
+    assert.match(route,/grokAssemblyPrompt/);
+    assert.match(route,/generateGrokAssemblyImage/);
+    assert.doesNotMatch(route,/freePictureEnabled|fetchFreeImage|FREE_SDXL_ENDPOINT|stable-diffusion-xl/);
     assert.match(design,/loadPathwayVisual\(objective,path,imageCache\.current,controller\.signal\)/);
     assert.match(design,/const generated=await fetch\(LOCAL\+"\/generate"/);
     assert.match(design,/modelCache\.current\.set\(key,output\)/);

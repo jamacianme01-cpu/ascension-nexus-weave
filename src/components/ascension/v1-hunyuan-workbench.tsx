@@ -76,7 +76,7 @@ export function V1HunyuanWorkbench({
       c.position.set(...axes[i]!.pos);c.up.set(...axes[i]!.up);c.lookAt(0,0,0);
     });
     const controls=new OrbitControls(camera,renderer.domElement);
-    controls.enableDamping=true;
+    controls.enableDamping=!window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     controls.minDistance=1.7;
     controls.maxDistance=70;
     controls.target.set(0,0,0);

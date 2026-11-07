@@ -129,13 +129,13 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   }
 
   useEffect(() => {
-    if (focusedPart) void ask(`Explain ${focusedPart.name}: how it works in this design, where it belongs, and what it connects to. Explain this component, not the surrounding scene.`, true, focusedPart.name);
+    if (focusedPart) void ask(`Where does ${focusedPart.name} sit, and what does it do? Two short sentences.`, true, focusedPart.name);
   }, [focusedPart?.name,focusRevision]);
 
   useEffect(() => {
     if(!introduce || introduced.has(JSON.stringify([objective,pathway.title])))return;
     // Defer so StrictMode's discarded mount cannot send a duplicate introduction.
-    const timer=window.setTimeout(()=>void ask(experience==="guidance"?"Help me use this approach in my real situation. Give one practical first action and ask the most useful question to tailor the next step. Do not invent my numbers or suggest building a financial app.":"Explain the design already on screen: what it is and how its main parts work together. Use two short sentences, at most 45 words. Do not assign research or ask me to specify the design.", true, pathway.title, true),0);
+    const timer=window.setTimeout(()=>void ask(experience==="guidance"?"Give one practical first action. Ask one question only if you need it. Do not invent my numbers or suggest building an app.":"Say what this design is and where its main parts sit. Two short sentences. No lecture.", true, pathway.title, true),0);
     return()=>window.clearTimeout(timer);
   },[introduce,objective,pathway.title,experience]);
 
@@ -181,7 +181,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
         className="rounded-full border border-amber-200/45 px-3 py-2 text-amber-100">HEAR AGAIN</button>}
     </div>
     {open && <>
-      <p className="mt-2 text-xs text-sky-100/80">Let's work on it together. Ask a question or tell me what you'd like to change.</p>
+      <p className="mt-2 text-xs text-sky-100/80">Ask a question or say what to change.</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {(focusedPart ? [`How does ${focusedPart.name} connect?`, `What should we change about ${focusedPart.name}?`] : experience==="guidance"
           ? (alternatives.length ? ["Help me choose between these pathways", "What could I be overlooking?", "What is my first practical step?"] : ["What would you improve?", "What is my first practical step?"])

@@ -7,6 +7,7 @@ const glb=read("src/components/ascension/v1-hunyuan-workbench.tsx");
 const bridge=read("runtime_bridge/hunyuan_browser_bridge.py");
 const launcher=read("runtime_bridge/start_hunyuan_now.ps1");
 const route=read("src/routes/api/public/ascension/independent.ts");
+const brief=read("src/lib/ascension/design-image-brief.ts");
 const app=read("src/routes/index.tsx");
 const guide=read("src/components/ascension/tree-guide.tsx");
 const checklist=read("docs/ASCENSION_V1_OWNER_APPROVAL_CHECKLIST.md");
@@ -79,6 +80,9 @@ const tests=[
     assert.match(route,/revisionDirective\(objective\)/);
     assert.match(route,/assessImageBytes/);
     assert.match(route,/!assessment\.ok/);
+    assert.match(brief,/function objectiveQualifier/);
+    assert.match(brief,/withoutRequestedExclusions/);
+    assert.match(brief,/The user's own purpose clause/);
   }],
   ["Tree can speak and user can select actual submeshes",()=>{
     assert.match(design,/<TreeGuide objective=\{objective\}/);

@@ -2,8 +2,9 @@
  * SDXL paints every concrete noun it is given and drops tokens past its
  * text-encoder limit. Pasting the pathway summary, or listing parts as
  * separate products, is what turned one machine into collages, mixed
- * aircraft, and disconnected components. The prompt is compiled only from
- * this identity. The summary is used to classify the design, then omitted.
+ * aircraft, and disconnected components. The machine identity stays first.
+ * The user's own purpose clause (for example "for people with dementia")
+ * is kept so the picture can follow it. The pathway summary is still omitted.
  * A generated picture is still an unverified concept, not measured hardware.
  */
 export type DesignIdentity = {
@@ -71,6 +72,27 @@ function titleSubject(title: string): string {
     .replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
+/** Purpose words the user typed, starting at for/with/to help. Pathway summaries are not read. */
+export function objectiveQualifier(objective: string): string {
+  const line = (objective.split("\nBuild on the selected pathway:")[0] ?? objective).replace(/\s+/g, " ").trim();
+  let start = -1;
+  for (const match of line.matchAll(/\b(?:designed for|meant for|to help|to assist|that helps|that help|for|with)\b/gi)) {
+    const at = match.index ?? -1;
+    if (at >= 0 && (start < 0 || at < start)) start = at;
+  }
+  if (start < 0) return "";
+  return line.slice(start).replace(/[.,;:]+$/g, "").replace(/\s+/g, " ").trim();
+}
+
+function withoutRequestedExclusions(negative: string, qualifier: string): string {
+  if (!qualifier) return negative;
+  const requested = new Set(qualifier.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+  return negative.split(",").map(phrase => phrase.trim()).filter(phrase => {
+    const words = phrase.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+    return !words.some(word => requested.has(word));
+  }).join(", ");
+}
+
 export function compileDesignIdentity(objective: string, title: string, parts: string[], summary = ""): DesignIdentity {
   // Parts stay on the pathway record. Naming them in the prompt makes SDXL
   // draw each one as its own product, which is the disconnected-component failure.
@@ -120,8 +142,9 @@ export function compileDesignIdentity(objective: string, title: string, parts: s
   const head = count === 3
     ? `Exactly three identical ${subject}s in one group, single photograph`
     : `One single ${subject}, one complete assembled machine, single photograph`;
-  const prompt = bound(`${head}, plain gray studio background`, 68);
-  const negative = bound([
+  const qualifier = objectiveQualifier(objective);
+  const prompt = bound([head, qualifier, "plain gray studio background"].filter(Boolean).join(", "), 68);
+  const negative = bound(withoutRequestedExclusions([
     "collage, split screen, triptych, multiple views, catalog sheet, exploded view",
     count === 1 ? "two objects, three machines, duplicate product, extra machine, second vehicle" : "one aircraft, two aircraft, four aircraft, mismatched vehicles, mixed designs",
     mobility === "aerial" ? "wheels, tires, ground rover, car" : "",
@@ -134,7 +157,7 @@ export function compileDesignIdentity(objective: string, title: string, parts: s
     !specialized ? "diagram, schematic, instruction sheet, dimension lines, worksheet, research notes" : "",
     "people, hands, text, watermark",
     "loose parts, detached accessories, docking station, city, landscape, room",
-  ].filter(Boolean).join(", "), 74);
+  ].filter(Boolean).join(", "), qualifier), 74);
   return { count, mobility, architecture, subject, prompt, negative };
 }
 

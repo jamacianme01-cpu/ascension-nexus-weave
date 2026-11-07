@@ -34,6 +34,13 @@ const brief=designImageBrief('make worker drones','Modular multirotor worker dro
 assert.match(brief.prompt,/^One single unmanned multirotor worker drone/);
 assert.doesNotMatch(brief.prompt,/station|people|human|city|fleet|gripper|airframe/i,'Positive prompt is one machine, not a parts list or scene');
 assert.match(brief.negative,/people/);assert.match(brief.negative,/city/);
+const dementia=designImageBrief('make worker drones for people with dementia','Modular multirotor worker drone',['Airframe','Gripper']);
+assert.match(dementia.prompt,/for people with dementia/,'The user purpose clause reaches the picture request');
+assert.match(dementia.prompt,/^One single unmanned multirotor worker drone/);
+assert.doesNotMatch(dementia.negative,/\bpeople\b/,'Do not negate a person the user named in the purpose');
+assert.match(dementia.negative,/collage/,'Collage rejection stays on when a purpose clause is kept');
+const summaryOnly=designImageBrief('make worker drones','Swarm Worker Drones',[],'Multiple drones for people with dementia.');
+assert.doesNotMatch(summaryOnly.prompt,/dementia/,'A pathway summary must not supply the purpose clause');
 console.log('PASS image brief: subject first, selected mobility, no infrastructure or human cues in the positive prompt');
 
 const {isPersonalFinanceObjective}=await module('src/lib/ascension/objective-experience.ts');

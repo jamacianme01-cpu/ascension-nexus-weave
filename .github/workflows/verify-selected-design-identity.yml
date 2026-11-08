@@ -4,6 +4,7 @@ on:
     branches:
       - repair/v1-selected-design-identity-20261107
       - repair/v1-universal-invention-identity-20261107
+      - repair/v1-image-component-fidelity-20261108
   workflow_dispatch:
 permissions:
   contents: read

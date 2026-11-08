@@ -162,7 +162,7 @@ function locatedOnExterior(part: SelectedDesignPart): boolean {
     return false;
   if (/\b(?:separate|remote|offsite|external station|detached|next to|beside the device)\b/i.test(location))
     return false;
-  return /\b(?:front|rear|back|side|top|upper|lower|bottom|underside|outside|exterior|outer|surface|face|panel|mounted|attached|left|right|above|below|on the)\b/i.test(location);
+  return /\b(?:front|rear|back|side|top|upper|lower|bottom|underside|underneath|outside|exterior|outer|surface|face|panel|mounted|attached|left|right|above|below|on the)\b/i.test(location);
 }
 
 function separateAccessory(part: SelectedDesignPart): boolean {
@@ -195,8 +195,8 @@ export function compileSelectedPathwayDesign(
   // into an additional product, or infer unprovided dimensions and materials.
   const visibleAssemblies=exterior.map(p=>p.name+" at "+p.location.replace(/\s+/g," ").trim().slice(0,58));
   const lead=base.count===3
-    ? "Exactly three matching "+subject+" assemblies together, single image"
-    : "One complete assembled "+subject+", single image";
+    ? "Exactly three matching "+subject+" assemblies together"
+    : "One complete assembled "+subject;
   // Every named exterior component must reach the image provider. The prior
   // slice(0,3) plus tail-truncation silently discarded owner-selected hardware.
   // A picture missing those constraints is not a picture of the selected design.
@@ -205,8 +205,8 @@ export function compileSelectedPathwayDesign(
   // was returned. Keep refinement metadata out of the image description.
   const originalObjective=(objective.split("\nBuild on the selected pathway:")[0] ?? objective)
     .replace(/\s+/g," ").trim();
-  const purpose=originalObjective ? "Requested purpose: "+originalObjective : "";
-  const required=[lead,purpose,...visibleAssemblies,"all parts integrated into the same design"].filter(Boolean);
+  const purpose=originalObjective ? "Purpose: "+originalObjective : "";
+  const required=[lead,purpose,"integrated components",...visibleAssemblies].filter(Boolean);
   const studio="neutral gray studio background";
   const requiredText=required.join(", ");
   if (validateImageBudget && clipTokenEstimate(requiredText)>68)

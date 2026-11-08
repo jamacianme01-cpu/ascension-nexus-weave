@@ -83,6 +83,9 @@ const tests=[
     assert.doesNotMatch(route,/limit\("global", 48\)/);
     assert.match(route,/revisionDirective\(objective\)/);
     assert.match(route,/not a professor/);
+    assert.match(route,/ASCENSION_ALLOW_XAI/);
+    assert.doesNotMatch(route,/api\.x\.ai\/v1\/images/);
+    assert.doesNotMatch(route,/grok-imagine/);
     assert.match(route,/assessImageBytes/);
     assert.match(route,/!assessment\.ok/);
   }],

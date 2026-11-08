@@ -17,7 +17,7 @@ function configured() {
   return {
     OpenAI: Boolean(process.env["OPENAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true"),
     Claude: Boolean(process.env["ANTHROPIC_API_KEY"]?.trim()),
-    Grok: Boolean(process.env["XAI_API_KEY"]?.trim()),
+    Grok: Boolean(process.env["XAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_XAI"] === "true"),
   };
 }
 function json(value: unknown, status = 200): Response {
@@ -323,8 +323,8 @@ async function fetchFreeImage(prompt: string, negative: string): Promise<Uint8Ar
   return bytes;
 }
 async function picture(objective: string, value: Record<string, unknown>) {
-  // Existing owner-configurable image bridge only. Never trigger paid image API
-  // calls or substitute stock/placeholder images for the selected invention.
+  // Free picture path, or an image bridge the owner explicitly turned on.
+  // Never call api.x.ai image generation. Grok Imagine bills the owner.
   if (!ownImageConfigured())
     throw new Error("ASCENSION's image engine is not connected. No picture was fabricated or purchased.");
   const title = String(value["title"] ?? "").trim().slice(0, 140);

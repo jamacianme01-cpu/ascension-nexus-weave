@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { chromium } from "playwright";
+
+const screenshotDir = process.env.ASCENSION_SCREENSHOT_DIR || join(tmpdir(), "ascension-v1-screenshots");
+mkdirSync(screenshotDir, { recursive: true });
 
 // Two physically distinct named triangles make a valid GLB; unlike a picture,
 // its identity and vertices can be checked across every inspection view.
@@ -82,7 +88,7 @@ try{
       return new Response("unrecognized route",{status:404});
     };
     Object.defineProperty(window,"speechSynthesis",{configurable:true,value:{
-      getVoices(){return [{name:"Microsoft Aria Online (Natural)",lang:"en-US"}]},cancel(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
+      getVoices(){return [{name:"Microsoft Aria Online (Natural)",lang:"en-US"}]},cancel(){},resume(){},speak(utterance){window.__treeSpeech.push(utterance.text);queueMicrotask(()=>{
         utterance.onstart?.();utterance.onend?.();
       });}
     }});
@@ -170,21 +176,22 @@ try{
     assert.equal(await page.evaluate(()=>window.__localHunyuanCalls.length),0,"Guidance cannot contact a local engine");
     assert.equal(guideRequests.at(-1).pathway.experience,"guidance","The Tree receives the correct conversation context");
     await page.getByRole("heading",{name:"Your first steps",exact:true}).waitFor();
-    await page.screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/finance-guidance-fixture.png",fullPage:true});
+    await page.screenshot({path:join(screenshotDir,"finance-guidance-fixture.png"),fullPage:true});
     console.log("PASS finance guidance: four spoken choices, practical plan and guide, zero image/3D/local-device requests");
     await browser.close();process.exit(0);
   }
   await page.locator("#objective").fill("make worker drones");
   await page.getByRole("button",{name:"ENGAGE ASCENSION"}).click();
   await page.getByRole("tab").first().waitFor();
-  assert.equal(generated.length,0,"The Tree must not generate images before a pathway is selected");
+  for(let i=0;i<30 && generated.length===0;i++) await page.waitForTimeout(100);
+  assert.deepEqual(generated.map(item=>item.id),["blend"],"Before a pathway is entered, only the first-result blend picture is requested");
   assert.equal(await page.getByRole("tab").count(),4);
   assert.deepEqual(creationPhases,["pathways"],"ENGAGE must reveal choices after one synthesis request, without waiting for a preliminary essay");
   assert.equal(await page.getByText("INITIAL ANSWER",{exact:true}).count(),0);
   assert.equal(await page.getByText("THREE PATHWAYS + FOURTH BLEND",{exact:true}).count(),0);
   assert.equal(await page.getByRole("region",{name:"Initial objective answer"}).count(),0);
   await entry.waitFor({state:"hidden"});
-  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-desktop.png"});
+  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:join(screenshotDir,"carousel-desktop.png")});
   await page.getByRole("button",{name:"Next pathway",exact:true}).click();
   assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"),"true");
   await page.getByRole("button",{name:"Previous pathway",exact:true}).click();
@@ -210,7 +217,7 @@ try{
     assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"),"true");
     await page.waitForFunction(()=>document.activeElement?.getAttribute("data-design-index")==="1");
     await page.setViewportSize({width:390,height:844});await page.waitForTimeout(450);
-    await carousel.screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-mobile.png"});
+    await carousel.screenshot({path:join(screenshotDir,"carousel-mobile.png")});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     await enterOrb(1);
     await page.getByRole("region",{name:"Selected pathway design"}).waitFor();
@@ -251,7 +258,7 @@ try{
       errors: errors.slice(-4),
     }));
     await page.waitForTimeout(200);
-    await canvas.screenshot({path:(process.env.ASCENSION_SCREENSHOT_DIR||"C:/Users/Gordo/.codex/tmp/ascension-feedback-check")+"/blueprint-"+expectedId+".png"});
+    await canvas.screenshot({path:join(screenshotDir,"blueprint-"+expectedId+".png")});
     const preserved=await canvas.evaluate(el=>{window.__realMesh=el;return el.width>200;});
     assert.ok(preserved);
     await page.getByRole("button",{name:"3D VIEW",exact:true}).click();
@@ -263,19 +270,46 @@ try{
     await page.getByRole("button",{name:"PERSPECTIVE",exact:true}).click();
     await page.waitForTimeout(200);
 
-    assembledPixels=await canvas.screenshot();
+    async function changedPixels(left,right){
+      return page.evaluate(async({left,right})=>{
+        const load=src=>new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(img);img.src=src;});
+        const [a,b]=await Promise.all([load("data:image/png;base64,"+left),load("data:image/png;base64,"+right)]);
+        const canvas=document.createElement("canvas");
+        canvas.width=a.width;canvas.height=a.height;
+        const ctx=canvas.getContext("2d",{willReadFrequently:true});
+        ctx.drawImage(a,0,0);const pa=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(b,0,0);const pb=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+        let changed=0;
+        for(let i=0;i<pa.length;i+=4){
+          if(Math.abs(pa[i]-pb[i])>2||Math.abs(pa[i+1]-pb[i+1])>2||Math.abs(pa[i+2]-pb[i+2])>2)changed++;
+        }
+        return changed;
+      },{left:left.toString("base64"),right:right.toString("base64")});
+    }
+    async function stillFrame(){
+      let previous=await canvas.screenshot();
+      for(let i=0;i<12;i++){
+        await page.waitForTimeout(120);
+        const next=await canvas.screenshot();
+        if(next.equals(previous))return next;
+        previous=next;
+      }
+      return previous;
+    }
+    assembledPixels=await stillFrame();
     await page.getByRole("button",{name:"DISSECT / EXPLODE",exact:true}).click();
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="dissect"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__realMesh),true,
       "Dissect must reuse the actual Hunyuan GLB canvas");
-    await page.waitForTimeout(200);
-    assert.ok(!(await canvas.screenshot()).equals(assembledPixels),"Explosion must actually separate geometry");
+    const exploded=await stillFrame();
+    assert.ok(await changedPixels(assembledPixels,exploded)>1000,"Explosion must actually separate geometry");
     await page.getByRole("button",{name:"IMPLODE / REASSEMBLE",exact:true}).click();
     await page.locator('[aria-label="One real Hunyuan3D model"][data-mode="assembled"]').waitFor();
     assert.equal(await canvas.evaluate(el=>el===window.__realMesh),true,
       "Reassemble must not regenerate another design");
-    await page.waitForTimeout(200);
-    assert.ok((await canvas.screenshot()).equals(assembledPixels),"Implosion must restore the original assembly");
+    const restored=await stillFrame();
+    assert.ok(await changedPixels(assembledPixels,restored)<80,"Implosion must restore the original assembly");
     if(expectedId==="rotor"){
       const question=detail.getByRole("textbox",{name:"Ask the Tree"});
       await question.fill("Why that rotor?");await detail.getByRole("button",{name:"ASK",exact:true}).click();
@@ -292,7 +326,7 @@ try{
       if(!response.url().includes('/api/public/ascension/independent')||response.request().method()!=="POST")return false;
       const input=response.request().postDataJSON();return input.phase==="guide"&&Boolean(input.pathway?.focused_part);
     });
-    await page.getByRole("button",{name:/^(Rotor|Coil)$/,exact:true}).click();
+    await page.getByRole("button",{name:/^(Rotor|Coil)\b/}).click();
     const explanation=detail.getByRole("status",{name:"Selected component explanation"});
     await explanation.waitFor();
     const explanationText=await explanation.innerText();
@@ -343,7 +377,7 @@ try{
   await detail.getByRole("button",{name:/BACK TO PATHWAYS/}).click();
 
   await page.setViewportSize({width:390,height:844});
-  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:"C:/Users/Gordo/.codex/tmp/ascension-feedback-check/carousel-mobile.png"});
+  await page.getByRole("region",{name:"Pathways around the Tree of Knowledge"}).screenshot({path:join(screenshotDir,"carousel-mobile.png")});
   await page.getByRole("button",{name:"Next pathway",exact:true}).click();
   await page.getByRole("tab").filter({has:page.locator('[data-active=true]')}).count();
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),"Mobile carousel must not overflow horizontally");
@@ -354,7 +388,7 @@ try{
   await page.getByRole("tab").first().waitFor();
   await enterOrb(0);
   await inspect("linear1");
-  assert.equal(new Set(generated.map(x=>x.id)).size,process.env.ASCENSION_INSPECTION_ONLY?2:5,"Only selected pathways across both objectives receive pictures");
+  assert.equal(new Set(generated.map(x=>x.id)).size,process.env.ASCENSION_INSPECTION_ONLY?2:6,"Selected pathways and each objective's first-result blend receive pictures");
   assert.equal(errors.length,0,errors.join(" | "));
   await page.goto(new URL("/console",process.env.ASCENSION_BASE_URL||"http://127.0.0.1:4174/").href);
   await page.locator("#objective").waitFor();

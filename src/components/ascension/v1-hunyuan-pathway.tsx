@@ -51,11 +51,13 @@ export function V1HunyuanPathway({
     setZoom(1);setRotation(0);setReset(0);setParts([]);
   },[path.id]);
   useEffect(()=>{
+    const named=buildInterpretiveAssemblyGlb(path.parts.map(part=>part.name).filter(Boolean));
     const stored=modelCache.current.get(key);
-    if(stored){const cached=imageCache.current.get(key)??null;setPicture(cached);setBytes(stored);setFailure("");setWorking(false);setInspectModel(true);setStatus("Hunyuan3D mesh ready");onPicture?.(designPictureReady(cached));return;}
+    if(stored){const cached=imageCache.current.get(key)??null;setPicture(cached);setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");onPicture?.(designPictureReady(cached));return;}
+    setBytes(named);setFailure("");setStatus("Blueprint, explode, and implode are open on this design's named parts.");
     let active=true;
     const controller=new AbortController();
-    setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
+    setPicture(imageCache.current.get(key)??null);setWorking(true);setParts([]);
     (async()=>{
       // React StrictMode replays mount effects during development. Defer one tick
       // so a discarded mount never spends a second image-generation request.
@@ -76,9 +78,9 @@ export function V1HunyuanPathway({
       if(!match)throw new Error("The saved selected invention picture is invalid.");
       let output: ArrayBuffer | null = null;
       let scanned = false;
-      setStatus("Checking the owner's Hunyuan3D engine on this computer…");
+      setStatus("Blueprint, explode, and implode are open. Checking for a local Hunyuan3D model…");
       try {
-        const ready=await fetch(LOCAL+"/status",{signal:controller.signal,cache:"no-store"});
+        const ready=await fetch(LOCAL+"/status",{signal:AbortSignal.any([controller.signal, AbortSignal.timeout(2500)]),cache:"no-store"});
         if(ready.ok){
           const condition=await ready.json() as {ready?:boolean;engine?:string};
           if(condition.ready&&condition.engine==="Hunyuan3D"){
@@ -98,12 +100,11 @@ export function V1HunyuanPathway({
         }
       } catch { /* The public page has no local Hunyuan worker. The named-part model still opens. */ }
       if(!active||controller.signal.aborted)return;
-      if(!output){
-        output=buildInterpretiveAssemblyGlb(path.parts.map(part=>part.name).filter(Boolean));
-        setStatus("3D is open. Hunyuan3D is not connected here, so views and explode use this design's named parts.");
-      } else setStatus("Real Hunyuan3D model ready");
-      if(scanned)modelCache.current.set(key,output);
-      setBytes(output);setInspectModel(true);setFailure("");
+      if(output){
+        if(scanned)modelCache.current.set(key,output);
+        setBytes(output);setStatus("Real Hunyuan3D model ready");
+      } else setStatus("Blueprint, explode, and implode use this design's named parts. Hunyuan3D is not connected.");
+      setFailure("");
     })().catch(e=>{
       if(!active||controller.signal.aborted)return;
       const message=formatError(e);
@@ -150,22 +151,18 @@ export function V1HunyuanPathway({
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
       {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
         key={v} type="button" aria-pressed={v==="assembled"?!inspectModel:inspectModel&&mode===v}
-        disabled={v==="assembled"?!picture:!bytes}
+        disabled={v==="assembled"?!picture&&!bytes:!bytes}
         onClick={()=>{if(v==="assembled"&&picture){setMode("assembled");setInspectModel(false);}else changeView(v);}}
         className={"rounded-lg border px-4 py-2 text-sm disabled:opacity-40 "+
           (mode===v?"border-primary bg-primary/20 text-primary":"border-gold/40 text-gold")}>
         {v==="assembled"?"ASSEMBLED":v==="blueprint"?"BLUEPRINT":"DISSECT / EXPLODE"}
       </button>)}
-      {!bytes&&<button type="button" disabled={working || localRequested && !failure}
-        onClick={()=>{setLocalRequested(true);setAttempt(v=>v+1);}}
-        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">CONNECT LOCAL 3D</button>}
-      {bytes&&<button type="button" aria-pressed={inspectModel&&mode==="assembled"}
+      <button type="button" aria-pressed={inspectModel&&mode==="assembled"}
         onClick={()=>changeView("assembled")}
-        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">3D VIEW</button>}
-      {!bytes&&<p className="basis-full text-xs text-foreground/70">The 3D model is being prepared from this design. Views and explode turn on when it loads. Measured dimensions remain unresolved.</p>}
-      {mode==="dissect"&&<button type="button"
-        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold"
-        onClick={()=>changeView("assembled")}>IMPLODE / REASSEMBLE</button>}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">3D VIEW</button>
+      <button type="button"
+        onClick={()=>changeView("assembled")}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">IMPLODE / REASSEMBLE</button>
     </div>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
       <div className="flex min-w-0 flex-col gap-3">
@@ -193,6 +190,11 @@ export function V1HunyuanPathway({
             className="pointer-events-none absolute inset-x-0 top-3 grid grid-cols-3 text-center text-xs text-cyan-200">
             <span>TOP</span><span>FRONT</span><span>SIDE</span>
           </div>}
+          {component!==null&&path.parts[component]&&<div role="status" aria-label="Where this part is"
+            className="pointer-events-none absolute left-3 top-3 max-w-[16rem] rounded-md bg-[#031320cf] px-3 py-2 text-xs text-cyan-100">
+            <span className="block font-medium text-gold">{path.parts[component].name}</span>
+            <span className="mt-1 block">Where: {path.parts[component].location||"Relative place in this assembly. No measured coordinates."}</span>
+          </div>}
           {picture&&inspectModel&&<div className="pointer-events-none absolute bottom-3 right-3 w-24 overflow-hidden rounded-xl border border-gold/50 bg-[#03101de8] p-1 sm:w-32">
             <img src={picture} alt="Selected design reference" className="aspect-square w-full rounded-lg object-contain"/>
             <p className="text-center text-[10px] text-gold">Design reference</p>
@@ -216,12 +218,12 @@ export function V1HunyuanPathway({
         aria-label="Hunyuan design description and parts">
         <h4 className="mb-3 text-sm text-gold">DESCRIPTION</h4>
         <p className="mb-3 text-sm leading-6">{path.summary}</p>
-        <div className="space-y-2 text-sm" aria-label="Design components">
+        <div className="space-y-2 text-sm" role="region" aria-label="Where parts are">
           {path.parts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
             onClick={()=>{
               setComponent(i);setPartSelection(value=>value+1);setInspectModel(true);
               const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
-              const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name))??parts[i];
+              const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name));
               if(match){setMode("assembled");setMeshIndex(match.meshIndex);}
               else setMeshIndex(null);
             }}
@@ -235,8 +237,8 @@ export function V1HunyuanPathway({
             <p className="font-medium text-gold">{path.parts[component].name}</p>
             <p className="mt-2 text-sm"><span className="text-gold">What it does:</span> {path.parts[component].purpose || "Function not specified in this design."}</p>
             <p className="mt-2 text-sm"><span className="text-gold">Where it belongs:</span> {path.parts[component].location || "Position not specified in this design."}</p>
-            {meshIndex===null?<p className="mt-2 text-xs text-foreground/70">Planned placement only. This part has not been found in the picture or the 3D model.</p>
-              :<p className="mt-2 text-xs text-foreground/70">Found in the loaded model geometry. The planned placement above is still not a measured position.</p>}
+            {meshIndex===null?<p className="mt-2 text-xs text-foreground/70">Planned placement only. This location is not verified in the picture or as a measured position in the 3D model.</p>
+              :<p className="mt-2 text-xs text-foreground/70">The named mesh is in the loaded model. That placement is still not verified in the picture and is not a measured position.</p>}
           </div>}
           {parts.length<2&&bytes&&<p className="text-xs text-foreground/70">This reconstruction has no separate component meshes. Dissection and explosion require a segmented model.</p>}
           {parts.length>0&&<details className="mt-4">

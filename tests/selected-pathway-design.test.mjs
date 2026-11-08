@@ -122,6 +122,20 @@ const group=compileSelectedPathwayDesign(
 assert.equal(group.count,3);
 assert.match(group.prompt,/exactly three matching/i);
 
+// All owner-specified exterior components must survive prompt preparation.
+const fourParts=["Lens","Indicator","Hatch","Antenna"].map((name,i)=>({
+  name,purpose:"Assembly function",location:["Front","Top","Left side","Right side"][i],
+}));
+const detailed=compileSelectedPathwayDesign("Build a monitoring device","Monitor",fourParts);
+for(const part of fourParts)
+  assert.ok(detailed.prompt.includes(part.name+" at "+part.location),
+    "Image prompt silently omitted selected exterior hardware: "+part.name);
+const tooMany=Array.from({length:12},(_,i)=>({
+  name:"Exterior assembly module "+i,purpose:"Distinct function "+i,location:"Front side panel",
+}));
+assert.throws(()=>compileSelectedPathwayDesign("Build a device","Monitoring device",tooMany),
+  /more visible component detail/,"Oversized image requests must not silently drop selected components");
+
 const route=readFileSync(new URL("../src/routes/api/public/ascension/independent.ts",import.meta.url),"utf8");
 const panel=readFileSync(new URL("../src/components/ascension/v1-hunyuan-pathway.tsx",import.meta.url),"utf8");
 assert.match(route,/compileSelectedPathwayDesign\(objective, title, parts, summary\)/);

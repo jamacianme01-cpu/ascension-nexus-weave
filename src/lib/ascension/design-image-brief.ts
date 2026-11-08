@@ -196,14 +196,16 @@ export function compileSelectedPathwayDesign(
   const lead=base.count===3
     ? "Exactly three matching "+subject+" assemblies together, single image"
     : "One complete assembled "+subject+", single image";
-  // The selected concept and exterior hardware receive priority within the
-  // existing free image engine's limited prompt budget.
-  const prompt=bound([
-    lead,
-    ...visibleAssemblies.slice(0,3),
-    "all parts integrated into the same design",
-    "neutral gray studio background",
-  ].join(", "),68);
+  // Every named exterior component must reach the image provider. The prior
+  // slice(0,3) plus tail-truncation silently discarded owner-selected hardware.
+  // A picture missing those constraints is not a picture of the selected design.
+  const required=[lead,...visibleAssemblies,"all parts integrated into the same design"];
+  const studio="neutral gray studio background";
+  const requiredText=required.join(", ");
+  if (clipTokenEstimate(requiredText)>68)
+    throw new Error("The selected design has more visible component detail than the current image engine can represent faithfully. No incomplete invention picture was requested.");
+  const prompt=clipTokenEstimate(requiredText+", "+studio)<=68
+    ? requiredText+", "+studio : requiredText;
   const negative=bound([
     "collage, split screen, comparison sheet, multiple views, exploded view",
     base.count===1?"duplicate machine, second object, disconnected products":"",

@@ -176,6 +176,7 @@ export function compileSelectedPathwayDesign(
   title: string,
   suppliedParts: readonly SelectedDesignPart[],
   summary = "",
+  validateImageBudget = true,
 ): SelectedPathwayDesign {
   const parts=suppliedParts.filter(part=>Boolean(part) &&
     typeof part.name==="string" && part.name.trim().length>0 &&
@@ -199,10 +200,16 @@ export function compileSelectedPathwayDesign(
   // Every named exterior component must reach the image provider. The prior
   // slice(0,3) plus tail-truncation silently discarded owner-selected hardware.
   // A picture missing those constraints is not a picture of the selected design.
-  const required=[lead,...visibleAssemblies,"all parts integrated into the same design"];
+  // The pathway title and hardware do not necessarily carry the user's purpose.
+  // Preserve the original request even when a generic title (e.g. Camera Drone)
+  // was returned. Keep refinement metadata out of the image description.
+  const originalObjective=(objective.split("\nBuild on the selected pathway:")[0] ?? objective)
+    .replace(/\s+/g," ").trim();
+  const purpose=originalObjective ? "Requested purpose: "+originalObjective : "";
+  const required=[lead,purpose,...visibleAssemblies,"all parts integrated into the same design"].filter(Boolean);
   const studio="neutral gray studio background";
   const requiredText=required.join(", ");
-  if (clipTokenEstimate(requiredText)>68)
+  if (validateImageBudget && clipTokenEstimate(requiredText)>68)
     throw new Error("The selected design has more visible component detail than the current image engine can represent faithfully. No incomplete invention picture was requested.");
   const prompt=clipTokenEstimate(requiredText+", "+studio)<=68
     ? requiredText+", "+studio : requiredText;
@@ -215,3 +222,4 @@ export function compileSelectedPathwayDesign(
 
   return {...base,subject,parts,visibleAssemblies,prompt,negative};
 }
+

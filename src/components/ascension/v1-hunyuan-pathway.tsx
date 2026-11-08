@@ -25,7 +25,9 @@ export function V1HunyuanPathway({
   alternatives?: Pathway[];
   onPicture?: (ready: boolean) => void;
 }) {
-  const selectedDesign=compileSelectedPathwayDesign(objective,path.title,path.parts,path.summary);
+  // Display the selected design even when its image prompt exceeds the provider
+  // budget. The picture endpoint reports that failure inside the viewer.
+  const selectedDesign=compileSelectedPathwayDesign(objective,path.title,path.parts,path.summary,false);
   const designParts=selectedDesign.parts;
   const key=pathwayVisualKey(objective,path);
   const [bytes,setBytes]=useState<ArrayBuffer|null>(null);
@@ -254,3 +256,4 @@ export function V1HunyuanPathway({
       focusRevision={partSelection} focusedPart={component===null?null:designParts[component]??null} view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"} partLocated={inspectModel&&meshIndex!==null}/>
   </section>;
 }
+

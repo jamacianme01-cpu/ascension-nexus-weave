@@ -113,6 +113,26 @@ for(const entry of cases.filter(c=>!/drone/i.test(c.title))){
     "Non-drone inventions must never acquire drone parts: "+entry.title);
 }
 const original=cases[0];
+// A generic pathway title must not erase who the invention is intended to help.
+const careObjective="Make a helper drone for people with dementia";
+const care=compileSelectedPathwayDesign(careObjective,"Camera Drone",[
+  {name:"Speaker",purpose:"Spoken orientation guidance",location:"Front"},
+  {name:"Camera",purpose:"Sense surroundings",location:"Top"},
+],"A flying helper with memory and orientation support.");
+assert.ok(care.prompt.includes(careObjective));
+assert.ok(care.prompt.includes("Speaker at Front"));
+const underneath=compileSelectedPathwayDesign(careObjective,"Companion Drone",[
+  {name:"Environmental Sensors",purpose:"Sense surroundings",location:"Underneath drone body"},
+]);
+assert.ok(underneath.prompt.includes("Environmental Sensors at Underneath drone body"));
+const revisedCare=compileSelectedPathwayDesign(careObjective+"\nBuild on the selected pathway: Camera Drone\nPreserve these features: memory support",
+  "Camera Drone",[],"A flying helper.");
+assert.ok(revisedCare.prompt.includes(careObjective));
+assert.doesNotMatch(revisedCare.prompt,/Preserve these features|Build on the selected pathway/);
+for(const entry of cases){
+  assert.ok(compileSelectedPathwayDesign(entry.objective,entry.title,entry.parts,entry.summary).prompt.includes(entry.objective),
+    "Original purpose missing: "+entry.objective);
+}
 const changed=compileSelectedPathwayDesign(original.objective,original.title,
   original.parts.filter(p=>p.name!=="Two 6-inch round ports"),original.summary);
 assert.doesNotMatch(changed.prompt,/two 6-inch round ports/i,"Removed hardware must not stay in the picture brief");
@@ -122,10 +142,26 @@ const group=compileSelectedPathwayDesign(
 assert.equal(group.count,3);
 assert.match(group.prompt,/exactly three matching/i);
 
+// All owner-specified exterior components must survive prompt preparation.
+const fourParts=["Lens","Indicator","Hatch","Antenna"].map((name,i)=>({
+  name,purpose:"Assembly function",location:["Front","Top","Left side","Right side"][i],
+}));
+const detailed=compileSelectedPathwayDesign("Build a monitoring device","Monitor",fourParts);
+for(const part of fourParts)
+  assert.ok(detailed.prompt.includes(part.name+" at "+part.location),
+    "Image prompt silently omitted selected exterior hardware: "+part.name);
+const tooMany=Array.from({length:12},(_,i)=>({
+  name:"Exterior assembly module "+i,purpose:"Distinct function "+i,location:"Front side panel",
+}));
+assert.throws(()=>compileSelectedPathwayDesign("Build a device","Monitoring device",tooMany),
+  /more visible component detail/,"Oversized image requests must not silently drop selected components");
+assert.equal(compileSelectedPathwayDesign("Build a device","Monitoring device",tooMany,"",false).parts.length,12,
+  "Image provider limits must not crash the parts panel");
+
 const route=readFileSync(new URL("../src/routes/api/public/ascension/independent.ts",import.meta.url),"utf8");
 const panel=readFileSync(new URL("../src/components/ascension/v1-hunyuan-pathway.tsx",import.meta.url),"utf8");
 assert.match(route,/compileSelectedPathwayDesign\(objective, title, parts, summary\)/);
-assert.match(panel,/compileSelectedPathwayDesign\(objective,path\.title,path\.parts,path\.summary\)/);
+assert.match(panel,/compileSelectedPathwayDesign\(objective,path\.title,path\.parts,path\.summary,false\)/);
 assert.match(panel,/designParts\.map\(\(p,i\)/);
 assert.match(panel,/designParts\[component\]/);
 assert.doesNotMatch(route,/generateGrokAssemblyImage|grokImagesEnabled|ASCENSION_ALLOW_GROK_IMAGES/);

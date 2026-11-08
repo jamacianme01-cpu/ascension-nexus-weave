@@ -121,6 +121,10 @@ const care=compileSelectedPathwayDesign(careObjective,"Camera Drone",[
 ],"A flying helper with memory and orientation support.");
 assert.ok(care.prompt.includes(careObjective));
 assert.ok(care.prompt.includes("Speaker at Front"));
+const underneath=compileSelectedPathwayDesign(careObjective,"Companion Drone",[
+  {name:"Environmental Sensors",purpose:"Sense surroundings",location:"Underneath drone body"},
+]);
+assert.ok(underneath.prompt.includes("Environmental Sensors at Underneath drone body"));
 const revisedCare=compileSelectedPathwayDesign(careObjective+"\nBuild on the selected pathway: Camera Drone\nPreserve these features: memory support",
   "Camera Drone",[],"A flying helper.");
 assert.ok(revisedCare.prompt.includes(careObjective));

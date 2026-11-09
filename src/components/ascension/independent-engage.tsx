@@ -296,7 +296,7 @@ export function IndependentEngage() {
   }
 
   function buildOn(path: Pathway, changes = "") {
-    const originalObjective = requested.split("\\nBuild on the selected pathway:")[0] ?? requested;
+    const originalObjective = requested.split("\nBuild on the selected pathway:")[0] ?? requested;
     const change = changes.trim();
     // Preserve what has already been produced. A refinement is not a new
     // independent objective and must not erase the selected plan or design.
@@ -306,9 +306,9 @@ export function IndependentEngage() {
         ...(path.plan ? { plan: path.plan } : {}) },
       requested_change: change || "Develop the selected result further",
     }).slice(0, 8500);
-    const next = (originalObjective + "\\nBuild on the selected pathway: " + path.title +
-      (change ? "\\nChange or improve: " + change :
-        "\\nDevelop the selected result further without restarting or repeating completed actions."))
+    const next = (originalObjective + "\nBuild on the selected pathway: " + path.title +
+      (change ? "\nChange or improve: " + change :
+        "\nDevelop the selected result further without restarting or repeating completed actions."))
       .slice(0, 2400);
     void engage(next, context);
   }

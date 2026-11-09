@@ -3,7 +3,6 @@ import { TreePathwayCarousel } from "@/components/ascension/tree-pathway-carouse
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
-import { objectiveExperience } from "@/lib/ascension/objective-experience";
 import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech";
 
 type Part = { name: string; purpose: string; location: string };
@@ -41,7 +40,7 @@ async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
   }
   if (!ACCEPTED_DOCUMENT.test(name)) throw new Error("Unsupported file type: " + name);
   if (TEXT_DOCUMENT.test(name)) {
-    if (file.size > 32_000) throw new Error(name + " exceeds the 32 KB text-document limit.");
+    if (file.size > 15_000) throw new Error(name + " exceeds the 15 KB text-document limit.");
     return { name, mime: "text/plain", text: await file.text() };
   }
   if (file.size > 2_000_000) throw new Error(name + " exceeds the 2 MB document limit.");

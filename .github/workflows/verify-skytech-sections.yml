@@ -2,7 +2,7 @@ name: Verify Skytech ASCENSION sections and evidence branch
 on:
   push:
     branches:
-      - repair/v1-upload-selected-view-20261109
+      - repair/restore-governed-old-pc-bridge-20261109
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,7 +21,10 @@ jobs:
       - name: Preserve approved V1 and current Skytech-only runtime
         run: |
           test ! -f src/lib/ascension/engine/local-answer.server.ts
-          test ! -f src/lib/ascension/brain-relay.server.ts
+          test -f src/lib/ascension/brain-relay.server.ts
+          test -f src/routes/api/public/ascension/brain-worker.ts
+          test -f src/routes/api/public/ascension/brain-3d/status.ts
+          test -f src/routes/api/public/ascension/brain-3d/generate.ts
           test -f .output/server/index.mjs
           bun tests/v1-repair-contract.test.mjs
           bun tests/selected-pathway-design.test.mjs

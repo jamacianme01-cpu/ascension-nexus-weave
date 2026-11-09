@@ -24,15 +24,26 @@ export function objectiveExperience(objective: string, suggested?: string): "des
   return suggested==="guidance"?"guidance":"design";
 }
 
-/** BUILD ON RESULT must extend the selected machine. The marker is part of the
- * objective sent back to pathway synthesis. */
-export function revisionDirective(objective: string): string {
+/** BUILD ON RESULT preserves the selected work in every approved category. */
+export function revisionDirective(objective: string, section: "business"|"build"|"guidance"|null = null): string {
   if (!objective.includes("\nBuild on the selected pathway:")) return "";
+  if (section === "business") return [
+    "This is a continuation of the user's selected BUSINESS PLAN, not a new business idea.",
+    "Preserve the selected strategy, facts, financial assumptions and completed actions from the supplied prior-result context.",
+    "Apply only the user's latest change. When the user has already done a proposed step, advance to the next concrete implementation step.",
+    "Provide an actionable sequence, dependencies, calculations using only real inputs, and specific deliverables; do not invent financial figures.",
+    "Every alternative and BLEND must build on the selected plan, not restart with generic advice."
+  ].join(" ");
+  if (section === "guidance") return [
+    "This is a continuation of the user's chosen GUIDANCE approach.",
+    "Treat the user's follow-up literally and respond to its actual facts, not to a generic psychological interpretation.",
+    "Preserve the selected approach and prior conversation; don't repeat suggestions the user already rejected or completed.",
+    "Offer concrete, relevant next actions or a focused question if essential. No generic journaling, mindfulness or motivational script unless requested."
+  ].join(" ");
   return [
     "This request revises an already selected design.",
-    "The selected pathway title and the Preserve these features text are binding architecture.",
-    "Every pathway and the blend must keep that machine, its mobility, its unit count, and its power architecture.",
-    "Apply only the Change or improve text.",
-    "Do not replace the invention with a different kind of machine or split it into separate products.",
+    "The selected pathway and prior result context are binding architecture.",
+    "Preserve the selected machine, its function, mobility, unit count, and power architecture.",
+    "Apply only the requested Change or improve text; do not replace it with a different machine.",
   ].join(" ");
 }

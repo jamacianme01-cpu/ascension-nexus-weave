@@ -293,7 +293,7 @@ async function build(objective: string, firstAnswerText = "", section: Objective
   }
   const allConnected = sources.length === 2;
   const sectionInstructions = section === "business"
-    ? "BUSINESS PLANNER: Claude is assigned lead when connected. Produce FOUR distinct alternatives, each including a COMPLETE plan object with all nine required fields. Each plan must describe one concrete business strategy and include customer and market analysis, store operations, inventory, sales/marketing, baseline financial statement, specific profit-improvement actions, projections with formulas or scenarios and explicit assumptions, milestones and risks. For missing numerical data, state exactly what figures are missing; do NOT manufacture revenue, margins, expenses or projections. Produce a substantive, practical store or business plan. Ground every financial amount in user-provided figures; explicitly mark unknown revenues, costs, margins, operating expenses, break-even inputs, and projections. Include market/customer strategy, operations, inventory, implementation and measurable profit improvements. Never invent an ROI."
+    ? "BUSINESS PLANNER: Claude is assigned lead when connected. Produce FOUR distinct alternatives, each including a COMPLETE plan object with all nine required fields. Each plan must describe one concrete business strategy and include customer and market analysis, store operations, inventory, sales/marketing, baseline financial statement, specific profit-improvement actions, projections with formulas or scenarios and explicit assumptions, milestones and risks. For missing numerical data, state exactly what figures are missing; do NOT manufacture revenue, margins, expenses or projections. Keep every plan field focused (one to three useful sentences), except numerical formulas which may require more detail. Produce a substantive, practical store or business plan. Ground every financial amount in user-provided figures; explicitly mark unknown revenues, costs, margins, operating expenses, break-even inputs, and projections. Include market/customer strategy, operations, inventory, implementation and measurable profit improvements. Never invent an ROI."
     : section === "build"
       ? "BUILD / CREATE: OpenAI is the assigned lead. Develop technically concrete designs, engineering and actual implementation pathways."
       : section === "guidance"
@@ -332,7 +332,9 @@ async function build(objective: string, firstAnswerText = "", section: Objective
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
   });
   const result = parseText(response.text);
-  result.experience=section === "build" ? "design" : section === "business" || section === "guidance" ? "guidance" : objectiveExperience(objective,result.experience);
+  if (section === "business" && [...result.pathways, result.blend].some(path => !path.plan))
+    throw new Error("The answer engine returned incomplete business plans.");
+  result.experience=section === "build" : section === "business" || section === "guidance" ? "guidance" : objectiveExperience(objective,result.experience);
   const hasClaude = sources.some(item => item.provider === "Claude");
   const hasGrok = sources.some(item => item.provider === "Grok");
   result.pathways[0]!.provider = "OpenAI";

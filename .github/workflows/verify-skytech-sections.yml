@@ -2,7 +2,7 @@ name: Verify Skytech ASCENSION sections and evidence branch
 on:
   push:
     branches:
-      - repair/v1-tree-inspection-20261109
+      - repair/v1-upload-selected-view-20261109
   workflow_dispatch:
 permissions:
   contents: read
@@ -59,8 +59,11 @@ jobs:
             await image.setInputFiles({name:'shelf.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9YzDL5gAAAAASUVORK5CYII=','base64')});
             await page.getByText('shelf.jpg',{exact:false}).waitFor({timeout:10000});
             const doc=page.locator('input[type="file"][accept*=".pdf"]');
-            await doc.setInputFiles({name:'sales.csv',mimeType:'text/csv',buffer:Buffer.from('month,sales\nOctober,100\n')});
+            await doc.setInputFiles({name:'sales.csv',mimeType:'text/csv',buffer:Buffer.from('month,sales\nOctober,100\n'+'0'.repeat(20000))});
             await page.getByText('sales.csv',{exact:false}).waitFor({timeout:10000});
+            await doc.setInputFiles({name:'business.pdf',mimeType:'application/pdf',buffer:Buffer.alloc(3_000_000,32)});
+            await page.getByText('business.pdf',{exact:false}).waitFor({timeout:15000});
+            if(await page.getByText('exceeds the 2 MB document limit').count()) throw Error('Old upload limit still present');
             console.log('PASS: current Tree entry, three sections, picture and document intake');
             const plan={
               executive_summary:'Improve existing shop sales.',customers_and_market:'Local repeat customers.',
@@ -102,7 +105,7 @@ jobs:
             await page.locator('#pathway-refinement').fill('We already completed the first step; continue from the next.');
             await page.getByRole('button',{name:'BUILD ON RESULT'}).click();
             for(let i=0;i<50&&pathwayRequests.length<2;i++)await page.waitForTimeout(100);
-            if(pathwayRequests.length!==2 || !pathwayRequests[1].firstAnswer?.includes('selected_pathway'))
+            if(pathwayRequests.length!==2 || pathwayRequests[0].attachments?.length!==3 || !pathwayRequests[0].attachments?.some(f=>f.name==='business.pdf') || !pathwayRequests[1].firstAnswer?.includes('selected_pathway'))
               throw Error('BUILD ON RESULT lost the selected business plan');
             console.log('PASS: Book selection, spoken Tree control, persistent pathway Tree, real business workflow, and context-preserving refinement');
           } finally { await browser.close(); }

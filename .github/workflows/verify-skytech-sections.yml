@@ -1,0 +1,61 @@
+name: Verify Skytech ASCENSION sections and evidence branch
+on:
+  push:
+    branches:
+      - repair/skytech-v1-sections-evidence-20261109
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  v1-section-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --no-save
+      - name: Compile ASCENSION without altering deployment
+        run: bun run build
+      - name: Preserve approved V1 and current Skytech-only runtime
+        run: |
+          test ! -f src/lib/ascension/engine/local-answer.server.ts
+          test ! -f src/lib/ascension/brain-relay.server.ts
+          test -f .output/server/index.mjs
+          bun tests/v1-repair-contract.test.mjs
+          bun tests/selected-pathway-design.test.mjs
+          bun tests/creation-source-context.test.mjs
+      - name: Verify section selectors and evidence controls in browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          bun run dev -- --host 127.0.0.1 --port 4174 > /tmp/ascension-sections-dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4174/ >/dev/null; then break; fi
+            sleep 2
+          done
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({headless:true});
+          try {
+            const page = await browser.newPage({viewport:{width:1280,height:800}});
+            await page.goto('http://127.0.0.1:4174/',{waitUntil:'domcontentloaded'});
+            await page.getByRole('button',{name:'Business Planner'}).waitFor({timeout:20000});
+            for (const name of ['Business Planner','Build / Create','Guidance']) {
+              const choice=page.getByRole('button',{name,exact:true});
+              await choice.click();
+              if (await choice.getAttribute('aria-pressed') !== 'true') throw Error(name+' did not select');
+            }
+            for (const name of ['Upload pictures','Take picture','Upload documents']) {
+              if (await page.getByText(name,{exact:true}).count()!==1) throw Error(name+' control missing');
+            }
+            const image=page.locator('input[type="file"][accept="image/*"][multiple]');
+            await image.setInputFiles({name:'shelf.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9YzDL5gAAAAASUVORK5CYII=','base64')});
+            await page.getByText('shelf.jpg',{exact:false}).waitFor({timeout:10000});
+            const doc=page.locator('input[type="file"][accept*=".pdf"]');
+            await doc.setInputFiles({name:'sales.csv',mimeType:'text/csv',buffer:Buffer.from('month,sales\nOctober,100\n')});
+            await page.getByText('sales.csv',{exact:false}).waitFor({timeout:10000});
+            console.log('PASS: current Tree entry, three sections, picture and document intake');
+          } finally { await browser.close(); }
+          NODE

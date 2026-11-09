@@ -151,7 +151,7 @@ function PathwayView(props: {
   if(props.experience==="guidance")return <section className="rounded-2xl border border-gold/30 bg-[#04101cdd] p-4 sm:p-6" aria-label="Selected guidance pathway">
     <h3 className="mb-3 text-xl text-gold">{props.path.title}</h3>
     <p className="mb-4 text-sm leading-6">{props.path.summary}</p>
-    <TreeGuide objective={props.objective} pathway={props.path} alternatives={props.alternatives} experience="guidance" introduce enabled={props.speakingEnabled} onSpeak={props.onSpeak}/>
+    <TreeGuide objective={props.objective} pathway={props.path} alternatives={props.alternatives} experience="guidance" introduce portrait enabled={props.speakingEnabled} onSpeak={props.onSpeak}/>
     {props.path.plan && <section className="mt-6 space-y-4" aria-label="Business plan">
       <h4 className="text-lg text-gold">Business plan</h4>
       {PLAN_LABELS.map(({ field, label }) => <div key={field}>
@@ -359,15 +359,12 @@ export function IndependentEngage() {
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
         </div>
-        <aside className="ascension-entry-guide" aria-label="Tree of Knowledge guide">
-          <button type="button" className="ascension-hear-tree" onClick={() => { setTalking(true); say(GREETING, () => setVoiceNotice(""), setVoiceNotice); }}>
-            Hear the Tree
-          </button>
+        <div className="ascension-entry-guide" aria-label="Speak to the Tree">
           <TreeGuide objective={objective || "Explore an idea with ASCENSION"}
             pathway={{ title: "Your objective", summary: objective, steps: [], parts: [] }}
             experience={experience} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
           {voiceNotice && <p role="status" className="ascension-voice-notice">{voiceNotice}</p>}
-        </aside>
+        </div>
         <label htmlFor="objective">What do you want to accomplish?</label>
         <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
           aria-label="What do you want to accomplish?" placeholder="What do you want to accomplish?"
@@ -427,13 +424,6 @@ export function IndependentEngage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg text-gold">{section !== "build"?"Explore your possibilities":"Explore your designs"}</h2>
         <div className="flex flex-wrap gap-3 text-xs">
-          <button type="button" onClick={() => {
-            if (talking) stopVoice();
-            else say(selected ? selected.title + ". " + selected.summary : "Your possibilities are ready. Choose an orb, or ask me to help you weigh the choices.");
-            setTalking(!talking);
-          }} className="rounded-full border border-gold/40 px-4 py-2 text-gold">
-            {talking ? "Mute Tree" : "Hear Tree"}
-          </button>
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
         </div>
       </div>
@@ -444,6 +434,10 @@ export function IndependentEngage() {
         id: p.id, title: p.provider ? p.provider + " · " + p.title : p.title, summary: p.summary,
       }))} active={orbit % choices.length} onRotate={index=>{stopVoice();setOrbPreview(null);setOrbit(index);}}
         onOpen={hearPathway} />
+      <div className="ascension-pathway-tree-voice">
+        <TreeGuide objective={requested || objective} pathway={{ title: "Your objective", summary: requested, steps: [], parts: [] }}
+          experience={experience} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }}/>
+      </div>
       {previewPath && <div className="flex flex-wrap items-center justify-center gap-3" aria-label="Pathway introduction">
         <button type="button" onClick={()=>hearPathway(orbPreview!)}
           className="rounded-full border border-gold/40 px-4 py-2 text-sm text-gold">HEAR AGAIN</button>
@@ -456,14 +450,6 @@ export function IndependentEngage() {
         {voiceNotice && <p role="status" className="w-full text-center text-sm text-gold">{voiceNotice} You can read the introduction or enter the pathway.</p>}
       </div>}
     </section>}
-    {enteredTree && choice === null && result && <div className="relative z-30 mx-auto max-w-6xl px-4">
-      <button type="button" onClick={() => { setTalking(true); void say(GREETING, () => setVoiceNotice(""), setVoiceNotice); }}
-        className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
-      <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}
-        pathway={{ title: "Your idea", summary: requested || objective, steps: [], parts: [] }}
-        experience={experience} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
-      {voiceNotice && <p role="status" className="text-sm text-gold">{voiceNotice}</p>}
-    </div>}
     {selected && <section ref={designView} className="ascension-knowledgeverse ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
       aria-label="Selected pathway design">
       <div className="flex items-center justify-between">

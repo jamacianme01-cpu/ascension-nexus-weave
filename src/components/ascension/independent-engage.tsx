@@ -74,8 +74,9 @@ async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
   return { name, mime, data_url: "data:" + mime + ";base64," + encoded };
 }
 
+const BOOK_SCENE = "/approved-scene/01-closed-book.jpg";
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
-const GREETING = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're here. What would you like to create? I'll help you work through it.";
+const GREETING = "Welcome to ASCENSION. What are we working on today?";
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
@@ -89,13 +90,9 @@ function say(text: string, onStarted?: () => void, onUnavailable?: (message: str
   try { synth.cancel(); synth.resume(); } catch { return; }
   const listed = synth.getVoices?.() ?? [];
   const voice = selectTreeVoice(listed);
-  if (!voice) {
-    void availableTreeVoice(synth);
-    onUnavailable?.(listed.length
-      ? "A woman's English voice isn't available in this browser yet. The Tree's conversation is still available below."
-      : "The voice list is still loading. Tap Hear the Tree again in a moment.");
-    return;
-  }
+  // A named voice is preferred, but the browser's default voice must not
+  // prevent the Tree from speaking when the user enters its world.
+  if (!voice && listed.length === 0) void availableTreeVoice(synth);
   const chunks: string[] = [];
   let chunk = "";
   for (const word of text.trim().split(/\s+/)) {
@@ -116,9 +113,9 @@ function say(text: string, onStarted?: () => void, onUnavailable?: (message: str
     }
     const words = new SpeechSynthesisUtterance(chunks[index++]!);
     activeUtterance = words;
-    words.voice = voice;
-    words.lang = voice.lang;
-    words.rate = 1;
+    if (voice) words.voice = voice;
+    words.lang = voice?.lang ?? "en-US";
+    words.rate = 0.96;
     words.pitch = 1;
     words.onstart = () => { started = true; onStarted?.(); };
     words.onend = next;
@@ -171,7 +168,8 @@ function PathwayView(props: {
 /** Hosted Tree entry. The first model answer is backend context, not a public essay. */
 export function IndependentEngage() {
   const [objective, setObjective] = useState("");
-  const [section, setSection] = useState<ObjectiveSection>("build");
+  const [section, setSection] = useState<ObjectiveSection | null>(null);
+  const [enteredTree, setEnteredTree] = useState(false);
   const [attachments, setAttachments] = useState<ObjectiveAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState("");
   const [requested, setRequested] = useState("");
@@ -194,30 +192,20 @@ export function IndependentEngage() {
   const generation = useRef(0);
   const modelCache = useRef(new Map<string, ArrayBuffer>());
   const imageCache = useRef(new Map<string, string>());
-  const welcomeStarted = useRef(false);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
-  useEffect(() => {
-    // Tree and Book remain in place; the Tree speaks without a new entrance scene.
-    // When a browser blocks autoplay, retry in the first genuine user interaction.
-    const greeting = GREETING;
-    let disposed = false;
-    const tryWelcome = () => {
-      if (disposed || welcomeStarted.current || document.hidden) return;
-      void say(greeting, () => { welcomeStarted.current = true; setVoiceNotice(""); }, setVoiceNotice);
-    };
-    const attempt = window.setTimeout(tryWelcome, 280);
-    const onVoices = () => { if (!welcomeStarted.current) tryWelcome(); };
-    window.speechSynthesis?.addEventListener?.("voiceschanged", onVoices);
-    window.addEventListener("pointerdown", tryWelcome, { capture: true });
-    window.addEventListener("keydown", tryWelcome, { capture: true });
-    return () => {
-      disposed = true;
-      window.clearTimeout(attempt);
-      window.speechSynthesis?.removeEventListener?.("voiceschanged", onVoices);
-      window.removeEventListener("pointerdown", tryWelcome, { capture: true });
-      window.removeEventListener("keydown", tryWelcome, { capture: true });
-    };
-  }, []);
+
+  function enterCategory(id: ObjectiveSection) {
+    // Selecting a category is the user's entry gesture, enabling speech.
+    stopVoice();
+    setSection(id);
+    setEnteredTree(true);
+    setVoiceNotice("");
+    setTalking(true);
+    const question = id === "business" ? "Tell me about your business. What do you want to work on?"
+      : id === "build" ? "What would you like to create?"
+      : "What would you like help with?";
+    say(GREETING + " " + question, () => setVoiceNotice(""), setVoiceNotice);
+  }
 
   async function addFiles(files: File[]) {
     if (!files.length) return;
@@ -249,7 +237,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      if (talking) say(section !== "build"?"I've brought together a few ways forward. Hear an orb, then choose the approach you'd like us to work through.":"I've brought your designs together. Choose one and we'll explore how its parts work, or build on it together.");
+      if (talking) say("I have four approaches. Choose one and I can explain it.");
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.
       window.setTimeout(() => {
@@ -265,7 +253,7 @@ export function IndependentEngage() {
 
   async function engage(override?: string) {
     const text = (override ?? objective).trim();
-    if (text.length < 3 || loading) return;
+    if (!enteredTree || !section || text.length < 3 || loading) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
@@ -320,7 +308,7 @@ export function IndependentEngage() {
     stopVoice();
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
-    setSection("build"); setAttachments([]); setAttachmentError("");
+    setSection(null); setEnteredTree(false); setAttachments([]); setAttachmentError("");
     setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -328,7 +316,7 @@ export function IndependentEngage() {
 
   const choices = result ? [...result.pathways, result.blend] : [];
   const selected = choice === null ? null : choices[choice];
-  const experience = section === "build" ? "design" : "guidance";
+  const experience = result?.experience ?? (section === "build" ? "design" : "guidance");
   const previewPath = orbPreview === null ? null : choices[orbPreview];
   const spokenPreview = (path: Pathway) => {
     return path.title + ". " + briefSpokenAnswer(path.summary,32);
@@ -358,25 +346,35 @@ export function IndependentEngage() {
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}
     data-realities={choice !== null ? "true" : undefined}
     data-design-ready={designPicture ? "true" : undefined}>
-    {choice === null && !result && <section aria-label="Engage ASCENSION" className="ascension-command">
+    {!enteredTree && <section aria-label="ASCENSION Book entrance" className="ascension-command ascension-book-entry">
+      <img className="ascension-book-art" src={BOOK_SCENE} alt="The ASCENSION Knowledge Book" draggable={false} />
+      <div className="ascension-book-categories" role="group" aria-label="Choose your ASCENSION section">
+        {SECTIONS.map(item => <button key={item.id} type="button" onClick={() => enterCategory(item.id)}>
+          {item.title}
+        </button>)}
+      </div>
+    </section>}
+    {enteredTree && choice === null && !result && <section aria-label="ASCENSION Tree world" className="ascension-command">
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
         </div>
-        <div className="relative z-10 flex flex-wrap justify-center gap-2" role="group" aria-label="ASCENSION sections">
-          {SECTIONS.map(item => <button key={item.id} type="button" disabled={loading}
-            aria-pressed={section === item.id} onClick={() => setSection(item.id)}
-            className={`rounded-full border px-4 py-2 text-sm ${section === item.id ? "border-gold bg-gold/20 text-gold" : "border-gold/30 bg-black/25 text-foreground"}`}>
-            {item.title}
-          </button>)}
-        </div>
+        <aside className="ascension-entry-guide" aria-label="Tree of Knowledge guide">
+          <button type="button" className="ascension-hear-tree" onClick={() => { setTalking(true); say(GREETING, () => setVoiceNotice(""), setVoiceNotice); }}>
+            Hear the Tree
+          </button>
+          <TreeGuide objective={objective || "Explore an idea with ASCENSION"}
+            pathway={{ title: "Your objective", summary: objective, steps: [], parts: [] }}
+            experience={experience} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
+          {voiceNotice && <p role="status" className="ascension-voice-notice">{voiceNotice}</p>}
+        </aside>
         <label htmlFor="objective">What do you want to accomplish?</label>
         <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
           aria-label="What do you want to accomplish?" placeholder="What do you want to accomplish?"
           onChange={event => setObjective(event.target.value)}
           onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !loading) { event.preventDefault(); void engage(); } }}
         />
-        <div className="relative z-10 flex flex-wrap items-center gap-3 text-xs">
+        <div className="ascension-evidence-tools relative z-10 flex flex-wrap items-center gap-3 text-xs">
           <label className="cursor-pointer rounded-full border border-gold/40 px-4 py-2 text-gold">
             Upload pictures
             <input className="sr-only" type="file" accept="image/*" multiple disabled={loading}
@@ -458,7 +456,7 @@ export function IndependentEngage() {
         {voiceNotice && <p role="status" className="w-full text-center text-sm text-gold">{voiceNotice} You can read the introduction or enter the pathway.</p>}
       </div>}
     </section>}
-    {choice === null && <div className="relative z-30 mx-auto max-w-6xl px-4">
+    {enteredTree && choice === null && result && <div className="relative z-30 mx-auto max-w-6xl px-4">
       <button type="button" onClick={() => { setTalking(true); void say(GREETING, () => setVoiceNotice(""), setVoiceNotice); }}
         className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
       <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}

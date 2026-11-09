@@ -60,9 +60,11 @@ const tests=[
     assert.match(glb,/new GLTFLoader\(\)/);
     assert.match(glb,/loader\.parse\(bytes\.slice\(0\)/);
     assert.match(glb,/type MeshRecord/);
-    assert.match(glb,/explode=mode==="dissect" && st\.meshes\.length>1/);
-    assert.match(design,/DISSECT \/ EXPLODE/);
-    assert.match(design,/IMPLODE \/ REASSEMBLE/);
+    assert.match(glb,/explode=mode==="exploded" && st\.meshes\.length>1/);
+    assert.match(design,/DISSECT/);
+    assert.match(design,/EXPLODED \/ IMPLODED/);
+    assert.doesNotMatch(design,/CONNECT LOCAL 3D/);
+    assert.match(design,/AbortSignal\.any\(/);
     assert.doesNotMatch(design,/DIVE INTO REALITY/);
     assert.match(glb,/orthos\.forEach/);
     assert.doesNotMatch(design,/new V1ModelWorkbench/);
@@ -100,6 +102,11 @@ const tests=[
     assert.match(guide,/ascension-tree-character/);
     assert.match(ui,/firstAnswer: continuationContext.current/);
     assert.match(ui,/ascension-business-plan-flow/);
+    assert.match(ui,/file.size > 5_000_000/);
+    assert.match(ui,/file.size > 64_000/);
+    assert.match(route,/data.length > 7_000_000/);
+    assert.match(route,/text.length > 64_000/);
+    assert.doesNotMatch(guide,/Read the Tree's reply/);
     assert.match(guide,/webkitSpeechRecognition/);
     assert.match(guide,/phase: "guide"/);
     assert.match(design,/inspect\(p\.meshIndex\)/);

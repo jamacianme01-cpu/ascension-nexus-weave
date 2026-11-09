@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-export type HunyuanMode = "assembled" | "blueprint" | "dissect";
+export type HunyuanMode = "assembled" | "blueprint" | "dissect" | "exploded";
 export type MeshPart = { name: string; meshIndex: number };
 type Props = {
   bytes: ArrayBuffer;
@@ -220,7 +220,7 @@ export function V1HunyuanWorkbench({
   useEffect(()=>{
     if(host.current)host.current.dataset["mode"]=mode;
     const st=live.current;if(!st?.meshes.length)return;
-    const blueprint=mode==="blueprint",explode=mode==="dissect" && st.meshes.length>1;
+    const blueprint=mode==="blueprint",explode=mode==="exploded" && st.meshes.length>1;
     st.scene.background=new THREE.Color(blueprint?"#06223a":"#051727");
     st.meshes.forEach((record,i)=>{
       const mesh=record.mesh;

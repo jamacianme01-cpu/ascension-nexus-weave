@@ -190,11 +190,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       </button>
     </form>
     {error && <p role="alert" className="text-sm text-red-200">{error}</p>}
-    {answer && <details className="ascension-tree-last-reply">
-      <summary>Read the Tree's reply</summary>
-      <p>{answer}</p>
-      {enabled && <button type="button" onClick={() => onSpeak(answer)}>Hear again</button>}
-    </details>}
+    {answer && <span className="sr-only" aria-live="polite">{answer}</span>}
     {conversation.length > 0 && <span className="sr-only" role="status">
       {conversation.length} messages in the Tree conversation
     </span>}

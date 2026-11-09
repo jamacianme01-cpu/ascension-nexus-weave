@@ -8,7 +8,18 @@ import { assessImageBytes } from "@/lib/ascension/image-identity.server";
 
 /** Railway-owned public intake: never calls Supabase or claims governed execution. */
 type Part = { name: string; purpose: string; location: string };
-type Path = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; provider?: string };
+type BusinessPlan = {
+  executive_summary: string;
+  customers_and_market: string;
+  operations_and_inventory: string;
+  marketing_and_sales: string;
+  revenue_and_cost_baseline: string;
+  profit_improvement: string;
+  financial_projection: string;
+  assumptions_and_missing_data: string;
+  milestones_and_risks: string;
+};
+type Path = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; provider?: string; plan?: BusinessPlan };
 type Output = { experience: "guidance" | "design"; introduction: string; pathways: Path[]; blend: Path & { blend_reason: string } };
 type Contributor = { provider: "OpenAI" | "Claude" | "Grok"; answer: string };
 type ObjectiveSection = "business" | "build" | "guidance";
@@ -58,8 +69,7 @@ async function evidenceContext(objective: string, attachments: Evidence[]): Prom
   const text = textFiles.map(item => "Document: " + item.name +
     "\n" + (item.text || "")).join("\n\n");
   if (!media.length) return text.slice(0, 64_000);
-  // In old-PC mode there is no verified multimodal model and no authorized
-  // cloud fallback. Never quietly pretend the images/PDFs were read.
+  // Refuse unconfigured multimodal requests instead of claiming to have read files.
   if (!configured().OpenAI) throw new Error("The configured answer provider cannot read uploaded pictures and documents.");
   const observed = await callOpenAIResponse({
     timeoutMs: 28000,
@@ -118,7 +128,16 @@ function parseText(text: string): Output {
         name: String(v["name"]).slice(0, 100), purpose: String(v["purpose"]).slice(0, 360),
         location: String(v["location"] ?? "").slice(0, 240),
       })) : [];
+    const rawPlan = obj(p["plan"]);
+    const keys: (keyof BusinessPlan)[] = [
+      "executive_summary", "customers_and_market", "operations_and_inventory", "marketing_and_sales",
+      "revenue_and_cost_baseline", "profit_improvement", "financial_projection",
+      "assumptions_and_missing_data", "milestones_and_risks",
+    ];
+    const hasPlan = keys.every(key => typeof rawPlan[key] === "string" && String(rawPlan[key]).trim().length > 0);
+    const plan = hasPlan ? Object.fromEntries(keys.map(key => [key, String(rawPlan[key]).slice(0, 2200)])) as BusinessPlan : undefined;
     return {
+      ...(plan ? { plan } : {}),
       id: String(p["id"] ?? "").slice(0, 30), title: String(p["title"] ?? "").slice(0, 140),
       summary: String(p["summary"] ?? "").slice(0, 1500),
       steps: strings("steps"), tradeoffs: strings("tradeoffs"), parts,
@@ -223,6 +242,36 @@ const outputSchema = {
   required: ["experience", "introduction", "path_one", "path_two", "path_three", "blend"],
   additionalProperties: false,
 };
+const businessPlanFields = [
+  "executive_summary", "customers_and_market", "operations_and_inventory", "marketing_and_sales",
+  "revenue_and_cost_baseline", "profit_improvement", "financial_projection",
+  "assumptions_and_missing_data", "milestones_and_risks",
+] as const;
+const businessPlanSchema = {
+  type: "object",
+  properties: Object.fromEntries(businessPlanFields.map(key => [key, { type: "string" }])),
+  required: [...businessPlanFields],
+  additionalProperties: false,
+};
+const businessPathwaySchema = {
+  ...pathwaySchema,
+  properties: { ...pathwaySchema.properties, plan: businessPlanSchema },
+  required: [...pathwaySchema.required, "plan"],
+};
+const businessOutputSchema = {
+  ...outputSchema,
+  properties: {
+    ...outputSchema.properties,
+    path_one: businessPathwaySchema,
+    path_two: businessPathwaySchema,
+    path_three: businessPathwaySchema,
+    blend: {
+      ...businessPathwaySchema,
+      properties: { ...businessPathwaySchema.properties, blend_reason: { type: "string" } },
+      required: [...businessPathwaySchema.required, "blend_reason"],
+    },
+  },
+};
 async function build(objective: string, firstAnswerText = "", section: ObjectiveSection | null = null, attachments: Evidence[] = []) {
   const providerStatus = configured();
   const designMode = section === "build" || (section === null && isInventionObjective(objective));
@@ -244,7 +293,7 @@ async function build(objective: string, firstAnswerText = "", section: Objective
   }
   const allConnected = sources.length === 2;
   const sectionInstructions = section === "business"
-    ? "BUSINESS PLANNER: Claude is assigned lead when connected. Produce a substantive, practical store or business plan. Ground every financial amount in user-provided figures; explicitly mark unknown revenues, costs, margins, operating expenses, break-even inputs, and projections. Include market/customer strategy, operations, inventory, implementation and measurable profit improvements. Never invent an ROI."
+    ? "BUSINESS PLANNER: Claude is assigned lead when connected. Produce FOUR distinct alternatives, each including a COMPLETE plan object with all nine required fields. Each plan must describe one concrete business strategy and include customer and market analysis, store operations, inventory, sales/marketing, baseline financial statement, specific profit-improvement actions, projections with formulas or scenarios and explicit assumptions, milestones and risks. For missing numerical data, state exactly what figures are missing; do NOT manufacture revenue, margins, expenses or projections. Produce a substantive, practical store or business plan. Ground every financial amount in user-provided figures; explicitly mark unknown revenues, costs, margins, operating expenses, break-even inputs, and projections. Include market/customer strategy, operations, inventory, implementation and measurable profit improvements. Never invent an ROI."
     : section === "build"
       ? "BUILD / CREATE: OpenAI is the assigned lead. Develop technically concrete designs, engineering and actual implementation pathways."
       : section === "guidance"
@@ -253,7 +302,7 @@ async function build(objective: string, firstAnswerText = "", section: Objective
   const response = await callOpenAIResponse({
     timeoutMs: 28500,
     structuredOutput: { name: "ascension_four_pathways", schema: {
-      ...outputSchema, properties:{...outputSchema.properties, experience:{type:"string",enum:designMode?["design"]:(financeMode||section==="guidance")?["guidance"]:["design","guidance"]}},
+      ...(section === "business" ? businessOutputSchema : outputSchema), properties:{...(section === "business" ? businessOutputSchema.properties : outputSchema.properties), experience:{type:"string",enum:designMode?["design"]:(financeMode||section==="guidance")?["guidance"]:["design","guidance"]}},
     } },
     system: [
       "Help the person accomplish the actual objective. Do not force every request into an invention or software product. You are proposing options, not reporting execution or verification.",

@@ -44,14 +44,18 @@ async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
     return { name, mime: "text/plain", text: await file.text() };
   }
   if (file.size > 2_000_000) throw new Error(name + " exceeds the 2 MB document limit.");
-  const data_url = await new Promise<string>((resolve, reject) => {
+  const rawUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ""));
     reader.onerror = () => reject(new Error("Unable to read " + name));
     reader.readAsDataURL(file);
   });
-  return { name, mime: name.toLowerCase().endsWith(".pdf") ? "application/pdf" :
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", data_url };
+  const mime = name.toLowerCase().endsWith(".pdf") ? "application/pdf" :
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  // Some browsers omit or mislabel Word MIME types. Preserve the actual bytes,
+  // but send the canonical MIME of the accepted filename.
+  const encoded = rawUrl.slice(rawUrl.indexOf(",") + 1);
+  return { name, mime, data_url: "data:" + mime + ";base64," + encoded };
 }
 
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";

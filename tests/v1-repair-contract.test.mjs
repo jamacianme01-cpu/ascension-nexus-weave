@@ -87,6 +87,7 @@ const tests=[
     assert.match(route,/image-ip/);
     assert.doesNotMatch(route,/limit\("global", 48\)/);
     assert.match(route,/revisionDirective\(objective, section\)/);
+    assert.match(route,/"blueprint", "dissect", "exploded"/);
     assert.match(route,/assessImageBytes/);
     assert.match(route,/!assessment\.ok/);
   }],

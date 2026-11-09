@@ -41,3 +41,14 @@ This section preserves the owner's latest corrections. No checklist items are ap
 - The initial answer/engineering research belongs **in the backend only**. Do **not** show a long essay, a shortened initial answer, or a separate initial-answer panel. The visible result is the three selectable pathways plus fourth BLEND.
 - The Tree remains a persistent spoken, knowledgeable interactive guide through the approved Tree-and-Book entrance, pathway descriptions, component labels, and V1 views.
 - Do not treat any code change, static check, or build success as owner approval. All approval boxes above stay unchecked.
+
+## November 9, 2026 — Owner-directed V1 extensions (NOT YET VERIFIED OR DEPLOYED)
+- Owner requests three dedicated objective sections in the approved Tree-and-Book entry: Business Planner, Build / Create, Guidance.
+- Designated specialist leads: Claude for Business Planner; OpenAI for Build / Create; Grok for Guidance. Preserve three independent contributions and the fourth BLEND, and do not falsely attribute unavailable sources.
+- Owner requests picture uploads, camera capture, and document uploads as actual objective evidence. Do not quietly claim a file was analyzed if the configured engine cannot read it.
+- Implementation is isolated to feature/v1-specialties-evidence-20261109. The approved V1 recovery branch and production are unchanged by this branch.
+- [ ] Verify build and UI interaction for all three sections and all file controls.
+- [ ] Verify business-plan figures come from provided records, with assumptions explicitly stated.
+- [ ] Verify image/PDF/Word analysis on the selected configured provider; old-PC relay is NOT yet connected for attachments.
+- [ ] Verify specialist-lead routing and all four pathways with real connected Claude, OpenAI, Grok sources.
+- [ ] Obtain explicit owner approval before integrating this branch into V1 or deploying it.

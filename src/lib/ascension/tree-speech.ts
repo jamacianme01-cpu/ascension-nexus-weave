@@ -1,8 +1,11 @@
 /** Prefer an available named woman's voice; never simulate one by pitching a male voice. */
 export function selectTreeVoice(voices: readonly SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   const names = /\b(Aria|Jenny|Sonia|Ava|Emma|Michelle|Samantha|Zira|Susan|Hazel|Serena|Victoria|Karen|Moira|Tessa)\b|Google US English/i;
-  return voices.filter(voice => /^en(?:-|_)/i.test(voice.lang) && names.test(voice.name))
-    .sort((a, b) => score(b) - score(a))[0] ?? null;
+  const english = voices.filter(voice => /^en(?:-|_)/i.test(voice.lang));
+  return english.filter(voice => names.test(voice.name))
+    .sort((a, b) => score(b) - score(a))[0]
+    ?? english.sort((a, b) => score(b) - score(a))[0]
+    ?? null;
 }
 function score(voice: SpeechSynthesisVoice): number {
   return (/natural|neural|enhanced|premium/i.test(voice.name) ? 100 : 0) +

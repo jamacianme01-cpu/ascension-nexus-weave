@@ -95,7 +95,7 @@ const tests=[
     assert.match(design,/className="ascension-tree-in-pathway"/);
     assert.match(design,/introduce portrait pathway=\{path\}/);
     assert.match(styles,/\.ascension-knowledgeverse \.ascension-pathway-side/);
-    assert.match(styles,/max-height: calc\(100svh - 1\.3rem\)/);
+    assert.match(styles,/\.ascension-knowledgeverse \.ascension-tree-character/);
     assert.match(ui,/introduce portrait enabled=\{props.speakingEnabled\}/);
     assert.doesNotMatch(guide,/What is my first practical step\?/);
     assert.doesNotMatch(guide,/Let.s work on it together/);

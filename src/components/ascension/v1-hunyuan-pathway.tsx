@@ -59,7 +59,11 @@ export function V1HunyuanPathway({
     if(stored){const cached=imageCache.current.get(key)??null;setPicture(cached);setBytes(stored);setFailure("");setWorking(false);setStatus("Hunyuan3D mesh ready");onPicture?.(designPictureReady(cached));return;}
     let active=true;
     const controller=new AbortController();
-    setBytes(null);setPicture(imageCache.current.get(key)??null);setFailure("");setWorking(true);setParts([]);
+    const cachedPicture = imageCache.current.get(key) ?? null;
+    setBytes(null);setPicture(cachedPicture);setFailure("");setWorking(true);setParts([]);
+    // Revisiting an already generated pathway must not leave its inspection
+    // view waiting forever for an onPicture callback that never fires.
+    if (designPictureReady(cachedPicture)) onPicture?.(true);
     (async()=>{
       // React StrictMode replays mount effects during development. Defer one tick
       // so a discarded mount never spends a second image-generation request.
@@ -76,7 +80,11 @@ export function V1HunyuanPathway({
         setPicture(sourceImage);
         onPicture?.(designPictureReady(sourceImage));
       }
-      if(!localRequested){setStatus("Design reference ready");return;}
+      if(!localRequested){
+        setStatus("Design reference ready");
+        if (designPictureReady(sourceImage)) onPicture?.(true);
+        return;
+      }
       const match=sourceImage.match(validImage);
       if(!match)throw new Error("The saved selected invention picture is invalid.");
       setStatus("Checking the owner's Hunyuan3D engine on this computer…");
@@ -110,7 +118,9 @@ export function V1HunyuanPathway({
     })().catch(e=>{
       if(!active||controller.signal.aborted)return;
       const message=formatError(e);
-      setFailure(message);setStatus(message);onPicture?.(false);
+      setFailure(message);setStatus(message);
+      // A failed optional 3D bridge does not invalidate an existing picture.
+      onPicture?.(designPictureReady(imageCache.current.get(key)));
     }).finally(()=>{if(active)setWorking(false);});
     return()=>{active=false;controller.abort();};
   },[key,attempt,localRequested,modelCache,imageCache]);

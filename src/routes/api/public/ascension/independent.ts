@@ -44,16 +44,16 @@ function validatedEvidence(raw: unknown): Evidence[] {
     const mime = String(entry["mime"] ?? "");
     const text = entry["text"];
     if (/\.(txt|md|csv|json)$/i.test(name)) {
-      if (mime !== "text/plain" || typeof text !== "string" || text.length > 15_000)
+      if (mime !== "text/plain" || typeof text !== "string" || text.length > 64_000)
         throw new Error("Invalid or oversized text document.");
       total += text.length;
-      if (total > 24_000) throw new Error("Total attached text exceeds 24,000 characters.");
+      if (total > 64_000) throw new Error("Total attached text exceeds 64,000 characters.");
       return { name, mime, text };
     }
     const extension = name.slice(name.lastIndexOf(".")).toLowerCase();
     if (mime !== allowedBinary[extension]) throw new Error("File type does not match its extension.");
     const data = entry["data_url"];
-    if (typeof data !== "string" || data.length > 2_800_000 ||
+    if (typeof data !== "string" || data.length > 7_000_000 ||
         !data.startsWith("data:" + mime + ";base64,") ||
         !/^[A-Za-z0-9+/=]+$/.test(data.slice(data.indexOf(",") + 1)))
       throw new Error("Invalid or oversized uploaded file.");

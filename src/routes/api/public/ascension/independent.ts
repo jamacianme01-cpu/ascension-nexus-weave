@@ -279,6 +279,8 @@ async function build(objective: string, firstAnswerText = "", section: Objective
       designMode ? "This is a DESIGN request for whatever object the person asked to make. Set experience=design. Propose concrete built designs with the decisions already made: arrangement, counts, sizes, and how it works. Do not substitute a research assignment, a shopping list, or a request that the person specify the design." : financeMode ? "This is BUSINESS OR FINANCIAL PLANNING. Set experience=guidance. Offer three distinct practical approaches and a blend for the person's money situation. Do not invent a financial app, account aggregator or mechanical system; do not default to linking accounts. Suggest a small useful action and ask only the most important missing question. Never invent income, expenses, eligibility, rates or guaranteed outcomes. Do not request bank credentials, account numbers or government identifiers. Do not assert current benefit, tax, legal or investment rules without authoritative current evidence; identify when such verification is needed." : "Preserve the actual intent: help and advice requests are not requests to build an app.",
       revision,
       sectionInstructions,
+      sources.some(item => item.provider === "Claude") ? "Claude contributed an actual independent proposal. Keep its contents in path_two; identify it honestly." : "Claude did not contribute; do not label any generated proposal as Claude's.",
+      sources.some(item => item.provider === "Grok") ? "Grok contributed an actual independent proposal. Keep its contents in path_three; identify it honestly." : "Grok did not contribute; do not label any generated proposal as Grok's.",
       "For guidance, consider real-world priorities, resources, constraints and useful next actions. For an actual design request, analyze the reference architecture and interacting modules internally. Return only the structured alternatives. A separate preliminary engineering essay is not required.",
       allConnected
         ? "Use three actual provider contributions, preserving their provenance. path_one is your own independently developed approach, informed by the objective. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
@@ -301,8 +303,10 @@ async function build(objective: string, firstAnswerText = "", section: Objective
   const result = parseText(response.text);
   result.experience=section === "build" ? "design" : section === "business" || section === "guidance" ? "guidance" : objectiveExperience(objective,result.experience);
   // Present the selected specialist first only when all provider sources really contributed.
-  if (allConnected && section === "business") result.pathways = [result.pathways[1]!, result.pathways[0]!, result.pathways[2]!];
-  if (allConnected && section === "guidance") result.pathways = [result.pathways[2]!, result.pathways[0]!, result.pathways[1]!];
+  if (section === "business" && sources.some(item => item.provider === "Claude"))
+    result.pathways = [result.pathways[1]!, result.pathways[0]!, result.pathways[2]!];
+  if (section === "guidance" && sources.some(item => item.provider === "Grok"))
+    result.pathways = [result.pathways[2]!, result.pathways[0]!, result.pathways[1]!];
   if(result.experience==="guidance"){
     result.pathways.forEach(path=>{path.parts=[];});result.blend.parts=[];
   } else {

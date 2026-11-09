@@ -142,6 +142,22 @@ const group=compileSelectedPathwayDesign(
 assert.equal(group.count,3);
 assert.match(group.prompt,/exactly three matching/i);
 
+// Distinct selected mechanisms must survive free-image prompt compilation
+// without replacing a named exterior part or the original purpose.
+const distinctA=compileSelectedPathwayDesign("Make helper drones for people with dementia",
+  "Companion worker drone",
+  [{name:"Speaker",purpose:"Spoken orientation",location:"Front body"}],
+  "Six-rotor aerial helper for spoken orientation in the home.");
+const distinctB=compileSelectedPathwayDesign("Make helper drones for people with dementia",
+  "Companion worker drone",
+  [{name:"Speaker",purpose:"Spoken orientation",location:"Front body"}],
+  "Aerial assistance with distinctive landing and approach mechanism.");
+assert.notEqual(distinctA.prompt,distinctB.prompt,
+  "Different selected pathway mechanisms cannot become identical generic product pictures");
+assert.match(distinctA.prompt,/Speaker at Front body/);
+assert.match(distinctA.prompt,/Make helper drones for people with dementia/);
+assert.ok(clipTokenEstimate(distinctA.prompt)<=68,"Free image engine must not lose the design to token truncation");
+
 // All owner-specified exterior components must survive prompt preparation.
 const fourParts=["Lens","Indicator","Hatch","Antenna"].map((name,i)=>({
   name,purpose:"Assembly function",location:["Front","Top","Left side","Right side"][i],

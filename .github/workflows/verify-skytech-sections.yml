@@ -2,7 +2,7 @@ name: Verify Skytech ASCENSION sections and evidence branch
 on:
   push:
     branches:
-      - repair/tree-persistent-pathway-20261109
+      - repair/v1-tree-inspection-20261109
   workflow_dispatch:
 permissions:
   contents: read

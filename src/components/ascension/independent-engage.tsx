@@ -473,7 +473,7 @@ export function IndependentEngage() {
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />
         {experience==="guidance"&&<section className="rounded-xl border border-gold/25 bg-[#051b2a]/95 p-4 sm:p-6" aria-label="Choose your next step">
-          <h3 className="text-lg text-gold">Make this possibility yours</h3>
+          <h3 className="text-lg text-gold">Next actions</h3>
           {"blend_reason" in selected && <p className="mt-3 text-sm leading-6">{String(selected.blend_reason)}</p>}
           {selected.tradeoffs.length > 0 && <div className="mt-4">
             <h4 className="text-sm font-semibold text-amber-100">What to weigh</h4>
@@ -492,7 +492,6 @@ export function IndependentEngage() {
               {selected.steps.map((step, index) => <li key={index}>{step}</li>)}
             </ol>}
           </div>}
-          <p className="mt-4 text-xs text-foreground/70">A proposed direction to explore. Ask the Tree what to check before committing time or money.</p>
         </section>}
         <div className="rounded-xl border border-primary/25 p-4">
           <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>

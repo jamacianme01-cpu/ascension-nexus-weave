@@ -236,12 +236,31 @@ export function IndependentEngage() {
   async function generatePathways(text: string, controller: AbortController, token: number) {
     setPathwayError("");
     try {
-      const response = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
+      let response = await fetch("/api/public/ascension/independent", {
+        method: "POST", headers: { "content-type": "application/json", "prefer": "respond-async" },
         body: JSON.stringify({ objective: text, phase: "pathways", section, attachments, firstAnswer: continuationContext.current }),
         signal: controller.signal,
       });
-      const data: Result & { error?: string } = await response.json();
+      let data: Result & { error?: string; brain_job_id?: string; status?: string } = await response.json();
+      // The original PC's CPU may need more time than one Railway HTTP
+      // connection permits. Poll the actual job; never fabricate substitutes.
+      if (response.status === 202) {
+        const id = data.brain_job_id;
+        if (!id || !/^[a-f0-9-]{36}$/.test(id))
+          throw new Error("ASCENSION did not return a valid old-computer job.");
+        let completed = false;
+        for (let step = 0; step < 600; step++) {
+          if (controller.signal.aborted || generation.current !== token) return;
+          await new Promise<void>(resolve => window.setTimeout(resolve, 2000));
+          if (controller.signal.aborted || generation.current !== token) return;
+          response = await fetch("/api/public/ascension/independent?brain_job=" + id, {
+            signal: controller.signal, cache: "no-store",
+          });
+          data = await response.json();
+          if (response.status !== 202) { completed = true; break; }
+        }
+        if (!completed) throw new Error("The designated computer did not finish the four pathways.");
+      }
       if (!response.ok) throw new Error(data.error || "Pathway synthesis did not complete.");
       if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend)
         throw new Error("The answer engine did not deliver three pathways and a blend.");

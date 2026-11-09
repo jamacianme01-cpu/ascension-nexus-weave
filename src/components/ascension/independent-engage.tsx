@@ -56,10 +56,10 @@ async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
   }
   if (!ACCEPTED_DOCUMENT.test(name)) throw new Error("Unsupported file type: " + name);
   if (TEXT_DOCUMENT.test(name)) {
-    if (file.size > 15_000) throw new Error(name + " exceeds the 15 KB text-document limit.");
+    if (file.size > 64_000) throw new Error(name + " exceeds the 64 KB text-document limit.");
     return { name, mime: "text/plain", text: await file.text() };
   }
-  if (file.size > 2_000_000) throw new Error(name + " exceeds the 2 MB document limit.");
+  if (file.size > 5_000_000) throw new Error(name + " exceeds the 5 MB document limit.");
   const rawUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ""));
@@ -217,6 +217,16 @@ export function IndependentEngage() {
     }
     try {
       const read = await Promise.all(files.map(readObjectiveFile));
+      const existingSize = attachments.reduce((total, item) =>
+        total + (item.data_url?.length ?? item.text?.length ?? 0), 0);
+      const addedSize = read.reduce((total, item) =>
+        total + (item.data_url?.length ?? item.text?.length ?? 0), 0);
+      if (existingSize + addedSize > 7_500_000)
+        throw new Error("These files exceed the 7.5 MB combined upload limit. Select smaller documents.");
+      const combinedText = [...attachments, ...read].reduce((total, item) =>
+        total + (item.text?.length ?? 0), 0);
+      if (combinedText > 64_000)
+        throw new Error("Combined text documents exceed 64,000 characters.");
       setAttachments(previous => [...previous, ...read].slice(0, 3));
     } catch (cause) {
       setAttachmentError(cause instanceof Error ? cause.message : "Unable to read the selected file.");

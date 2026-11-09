@@ -7,6 +7,8 @@ const glb=read("src/components/ascension/v1-hunyuan-workbench.tsx");
 const bridge=read("runtime_bridge/hunyuan_browser_bridge.py");
 const launcher=read("runtime_bridge/start_hunyuan_now.ps1");
 const route=read("src/routes/api/public/ascension/independent.ts");
+const brain=read("src/routes/api/public/ascension/brain-worker.ts");
+const relay=read("src/lib/ascension/brain-relay.server.ts");
 const app=read("src/routes/index.tsx");
 const guide=read("src/components/ascension/tree-guide.tsx");
 const styles=read("src/book-entry.css");
@@ -54,6 +56,7 @@ const tests=[
     assert.match(route,/fetchFreeImage/);
     assert.match(design,/loadPathwayVisual\(objective,path,imageCache\.current,controller\.signal\)/);
     assert.match(design,/const generated=await fetch\(LOCAL\+"\/generate"/);
+    assert.match(design,/const LOCAL="\/api\/public\/ascension\/brain-3d"/);
     assert.match(design,/modelCache\.current\.set\(key,output\)/);
   }],
   ["blueprint dissection and reassemble use one parsed real GLB",()=>{
@@ -82,6 +85,9 @@ const tests=[
   }],
   ["route counts only objective creation as objective, not 3D views",()=>{
     assert.match(route,/objective-global/);
+    assert.match(route,/brain_connected: isBrainOnline\(\)/);
+    assert.match(brain,/authenticateBrain\(request\)/);
+    assert.match(relay,/timingSafeEqual/);
     assert.match(route,/pathway-global/);
     assert.match(route,/guide-ip/);
     assert.match(route,/image-ip/);
@@ -95,7 +101,7 @@ const tests=[
     assert.match(design,/className="ascension-tree-in-pathway"/);
     assert.match(design,/introduce portrait pathway=\{path\}/);
     assert.match(styles,/\.ascension-knowledgeverse \.ascension-pathway-side/);
-    assert.match(styles,/max-height: calc\(100svh - 1\.3rem\)/);
+    assert.match(styles,/\.ascension-knowledgeverse \.ascension-tree-character/);
     assert.match(ui,/introduce portrait enabled=\{props.speakingEnabled\}/);
     assert.doesNotMatch(guide,/What is my first practical step\?/);
     assert.doesNotMatch(guide,/Let.s work on it together/);

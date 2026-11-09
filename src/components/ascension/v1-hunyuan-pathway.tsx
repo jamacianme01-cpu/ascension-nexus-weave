@@ -36,7 +36,6 @@ export function V1HunyuanPathway({
   const [status,setStatus]=useState("Drawing this design…");
   const [failure,setFailure]=useState("");
   const [attempt,setAttempt]=useState(0);
-  const [localRequested,setLocalRequested]=useState(false);
   const [mode,setMode]=useState<HunyuanMode>("assembled");
   const [parts,setParts]=useState<MeshPart[]>([]);
   const [meshIndex,setMeshIndex]=useState<number|null>(null);
@@ -80,24 +79,25 @@ export function V1HunyuanPathway({
         setPicture(sourceImage);
         onPicture?.(designPictureReady(sourceImage));
       }
-      if(!localRequested){
-        setStatus("Design reference ready");
-        if (designPictureReady(sourceImage)) onPicture?.(true);
-        return;
-      }
       const match=sourceImage.match(validImage);
       if(!match)throw new Error("The saved selected invention picture is invalid.");
       setStatus("Checking the owner's Hunyuan3D engine on this computer…");
       let ready:Response;
       try{
-        ready=await fetch(LOCAL+"/status",{signal:controller.signal,cache:"no-store"});
+        ready=await fetch(LOCAL+"/status",{signal:AbortSignal.any([controller.signal, AbortSignal.timeout(4500)]),cache:"no-store"});
       }catch{
-        throw new Error("Hunyuan3D is not connected to this browser. The invention picture remains available; real 3D requires the Windows local bridge.");
+        setStatus("3D is unavailable: the Windows Hunyuan bridge is not connected to this browser.");
+        return;
       }
-      if(!ready.ok)throw new Error("Hunyuan3D is not ready on the Windows PC (port 8082).");
+      if(!ready.ok){
+        setStatus("3D is unavailable: the Windows worker is not ready.");
+        return;
+      }
       const condition=await ready.json() as {ready?:boolean;engine?:string};
-      if(!condition.ready||condition.engine!=="Hunyuan3D")
-        throw new Error("The local bridge is not connected to Hunyuan3D.");
+      if(!condition.ready||condition.engine!=="Hunyuan3D"){
+        setStatus("3D is unavailable: the Hunyuan worker is not connected.");
+        return;
+      }
       setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
       const generated=await fetch(LOCAL+"/generate",{
         method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},
@@ -123,10 +123,10 @@ export function V1HunyuanPathway({
       onPicture?.(designPictureReady(imageCache.current.get(key)));
     }).finally(()=>{if(active)setWorking(false);});
     return()=>{active=false;controller.abort();};
-  },[key,attempt,localRequested,modelCache,imageCache]);
+  },[key,attempt,modelCache,imageCache]);
 
 
-  const changeView=(next:HunyuanMode)=>{setInspectModel(true);setMode(next);};
+  const changeView=(next:HunyuanMode)=>{if(!bytes)return;setInspectModel(true);setMode(next);};
   const inspect=(index:number)=>{
     setMeshIndex(index);
     const mesh=parts[index];
@@ -160,25 +160,20 @@ export function V1HunyuanPathway({
       </ol>
       <p className="mt-2 text-xs text-foreground/70">These choices are already in the design. Measurements and physical tests remain unresolved.</p>
     </div>}
-    <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Design views from the same Hunyuan mesh">
-      {(["assembled","blueprint","dissect"] as HunyuanMode[]).map(v=><button
-        key={v} type="button" aria-pressed={v==="assembled"?!inspectModel:inspectModel&&mode===v}
-        disabled={v==="assembled"?!picture:!bytes||(v==="dissect"&&parts.length<2)}
-        onClick={()=>{if(v==="assembled"&&picture){setMode("assembled");setInspectModel(false);}else changeView(v);}}
-        className={"rounded-lg border px-4 py-2 text-sm disabled:opacity-40 "+
-          (mode===v?"border-primary bg-primary/20 text-primary":"border-gold/40 text-gold")}>
-        {v==="assembled"?"ASSEMBLED":v==="blueprint"?"BLUEPRINT":"DISSECT / EXPLODE"}
-      </button>)}
-      {!bytes&&<button type="button" disabled={working || localRequested && !failure}
-        onClick={()=>{setLocalRequested(true);setAttempt(v=>v+1);}}
-        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">CONNECT LOCAL 3D</button>}
-      {bytes&&<button type="button" aria-pressed={inspectModel&&mode==="assembled"}
-        onClick={()=>changeView("assembled")}
-        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold">3D VIEW</button>}
-      {!bytes&&<p className="basis-full text-xs text-foreground/70">Blueprint and Dissect stay off until a segmented 3D assembly is loaded. This picture is the design reference. Measured dimensions remain unresolved.</p>}
-      {mode==="dissect"&&<button type="button"
-        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold"
-        onClick={()=>changeView("assembled")}>IMPLODE / REASSEMBLE</button>}
+    <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="ASCENSION inspection views">
+      <button type="button" aria-pressed={inspectModel&&mode==="blueprint"} disabled={!bytes}
+        onClick={()=>changeView("blueprint")}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
+      <button type="button" aria-pressed={inspectModel&&mode==="dissect"}
+        disabled={!bytes||parts.length<2} onClick={()=>changeView("dissect")}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT</button>
+      <button type="button" aria-pressed={inspectModel&&mode==="exploded"}
+        disabled={!bytes||parts.length<2}
+        onClick={()=>inspectModel&&mode==="exploded"?changeView("assembled"):changeView("exploded")}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">EXPLODED / IMPLODED</button>
+      {!bytes&&<p role="status" className="basis-full text-xs text-foreground/70">
+        {working?"Preparing the design and checking 3D…":status}
+      </p>}
     </div>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
       <div className="flex min-w-0 flex-col gap-3">
@@ -194,13 +189,13 @@ export function V1HunyuanPathway({
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
                 <span>{working?status:failure||""}</span>
                 {failure&&<button type="button" className="rounded-lg border border-gold/50 px-3 py-2"
-                  onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
+                  onClick={()=>setAttempt(v=>v+1)}>TRY THIS PICTURE AGAIN</button>}
               </div>
             </div>:
             <div role={failure?"alert":"status"} className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
               <p className="max-w-xl text-sm text-gold">{working?status:failure||""}</p>
               {failure&&<button type="button" className="rounded-lg border border-gold/50 px-4 py-2 text-gold"
-                onClick={()=>setAttempt(v=>v+1)}>{localRequested?"RECONNECT HUNYUAN3D":"TRY THIS PICTURE AGAIN"}</button>}
+                onClick={()=>setAttempt(v=>v+1)}>TRY THIS PICTURE AGAIN</button>}
             </div>}
           {inspectModel&&mode==="blueprint"&&bytes&&<div aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-3 grid grid-cols-3 text-center text-xs text-cyan-200">
@@ -221,7 +216,7 @@ export function V1HunyuanPathway({
           className="self-start text-xs text-gold underline">Return to the design reference</button>}
         <p className="text-xs text-foreground/70">
           {bytes?"3D views use an unverified reconstruction. It may differ from the design reference; dimensions are not calibrated."
-            :"Optional 3D uses a service on your computer. Connect local 3D only if you have it installed; your browser may ask for device access."}
+            :"The original image is a concept reference. Inspectable 3D and calibrated dimensions require the connected Windows worker."
           {mode==="dissect"&&parts.length<2?" The generator returned a fused mesh that cannot honestly be dissected.":""}
         </p>
       </div>

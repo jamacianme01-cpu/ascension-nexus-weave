@@ -14,7 +14,12 @@ const tests=[
   ["original approved Tree and Book entry survives pathway work",()=>{
     assert.match(ui,/ascension-tree-behind-book-hq\.jpg/);
     assert.match(ui,/className="ascension-scene-hero"/);
-    assert.match(ui,/choice === null && !result && <section aria-label="Engage ASCENSION"/);
+    assert.match(ui,/!enteredTree && <section aria-label="ASCENSION Book entrance"/);
+    assert.match(ui,/BOOK_SCENE = "\/approved-scene\/01-closed-book\.jpg"/);
+    assert.match(ui,/enteredTree && choice === null && !result && <section aria-label="ASCENSION Tree world"/);
+    assert.match(ui,/onClick=\{\(\) => enterCategory\(item.id\)\}/);
+    assert.match(ui,/className="ascension-entry-guide"/);
+    assert.doesNotMatch(ui,/onClick=\{\(\) => setSection\(item.id\)\}/);
     assert.match(ui,/data-realities=\{choice !== null \? "true" : undefined\}/);
     assert.match(ui,/What do you want to accomplish\?/);
     assert.match(ui,/ENGAGE ASCENSION/);

@@ -81,12 +81,20 @@ const tests=[
     assert.match(route,/guide-ip/);
     assert.match(route,/image-ip/);
     assert.doesNotMatch(route,/limit\("global", 48\)/);
-    assert.match(route,/revisionDirective\(objective\)/);
+    assert.match(route,/revisionDirective\(objective, section\)/);
     assert.match(route,/assessImageBytes/);
     assert.match(route,/!assessment\.ok/);
   }],
   ["Tree can speak and user can select actual submeshes",()=>{
     assert.match(design,/<TreeGuide objective=\{objective\}/);
+    assert.match(design,/className="ascension-tree-in-pathway"/);
+    assert.match(design,/introduce portrait pathway=\{path\}/);
+    assert.match(ui,/introduce portrait enabled=\{props.speakingEnabled\}/);
+    assert.doesNotMatch(guide,/What is my first practical step\?/);
+    assert.doesNotMatch(guide,/Let.s work on it together/);
+    assert.match(guide,/ascension-tree-character/);
+    assert.match(ui,/firstAnswer: continuationContext.current/);
+    assert.match(ui,/ascension-business-plan-flow/);
     assert.match(guide,/webkitSpeechRecognition/);
     assert.match(guide,/phase: "guide"/);
     assert.match(design,/inspect\(p\.meshIndex\)/);

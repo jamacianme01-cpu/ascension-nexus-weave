@@ -6,9 +6,25 @@ import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech";
 
 type Part = { name: string; purpose: string; location: string };
-type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
+type BusinessPlan = {
+  executive_summary: string; customers_and_market: string; operations_and_inventory: string;
+  marketing_and_sales: string; revenue_and_cost_baseline: string; profit_improvement: string;
+  financial_projection: string; assumptions_and_missing_data: string; milestones_and_risks: string;
+};
+const PLAN_LABELS: { field: keyof BusinessPlan; label: string }[] = [
+  { field: "executive_summary", label: "Executive summary" },
+  { field: "customers_and_market", label: "Customers and market" },
+  { field: "operations_and_inventory", label: "Operations and inventory" },
+  { field: "marketing_and_sales", label: "Marketing and sales" },
+  { field: "revenue_and_cost_baseline", label: "Revenue and cost baseline" },
+  { field: "profit_improvement", label: "Profit improvement" },
+  { field: "financial_projection", label: "Financial projections" },
+  { field: "assumptions_and_missing_data", label: "Assumptions and missing data" },
+  { field: "milestones_and_risks", label: "Milestones and risks" },
+];
+type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; provider?: string; plan?: BusinessPlan };
 type Result = { experience?: "guidance" | "design"; introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string };
-  contributors: string[]; unavailable: string[]; providerErrors: string[]; mode: string; verified: false; governance: string; persistence: string };
+  contributors: string[]; unavailable: string[]; providerErrors: string[]; mode: string; verified: false; governance: string; persistence: string; specialty_lead?: string };
 type ObjectiveSection = "business" | "build" | "guidance";
 type ObjectiveAttachment = { name: string; mime: string; text?: string; data_url?: string };
 const SECTIONS: { id: ObjectiveSection; title: string; lead: string }[] = [
@@ -139,6 +155,13 @@ function PathwayView(props: {
     <h3 className="mb-3 text-xl text-gold">{props.path.title}</h3>
     <p className="mb-4 text-sm leading-6">{props.path.summary}</p>
     <TreeGuide objective={props.objective} pathway={props.path} alternatives={props.alternatives} experience="guidance" introduce enabled={props.speakingEnabled} onSpeak={props.onSpeak}/>
+    {props.path.plan && <section className="mt-6 space-y-4" aria-label="Business plan">
+      <h4 className="text-lg text-gold">Business plan</h4>
+      {PLAN_LABELS.map(({ field, label }) => <div key={field}>
+        <h5 className="text-sm font-semibold text-gold">{label}</h5>
+        <p className="mt-1 whitespace-pre-line text-sm leading-6">{props.path.plan?.[field]}</p>
+      </div>)}
+    </section>}
   </section>;
   return <V1HunyuanPathway
     path={props.path} alternatives={props.alternatives} objective={props.objective} modelCache={props.modelCache} imageCache={props.imageCache}
@@ -416,8 +439,11 @@ export function IndependentEngage() {
           <button type="button" onClick={reset} className="rounded-full border border-gold/40 px-4 py-2 text-gold">New objective</button>
         </div>
       </div>
+      {result.specialty_lead === "unavailable" && <p role="status" className="text-xs text-foreground/70">
+        The assigned specialist is not connected. Actual model contributions are identified in the pathways.
+      </p>}
       <TreePathwayCarousel designs={choices.map(p => ({
-        id: p.id, title: p.title, summary: p.summary,
+        id: p.id, title: p.provider ? p.provider + " · " + p.title : p.title, summary: p.summary,
       }))} active={orbit % choices.length} onRotate={index=>{stopVoice();setOrbPreview(null);setOrbit(index);}}
         onOpen={hearPathway} />
       {previewPath && <div className="flex flex-wrap items-center justify-center gap-3" aria-label="Pathway introduction">

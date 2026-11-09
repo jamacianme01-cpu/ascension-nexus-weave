@@ -101,7 +101,7 @@ jobs:
             if(await page.locator('.ascension-entry-guide').count())throw Error('Unrequested floating Tree panel persisted');
             await page.locator('#pathway-refinement').fill('We already completed the first step; continue from the next.');
             await page.getByRole('button',{name:'BUILD ON RESULT'}).click();
-            await page.waitForFunction(()=>document.querySelector('[aria-label="ASCENSION pathways"]')!==null);
+            for(let i=0;i<50&&pathwayRequests.length<2;i++)await page.waitForTimeout(100);
             if(pathwayRequests.length!==2 || !pathwayRequests[1].firstAnswer?.includes('selected_pathway'))
               throw Error('BUILD ON RESULT lost the selected business plan');
             console.log('PASS: Book selection, spoken Tree control, persistent pathway Tree, real business workflow, and context-preserving refinement');

@@ -483,9 +483,14 @@ export function IndependentEngage() {
           </div>}
           {selected.steps.length > 0 && <div className="mt-4">
             <h4 className="text-sm font-semibold text-sky-100">Your first steps</h4>
-            <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6">
+            {section === "business" ? <div className="ascension-business-plan-flow" role="list"
+              aria-label="Business plan implementation sequence">
+              {selected.steps.map((step, index) => <div role="listitem" key={index} className="ascension-business-step">
+                <strong>{index + 1}</strong><span>{step}</span>
+              </div>)}
+            </div> : <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6">
               {selected.steps.map((step, index) => <li key={index}>{step}</li>)}
-            </ol>
+            </ol>}
           </div>}
           <p className="mt-4 text-xs text-foreground/70">A proposed direction to explore. Ask the Tree what to check before committing time or money.</p>
         </section>}

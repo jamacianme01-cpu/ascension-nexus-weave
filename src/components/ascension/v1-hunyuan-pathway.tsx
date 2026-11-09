@@ -11,7 +11,7 @@ type Pathway={
   parts:Part[];blend_reason?:string;
 };
 type Cache={current:Map<string,ArrayBuffer>};
-const LOCAL="http://127.0.0.1:8082";
+const LOCAL="/api/public/ascension/brain-3d";
 const validImage=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/=]{4000,12000000})$/i;
 function formatError(reason:unknown){
   return reason instanceof Error?reason.message:String(reason);
@@ -84,18 +84,18 @@ export function V1HunyuanPathway({
       setStatus("Checking the owner's Hunyuan3D engine on this computer…");
       let ready:Response;
       try{
-        ready=await fetch(LOCAL+"/status",{signal:AbortSignal.any([controller.signal, AbortSignal.timeout(4500)]),cache:"no-store"});
+        ready=await fetch(LOCAL+"/status",{signal:AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),cache:"no-store"});
       }catch{
-        setStatus("3D is unavailable: the Windows Hunyuan bridge is not connected to this browser.");
+        setStatus("3D is unavailable: the designated old computer did not respond.");
         return;
       }
       if(!ready.ok){
-        setStatus("3D is unavailable: the Windows worker is not ready.");
+        setStatus("3D is unavailable: the designated old-computer worker is not ready.");
         return;
       }
       const condition=await ready.json() as {ready?:boolean;engine?:string};
       if(!condition.ready||condition.engine!=="Hunyuan3D"){
-        setStatus("3D is unavailable: the Hunyuan worker is not connected.");
+        setStatus("3D is unavailable: Hunyuan3D on the designated old computer is not connected.");
         return;
       }
       setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");

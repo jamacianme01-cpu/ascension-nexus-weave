@@ -334,7 +334,7 @@ async function build(objective: string, firstAnswerText = "", section: Objective
   const result = parseText(response.text);
   if (section === "business" && [...result.pathways, result.blend].some(path => !path.plan))
     throw new Error("The answer engine returned incomplete business plans.");
-  result.experience=section === "build" : section === "business" || section === "guidance" ? "guidance" : objectiveExperience(objective,result.experience);
+  result.experience = section === "build" ? "design" : section === "business" || section === "guidance" ? "guidance" : objectiveExperience(objective, result.experience);
   const hasClaude = sources.some(item => item.provider === "Claude");
   const hasGrok = sources.some(item => item.provider === "Grok");
   result.pathways[0]!.provider = "OpenAI";

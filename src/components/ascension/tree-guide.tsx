@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { TreePine } from "lucide-react";
 
 /** The same spoken Tree stays available with the selected pathway and in reality inspection.
  * The server answers from selected design context; it cannot claim a physical test.
@@ -28,12 +27,13 @@ type VoiceRecognizer = {
   stop(): void;
 };
 
-export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0, experience = "design" }: {
+export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, portrait = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0, experience = "design" }: {
   objective: string;
   pathway: GuidePathway;
   enabled: boolean;
   onSpeak: (answer: string) => void;
   compact?: boolean;
+  portrait?: boolean;
   focusedPart?: GuidePart | null;
   view?: string;
   partLocated?: boolean;
@@ -45,7 +45,6 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
-  const [open, setOpen] = useState(true);
   const [conversation, setConversation] = useState<Exchange[]>(() => conversations.get(objective) ?? []);
   const [thinking, setThinking] = useState(false);
   const [listening, setListening] = useState(false);
@@ -170,54 +169,34 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     }
   }
 
-  return <div className={"rounded-xl border border-amber-300/25 bg-[#051b2a]/95 p-3 text-sm text-foreground " +
-    (compact ? "w-full" : "my-4")} aria-label="Speak with the Tree of Knowledge">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}
-        className="flex items-center gap-2 rounded-full border border-amber-200/45 px-3 py-2 text-amber-100">
-        <TreePine aria-hidden="true" size={18} /> TREE OF KNOWLEDGE {open ? "▴" : "▾"}
+  return <div className={"ascension-tree-voice " + (compact ? "ascension-tree-voice-compact" : "")}
+    aria-label="Speak with the Tree of Knowledge">
+    {portrait && <button type="button" className="ascension-tree-character"
+      aria-label="Speak to the Tree" title="Speak to the Tree" onClick={listen}
+      aria-pressed={listening}>
+      <img src="/approved-scene/ascension-tree-behind-book-hq.jpg"
+        alt="Tree of Knowledge" draggable={false}/>
+    </button>}
+    <form className="ascension-tree-conversation" onSubmit={event => { event.preventDefault(); void ask(question); }}>
+      <input type="text" aria-label="Ask the Tree" value={question} maxLength={800}
+        onChange={event => setQuestion(event.target.value)}
+        placeholder="Ask the Tree" disabled={thinking}/>
+      {!portrait && <button type="button" onClick={listen} aria-pressed={listening}
+        aria-label={listening ? "Stop speaking to the Tree" : "Speak to the Tree"}>
+        {listening ? "STOP" : "SPEAK"}
+      </button>}
+      <button type="submit" disabled={!question.trim() || thinking}>
+        {thinking ? "CONNECTING…" : "ASK"}
       </button>
-      {open && enabled && answer && <button type="button" onClick={() => onSpeak(answer)}
-        className="rounded-full border border-amber-200/45 px-3 py-2 text-amber-100">HEAR AGAIN</button>}
-    </div>
-    {open && <>
-      <p className="mt-2 text-xs text-sky-100/80">Let's work on it together. Ask a question or tell me what you'd like to change.</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {(focusedPart ? [`How does ${focusedPart.name} connect?`, `What should we change about ${focusedPart.name}?`] : experience==="guidance"
-          ? (alternatives.length ? ["Help me choose between these pathways", "What could I be overlooking?", "What is my first practical step?"] : ["What would you improve?", "What is my first practical step?"])
-          : pathway.steps.length===0 && pathway.parts.length===0
-            ? ["Which design matches what I asked?", "How do these designs differ?", "What has already been decided?"]
-            : ["How does this design work?", "What should we change in this design?", "How do these parts connect?"]).map(prompt => <button type="button" key={prompt}
-          disabled={thinking} onClick={() => void ask(prompt)}
-          className="rounded-full border border-amber-200/30 px-3 py-1 text-xs text-amber-100 disabled:opacity-40">{prompt}</button>)}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <input type="text" aria-label="Ask the Tree" value={question} maxLength={800}
-          onChange={event => setQuestion(event.target.value)}
-          onKeyDown={event => { if (event.key === "Enter") void ask(question); }}
-          placeholder="Talk with the Tree"
-          className="min-w-[10rem] flex-1 rounded-lg border border-amber-200/30 bg-[#07111d] px-3 py-2 text-foreground"/>
-        <button type="button" onClick={listen} aria-pressed={listening}
-          className="rounded-full border border-amber-200/45 px-3 py-2 text-amber-100">
-          {listening ? "STOP LISTENING" : "SPEAK"}
-        </button>
-        <button type="button" disabled={!question.trim() || thinking} onClick={() => void ask(question)}
-          className="rounded-full border border-amber-200/45 px-3 py-2 text-amber-100 disabled:opacity-40">
-          {thinking ? "CONNECTING…" : "ASK"}
-        </button>
-      </div>
-      {error && <p role="alert" className="mt-2 text-red-200">{error}</p>}
-      <div className="mt-3 space-y-2" role="log" aria-label="Conversation with the Tree" aria-live="polite">
-        {conversation.map((message,index)=>{
-          const previous=conversation[index-1];
-          if(message.role==="assistant"&&(previous?.selectedPathway||previous?.selectedPart))return <details key={index} className="text-sky-100">
-            <summary className="cursor-pointer text-xs text-gold">Read spoken explanation</summary>
-            <p className="mt-2 whitespace-pre-wrap leading-6">{message.content}</p>
-          </details>;
-          return <p key={index} className={"whitespace-pre-wrap leading-6 "+(message.role==="user"?"text-amber-100":"text-sky-100")}>
-            <span className="mr-2 text-xs opacity-70">{message.selectedPathway?"Selected pathway":message.selectedPart?"Selected part":message.role==="user"?"You":"Tree"}</span>{message.selectedPathway ?? message.selectedPart ?? message.content}</p>;
-        })}
-      </div>
-    </>}
+    </form>
+    {error && <p role="alert" className="text-sm text-red-200">{error}</p>}
+    {answer && <details className="ascension-tree-last-reply">
+      <summary>Read the Tree's reply</summary>
+      <p>{answer}</p>
+      {enabled && <button type="button" onClick={() => onSpeak(answer)}>Hear again</button>}
+    </details>}
+    {conversation.length > 0 && <span className="sr-only" role="status">
+      {conversation.length} messages in the Tree conversation
+    </span>}
   </div>;
 }

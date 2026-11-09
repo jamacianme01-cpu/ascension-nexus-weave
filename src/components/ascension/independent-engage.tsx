@@ -3,13 +3,61 @@ import { TreePathwayCarousel } from "@/components/ascension/tree-pathway-carouse
 import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
-import { objectiveExperience } from "@/lib/ascension/objective-experience";
 import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
 type Result = { experience?: "guidance" | "design"; introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string };
   contributors: string[]; unavailable: string[]; providerErrors: string[]; mode: string; verified: false; governance: string; persistence: string };
+type ObjectiveSection = "business" | "build" | "guidance";
+type ObjectiveAttachment = { name: string; mime: string; text?: string; data_url?: string };
+const SECTIONS: { id: ObjectiveSection; title: string; lead: string }[] = [
+  { id: "business", title: "Business Planner", lead: "Claude" },
+  { id: "build", title: "Build / Create", lead: "OpenAI" },
+  { id: "guidance", title: "Guidance", lead: "Grok" },
+];
+const ACCEPTED_DOCUMENT = /\.(pdf|docx|txt|md|csv|json)$/i;
+const TEXT_DOCUMENT = /\.(txt|md|csv|json)$/i;
+
+/** Files stay in this browser until ENGAGE; no hidden upload or persistence. */
+async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
+  const name = file.name.slice(0, 140);
+  if (file.type.startsWith("image/") || /\.(png|jpe?g|webp|heic|heif)$/i.test(name)) {
+    if (file.size > 15_000_000) throw new Error(name + " is too large for a picture.");
+    const bitmap = await createImageBitmap(file).catch(() => { throw new Error("Cannot read " + name + ". Try JPEG or PNG."); });
+    try {
+      const ratio = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+      canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Camera picture could not be prepared.");
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const data_url = canvas.toDataURL("image/jpeg", 0.75);
+      if (data_url.length > 2_400_000) throw new Error(name + " is still too large after resizing.");
+      return { name: name.replace(/\.[^.]+$/, ".jpg"), mime: "image/jpeg", data_url };
+    } finally { bitmap.close(); }
+  }
+  if (!ACCEPTED_DOCUMENT.test(name)) throw new Error("Unsupported file type: " + name);
+  if (TEXT_DOCUMENT.test(name)) {
+    if (file.size > 15_000) throw new Error(name + " exceeds the 15 KB text-document limit.");
+    return { name, mime: "text/plain", text: await file.text() };
+  }
+  if (file.size > 2_000_000) throw new Error(name + " exceeds the 2 MB document limit.");
+  const rawUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("Unable to read " + name));
+    reader.readAsDataURL(file);
+  });
+  const mime = name.toLowerCase().endsWith(".pdf") ? "application/pdf" :
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  // Some browsers omit or mislabel Word MIME types. Preserve the actual bytes,
+  // but send the canonical MIME of the accepted filename.
+  const encoded = rawUrl.slice(rawUrl.indexOf(",") + 1);
+  return { name, mime, data_url: "data:" + mime + ";base64," + encoded };
+}
+
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 const GREETING = "Welcome to ASCENSION. I'm the Tree of Knowledge. Glad you're here. What would you like to create? I'll help you work through it.";
 
@@ -100,6 +148,9 @@ function PathwayView(props: {
 /** Hosted Tree entry. The first model answer is backend context, not a public essay. */
 export function IndependentEngage() {
   const [objective, setObjective] = useState("");
+  const [section, setSection] = useState<ObjectiveSection>("build");
+  const [attachments, setAttachments] = useState<ObjectiveAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState("");
   const [requested, setRequested] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -145,12 +196,27 @@ export function IndependentEngage() {
     };
   }, []);
 
+  async function addFiles(files: File[]) {
+    if (!files.length) return;
+    setAttachmentError("");
+    if (attachments.length + files.length > 3) {
+      setAttachmentError("Up to three files per objective.");
+      return;
+    }
+    try {
+      const read = await Promise.all(files.map(readObjectiveFile));
+      setAttachments(previous => [...previous, ...read].slice(0, 3));
+    } catch (cause) {
+      setAttachmentError(cause instanceof Error ? cause.message : "Unable to read the selected file.");
+    }
+  }
+
   async function generatePathways(text: string, controller: AbortController, token: number) {
     setPathwayError("");
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways" }),
+        body: JSON.stringify({ objective: text, phase: "pathways", section, attachments }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();
@@ -160,7 +226,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      if (talking) say(objectiveExperience(text,data.experience)==="guidance"?"I've brought together a few ways forward. Hear an orb, then choose the approach you'd like us to work through.":"I've brought your designs together. Choose one and we'll explore how its parts work, or build on it together.");
+      if (talking) say(section !== "build"?"I've brought together a few ways forward. Hear an orb, then choose the approach you'd like us to work through.":"I've brought your designs together. Choose one and we'll explore how its parts work, or build on it together.");
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.
       window.setTimeout(() => {
@@ -231,6 +297,7 @@ export function IndependentEngage() {
     stopVoice();
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
+    setSection("build"); setAttachments([]); setAttachmentError("");
     setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -238,7 +305,7 @@ export function IndependentEngage() {
 
   const choices = result ? [...result.pathways, result.blend] : [];
   const selected = choice === null ? null : choices[choice];
-  const experience=objectiveExperience(requested,result?.experience);
+  const experience = section === "build" ? "design" : "guidance";
   const previewPath = orbPreview === null ? null : choices[orbPreview];
   const spokenPreview = (path: Pathway) => {
     return path.title + ". " + briefSpokenAnswer(path.summary,32);
@@ -273,12 +340,42 @@ export function IndependentEngage() {
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
         </div>
+        <div className="relative z-10 flex flex-wrap justify-center gap-2" role="group" aria-label="ASCENSION sections">
+          {SECTIONS.map(item => <button key={item.id} type="button" disabled={loading}
+            aria-pressed={section === item.id} onClick={() => setSection(item.id)}
+            className={`rounded-full border px-4 py-2 text-sm ${section === item.id ? "border-gold bg-gold/20 text-gold" : "border-gold/30 bg-black/25 text-foreground"}`}>
+            {item.title}
+          </button>)}
+        </div>
         <label htmlFor="objective">What do you want to accomplish?</label>
         <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
           aria-label="What do you want to accomplish?" placeholder="What do you want to accomplish?"
           onChange={event => setObjective(event.target.value)}
           onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !loading) { event.preventDefault(); void engage(); } }}
         />
+        <div className="relative z-10 flex flex-wrap items-center gap-3 text-xs">
+          <label className="cursor-pointer rounded-full border border-gold/40 px-4 py-2 text-gold">
+            Upload pictures
+            <input className="sr-only" type="file" accept="image/*" multiple disabled={loading}
+              onChange={event => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void addFiles(files); }}/>
+          </label>
+          <label className="cursor-pointer rounded-full border border-gold/40 px-4 py-2 text-gold">
+            Take picture
+            <input className="sr-only" type="file" accept="image/*" capture="environment" disabled={loading}
+              onChange={event => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void addFiles(files); }}/>
+          </label>
+          <label className="cursor-pointer rounded-full border border-gold/40 px-4 py-2 text-gold">
+            Upload documents
+            <input className="sr-only" type="file" accept=".pdf,.docx,.txt,.md,.csv,.json" multiple disabled={loading}
+              onChange={event => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void addFiles(files); }}/>
+          </label>
+          {attachments.map((item, index) => <span key={index} className="rounded-full border border-gold/30 px-3 py-2">
+            {item.name} <button type="button" disabled={loading} aria-label={`Remove ${item.name}`}
+              onClick={() => setAttachments(current => current.filter((_, i) => i !== index))}>×</button>
+          </span>)}
+        </div>
+        {attachmentError && <p role="alert" className="text-sm text-red-200">{attachmentError}</p>}
+        {attachments.length > 0 && <p className="text-xs text-foreground/70">Files are sent to the configured answer provider when you engage. They are not saved to your ASCENSION library.</p>}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button type="button" disabled={loading || objective.trim().length < 3} onClick={() => void engage()}
             className="min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
@@ -307,7 +404,7 @@ export function IndependentEngage() {
 
     {result && choice === null && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg text-gold">{objectiveExperience(requested,result.experience)==="guidance"?"Explore your possibilities":"Explore your designs"}</h2>
+        <h2 className="text-lg text-gold">{section !== "build"?"Explore your possibilities":"Explore your designs"}</h2>
         <div className="flex flex-wrap gap-3 text-xs">
           <button type="button" onClick={() => {
             if (talking) stopVoice();
@@ -340,7 +437,7 @@ export function IndependentEngage() {
         className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
       <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}
         pathway={{ title: "Your idea", summary: requested || objective, steps: [], parts: [] }}
-        experience={objectiveExperience(requested,result?.experience)} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
+        experience={experience} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
       {voiceNotice && <p role="status" className="text-sm text-gold">{voiceNotice}</p>}
     </div>}
     {selected && <section ref={designView} className="ascension-knowledgeverse ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
@@ -349,7 +446,7 @@ export function IndependentEngage() {
         <button type="button" onClick={() => { stopVoice(); setDesignPicture(false); setDesignSettled(false); setChoice(null); }}
           className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
       </div>
-        <PathwayView key={selected.id} experience={objectiveExperience(requested,result?.experience)} path={selected} alternatives={choices} objective={requested} modelCache={modelCache} imageCache={imageCache}
+        <PathwayView key={selected.id} experience={experience} path={selected} alternatives={choices} objective={requested} modelCache={modelCache} imageCache={imageCache}
           onPicture={(ready) => { setDesignPicture(ready); setDesignSettled(true); }}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />

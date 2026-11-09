@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
-import { isBrainOnline, remoteBrainEnabled } from "@/lib/ascension/brain-relay.server";
+import { isBrainOnline, remoteBrainEnabled, sendToBrain, enqueueBrowserBrainJob, browserBrainJobResult } from "@/lib/ascension/brain-relay.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { compileSelectedPathwayDesign } from "@/lib/ascension/design-image-brief";
@@ -543,11 +543,18 @@ async function picture(objective: string, value: Record<string, unknown>) {
 
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
-    GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false,
-      brain_mode: remoteBrainEnabled() ? "designated-old-pc" : "hosted",
-      brain_connected: isBrainOnline(),
-      picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+    GET: async ({ request }) => {
+      const jobId = new URL(request.url).searchParams.get("brain_job");
+      if (jobId && remoteBrainEnabled()) {
+        const reply = browserBrainJobResult(jobId);
+        return json(reply.body, reply.status);
+      }
+      return json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
+        governed_runtime_connected: false,
+        brain_mode: remoteBrainEnabled() ? "designated-old-pc" : "hosted",
+        brain_connected: isBrainOnline(),
+        picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. No provider or governed verification is invented." });
+    },
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");
@@ -567,6 +574,31 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         const section = selectedSection(input["section"]);
         const attachments = input["phase"] === "pathways" ? validatedEvidence(input["attachments"]) : [];
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
+        // The designated old PC executes V1 answer phases when its original
+        // authenticated bridge is enabled. Never silently substitute a hosted
+        // OpenAI result for a disconnected owner's computer.
+        if (remoteBrainEnabled()) {
+          const phase = String(input["phase"] ?? "pathways");
+          if (!["pathways", "initial", "guide", "picture"].includes(phase))
+            return json({ error: "Unsupported ASCENSION phase." }, 400);
+          if (phase === "guide" &&
+              (typeof input["question"] !== "string" || input["question"].trim().length < 3 ||
+               input["question"].length > 800))
+            return json({ error: "Ask a question between 3 and 800 characters." }, 400);
+          if (phase === "picture" && isPersonalFinanceObjective(objective))
+            return json({ error: "Financial guidance does not require an invention picture." }, 400);
+          if (!limit("brain:" + phase + ":global", phase === "guide" ? 240 : 48) ||
+              !limit("brain:" + phase + ":ip:" + address, phase === "guide" ? 48 : 12))
+            return json({ error: "ASCENSION designated-computer request limit reached." }, 429);
+          // Preserve the user's chosen section and uploaded evidence unchanged.
+          // CPU pathway generation is asynchronous, as in the original relay.
+          if (phase === "pathways" && request.headers.get("prefer") === "respond-async") {
+            const queued = enqueueBrowserBrainJob(input);
+            return json(queued.body, queued.status);
+          }
+          const reply = await sendToBrain(input);
+          return json(reply.body, reply.status);
+        }
         if (input["phase"] === "initial") {
           if (!limit("objective-global", 48) || !limit("objective-ip:" + address, 12))
             return json({ error: "Too many objectives. Try again later." }, 429);

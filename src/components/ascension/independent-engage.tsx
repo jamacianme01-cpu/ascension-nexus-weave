@@ -51,7 +51,7 @@ async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       const data_url = canvas.toDataURL("image/jpeg", 0.75);
       if (data_url.length > 2_400_000) throw new Error(name + " is still too large after resizing.");
-      return { name: name.replace(/\.[^.]+$/, ".jpg"), mime: "image/jpeg", data_url };
+      return { name: /\.[^.]+$/.test(name) ? name.replace(/\.[^.]+$/, ".jpg") : name + ".jpg", mime: "image/jpeg", data_url };
     } finally { bitmap.close(); }
   }
   if (!ACCEPTED_DOCUMENT.test(name)) throw new Error("Unsupported file type: " + name);

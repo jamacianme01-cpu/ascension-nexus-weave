@@ -211,8 +211,20 @@ export function compileSelectedPathwayDesign(
   const requiredText=required.join(", ");
   if (validateImageBudget && clipTokenEstimate(requiredText)>68)
     throw new Error("The selected design has more visible component detail than the current image engine can represent faithfully. No incomplete invention picture was requested.");
-  const prompt=clipTokenEstimate(requiredText+", "+studio)<=68
+  // Keep a short statement of the selected pathway's actual operating
+  // mechanism when the existing free image provider has room for it.
+  // A generic object title alone caused visibly different designs to turn
+  // into the same stock drone. Never evict requested exterior hardware.
+  const basePrompt=clipTokenEstimate(requiredText+", "+studio)<=68
     ? requiredText+", "+studio : requiredText;
+  const operationalDetail=(summary.split(/[.!?]/)[0] ?? "").replace(/\\s+/g," ").trim();
+  let prompt=basePrompt;
+  if (operationalDetail && clipTokenEstimate(basePrompt)<62) {
+    const remaining=68-clipTokenEstimate(basePrompt)-2;
+    const detail=bound("Operating design: "+operationalDetail,Math.min(remaining,24));
+    if (detail && clipTokenEstimate(basePrompt+", "+detail)<=68)
+      prompt=requiredText+", "+detail+(basePrompt.endsWith(studio)?", "+studio:"");
+  }
   const negative=bound([
     "collage, split screen, comparison sheet, multiple views, exploded view",
     base.count===1?"duplicate machine, second object, disconnected products":"",

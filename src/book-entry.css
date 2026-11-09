@@ -2422,3 +2422,56 @@ body:has(.ascension-world > .ascension-command) main {
   background: rgb(235 194 118 / 18%);
   color: #f0d08e;
 }
+
+
+/* Restore the Tree as a prominent persistent character during selected-pathway inspection.
+   Reuse the approved Tree artwork rather than adding a new panel or scene. */
+@media (min-width: 1024px) {
+  .ascension-knowledgeverse .ascension-pathway-side {
+    position: sticky;
+    top: 0.65rem;
+    align-self: start;
+    max-height: calc(100svh - 1.3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .ascension-knowledgeverse .ascension-tree-in-pathway {
+    position: sticky;
+    top: -0.8rem;
+    z-index: 5;
+    padding: 0 0 0.65rem;
+    background: #08192a;
+  }
+}
+.ascension-knowledgeverse .ascension-tree-character {
+  height: clamp(235px, 36vh, 370px);
+  width: 100%;
+  margin: 0 0 0.2rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 99%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 99%);
+}
+.ascension-knowledgeverse .ascension-tree-character img {
+  transform: scale(1.65) translateY(13%);
+  object-fit: cover;
+  object-position: 50% 26%;
+  filter: brightness(1.2) saturate(1.12);
+}
+.ascension-knowledgeverse .ascension-tree-conversation {
+  position: relative;
+  z-index: 6;
+  margin-top: -0.4rem;
+}
+@media (max-width: 1023px) {
+  .ascension-knowledgeverse .ascension-pathway-side,
+  .ascension-knowledgeverse .ascension-tree-in-pathway {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+  .ascension-knowledgeverse .ascension-tree-character {
+    height: clamp(260px, 36vh, 350px);
+  }
+}

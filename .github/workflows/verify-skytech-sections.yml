@@ -2,7 +2,7 @@ name: Verify Skytech ASCENSION sections and evidence branch
 on:
   push:
     branches:
-      - repair/restore-governed-old-pc-bridge-20261109
+      - repair/route-current-v1-through-old-pc-20261109
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,6 +27,7 @@ jobs:
           test -f src/routes/api/public/ascension/brain-3d/generate.ts
           test -f .output/server/index.mjs
           bun tests/v1-repair-contract.test.mjs
+          node tests/brain-relay.test.mjs
           bun tests/selected-pathway-design.test.mjs
           bun tests/creation-source-context.test.mjs
       - name: Verify section selectors and evidence controls in browser

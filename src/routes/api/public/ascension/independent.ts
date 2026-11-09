@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
+import { isBrainOnline, remoteBrainEnabled } from "@/lib/ascension/brain-relay.server";
 import { isPersonalFinanceObjective, isInventionObjective, objectiveExperience, revisionDirective } from "@/lib/ascension/objective-experience";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { compileSelectedPathwayDesign } from "@/lib/ascension/design-image-brief";
@@ -543,7 +544,10 @@ async function picture(objective: string, value: Record<string, unknown>) {
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false, picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+      governed_runtime_connected: false,
+      brain_mode: remoteBrainEnabled() ? "designated-old-pc" : "hosted",
+      brain_connected: isBrainOnline(),
+      picture_generation_enabled: ownImageConfigured(), note: "Only configured providers can contribute. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");

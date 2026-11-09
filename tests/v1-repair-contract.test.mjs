@@ -9,6 +9,7 @@ const launcher=read("runtime_bridge/start_hunyuan_now.ps1");
 const route=read("src/routes/api/public/ascension/independent.ts");
 const app=read("src/routes/index.tsx");
 const guide=read("src/components/ascension/tree-guide.tsx");
+const styles=read("src/book-entry.css");
 const checklist=read("docs/ASCENSION_V1_OWNER_APPROVAL_CHECKLIST.md");
 const tests=[
   ["original approved Tree and Book entry survives pathway work",()=>{
@@ -44,6 +45,8 @@ const tests=[
     assert.match(design,/Hunyuan3D is creating one real 3D GLB/);
     assert.match(design,/sourceImage\.match\(validImage\)/);
     assert.match(design,/imageCache\.current\.set\(key,sourceImage\)/);
+    assert.match(design,/const cachedPicture = imageCache\.current\.get\(key\)/);
+    assert.match(design,/if \(designPictureReady\(cachedPicture\)\) onPicture\?\.\(true\)/);
     assert.match(design,/picture\?<div/);
     assert.match(design,/How this design works/);
     assert.match(design,/asCompletedDesignStep/);
@@ -89,6 +92,8 @@ const tests=[
     assert.match(design,/<TreeGuide objective=\{objective\}/);
     assert.match(design,/className="ascension-tree-in-pathway"/);
     assert.match(design,/introduce portrait pathway=\{path\}/);
+    assert.match(styles,/\.ascension-knowledgeverse \.ascension-pathway-side/);
+    assert.match(styles,/max-height: calc\(100svh - 1\.3rem\)/);
     assert.match(ui,/introduce portrait enabled=\{props.speakingEnabled\}/);
     assert.doesNotMatch(guide,/What is my first practical step\?/);
     assert.doesNotMatch(guide,/Let.s work on it together/);

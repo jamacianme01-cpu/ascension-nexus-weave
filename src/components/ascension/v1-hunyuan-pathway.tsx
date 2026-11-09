@@ -216,7 +216,7 @@ export function V1HunyuanPathway({
           className="self-start text-xs text-gold underline">Return to the design reference</button>}
         <p className="text-xs text-foreground/70">
           {bytes?"3D views use an unverified reconstruction. It may differ from the design reference; dimensions are not calibrated."
-            :"The original image is a concept reference. Inspectable 3D and calibrated dimensions require the connected Windows worker."
+            :"The original image is a concept reference. Inspectable 3D and calibrated dimensions require the connected Windows worker."}
           {mode==="dissect"&&parts.length<2?" The generator returned a fused mesh that cannot honestly be dissected.":""}
         </p>
       </div>

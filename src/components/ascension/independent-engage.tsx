@@ -190,6 +190,7 @@ export function IndependentEngage() {
   const designView = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
+  const continuationContext = useRef("");
   const modelCache = useRef(new Map<string, ArrayBuffer>());
   const imageCache = useRef(new Map<string, string>());
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
@@ -227,7 +228,7 @@ export function IndependentEngage() {
     try {
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways", section, attachments }),
+        body: JSON.stringify({ objective: text, phase: "pathways", section, attachments, firstAnswer: continuationContext.current }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();
@@ -251,12 +252,13 @@ export function IndependentEngage() {
     }
   }
 
-  async function engage(override?: string) {
+  async function engage(override?: string, existingContext = "") {
     const text = (override ?? objective).trim();
     if (!enteredTree || !section || text.length < 3 || loading) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
+    continuationContext.current = existingContext;
     stopVoice();
     // Keep private refinement context out of the visible objective field.
     if (!override) setObjective(text);
@@ -294,12 +296,21 @@ export function IndependentEngage() {
   }
 
   function buildOn(path: Pathway, changes = "") {
-    const originalObjective = requested.split("\nBuild on the selected pathway:")[0] ?? requested;
-    const next = (originalObjective + "\nBuild on the selected pathway: " + path.title +
-      "\nPreserve these features: " + path.summary +
-      (changes.trim() ? "\nChange or improve: " + changes.trim() : "\nImprove and extend it without starting over."))
+    const originalObjective = requested.split("\\nBuild on the selected pathway:")[0] ?? requested;
+    const change = changes.trim();
+    // Preserve what has already been produced. A refinement is not a new
+    // independent objective and must not erase the selected plan or design.
+    const context = JSON.stringify({
+      selected_pathway: { title: path.title, summary: path.summary,
+        steps: path.steps, tradeoffs: path.tradeoffs, parts: path.parts,
+        ...(path.plan ? { plan: path.plan } : {}) },
+      requested_change: change || "Develop the selected result further",
+    }).slice(0, 8500);
+    const next = (originalObjective + "\\nBuild on the selected pathway: " + path.title +
+      (change ? "\\nChange or improve: " + change :
+        "\\nDevelop the selected result further without restarting or repeating completed actions."))
       .slice(0, 2400);
-    void engage(next);
+    void engage(next, context);
   }
 
   function reset() {
@@ -308,6 +319,7 @@ export function IndependentEngage() {
     stopVoice();
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
+    continuationContext.current = "";
     setSection(null); setEnteredTree(false); setAttachments([]); setAttachmentError("");
     setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);

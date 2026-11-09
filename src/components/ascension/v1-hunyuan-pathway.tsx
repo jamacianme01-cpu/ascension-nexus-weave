@@ -81,12 +81,12 @@ export function V1HunyuanPathway({
       }
       const match=sourceImage.match(validImage);
       if(!match)throw new Error("The saved selected invention picture is invalid.");
-      setStatus("Checking the owner's Hunyuan3D engine on this computer…");
+      setStatus("Checking the existing Skytech-local Hunyuan3D bridge…");
       let ready:Response;
       try{
         ready=await fetch(LOCAL+"/status",{signal:AbortSignal.any([controller.signal, AbortSignal.timeout(4500)]),cache:"no-store"});
       }catch{
-        setStatus("3D is unavailable: the Windows Hunyuan bridge is not connected to this browser.");
+        setStatus("3D unavailable: this browser cannot reach Skytech\'s local Hunyuan3D bridge at port 8082. Open ASCENSION on Skytech with its existing bridge running.");
         return;
       }
       if(!ready.ok){

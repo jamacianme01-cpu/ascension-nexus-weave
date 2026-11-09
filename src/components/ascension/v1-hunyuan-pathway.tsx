@@ -215,8 +215,15 @@ export function V1HunyuanPathway({
           {mode==="dissect"&&parts.length<2?" The generator returned a fused mesh that cannot honestly be dissected.":""}
         </p>
       </div>
-      <aside className="min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4"
+      <aside className="ascension-pathway-side min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4"
         aria-label="Hunyuan design description and parts">
+        <div className="ascension-tree-in-pathway">
+          <TreeGuide objective={objective} introduce portrait pathway={path} alternatives={alternatives}
+            enabled={speakingEnabled} onSpeak={onSpeak}
+            focusRevision={partSelection} focusedPart={component===null?null:designParts[component]??null}
+            view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"}
+            partLocated={inspectModel&&meshIndex!==null}/>
+        </div>
         <h4 className="mb-3 text-sm text-gold">PARTS</h4>
         <div className="space-y-2 text-sm" aria-label="Design components">
           {designParts.map((p,i)=><button type="button" key={i} aria-pressed={component===i}
@@ -252,8 +259,7 @@ export function V1HunyuanPathway({
         </div>
       </aside>
     </div>
-    <TreeGuide objective={objective} introduce pathway={path} alternatives={alternatives} enabled={speakingEnabled} onSpeak={onSpeak}
-      focusRevision={partSelection} focusedPart={component===null?null:designParts[component]??null} view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"} partLocated={inspectModel&&meshIndex!==null}/>
+
   </section>;
 }
 

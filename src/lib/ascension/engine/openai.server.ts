@@ -107,6 +107,7 @@ export async function callOpenAIResponse(input: {
   system: string;
   user: string;
   imageDataUrl?: string;
+  attachments?: { name: string; mime: string; data_url: string }[];
   webSearch?: boolean;
   /** Bound research and synthesis calls so ENGAGE does not time out. */
   timeoutMs?: number;
@@ -125,15 +126,22 @@ export async function callOpenAIResponse(input: {
     "Use ASCENSION's governed records as recorded context; do not treat web findings or generated proposals as a verified ASCENSION runtime execution.",
     "Do not invent web research when the web search tool did not run. Only rely on sources genuinely obtained by the search tool.",
   ].join("\n");
+  // Use the Responses API's actual file/image inputs. Merely attaching
+  // filenames to the prompt would fabricate document/vision understanding.
+  const media = input.attachments ?? [];
+  const content = [
+    { type: "input_text", text: input.user },
+    ...(input.imageDataUrl ? [{ type: "input_image", image_url: input.imageDataUrl }] : []),
+    ...media.map(item => item.mime.startsWith("image/")
+      ? { type: "input_image", image_url: item.data_url }
+      : { type: "input_file", filename: item.name, file_data: item.data_url }),
+  ];
   const request = {
     model,
     instructions,
     input: [{
       role: "user",
-      content: input.imageDataUrl
-        ? [{ type: "input_text", text: input.user },
-            { type: "input_image", image_url: input.imageDataUrl }]
-        : input.user,
+      content: content.length > 1 ? content : input.user,
     }],
     store: false,
     max_output_tokens: 6000,

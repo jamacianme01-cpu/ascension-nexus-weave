@@ -2,7 +2,7 @@ name: Verify Skytech ASCENSION sections and evidence branch
 on:
   push:
     branches:
-      - repair/skytech-v1-sections-evidence-20261109
+      - repair/book-first-tree-world-20261109
   workflow_dispatch:
 permissions:
   contents: read
@@ -41,14 +41,18 @@ jobs:
           try {
             const page = await browser.newPage({viewport:{width:1280,height:800}});
             await page.goto('http://127.0.0.1:4174/',{waitUntil:'domcontentloaded'});
-            await page.getByRole('button',{name:'Business Planner'}).waitFor({timeout:20000});
+            await page.getByRole('group',{name:'Choose your ASCENSION section'}).waitFor({timeout:20000});
+            if (await page.locator('section[aria-label="ASCENSION Tree world"]').count()) throw Error('Tree entered before Book choice');
+            if (await page.locator('textarea#objective').count()) throw Error('Objective appears before Tree entry');
             for (const name of ['Business Planner','Build / Create','Guidance']) {
-              const choice=page.getByRole('button',{name,exact:true});
-              await choice.click();
-              if (await choice.getAttribute('aria-pressed') !== 'true') throw Error(name+' did not select');
+              if (await page.getByRole('button',{name,exact:true}).count()!==1) throw Error(name+' missing from Book');
             }
+            await page.getByRole('button',{name:'Business Planner',exact:true}).click();
+            await page.locator('section[aria-label="ASCENSION Tree world"]').waitFor();
+            await page.getByRole('button',{name:'Hear the Tree',exact:true}).waitFor();
+            await page.getByRole('textbox',{name:'What do you want to accomplish?'}).waitFor();
             for (const name of ['Upload pictures','Take picture','Upload documents']) {
-              if (await page.getByText(name,{exact:true}).count()!==1) throw Error(name+' control missing');
+              if (await page.getByText(name,{exact:true}).count()!==1) throw Error(name+' control missing in Tree world');
             }
             const image=page.locator('input[type="file"][accept="image/*"][multiple]');
             await image.setInputFiles({name:'shelf.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9YzDL5gAAAAASUVORK5CYII=','base64')});

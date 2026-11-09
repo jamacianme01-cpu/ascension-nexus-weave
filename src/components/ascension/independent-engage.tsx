@@ -36,7 +36,7 @@ async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       const data_url = canvas.toDataURL("image/jpeg", 0.75);
       if (data_url.length > 2_400_000) throw new Error(name + " is still too large after resizing.");
-      return { name, mime: "image/jpeg", data_url };
+      return { name: name.replace(/\.[^.]+$/, ".jpg"), mime: "image/jpeg", data_url };
     } finally { bitmap.close(); }
   }
   if (!ACCEPTED_DOCUMENT.test(name)) throw new Error("Unsupported file type: " + name);
@@ -246,7 +246,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      if (talking) say(objectiveExperience(text,data.experience)==="guidance"?"I've brought together a few ways forward. Hear an orb, then choose the approach you'd like us to work through.":"I've brought your designs together. Choose one and we'll explore how its parts work, or build on it together.");
+      if (talking) say(section !== "build"?"I've brought together a few ways forward. Hear an orb, then choose the approach you'd like us to work through.":"I've brought your designs together. Choose one and we'll explore how its parts work, or build on it together.");
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.
       window.setTimeout(() => {
@@ -325,7 +325,7 @@ export function IndependentEngage() {
 
   const choices = result ? [...result.pathways, result.blend] : [];
   const selected = choice === null ? null : choices[choice];
-  const experience=objectiveExperience(requested,result?.experience);
+  const experience = section === "build" ? "design" : "guidance";
   const previewPath = orbPreview === null ? null : choices[orbPreview];
   const spokenPreview = (path: Pathway) => {
     return path.title + ". " + briefSpokenAnswer(path.summary,32);
@@ -396,6 +396,9 @@ export function IndependentEngage() {
           </span>)}
         </div>
         {attachmentError && <p role="alert" className="text-sm text-red-200">{attachmentError}</p>}
+        {attachments.length > 0 && <p className="text-xs text-foreground/70">
+          Files are included only when you engage; the configured answer providers may receive their contents.
+        </p>}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button type="button" disabled={loading || objective.trim().length < 3} onClick={() => void engage()}
             className="min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
@@ -424,7 +427,7 @@ export function IndependentEngage() {
 
     {result && choice === null && <section ref={view} className="ascension-result-reveal mx-auto mt-5 max-w-6xl space-y-5 rounded-xl border border-gold/25 bg-[#020913ed] p-4 sm:p-7" aria-label="ASCENSION pathways">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg text-gold">{objectiveExperience(requested,result.experience)==="guidance"?"Explore your possibilities":"Explore your designs"}</h2>
+        <h2 className="text-lg text-gold">{section !== "build"?"Explore your possibilities":"Explore your designs"}</h2>
         <div className="flex flex-wrap gap-3 text-xs">
           <button type="button" onClick={() => {
             if (talking) stopVoice();
@@ -457,7 +460,7 @@ export function IndependentEngage() {
         className="rounded-full border border-gold/45 bg-[#051b2a] px-4 py-2 text-sm text-gold">Hear the Tree</button>
       <TreeGuide objective={requested || objective || "Explore an idea with ASCENSION"}
         pathway={{ title: "Your idea", summary: requested || objective, steps: [], parts: [] }}
-        experience={objectiveExperience(requested,result?.experience)} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
+        experience={experience} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
       {voiceNotice && <p role="status" className="text-sm text-gold">{voiceNotice}</p>}
     </div>}
     {selected && <section ref={designView} className="ascension-knowledgeverse ascension-result-reveal mx-auto mt-5 min-h-[calc(100svh-3rem)] max-w-6xl space-y-5 p-4 sm:p-7"
@@ -466,7 +469,7 @@ export function IndependentEngage() {
         <button type="button" onClick={() => { stopVoice(); setDesignPicture(false); setDesignSettled(false); setChoice(null); }}
           className="rounded-full border border-gold/50 px-5 py-2 text-sm text-gold">← BACK TO PATHWAYS</button>
       </div>
-        <PathwayView key={selected.id} experience={objectiveExperience(requested,result?.experience)} path={selected} alternatives={choices} objective={requested} modelCache={modelCache} imageCache={imageCache}
+        <PathwayView key={selected.id} experience={experience} path={selected} alternatives={choices} objective={requested} modelCache={modelCache} imageCache={imageCache}
           onPicture={(ready) => { setDesignPicture(ready); setDesignSettled(true); }}
           speakingEnabled={talking}
           onSpeak={text => { if (talking) say(text); }} />

@@ -28,7 +28,7 @@ function localEndpoint(): URL {
 
 export async function callAscensionAnswer(input: RequestInput & { maxPredict?: number }): Promise<OpenAIAnswer> {
   if (!localBrainConfigured()) return callOpenAIResponse(input);
-  if (input.imageDataUrl || input.webSearch) {
+  if (input.imageDataUrl || input.attachments?.length || input.webSearch) {
     throw new Error("The local brain has no verified vision/web-search tool for this request.");
   }
   const model = process.env["LOCAL_LLM_MODEL"]?.trim() || "qwen3-ascension:latest";

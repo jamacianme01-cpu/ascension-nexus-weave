@@ -217,7 +217,7 @@ export function compileSelectedPathwayDesign(
   // into the same stock drone. Never evict requested exterior hardware.
   const basePrompt=clipTokenEstimate(requiredText+", "+studio)<=68
     ? requiredText+", "+studio : requiredText;
-  const operationalDetail=(summary.split(/[.!?]/)[0] ?? "").replace(/\\s+/g," ").trim();
+  const operationalDetail=(summary.split(/[.!?]/)[0] ?? "").replace(/\s+/g," ").trim();
   let prompt=basePrompt;
   if (operationalDetail && clipTokenEstimate(basePrompt)<62) {
     const remaining=68-clipTokenEstimate(basePrompt)-2;

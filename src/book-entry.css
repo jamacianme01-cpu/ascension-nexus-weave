@@ -2431,9 +2431,8 @@ body:has(.ascension-world > .ascension-command) main {
     position: sticky;
     top: 0.65rem;
     align-self: start;
-    max-height: calc(100svh - 1.3rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    max-height: none;
+    overflow: visible;
   }
   .ascension-knowledgeverse .ascension-tree-in-pathway {
     position: sticky;
@@ -2454,9 +2453,10 @@ body:has(.ascension-world > .ascension-command) main {
   mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 99%);
 }
 .ascension-knowledgeverse .ascension-tree-character img {
-  transform: scale(1.65) translateY(13%);
+  transform: scale(1.85);
+  transform-origin: center top;
   object-fit: cover;
-  object-position: 50% 26%;
+  object-position: 50% 0%;
   filter: brightness(1.2) saturate(1.12);
 }
 .ascension-knowledgeverse .ascension-tree-conversation {

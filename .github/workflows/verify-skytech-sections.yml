@@ -2,7 +2,7 @@ name: Verify Skytech ASCENSION sections and evidence branch
 on:
   push:
     branches:
-      - repair/book-first-tree-world-20261109
+      - repair/tree-persistent-pathway-20261109
   workflow_dispatch:
 permissions:
   contents: read
@@ -49,7 +49,8 @@ jobs:
             }
             await page.getByRole('button',{name:'Business Planner',exact:true}).click();
             await page.locator('section[aria-label="ASCENSION Tree world"]').waitFor();
-            await page.getByRole('button',{name:'Hear the Tree',exact:true}).waitFor();
+            await page.getByRole('textbox',{name:'Ask the Tree'}).waitFor();
+            if(await page.getByText("Let's work on it together.",{exact:false}).count()) throw Error('Unrequested chat script was restored');
             await page.getByRole('textbox',{name:'What do you want to accomplish?'}).waitFor();
             for (const name of ['Upload pictures','Take picture','Upload documents']) {
               if (await page.getByText(name,{exact:true}).count()!==1) throw Error(name+' control missing in Tree world');
@@ -61,5 +62,48 @@ jobs:
             await doc.setInputFiles({name:'sales.csv',mimeType:'text/csv',buffer:Buffer.from('month,sales\nOctober,100\n')});
             await page.getByText('sales.csv',{exact:false}).waitFor({timeout:10000});
             console.log('PASS: current Tree entry, three sections, picture and document intake');
+            const plan={
+              executive_summary:'Improve existing shop sales.',customers_and_market:'Local repeat customers.',
+              operations_and_inventory:'Keep verified stock records.',marketing_and_sales:'Prioritize existing channels.',
+              revenue_and_cost_baseline:'Numbers not provided.',profit_improvement:'Reduce returns.',
+              financial_projection:'No data to project.',assumptions_and_missing_data:'Await cost figures.',
+              milestones_and_risks:'Verify first action.'
+            };
+            const makePath=(id,title)=>({id,title,summary:'Concrete continuation of the selected shop plan.',steps:[
+              'Use the current records to identify the first bottleneck.',
+              'Change the identified process without replacing the business.',
+              'Review the actual sales and cost results after the change.'
+            ],tradeoffs:['Requires real measured inputs.'],parts:[],plan});
+            const fake={experience:'guidance',introduction:'Business approaches',
+              pathways:[makePath('p1','Current shop'),makePath('p2','Alternate shop'),makePath('p3','Third shop')],
+              blend:{...makePath('blend','Combined shop'),blend_reason:'Uses recorded steps.'},
+              specialty_lead:'unavailable',contributors:['OpenAI'],unavailable:['Claude','Grok'],providerErrors:[],
+              mode:'openai-only-provisional',verified:false,governance:'unverified',persistence:'none'};
+            const pathwayRequests=[];
+            await page.route('**/api/public/ascension/independent',async route=>{
+              const req=route.request();
+              if(req.method()!=='POST')return route.continue();
+              const body=req.postDataJSON();
+              if(body.phase==='pathways'){
+                pathwayRequests.push(body);
+                return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(fake)});
+              }
+              if(body.phase==='guide')return route.fulfill({status:200,contentType:'application/json',
+                body:JSON.stringify({answer:'First review the actual sales figures.'})});
+              return route.fulfill({status:400,contentType:'application/json',body:'{"error":"Mock phase unavailable"}'});
+            });
+            await page.getByRole('textbox',{name:'What do you want to accomplish?'}).fill('Improve the shop we already operate');
+            await page.getByRole('button',{name:'ENGAGE ASCENSION'}).click();
+            await page.getByRole('tab').first().click();
+            await page.getByRole('button',{name:'ENTER PATHWAY'}).click();
+            await page.locator('.ascension-tree-character img').waitFor({timeout:15000});
+            await page.getByRole('list',{name:'Business plan implementation sequence'}).waitFor();
+            if(await page.locator('.ascension-entry-guide').count())throw Error('Unrequested floating Tree panel persisted');
+            await page.locator('#pathway-refinement').fill('We already completed the first step; continue from the next.');
+            await page.getByRole('button',{name:'BUILD ON RESULT'}).click();
+            await page.waitForFunction(()=>document.querySelector('[aria-label="ASCENSION pathways"]')!==null);
+            if(pathwayRequests.length!==2 || !pathwayRequests[1].firstAnswer?.includes('selected_pathway'))
+              throw Error('BUILD ON RESULT lost the selected business plan');
+            console.log('PASS: Book selection, spoken Tree control, persistent pathway Tree, real business workflow, and context-preserving refinement');
           } finally { await browser.close(); }
           NODE

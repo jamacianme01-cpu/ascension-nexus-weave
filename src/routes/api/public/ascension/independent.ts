@@ -387,7 +387,7 @@ async function guide(objective: string, question: string, selected: Record<strin
   })).filter(item => item.title && item.summary) : [];
   const focused = obj(selected["focused_part"]);
   const focusedPart = parts.find(part => part.name === String(focused["name"] ?? "")) ?? null;
-  const currentView = ["assembled", "blueprint", "dissect"].includes(String(selected["current_view"])) ? selected["current_view"] : "assembled";
+  const currentView = ["assembled", "blueprint", "dissect", "exploded"].includes(String(selected["current_view"])) ? selected["current_view"] : "assembled";
   const response = await callOpenAIResponse({
     timeoutMs: 20000,
     system: [

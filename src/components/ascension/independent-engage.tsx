@@ -83,6 +83,8 @@ let activeUtterance: SpeechSynthesisUtterance | null = null;
 function say(text: string, onStarted?: () => void, onUnavailable?: (message: string) => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
+  // React to actual speech playback without adding another Tree image.
+  document.documentElement.classList.remove("ascension-tree-is-speaking");
   const synth = window.speechSynthesis;
   // Speak in the same turn as the click. Waiting for the voice list drops
   // the browser's user-activation, so playback can "succeed" and stay silent.
@@ -108,7 +110,10 @@ function say(text: string, onStarted?: () => void, onUnavailable?: (message: str
   let started = false;
   const next = () => {
     if (sequence !== speechSequence || index >= chunks.length) {
-      if (sequence === speechSequence) activeUtterance = null;
+      if (sequence === speechSequence) {
+        activeUtterance = null;
+        document.documentElement.classList.remove("ascension-tree-is-speaking");
+      }
       return;
     }
     const words = new SpeechSynthesisUtterance(chunks[index++]!);
@@ -117,16 +122,25 @@ function say(text: string, onStarted?: () => void, onUnavailable?: (message: str
     words.lang = voice?.lang ?? "en-US";
     words.rate = 0.96;
     words.pitch = 1;
-    words.onstart = () => { started = true; onStarted?.(); };
+    words.onstart = () => {
+      if (sequence !== speechSequence) return;
+      started = true;
+      document.documentElement.classList.add("ascension-tree-is-speaking");
+      onStarted?.();
+    };
     words.onend = next;
     words.onerror = (event: Event) => {
       if (sequence !== speechSequence) return;
       const reason = "error" in event ? String((event as { error?: string }).error ?? "") : "";
       if (reason === "canceled" || reason === "interrupted") return;
       activeUtterance = null;
+      document.documentElement.classList.remove("ascension-tree-is-speaking");
       if (!started) onUnavailable?.("This browser blocked spoken playback. Tap Hear the Tree and I'll speak.");
     };
-    try { synth.speak(words); } catch { activeUtterance = null; }
+    try { synth.speak(words); } catch {
+      activeUtterance = null;
+      document.documentElement.classList.remove("ascension-tree-is-speaking");
+    }
   };
   // Chrome drops an utterance spoken in the same turn as cancel().
   if (interrupted) window.setTimeout(next, 60);
@@ -135,6 +149,7 @@ function say(text: string, onStarted?: () => void, onUnavailable?: (message: str
 function stopVoice() {
   speechSequence += 1;
   activeUtterance = null;
+  if (typeof document !== "undefined") document.documentElement.classList.remove("ascension-tree-is-speaking");
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
 function PathwayView(props: {

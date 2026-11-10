@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
+import { callZai } from "@/lib/ascension/engine/zai.server";
 
 /** Railway-owned public intake: never calls Supabase or claims governed execution. */
 type Part = { name: string; purpose: string; location: string };
@@ -98,23 +99,38 @@ async function grok(objective: string): Promise<Contributor> {
   if (!text) throw new Error("Grok returned no answer.");
   return { provider: "Grok", answer: text.slice(0, 9000) };
 }
+/** Paid OpenAI only when the owner turned it on. Otherwise the free cloud route. */
+async function draft(system: string, user: string, structured?: { name: string; schema: Record<string, unknown> }): Promise<string> {
+  if (configured().OpenAI) {
+    const response = await callOpenAIResponse({
+      timeoutMs: 28500,
+      system,
+      user,
+      ...(structured ? { structuredOutput: structured } : {}),
+    });
+    return response.text;
+  }
+  const response = await callZai({
+    system,
+    user,
+    includeInternalKnowledge: false,
+    knowledgeQuery: user.slice(0, 280),
+  });
+  return response.text;
+}
+
 /** A useful, readable first answer is independent of pathway JSON parsing. */
 async function firstAnswer(objective: string) {
-  if (!configured().OpenAI) throw new Error("OpenAI is not configured for the first answer.");
-  const response = await callOpenAIResponse({
-    timeoutMs: 26000,
-    system: [
-      "Give a substantive direct answer to the user's objective now.",
-      "Focus on accomplishing the objective with specific useful details, a practical structure and key requirements.",
-      "Do not return JSON or pathways yet. A separate stage will compare possible implementations.",
-      "Keep the original user's terms and meaning. Do not substitute an unrelated topic.",
-      "Never claim anything is built, tested, connected, or governed without evidence."
-    ].join(" "),
-    user: objective,
-  });
-  const answer = response.text.trim();
+  const text = await draft([
+    "Give a substantive direct answer to the user's objective now.",
+    "Focus on accomplishing the objective with specific useful details, a practical structure and key requirements.",
+    "Do not return JSON or pathways yet. A separate stage will compare possible implementations.",
+    "Keep the original user's terms and meaning, including who or what it is for. Do not reduce it to a generic machine.",
+    "Never claim anything is built, tested, connected, or governed without evidence."
+  ].join(" "), objective);
+  const answer = text.trim();
   if (answer.length < 45) throw new Error("The provider returned an incomplete initial answer.");
-  return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: "OpenAI", verified: false };
+  return { phase: "initial" as const, answer: answer.slice(0, 14000), contributor: configured().OpenAI ? "OpenAI" : "free-route", verified: false };
 }
 /** Exact structural contract: the model cannot silently return two pathways instead of three. */
 const componentSchema = {
@@ -155,7 +171,6 @@ const outputSchema = {
 };
 async function build(objective: string, firstAnswerText = "") {
   const providerStatus = configured();
-  if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
   const external = await Promise.allSettled([
     providerStatus.Claude ? claude(objective) : Promise.resolve(null),
     providerStatus.Grok ? grok(objective) : Promise.resolve(null),
@@ -167,51 +182,63 @@ async function build(objective: string, firstAnswerText = "") {
     if (result.status === "rejected") errors.push((i === 0 ? "Claude" : "Grok") + " did not respond");
   }
   const allConnected = sources.length === 2;
-  const response = await callOpenAIResponse({
-    timeoutMs: 28500,
-    structuredOutput: { name: "ascension_four_pathways", schema: outputSchema },
-    system: [
+  const responseText = await draft([
       "You are drafting an ASCENSION creation result, not reporting execution or verification.",
       allConnected
-        ? "Use three actual provider contributions, preserving their provenance. path_one is your independently developed OpenAI approach, informed by the initial OpenAI answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
-        : "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
+        ? "Use three actual provider contributions, preserving their provenance. path_one is the independently developed reading, informed by the initial answer. path_two must faithfully structure CLAUDE\'S independently supplied proposal; path_three must faithfully structure GROK\'S independently supplied proposal. Never substitute your own different ideas for Claude or Grok or swap their approaches. Identify meaningful contradictions, compatibility, feasibility, tradeoffs and confidence limitations across all three before constructing the fourth blend. This analysis is external synthesis, NOT a claim the local governed ASCENSION engines ran."
+        : providerStatus.OpenAI
+          ? "Only OpenAI is currently responding. Generate three genuinely distinct OpenAI-proposed pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them."
+          : "The free answer route is responding. Generate three genuinely distinct pathways and a reasoned fourth blend. Never pretend Claude, Grok, Spiral, Guardian, or AutoSync supplied or verified them.",
       "Return exactly one JSON object with required keys: introduction, path_one, path_two, path_three, blend. Do NOT create a pathways array. Do NOT omit any of the three named approaches.",
       "path_one, path_two, and path_three are three substantively different approaches. Set ids p1,p2,p3 respectively. Every approach needs title, substantive summary (more than 35 characters), steps (3-5 detailed implementation steps), tradeoffs (at least one), parts (named components, purpose, location or [] when not relevant).",
       "Titles name the approach itself. Never put a provider or model name in a title, summary, step, or the blend, including ChatGPT, OpenAI, Claude, and Grok. The fourth object is the blend of the three readings.",
       "blend is a fourth object with id blend, title, summary, steps, tradeoffs, parts and blend_reason explaining why specific strengths work together and what conflicting choices were rejected.",
       "Provide substance specific to the objective. Do not just describe an app interface or repeat the same concept three times.",
+      "Keep the user's full description in the titles, summaries, and part names. If they say who it is for, where it is, or what condition it serves, those words stay. Never reduce the subject to a generic machine type.",
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",
     ].join(" "),
-    user: "OBJECTIVE (user wording is authoritative):\n" + objective +
+    "OBJECTIVE (user wording is authoritative):\n" + objective +
       (firstAnswerText ? "\nINITIAL USER-FACING ANSWER TO BUILD ON (unverified):\n" + firstAnswerText.slice(0, 9000) : "") +
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
-  });
-  const result = parseText(response.text);
+    providerStatus.OpenAI ? { name: "ascension_four_pathways", schema: outputSchema as Record<string, unknown> } : undefined,
+  );
+  const result = parseText(responseText);
   return {
     ...result,
-    contributors: ["OpenAI", ...sources.map(s => s.provider)],
+    contributors: [providerStatus.OpenAI ? "OpenAI" : "free-route", ...sources.map(s => s.provider)],
     unavailable: ["Claude", "Grok"].filter(provider => !sources.some(s => s.provider === provider)),
     providerErrors: errors,
-    mode: allConnected ? "three-provider-synthesis" : "openai-only-provisional",
+    mode: allConnected ? "three-provider-synthesis" : providerStatus.OpenAI ? "openai-only-provisional" : "free-route-provisional",
     verified: false,
     governance: "ASCENSION's local Meaning Elements, Spiral, Outcome Predictor, Guardian and AutoSync were not invoked by this hosted result.",
     persistence: "This hosted route does not use Supabase and does not persist objectives on the server.",
   };
 }
 
-/** Produce a real image for the selected pathway, never substitute diagram boxes.
- * A separate owner-controlled switch prevents surprise image-generation charges.
- */
-async function picture(_objective: string, _value: Record<string, unknown>) {
-  // The owner did not authorize a paid external image-generation dependency.
-  // Do not substitute a paid provider for the owner's existing engine.
-  throw new Error("ASCENSION's own image-generation engine is not yet connected to the live app. No paid image service was used.");
+/** The picture is a reading of the user's full sentence. Paid image calls stay off. */
+function picture(objective: string, value: Record<string, unknown>) {
+  const parts = Array.isArray(value["parts"]) ? value["parts"].slice(0, 12).map(raw => obj(raw)).filter(part =>
+    typeof part["name"] === "string").map(part => ({
+      name: String(part["name"]).slice(0, 100),
+      purpose: String(part["purpose"] ?? "").slice(0, 360),
+      location: String(part["location"] ?? "").slice(0, 240),
+    })) : [];
+  return {
+    phase: "picture" as const,
+    paid: false,
+    kind: "design-reading" as const,
+    objective,
+    title: String(value["title"] ?? "").slice(0, 140),
+    summary: String(value["summary"] ?? "").slice(0, 1500),
+    parts,
+    note: "Interpretive design reading of the user's full sentence. Not a photograph and not a verified build. No paid image service was used.",
+  };
 }
 
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
     GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false, picture_generation_enabled: false, note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+      governed_runtime_connected: false, picture_generation_enabled: false, design_picture: "reading-of-user-words", note: "Paid pictures stay off. A design reading keeps the user's full sentence. No provider or governed verification is invented." }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");

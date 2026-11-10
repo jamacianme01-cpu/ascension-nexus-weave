@@ -57,21 +57,18 @@ function sentence(text: string): string {
 }
 
 function cardLine(text: string): string {
-  const phrase = text.replace(/\s+/g, " ").trim().split(/[.!?]/)[0]?.trim() ?? "";
-  return phrase.length <= 28 ? phrase : "";
+  const phrase = sentence(text);
+  return phrase.length <= 140 ? phrase : phrase.slice(0, 137).trim() + "…";
 }
 
 function guideFor(result: Result): string {
-  const intro = result.introduction.replace(/\b(ChatGPT|OpenAI|Claude|Grok)\b/gi, "").replace(/\s+/g, " ").trim();
-  if (intro.length > 40 && intro.length < 320) return intro;
-  const [first, second, third] = result.pathways;
-  return `Three readings came back: ${first?.title}, ${second?.title}, and ${third?.title}. The fourth is a blend, ${result.blend.title}. Any of them can be opened if a closer look would help.`;
+  const first = result.pathways[0];
+  if (!first) return "The readings are here.";
+  return `${first.title}. ${sentence(first.summary)}`;
 }
 
-function openLine(path: Pathway, blend: boolean): string {
-  const detail = sentence(blend ? path.blend_reason || path.summary : path.summary);
-  if (blend) return `This fourth one is the blend. ${path.title}. ${detail}`;
-  return `${path.title}. ${detail} The other views are there if a closer look would help.`;
+function openLine(path: Pathway): string {
+  return `${path.title}. ${sentence(path.summary)}`;
 }
 
 /** Hosted Tree entry. Engines analyze the answer; the fourth pathway is the blend. */
@@ -117,20 +114,11 @@ export function IndependentEngage() {
     setResult(null);
     setScreen(null);
     setChoice(0);
-    offer("I'm with you. I'll read this and bring back a few ways it could come together.");
+    offer("Reading your sentence.");
     try {
-      const initial = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "initial" }),
-        signal: controller.signal,
-      });
-      const first: { answer?: string; error?: string } = await initial.json();
-      if (!initial.ok) throw new Error(first.error || "The reading didn't finish.");
-      if (!first.answer?.trim()) throw new Error("The reading didn't finish.");
-      if (generation.current !== token) return;
       const pathways = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
+        body: JSON.stringify({ objective: text, phase: "pathways" }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await pathways.json();
@@ -144,7 +132,7 @@ export function IndependentEngage() {
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
         const message = cause instanceof Error ? cause.message : String(cause);
-        const quiet = /not configured|unavailable|did not respond/i.test(message)
+        const quiet = /not configured|unavailable|did not respond|not connected|no answer engine|unreachable/i.test(message)
           ? "The reading engines aren't connected from here, so I don't have that analysis yet. The book can wait if you want to try again."
           : "That reading didn't finish. The book can wait if you want to try again.";
         setError(quiet);
@@ -167,6 +155,7 @@ export function IndependentEngage() {
         title: path.title,
         line: cardLine(path.summary),
         blend: index === 3,
+        parts: path.parts ?? [],
       }))
     : [];
 
@@ -179,13 +168,12 @@ export function IndependentEngage() {
     const selected = readings[choice];
     if (next === "assembled" && selected) offer(openLine(
       choice === 3 ? result!.blend : result!.pathways[choice]!,
-      choice === 3,
     ));
-    else if (next === "blueprint") offer("The blueprint is this same reading, drawn out, if that view would help.");
-    else if (next === "dissect") offer("This opens the same reading so the parts can be seen.");
-    else if (next === "exploded") offer("The parts are set apart here, if seeing them separately would help.");
-    else if (next === "imploded") offer("The parts can come back together from here.");
-    else if (next === "spiral") offer("The four readings are still here. The fourth is the blend, if you want to compare them.");
+    else if (next === "blueprint") offer("Blueprint. Same reading, drawn as parts.");
+    else if (next === "dissect") offer("Dissect. The named parts, apart.");
+    else if (next === "exploded") offer("Exploded. The named parts, separated.");
+    else if (next === "imploded") offer("Imploded. The named parts, back together.");
+    else if (next === "spiral") offer(guideFor(result!));
     setScreen(next);
   }
 
@@ -193,7 +181,7 @@ export function IndependentEngage() {
     const path = index === 3 ? result?.blend : result?.pathways[index];
     if (!path) return;
     setChoice(index);
-    offer(openLine(path, index === 3));
+    offer(openLine(path));
     setScreen("assembled");
   }
 
@@ -225,6 +213,6 @@ export function IndependentEngage() {
         </button>
       </div>
     </section>
-    {screen && result && <DesignedFlow screen={screen} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
+    {screen && result && <DesignedFlow screen={screen} objective={objective.trim()} readings={readings} choice={choice} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
   </div>;
 }

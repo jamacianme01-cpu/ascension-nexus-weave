@@ -338,8 +338,8 @@ async function build(objective: string, firstAnswerText = "", section: Objective
   const hasClaude = sources.some(item => item.provider === "Claude");
   const hasGrok = sources.some(item => item.provider === "Grok");
   result.pathways[0]!.provider = "OpenAI";
-  result.pathways[1]!.provider = hasClaude ? "Claude" : "OpenAI";
-  result.pathways[2]!.provider = hasGrok ? "Grok" : "OpenAI";
+  result.pathways[1]!.provider = hasClaude ? "Claude" : "OpenAI alternative (Claude unavailable)";
+  result.pathways[2]!.provider = hasGrok ? "Grok" : "OpenAI alternative (Grok unavailable)";
   if (section === "business" && hasClaude)
     result.pathways = [result.pathways[1]!, result.pathways[0]!, result.pathways[2]!];
   if (section === "guidance" && hasGrok)

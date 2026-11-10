@@ -2,7 +2,7 @@ name: Verify Skytech ASCENSION sections and evidence branch
 on:
   push:
     branches:
-      - repair/v1-selected-design-precision-20261109
+      - repair/v1-provider-attribution-and-tree-20261109
   workflow_dispatch:
 permissions:
   contents: read

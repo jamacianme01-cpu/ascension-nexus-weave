@@ -126,6 +126,7 @@ function place(hit: Hit): CSSProperties {
 
 export function DesignedFlow({
   screen,
+  objective,
   readings,
   talking,
   onToggleTalking,
@@ -133,6 +134,7 @@ export function DesignedFlow({
   onOpen,
 }: {
   screen: DesignedScreen;
+  objective: string;
   readings: PathwayReading[];
   talking: boolean;
   onToggleTalking: () => void;
@@ -156,15 +158,17 @@ export function DesignedFlow({
       </button>
       <button type="button" className="designed-margin" aria-label="Back" onClick={() => onScreen(back)} />
       <div className="designed-frame" data-screen={screen}>
-        <img src={PICTURE[screen]} alt="" draggable={false} />
+        <img src={PICTURE[screen]} alt={objective} draggable={false} />
         {screen === "spiral" && CARD_BOXES.map(([x, , w], index) => {
           const reading = readings[index];
           if (!reading) return null;
           return <div key={reading.title} className="designed-reading" style={{ left: `${((x + 8) / FRAME.width) * 100}%`, width: `${((w - 16) / FRAME.width) * 100}%` }}>
             <p className="designed-reading-name">{reading.title}</p>
-            <p className="designed-reading-line">{reading.blend ? "Blend" : reading.line}</p>
+            <p className="designed-reading-picture">{objective}</p>
+            <p className="designed-reading-line">{reading.line}</p>
           </div>;
         })}
+        {screen !== "spiral" && <p className="designed-subject-picture">{objective}</p>}
         {hitsFor(screen, readings).map((hit, index) => (
           <button
             key={`${hit.label}-${index}`}

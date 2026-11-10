@@ -212,6 +212,6 @@ export function IndependentEngage() {
         </button>
       </div>
     </section>
-    {screen && result && <DesignedFlow screen={screen} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
+    {screen && result && <DesignedFlow screen={screen} objective={objective.trim()} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
   </div>;
 }

@@ -9,6 +9,8 @@ assert.match(engage, /DesignedFlow/);
 assert.match(engage, /objective=\{objective\.trim\(\)\}/);
 assert.doesNotMatch(engage, /phrase\.length <= 28/);
 assert.match(flow, /designed-reading-picture/);
+assert.doesNotMatch(flow, /designed-subject-picture/);
+assert.doesNotMatch(flow, /ChatGPT|Claude|Grok/);
 assert.match(flow, /\/designed-flow\/spiral\.jpg/);
 assert.match(route, /kind: "design-reading"/);
 assert.doesNotMatch(route, /own image-generation engine is not yet connected/);

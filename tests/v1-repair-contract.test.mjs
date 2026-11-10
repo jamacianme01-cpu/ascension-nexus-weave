@@ -105,8 +105,11 @@ const tests=[
     assert.match(ui,/ascension-tree-is-speaking/);
     assert.match(styles,/ascension-tree-is-speaking/);
     assert.match(styles,/prefers-reduced-motion/);
-    assert.match(route,/OpenAI alternative \(Claude unavailable\)/);
-    assert.match(route,/OpenAI alternative \(Grok unavailable\)/);
+    assert.match(route,/The external answers are inputs/);
+    assert.match(route,/Do not copy an external answer into a pathway/);
+    assert.match(route,/THIS USER'S KNOWLEDGEVERSE MEMORY/);
+    assert.doesNotMatch(route,/OpenAI alternative \(Claude unavailable\)/);
+    assert.match(ui,/recallContext\(readLattice\(\), text\)/);
     assert.match(ui,/ascension-business-plan-flow/);
     assert.match(ui,/file.size > 5_000_000/);
     assert.match(ui,/file.size > 64_000/);

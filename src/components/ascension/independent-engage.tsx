@@ -4,6 +4,7 @@ import { TreeGuide } from "@/components/ascension/tree-guide";
 import { V1HunyuanPathway } from "@/components/ascension/v1-hunyuan-pathway";
 import { briefSpokenAnswer } from "@/lib/ascension/spoken-answer";
 import { availableTreeVoice, selectTreeVoice } from "@/lib/ascension/tree-speech";
+import { readLattice, recallContext, remember, writeLattice } from "@/lib/ascension/knowledgeverse-memory";
 
 type Part = { name: string; purpose: string; location: string };
 type BusinessPlan = {
@@ -248,12 +249,19 @@ export function IndependentEngage() {
     }
   }
 
+  function keep(kind: "objective" | "pathway" | "selection", text: string, relatesTo?: string[]) {
+    const stored = remember(readLattice(), { kind, text, relatesTo });
+    writeLattice(stored);
+    return stored.records.at(-1)?.id;
+  }
+
   async function generatePathways(text: string, controller: AbortController, token: number) {
     setPathwayError("");
     try {
+      const memory = recallContext(readLattice(), text);
       const response = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways", section, attachments, firstAnswer: continuationContext.current }),
+        body: JSON.stringify({ objective: text, phase: "pathways", section, attachments, firstAnswer: continuationContext.current, ...(memory ? { memory } : {}) }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await response.json();
@@ -261,6 +269,8 @@ export function IndependentEngage() {
       if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend)
         throw new Error("The answer engine did not deliver three pathways and a blend.");
       if (generation.current !== token) return;
+      const objectiveId = keep("objective", text);
+      for (const path of [...data.pathways, data.blend]) keep("pathway", path.title + ". " + path.summary, objectiveId ? [objectiveId] : undefined);
       setResult(data);
       setChoice(null);
       if (talking) say("I have four approaches. Choose one and I can explain it.");
@@ -325,6 +335,7 @@ export function IndependentEngage() {
     const change = changes.trim();
     // Preserve what has already been produced. A refinement is not a new
     // independent objective and must not erase the selected plan or design.
+    keep("selection", path.title + ". " + path.summary);
     const context = JSON.stringify({
       selected_pathway: { title: path.title, summary: path.summary,
         steps: path.steps, tradeoffs: path.tradeoffs, parts: path.parts,
@@ -465,7 +476,7 @@ export function IndependentEngage() {
         </div>
       </div>
       {result.specialty_lead === "unavailable" && <p role="status" className="text-xs text-foreground/70">
-        The assigned specialist is not connected. Actual model contributions are identified in the pathways.
+        The assigned specialist is not connected. These pathways are ASCENSION's own.
       </p>}
       <TreePathwayCarousel designs={choices.map(p => ({
         id: p.id, title: p.provider ? p.provider + " · " + p.title : p.title, summary: p.summary,

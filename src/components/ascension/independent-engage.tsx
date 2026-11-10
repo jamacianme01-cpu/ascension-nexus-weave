@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; blend_reason?: string };
@@ -66,8 +67,10 @@ function guideFor(result: Result): string {
   return `${first.title}. ${sentence(first.summary)}`;
 }
 
-function openLine(path: Pathway): string {
-  return `${path.title}. ${sentence(path.summary)}`;
+function openLine(path: Pathway, blend: boolean): string {
+  const detail = sentence(blend ? path.blend_reason || path.summary : path.summary);
+  if (blend) return `This fourth one is the blend. ${path.title}. ${detail}`;
+  return `${path.title}. ${detail} The other views are there if a closer look would help.`;
 }
 
 /** Hosted Tree entry. Engines analyze the answer; the fourth pathway is the blend. */
@@ -76,6 +79,7 @@ export function IndependentEngage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  const [screen, setScreen] = useState<DesignedScreen | null>(null);
   const [choice, setChoice] = useState(0);
   const [talking, setTalking] = useState(true);
   const abort = useRef<AbortController | null>(null);
@@ -110,6 +114,7 @@ export function IndependentEngage() {
     setLoading(true);
     setError("");
     setResult(null);
+    setScreen(null);
     setChoice(0);
     offer("Reading your sentence.");
     try {
@@ -124,6 +129,7 @@ export function IndependentEngage() {
         throw new Error("The pathways didn't finish.");
       if (generation.current !== token) return;
       setResult(data);
+      setScreen("spiral");
       offer(guideFor(data));
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
@@ -146,7 +152,7 @@ export function IndependentEngage() {
     offer("Stopped. The book can wait until you want to try again.");
   }
 
-  const readings = result
+  const readings: PathwayReading[] = result
     ? [...result.pathways, result.blend].map((path, index) => ({
         title: path.title,
         line: cardLine(path.summary),
@@ -154,15 +160,35 @@ export function IndependentEngage() {
       }))
     : [];
 
+  function show(next: DesignedTarget) {
+    if (next === "book") {
+      setScreen(null);
+      offer("The book is here whenever another reading would help.");
+      return;
+    }
+    const selected = readings[choice];
+    if (next === "assembled" && selected) offer(openLine(
+      choice === 3 ? result!.blend : result!.pathways[choice]!,
+      choice === 3,
+    ));
+    else if (next === "blueprint") offer("The blueprint is this same reading, drawn out, if that view would help.");
+    else if (next === "dissect") offer("This opens the same reading so the parts can be seen.");
+    else if (next === "exploded") offer("The parts are set apart here, if seeing them separately would help.");
+    else if (next === "imploded") offer("The parts can come back together from here.");
+    else if (next === "spiral") offer("The four readings are still here. The fourth is the blend, if you want to compare them.");
+    setScreen(next);
+  }
+
   function openPathway(index: number) {
     const path = index === 3 ? result?.blend : result?.pathways[index];
     if (!path) return;
     setChoice(index);
-    offer(openLine(path));
+    offer(openLine(path, index === 3));
+    setScreen("assembled");
   }
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none">
-    <section aria-label="Engage ASCENSION" className="ascension-command">
+    <section aria-label="Engage ASCENSION" className="ascension-command" hidden={screen !== null}>
       <div className="ascension-stage">
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
@@ -184,21 +210,11 @@ export function IndependentEngage() {
           <button type="button" onClick={stop}>Stop</button>
         </p>}
         {error && <p className="ascension-tree-status" role="status">{error}</p>}
-        {result && <div className="ascension-first" aria-label="Your sentence">
-          <p className="ascension-picture">{objective.trim()}</p>
-          <div className="ascension-paths">
-            {readings.map((reading, index) => (
-              <button key={`${reading.title}-${index}`} type="button" aria-pressed={choice === index} onClick={() => openPathway(index)}>
-                <strong>{reading.title}</strong>
-                <span>{reading.line}</span>
-              </button>
-            ))}
-          </div>
-        </div>}
         <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
           {talking ? "MUTE TREE" : "HEAR TREE"}
         </button>
       </div>
     </section>
+    {screen && result && <DesignedFlow screen={screen} objective={objective.trim()} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
   </div>;
 }

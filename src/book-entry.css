@@ -303,10 +303,6 @@ body:has(.ascension-world > .ascension-command) main {
   color: #e4c88b;
   font-size: 12px;
 }
-.ascension-question-tools button[aria-pressed="true"] {
-  border-color: #e7c98a;
-  color: #fff4d4;
-}
 .ascension-history {
   position: absolute;
   z-index: 50;

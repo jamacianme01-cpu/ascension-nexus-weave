@@ -1,17 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
-import { SECTIONS, type Section } from "@/lib/ascension/engine/organization";
-import { readLattice, recallContext, remember, writeLattice } from "@/lib/ascension/knowledgeverse-memory";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; blend_reason?: string };
-type Result = {
-  introduction: string;
-  pathways: Pathway[];
-  blend: Pathway & { blend_reason: string };
-  statusLine?: string;
-  analysis?: { contradictions?: string[] } | null;
-};
+type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
 
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 
@@ -90,7 +82,6 @@ export function IndependentEngage() {
   const [screen, setScreen] = useState<DesignedScreen | null>(null);
   const [choice, setChoice] = useState(0);
   const [talking, setTalking] = useState(true);
-  const [section, setSection] = useState<Section | null>(null);
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const welcomed = useRef(false);
@@ -126,16 +117,10 @@ export function IndependentEngage() {
     setScreen(null);
     setChoice(0);
     offer("Reading your sentence.");
-    const memory = recallContext(readLattice(), text);
     try {
       const pathways = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          objective: text,
-          phase: "pathways",
-          ...(section ? { section } : {}),
-          ...(memory ? { memory } : {}),
-        }),
+        body: JSON.stringify({ objective: text, phase: "pathways" }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await pathways.json();
@@ -143,21 +128,6 @@ export function IndependentEngage() {
       if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend?.title)
         throw new Error("The pathways didn't finish.");
       if (generation.current !== token) return;
-      const objectiveMemory = remember(readLattice(), { kind: "objective", text });
-      const objectiveId = objectiveMemory.records.at(-1)?.id;
-      let stored = objectiveMemory;
-      for (const path of [...data.pathways, data.blend]) {
-        stored = remember(stored, {
-          kind: "pathway",
-          text: `${path.title}. ${path.summary}`,
-          relatesTo: objectiveId ? [objectiveId] : [],
-          relation: "pathway_for",
-        });
-      }
-      for (const contradiction of data.analysis?.contradictions ?? []) {
-        stored = remember(stored, { kind: "contradiction", text: contradiction, relatesTo: objectiveId ? [objectiveId] : [], relation: "contradiction_in" });
-      }
-      writeLattice(stored);
       setResult(data);
       setScreen("spiral");
       offer(guideFor(data));
@@ -213,9 +183,6 @@ export function IndependentEngage() {
     const path = index === 3 ? result?.blend : result?.pathways[index];
     if (!path) return;
     setChoice(index);
-    const current = readLattice();
-    const related = current.records.filter(record => record.kind === "pathway" && record.text.startsWith(path.title)).slice(-1).map(record => record.id);
-    writeLattice(remember(current, { kind: "selection", text: path.title, relatesTo: related, relation: "selected" }));
     offer(openLine(path, index === 3));
     setScreen("assembled");
   }
@@ -232,14 +199,6 @@ export function IndependentEngage() {
           onChange={event => setObjective(event.target.value)}
           onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !loading) { event.preventDefault(); void engage(); } }}
         />
-        <div className="ascension-question-tools" role="group" aria-label="ASCENSION sections">
-          {SECTIONS.map(item => (
-            <button type="button" key={item.id} aria-pressed={section === item.id} disabled={loading}
-              onClick={() => setSection(current => current === item.id ? null : item.id)}>
-              {item.label}
-            </button>
-          ))}
-        </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button type="button" disabled={loading || objective.trim().length < 3} onClick={() => void engage()}
             className="ascension-engage min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
@@ -256,6 +215,6 @@ export function IndependentEngage() {
         </button>
       </div>
     </section>
-    {screen && result && <DesignedFlow screen={screen} objective={objective.trim()} readings={readings} status={result.statusLine ?? ""} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
+    {screen && result && <DesignedFlow screen={screen} objective={objective.trim()} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
   </div>;
 }

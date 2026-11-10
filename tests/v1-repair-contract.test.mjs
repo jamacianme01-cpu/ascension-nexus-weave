@@ -105,8 +105,8 @@ const tests=[
     assert.match(ui,/ascension-tree-is-speaking/);
     assert.match(styles,/ascension-tree-is-speaking/);
     assert.match(styles,/prefers-reduced-motion/);
-    assert.match(route,/OpenAI alternative \\(Claude unavailable\\)/);
-    assert.match(route,/OpenAI alternative \\(Grok unavailable\\)/);
+    assert.match(route,/OpenAI alternative \(Claude unavailable\)/);
+    assert.match(route,/OpenAI alternative \(Grok unavailable\)/);
     assert.match(ui,/ascension-business-plan-flow/);
     assert.match(ui,/file.size > 5_000_000/);
     assert.match(ui,/file.size > 64_000/);

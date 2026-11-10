@@ -120,26 +120,28 @@ export async function callZai(input: CallZaiOptions | string, user?: string, opt
 
   // 3. Local LLM endpoint
   if (process.env.LOCAL_LLM_BASE_URL) {
+    const localModel = process.env.LOCAL_LLM_MODEL?.trim() || model;
     try {
       const base = process.env.LOCAL_LLM_BASE_URL.replace(/\/$/, '');
       const res = await fetch(`${base}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model,
+          model: localModel,
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
           temperature,
           max_tokens: maxTokens,
         }),
       });
-      // local servers vary; try OpenAI-style first
       if (res.ok) {
         const data = await res.json();
         const text = data.choices?.[0]?.message?.content;
         if (text) return output(text);
       }
-    } catch {
-      // fall through
+      throw new ZaiEngineError("The configured local answer model did not respond. No result was fabricated.", res.status);
+    } catch (error) {
+      if (error instanceof ZaiEngineError) throw error;
+      throw new ZaiEngineError("The configured local answer model is not running. No result was fabricated.", 503);
     }
   }
 

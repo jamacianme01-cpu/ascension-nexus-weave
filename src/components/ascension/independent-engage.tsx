@@ -491,6 +491,7 @@ export function IndependentEngage() {
           className="rounded-full border border-gold/40 px-4 py-2 text-sm text-gold">HEAR AGAIN</button>
         <button type="button" onClick={()=>{stopVoice();setDesignPicture(false);setDesignSettled(false);setChoice(orbPreview);setRefinement("");}}
           className="rounded-full border border-primary/60 bg-primary/10 px-6 py-3 text-sm text-primary">ENTER PATHWAY</button>
+        <p className="w-full text-center text-sm leading-6 text-[#e7eef2]">{previewPath.summary}</p>
         <details className="w-full text-center text-xs text-foreground/70">
           <summary className="cursor-pointer">Read introduction</summary>
           <p className="mx-auto mt-2 max-w-xl leading-6">{spokenPreview(previewPath)}</p>

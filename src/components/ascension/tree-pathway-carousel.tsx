@@ -47,6 +47,7 @@ export function TreePathwayCarousel({ designs, active, onRotate, onOpen }: {
     </div>
     <div className="tree-orb-reading" aria-live="polite" aria-atomic="true">
       <strong>{focused?.title}</strong>
+      {focused?.summary && <p>{focused.summary}</p>}
       <span>Select an orb to hear this possibility</span>
     </div>
     <div className="tree-carousel-navigation">

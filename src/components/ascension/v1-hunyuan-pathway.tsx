@@ -126,7 +126,7 @@ export function V1HunyuanPathway({
   },[key,attempt,modelCache,imageCache]);
 
 
-  const canInspect=Boolean(bytes||picture);
+  const canInspect=designParts.length>0||Boolean(bytes||picture);
   const changeView=(next:HunyuanMode)=>{if(!canInspect)return;setInspectModel(true);setMode(next);};
   const inspect=(index:number)=>{
     setMeshIndex(index);
@@ -263,9 +263,13 @@ export function V1HunyuanPathway({
               const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
               const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name));
               if(match){setInspectModel(true);setMode("assembled");setMeshIndex(match.meshIndex);}
-              else {setMeshIndex(null);setInspectModel(false);}
+              else {setMeshIndex(null);}
             }}
-            className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
+            className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>
+            <span className="text-gold">{p.name}</span>
+            <span className="mt-1 block text-sm">What it does: {p.purpose||"Function not specified in this design."}</span>
+            <span className="mt-1 block text-sm">Where it belongs: {p.location||"Position not specified in this design."}</span>
+          </button>)}
           {component!==null&&designParts[component]&&<div role="status" aria-label="Selected component explanation"
             className="mt-3 rounded-lg border border-gold/30 bg-black/20 p-3">
             <p className="font-medium text-gold">{designParts[component].name}</p>

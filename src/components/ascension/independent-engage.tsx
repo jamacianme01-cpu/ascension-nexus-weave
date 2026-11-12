@@ -407,12 +407,6 @@ export function IndependentEngage() {
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
         </div>
-        <div className="ascension-entry-guide" aria-label="Speak to the Tree">
-          <TreeGuide objective={objective || "Explore an idea with ASCENSION"}
-            pathway={{ title: "Your objective", summary: objective, steps: [], parts: [] }}
-            experience={experience} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
-          {voiceNotice && <p role="status" className="ascension-voice-notice">{voiceNotice}</p>}
-        </div>
         <label htmlFor="objective">What do you want to accomplish?</label>
         <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
           aria-label="What do you want to accomplish?" placeholder="What do you want to accomplish?"

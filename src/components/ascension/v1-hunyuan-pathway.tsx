@@ -3,6 +3,7 @@ import { asCompletedDesignStep, designPictureReady } from "@/lib/ascension/desig
 import { compileSelectedPathwayDesign } from "@/lib/ascension/design-image-brief";
 import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
+import type { VoiceCommand } from "@/lib/ascension/spoken-answer";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
 
 type Part={name:string;purpose:string;location:string};
@@ -18,12 +19,14 @@ function formatError(reason:unknown){
 }
 
 export function V1HunyuanPathway({
-  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],onPicture,
+  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],onPicture,inspectionCommand = null,prompt = null,
 }:{
   path:Pathway;objective:string;onSpeak:(text:string)=>void; speakingEnabled:boolean;modelCache:Cache;
   imageCache:{current:Map<string,string>};
   alternatives?: Pathway[];
   onPicture?: (ready: boolean) => void;
+  inspectionCommand?: { id: number; command: VoiceCommand } | null;
+  prompt?: { id: number; text: string } | null;
 }) {
   // Display the selected design even when its image prompt exceeds the provider
   // budget. The picture endpoint reports that failure inside the viewer.
@@ -48,6 +51,7 @@ export function V1HunyuanPathway({
   const [move,setMove]=useState<{seq:number;index:number;delta:[number,number,number]}>();
   const [generatorError,setGeneratorError]=useState("");
   const [cameraView,setCameraView]=useState<"perspective"|"front"|"back"|"left"|"right"|"top">("perspective");
+  const heardInspection = useRef<number | null>(null);
 
   useEffect(()=>{
     setMode("assembled");setMeshIndex(null);setInspectModel(false);setComponent(null);
@@ -136,6 +140,50 @@ export function V1HunyuanPathway({
   const moveMesh=(delta:[number,number,number])=>{
     if(meshIndex!==null)setMove(prev=>({seq:(prev?.seq??0)+1,index:meshIndex,delta}));
   };
+  const selectDesignPart=(index:number)=>{
+    const part=designParts[index];
+    if(!part)return;
+    setComponent(index);setPartSelection(value=>value+1);
+    const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
+    const match=parts.find(mesh=>normalize(mesh.name)===normalize(part.name));
+    if(match){setInspectModel(true);setMode("assembled");setMeshIndex(match.meshIndex);}
+    else setMeshIndex(null);
+    onSpeak(part.name+". "+(part.purpose||"Function not specified in this design."));
+  };
+  useEffect(()=>{
+    if(!inspectionCommand || heardInspection.current===inspectionCommand.id)return;
+    heardInspection.current=inspectionCommand.id;
+    const command=inspectionCommand.command;
+    const note=(text:string)=>onSpeak(text);
+    if(command.kind==="view"){
+      if(command.view==="picture"){setInspectModel(false);note("Showing the picture.");return;}
+      if(command.view==="assembled"){setInspectModel(true);setMode("assembled");note("Assembled view.");return;}
+      if(!canInspect){note("That view is not ready yet.");return;}
+      if((command.view==="dissect"||command.view==="exploded")&&designParts.length<2){
+        note("This design does not have separate parts to dissect.");return;
+      }
+      changeView(command.view);note("Opening "+command.view+".");return;
+    }
+    if(command.kind==="retry-picture"){setAttempt(value=>value+1);note("Trying the picture again.");return;}
+    if(command.kind==="zoom"){setZoom(value=>command.direction==="in"?Math.min(5,value*1.25):Math.max(.5,value/1.25));note("Zooming "+command.direction+".");return;}
+    if(command.kind==="rotate"){setRotation(value=>value+(command.direction==="left"?-15:15));note("Rotating "+command.direction+".");return;}
+    if(command.kind==="reset-view"){setZoom(1);setRotation(0);setCameraView("perspective");setMode("assembled");setReset(value=>value+1);note("View reset.");return;}
+    if(command.kind==="camera"){
+      if(!bytes){note("Camera views need the 3D model.");return;}
+      setInspectModel(true);setMode("assembled");setCameraView(command.view);note(command.view+" view.");return;
+    }
+    if(command.kind==="move"){
+      if(meshIndex===null){note("Select a part before moving it.");return;}
+      const delta={left:[-.15,0,0],right:[.15,0,0],up:[0,.15,0],down:[0,-.15,0]} as const;
+      moveMesh(delta[command.direction]);note("Moving "+command.direction+".");return;
+    }
+    if(command.kind==="part"){
+      const wanted=command.name.toLowerCase();
+      const index=designParts.findIndex(part=>part.name.toLowerCase().includes(wanted));
+      if(index<0){note("I do not see a part named "+command.name+".");return;}
+      selectDesignPart(index);
+    }
+  },[inspectionCommand]);
   const buttons=<div role="group" aria-label="Actual Hunyuan model controls"
     className="flex flex-wrap gap-2">
     <button type="button" onClick={()=>setZoom(v=>Math.min(5,v*1.25))}
@@ -249,7 +297,7 @@ export function V1HunyuanPathway({
       <aside className="ascension-pathway-side min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4"
         aria-label="Hunyuan design description and parts">
         <div className="ascension-tree-in-pathway">
-          <TreeGuide objective={objective} introduce portrait pathway={path} alternatives={alternatives}
+          <TreeGuide objective={objective} introduce portrait pathway={path} alternatives={alternatives} prompt={prompt}
             enabled={speakingEnabled} onSpeak={onSpeak}
             focusRevision={partSelection} focusedPart={component===null?null:designParts[component]??null}
             view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"}

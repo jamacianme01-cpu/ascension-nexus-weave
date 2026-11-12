@@ -51,6 +51,7 @@ export function V1HunyuanPathway({
   const [move,setMove]=useState<{seq:number;index:number;delta:[number,number,number]}>();
   const [generatorError,setGeneratorError]=useState("");
   const [cameraView,setCameraView]=useState<"perspective"|"front"|"back"|"left"|"right"|"top">("perspective");
+  const [localBusy,setLocalBusy]=useState(false);
   const heardInspection = useRef<number | null>(null);
 
   useEffect(()=>{
@@ -83,42 +84,8 @@ export function V1HunyuanPathway({
         setPicture(sourceImage);
         onPicture?.(designPictureReady(sourceImage));
       }
-      const match=sourceImage.match(validImage);
-      if(!match)throw new Error("The saved selected invention picture is invalid.");
-      setStatus("Checking the existing Skytech-local Hunyuan3D bridge…");
-      let ready:Response;
-      try{
-        ready=await fetch(LOCAL+"/status",{signal:AbortSignal.any([controller.signal, AbortSignal.timeout(4500)]),cache:"no-store"});
-      }catch{
-        setStatus("3D unavailable: this browser cannot reach Skytech\'s local Hunyuan3D bridge at port 8082. Open ASCENSION on Skytech with its existing bridge running.");
-        return;
-      }
-      if(!ready.ok){
-        setStatus("3D is unavailable: the Windows worker is not ready.");
-        return;
-      }
-      const condition=await ready.json() as {ready?:boolean;engine?:string};
-      if(!condition.ready||condition.engine!=="Hunyuan3D"){
-        setStatus("3D is unavailable: the Hunyuan worker is not connected.");
-        return;
-      }
-      setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
-      const generated=await fetch(LOCAL+"/generate",{
-        method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},
-        body:JSON.stringify({image:match[1]}),
-      });
-      if(!generated.ok){
-        let reason="";
-        try{const error=await generated.json() as {error?:string};reason=error.error||"";}catch{}
-        throw new Error(reason||"Local Hunyuan3D returned HTTP "+generated.status);
-      }
-      const output=await generated.arrayBuffer();
-      if(output.byteLength<20||output.byteLength>60*1024*1024||
-        new TextDecoder().decode(output.slice(0,4))!=="glTF")
-        throw new Error("Hunyuan3D did not return a valid GLB. A fabricated model is not allowed.");
       if(!active)return;
-      modelCache.current.set(key,output);
-      setBytes(output);setStatus("Real Hunyuan3D model ready");setFailure("");
+      setStatus("Picture ready. 3D starts only when you choose Connect local 3D.");
     })().catch(e=>{
       if(!active||controller.signal.aborted)return;
       const message=formatError(e);
@@ -130,6 +97,48 @@ export function V1HunyuanPathway({
   },[key,attempt,modelCache,imageCache]);
 
 
+  async function connectLocal(){
+    if(localBusy||bytes)return;
+    const sourceImage=imageCache.current.get(key)??picture??"";
+    const match=sourceImage.match(validImage);
+    if(!match){setStatus("The selected picture is not ready for a 3D request.");return;}
+    setLocalBusy(true);setFailure("");
+    setStatus("Checking the existing Skytech-local Hunyuan3D bridge…");
+    try{
+      let ready:Response;
+      try{
+        ready=await fetch(LOCAL+"/status",{signal:AbortSignal.timeout(4500),cache:"no-store"});
+      }catch{
+        setStatus("3D unavailable: this browser cannot reach Skytech's local Hunyuan3D bridge at port 8082. Open ASCENSION on Skytech with its existing bridge running.");
+        return;
+      }
+      if(!ready.ok){setStatus("3D is unavailable: the Windows worker is not ready.");return;}
+      const condition=await ready.json() as {ready?:boolean;engine?:string};
+      if(!condition.ready||condition.engine!=="Hunyuan3D"){
+        setStatus("3D is unavailable: the Hunyuan worker is not connected.");
+        return;
+      }
+      setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
+      const generated=await fetch(LOCAL+"/generate",{
+        method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({image:match[1]}),
+      });
+      if(!generated.ok){
+        let reason="";
+        try{const error=await generated.json() as {error?:string};reason=error.error||"";}catch{}
+        throw new Error(reason||"Local Hunyuan3D returned HTTP "+generated.status);
+      }
+      const output=await generated.arrayBuffer();
+      if(output.byteLength<20||output.byteLength>60*1024*1024||
+        new TextDecoder().decode(output.slice(0,4))!=="glTF")
+        throw new Error("Hunyuan3D did not return a valid GLB. A fabricated model is not allowed.");
+      modelCache.current.set(key,output);
+      setBytes(output);setStatus("Real Hunyuan3D model ready");setFailure("");
+    }catch(error){
+      const message=formatError(error);
+      setFailure(message);setStatus(message);
+    }finally{setLocalBusy(false);}
+  }
   const canInspect=designParts.length>0||Boolean(bytes||picture);
   const changeView=(next:HunyuanMode)=>{if(!canInspect)return;setInspectModel(true);setMode(next);};
   const inspect=(index:number)=>{
@@ -220,8 +229,10 @@ export function V1HunyuanPathway({
         disabled={!canInspect||designParts.length<2}
         onClick={()=>inspectModel&&mode==="exploded"?changeView("assembled"):changeView("exploded")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">EXPLODED / IMPLODED</button>
+      {!bytes&&<button type="button" disabled={localBusy||!picture} onClick={()=>void connectLocal()}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">CONNECT LOCAL 3D</button>}
       {!bytes&&<p role="status" className="basis-full text-xs text-foreground/70">
-        {working?"Preparing the design and checking 3D…":status}
+        {working||localBusy?"Preparing the design…":status}
       </p>}
     </div>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">

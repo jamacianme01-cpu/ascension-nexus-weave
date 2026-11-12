@@ -55,6 +55,8 @@ const tests=[
     assert.match(design,/loadPathwayVisual\(objective,path,imageCache\.current,controller\.signal\)/);
     assert.match(design,/const generated=await fetch\(LOCAL\+"\/generate"/);
     assert.match(design,/modelCache\.current\.set\(key,output\)/);
+    assert.match(design,/CONNECT LOCAL 3D/);
+    assert.doesNotMatch(design.slice(design.indexOf("loadPathwayVisual"),design.indexOf("async function connectLocal")),/LOCAL\+"\/(?:status|generate)"/);
   }],
   ["blueprint dissection and reassemble use one parsed real GLB",()=>{
     assert.match(glb,/new GLTFLoader\(\)/);
@@ -63,8 +65,8 @@ const tests=[
     assert.match(glb,/explode=mode==="exploded" && st\.meshes\.length>1/);
     assert.match(design,/DISSECT/);
     assert.match(design,/EXPLODED \/ IMPLODED/);
-    assert.doesNotMatch(design,/CONNECT LOCAL 3D/);
-    assert.match(design,/AbortSignal\.any\(/);
+    assert.match(design,/onClick=\{\(\)=>void connectLocal\(\)\}/);
+    assert.match(design,/AbortSignal\.timeout\(4500\)/);
     assert.doesNotMatch(design,/DIVE INTO REALITY/);
     assert.match(glb,/orthos\.forEach/);
     assert.doesNotMatch(design,/new V1ModelWorkbench/);

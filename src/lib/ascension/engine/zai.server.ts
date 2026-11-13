@@ -1,7 +1,7 @@
 /**
- * Server-only Z.AI client.
+ * Server-only ASCENSION inference adapter.
  *
- * Z.AI is an EXTERNAL execution engine. Nothing here is ASCENSION governed
+ * External inference is not ASCENSION governed
  * state: every response returned by this module is raw external output and must
  * be labelled as such by the caller. This module never writes governed state,
  * never invents a value and never rewrites an engine error.
@@ -91,7 +91,7 @@ function extractJson(text: string): Record<string, unknown> | null {
 
 async function readStream(response: Response, nativeOllama = false) {
   const body = response.body;
-  if (!body) throw new ZaiEngineError("Z.AI returned no response body", response.status);
+  if (!body) throw new ZaiEngineError("Inference provider returned no response body", response.status);
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -302,7 +302,7 @@ export async function callZai(input: {
         ? " returned thinking without a final answer"
         : " returned an empty response";
     throw new ZaiEngineError(
-      `${provider === "local" ? "The local answer engine" : provider === "lovable" ? "Lovable AI" : "Z.AI"}${detail}`,
+      `${provider === "local" ? "The local answer engine" : "OpenRouter free inference"}${detail}`,
       response.status,
     );
   }

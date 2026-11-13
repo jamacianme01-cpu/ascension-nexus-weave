@@ -13,18 +13,10 @@ import {
 } from "./knowledge.server";
 import { callOpenAIResponse } from "./openai.server";
 
-const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
-const DEFAULT_MODEL = "glm-4.6";
-const LOVABLE_BASE_URL = "https://ai.gateway.lovable.dev/v1";
-const LOVABLE_MODEL = "google/gemini-3.1-flash-lite";
 // A hosted, zero-price preview route. Never select a paid model here.
 const FREE_BASE_URL = "https://openrouter.ai/api/v1";
 const FREE_MODEL = "openrouter/free";
-// Officially zero-token-cost Z.AI models; never replace with a billed GLM model.
-const ZAI_FREE_TEXT_MODEL = "glm-4.7-flash";
-const ZAI_FREE_VISION_MODEL = "glm-4.6v-flash";
 // Local answer engine takes priority when explicitly configured.
-// Lovable AI is optional and requires explicit owner opt-in.
 const DEFAULT_LOCAL_MODEL = "qwen3:4b";
 const LOCAL_MAX_TOKENS = 4096;
 
@@ -73,16 +65,8 @@ export function zaiModel(): string {
   if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" && process.env["OPENAI_API_KEY"]?.trim())
     return process.env["ASCENSION_OPENAI_MODEL"]?.trim() || "gpt-4.1-mini";
   if (process.env["OPENROUTER_API_KEY"]?.trim()) return FREE_MODEL;
-  if (process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true" &&
-      process.env["LOVABLE_API_KEY"]?.trim())
-    return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
-  if (process.env["ZAI_API_KEY"]?.trim()) return ZAI_FREE_TEXT_MODEL;
   if (localLlmConfig()) return localLlmConfig()!.model;
   return DEFAULT_LOCAL_MODEL;
-}
-
-function zaiBaseUrl(): string {
-  return (process.env["ZAI_BASE_URL"]?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
 function extractJson(text: string): Record<string, unknown> | null {
@@ -173,23 +157,17 @@ export async function callZai(input: {
   imageDataUrl?: string;
   temperature?: number;
   /** Internal failover; only already configured zero-price providers. */
-  fallbackProvider?: "free_cloud" | "zai_free";
+  fallbackProvider?: "free_cloud";
   fallbackAttempted?: boolean;
 }): Promise<ZaiCallResult> {
   const local = localLlmConfig();
   const freeCloudKey = process.env["OPENROUTER_API_KEY"]?.trim();
-  const lovableKey = process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true"
-    ? process.env["LOVABLE_API_KEY"]?.trim() : null;
-  const zaiKey = process.env["ZAI_API_KEY"]?.trim();
   const openaiEnabled = process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
     Boolean(process.env["OPENAI_API_KEY"]?.trim());
   // A configured public cloud route wins over localhost, even if a local
   // desktop development URL accidentally remains in server settings.
-  // Explicitly opted-in OpenAI wins for user-facing inference even when
-  // stale ZAI_API_KEY remains in Lovable's environment.
   const provider = input.fallbackProvider ??
-    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" : lovableKey ? "lovable" :
-      zaiKey ? "zai_free" : local ? "local" : null);
+    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" : local ? "local" : null);
   if (!provider) {
     throw new ZaiEngineError(
       "No answer engine is connected. Start ASCENSION local inference or explicitly authorize a provider.",
@@ -250,13 +228,10 @@ export async function callZai(input: {
     }
   }
 
-  const model = provider === "zai_free"
-    ? (input.imageDataUrl ? ZAI_FREE_VISION_MODEL : ZAI_FREE_TEXT_MODEL)
-    : zaiModel();
+  const model = zaiModel();
   const started = Date.now();
-  const baseUrl =
-    provider === "free_cloud" ? FREE_BASE_URL : provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai_free" ? DEFAULT_BASE_URL : local!.baseUrl;
-  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "lovable" ? lovableKey : provider === "zai_free" ? zaiKey : null;
+  const baseUrl = provider === "free_cloud" ? FREE_BASE_URL : local!.baseUrl;
+  const apiKey = freeCloudKey;
   const nativeUrl = provider === "local" ? ollamaChatUrl(baseUrl) : null;
   let response: Response;
   try {
@@ -272,7 +247,6 @@ export async function callZai(input: {
           : {
               "Content-Type": "application/json",
               Authorization: `Bearer ${apiKey}`,
-              ...(provider === "lovable" ? { "Lovable-API-Key": apiKey! } : {}),
               Accept: "text/event-stream",
             },
       body: JSON.stringify({
@@ -307,28 +281,14 @@ export async function callZai(input: {
       );
     }
     throw new ZaiEngineError(
-      `${provider === "lovable" ? "Lovable AI" : "Z.AI"} request failed: ${detail}`,
+      `OpenRouter free inference request failed: ${detail}`,
     );
   }
 
   if (!response.ok) {
-    // An overloaded zero-price provider should not strand an objective when
-    // another independently configured free route is available.
-    // Never silently switch to a billed model or gateway.
-    if (!input.fallbackAttempted && [429, 502, 503, 504].includes(response.status)) {
-      const alternative = provider === "zai_free" && freeCloudKey
-        ? "free_cloud"
-        : provider === "free_cloud" && zaiKey
-          ? "zai_free"
-          : null;
-      if (alternative) {
-        await response.body?.cancel().catch(() => undefined);
-        return callZai({ ...input, fallbackProvider: alternative, fallbackAttempted: true });
-      }
-    }
     const detail = (await response.text().catch(() => "")).slice(0, 2000);
     throw new ZaiEngineError(
-      `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : provider === "lovable" ? "Lovable AI" : "Z.AI"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
+      `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : "OpenRouter free inference"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
       response.status,
     );
   }

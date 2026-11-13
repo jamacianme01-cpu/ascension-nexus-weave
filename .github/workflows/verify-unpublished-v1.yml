@@ -1,0 +1,25 @@
+name: ASCENSION V1 unpublished repair verification
+on:
+  push:
+    branches:
+      - repair/v1-approved-baseline-20261113
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --no-save
+      - run: bun run build
+      - run: test -f .output/server/index.mjs
+      - run: bun tests/v1-repair-contract.test.mjs
+      - run: bun tests/creation-source-context.test.mjs
+      - run: bun tests/vision-behavior.test.mjs
+      - run: bun tests/design-identity.test.mjs
+      - run: bun tests/ascension-provider-boundary.test.mjs

@@ -8,13 +8,10 @@ import { loadEnv } from "vite";
 // object or give them a VITE_ prefix.
 export function loadServerEnvironment(env, values) {
   for (const key of [
-    "LOVABLE_API_KEY",
-    "LOVABLE_AI_MODEL",
     "ZAI_API_KEY",
     "ZAI_MODEL",
     "ZAI_BASE_URL",
     "ASCENSION_ALLOW_PAID_DRAFTS",
-    "ASCENSION_ALLOW_LOVABLE_AI",
     "ASCENSION_ALLOW_PAID_IMAGES",
     "LOCAL_LLM_BASE_URL",
     "LOCAL_LLM_MODEL",
@@ -74,8 +71,6 @@ export async function connectAnswerEngine(
   // A configured API key is not approval to bill inference. Explicit local
   // configuration always wins; hosted providers require owner opt-in.
   if (!env.LOCAL_LLM_BASE_URL?.trim()) {
-    if (env.ASCENSION_ALLOW_LOVABLE_AI === "true" && env.LOVABLE_API_KEY?.trim())
-      return "configured Lovable AI";
     if (env.ASCENSION_ALLOW_PAID_DRAFTS === "true" && env.ZAI_API_KEY?.trim())
       return "configured Z.AI";
   }

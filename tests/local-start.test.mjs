@@ -19,9 +19,9 @@ console.log("PASS local launch loads server configuration without overriding exi
 const noNetwork = async () => {
   throw new Error("unexpected request");
 };
-assert.equal(
-  await connectAnswerEngine({ LOVABLE_API_KEY: "test-only", ASCENSION_ALLOW_LOVABLE_AI: "true" }, { request: noNetwork }),
-  "configured Lovable AI",
+await assert.rejects(
+  connectAnswerEngine({ LOVABLE_API_KEY: "test-only", ASCENSION_ALLOW_LOVABLE_AI: "true" }, { request: noNetwork, start: async () => {} }),
+  /No local answer engine is reachable/,
 );
 assert.equal(
   await connectAnswerEngine({ ZAI_API_KEY: "test-only", ASCENSION_ALLOW_PAID_DRAFTS: "true" }, { request: noNetwork }),

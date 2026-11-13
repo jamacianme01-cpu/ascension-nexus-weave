@@ -772,39 +772,28 @@ try {
     else process.env.LOVABLE_API_KEY = priorFreeHostedKey;
   }
 
-  // Explicitly opted-in hosted path: Lovable is available only when authorized,
-  // credential exists, and it never calls localhost.
+  // A Lovable key and opt-in must not open a connection.
   const priorLovableModel = process.env.LOVABLE_AI_MODEL;
   const priorHostedOptIn = process.env.ASCENSION_ALLOW_LOVABLE_AI;
+  const priorOpenRouter = process.env.OPENROUTER_API_KEY;
+  const priorOpenAI = process.env.OPENAI_API_KEY;
+  const priorOpenAIAllow = process.env.ASCENSION_ALLOW_OPENAI_AI;
   process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
   process.env.LOVABLE_API_KEY = "lovable-test-only";
-  process.env.ZAI_API_KEY = "stale-zai-key";
+  delete process.env.ZAI_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ASCENSION_ALLOW_OPENAI_AI;
   delete process.env.LOCAL_LLM_BASE_URL;
   try {
     let sentUrl = "";
-    let sentAuth = null;
-    let sentLovableKey = null;
-    let sentBody = null;
-    globalThis.fetch = async (url, init) => {
+    globalThis.fetch = async (url) => {
       sentUrl = String(url);
-      sentAuth = init.headers["Authorization"] ?? null;
-      sentLovableKey = init.headers["Lovable-API-Key"] ?? null;
-      sentBody = JSON.parse(String(init.body));
-      return new Response(
-        'data: ' +
-          JSON.stringify({ choices: [{ delta: { content: "Hosted answer." } }] }) +
-          '\n' +
-          'data: [DONE]\n',
-      );
+      throw new Error("network should stay closed");
     };
-    const hosted = await callZai({ system: "test", user: "test" });
-    check("explicit Lovable opt-in uses hosted inference and not localhost", () => {
-      assert.equal(sentUrl, "https://ai.gateway.lovable.dev/v1/chat/completions");
-      assert.equal(sentAuth, "Bearer lovable-test-only");
-      assert.equal(sentLovableKey, "lovable-test-only");
-      assert.equal(sentBody.model, "google/gemini-3.1-flash-lite");
-      assert.ok(!sentUrl.includes("localhost"));
-      assert.equal(hosted.text, "Hosted answer.");
+    await assert.rejects(callZai({ system: "test", user: "test" }), /No answer engine is connected/);
+    check("Lovable opt-in is refused and does not call Lovable", () => {
+      assert.equal(sentUrl, "");
     });
   } finally {
     globalThis.fetch = original;
@@ -814,6 +803,12 @@ try {
     else process.env.LOVABLE_AI_MODEL = priorLovableModel;
     if (priorHostedOptIn === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI;
     else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptIn;
+    if (priorOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = priorOpenRouter;
+    if (priorOpenAI === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = priorOpenAI;
+    if (priorOpenAIAllow === undefined) delete process.env.ASCENSION_ALLOW_OPENAI_AI;
+    else process.env.ASCENSION_ALLOW_OPENAI_AI = priorOpenAIAllow;
     if (priorKey === undefined) delete process.env.ZAI_API_KEY;
     else process.env.ZAI_API_KEY = priorKey;
   }

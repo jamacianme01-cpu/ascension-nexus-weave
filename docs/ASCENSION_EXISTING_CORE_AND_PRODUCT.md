@@ -45,7 +45,7 @@ Follow-ups retain the parent request and prior generated result as explicitly un
 
 ## Existing deployment requirements
 
-The Lovable environment supplies its existing Supabase configuration and `ZAI_API_KEY`. The local queue worker uses the already established `ASCENSION_PUBLISH_TOKEN`. No additional database migration is needed: `ascension_run_stages` and its owner-scoped read policy were created on September 11.
+Lovable is not a host or an answer provider for this app. Supabase configuration and `ZAI_API_KEY`, where present, are existing server settings. The local queue worker uses the already established `ASCENSION_PUBLISH_TOKEN`. No additional database migration is needed: `ascension_run_stages` and its owner-scoped read policy were created on September 11.
 
 No core, Unreal, CAD, Guardian, AutoSync, DTF, Galaxy Bridge, ID/SID or Meaning Element implementation was modified in this change. A production build and interface tests do not prove the operator's local worker is online. The live ASCENSION connector check stalled during this session and could not establish that connection.
 

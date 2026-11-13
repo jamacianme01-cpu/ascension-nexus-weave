@@ -11,12 +11,11 @@ import {
   retrieveKnowledge,
   type KnowledgeRetrievalResult,
 } from "./knowledge.server";
+import { refuseBlockedOrigin } from "./blocked-origins";
 import { callOpenAIResponse } from "./openai.server";
 
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_MODEL = "glm-4.6";
-const LOVABLE_BASE_URL = "https://ai.gateway.lovable.dev/v1";
-const LOVABLE_MODEL = "google/gemini-3.1-flash-lite";
 // A hosted, zero-price preview route. Never select a paid model here.
 const FREE_BASE_URL = "https://openrouter.ai/api/v1";
 const FREE_MODEL = "openrouter/free";
@@ -24,7 +23,6 @@ const FREE_MODEL = "openrouter/free";
 const ZAI_FREE_TEXT_MODEL = "glm-4.7-flash";
 const ZAI_FREE_VISION_MODEL = "glm-4.6v-flash";
 // Local answer engine takes priority when explicitly configured.
-// Lovable AI is optional and requires explicit owner opt-in.
 const DEFAULT_LOCAL_MODEL = "qwen3:4b";
 const LOCAL_MAX_TOKENS = 4096;
 
@@ -73,9 +71,6 @@ export function zaiModel(): string {
   if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" && process.env["OPENAI_API_KEY"]?.trim())
     return process.env["ASCENSION_OPENAI_MODEL"]?.trim() || "gpt-4.1-mini";
   if (process.env["OPENROUTER_API_KEY"]?.trim()) return FREE_MODEL;
-  if (process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true" &&
-      process.env["LOVABLE_API_KEY"]?.trim())
-    return process.env["LOVABLE_AI_MODEL"]?.trim() || LOVABLE_MODEL;
   if (process.env["ZAI_API_KEY"]?.trim()) return ZAI_FREE_TEXT_MODEL;
   if (localLlmConfig()) return localLlmConfig()!.model;
   return DEFAULT_LOCAL_MODEL;
@@ -178,17 +173,15 @@ export async function callZai(input: {
 }): Promise<ZaiCallResult> {
   const local = localLlmConfig();
   const freeCloudKey = process.env["OPENROUTER_API_KEY"]?.trim();
-  const lovableKey = process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true"
-    ? process.env["LOVABLE_API_KEY"]?.trim() : null;
   const zaiKey = process.env["ZAI_API_KEY"]?.trim();
   const openaiEnabled = process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
     Boolean(process.env["OPENAI_API_KEY"]?.trim());
   // A configured public cloud route wins over localhost, even if a local
   // desktop development URL accidentally remains in server settings.
   // Explicitly opted-in OpenAI wins for user-facing inference even when
-  // stale ZAI_API_KEY remains in Lovable's environment.
+  // a stale ZAI_API_KEY remains in the server environment.
   const provider = input.fallbackProvider ??
-    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" : lovableKey ? "lovable" :
+    (openaiEnabled ? "openai" : freeCloudKey ? "free_cloud" :
       zaiKey ? "zai_free" : local ? "local" : null);
   if (!provider) {
     throw new ZaiEngineError(
@@ -255,12 +248,14 @@ export async function callZai(input: {
     : zaiModel();
   const started = Date.now();
   const baseUrl =
-    provider === "free_cloud" ? FREE_BASE_URL : provider === "lovable" ? LOVABLE_BASE_URL : provider === "zai_free" ? DEFAULT_BASE_URL : local!.baseUrl;
-  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "lovable" ? lovableKey : provider === "zai_free" ? zaiKey : null;
+    provider === "free_cloud" ? FREE_BASE_URL : provider === "zai_free" ? DEFAULT_BASE_URL : local!.baseUrl;
+  const apiKey = provider === "free_cloud" ? freeCloudKey : provider === "zai_free" ? zaiKey : null;
   const nativeUrl = provider === "local" ? ollamaChatUrl(baseUrl) : null;
+  const requestUrl = nativeUrl ?? `${baseUrl}/chat/completions`;
+  refuseBlockedOrigin(requestUrl);
   let response: Response;
   try {
-    response = await fetch(nativeUrl ?? `${baseUrl}/chat/completions`, {
+    response = await fetch(requestUrl, {
       method: "POST",
       signal: AbortSignal.timeout(provider === "local" ? 180000 : 90000),
       headers:
@@ -272,7 +267,6 @@ export async function callZai(input: {
           : {
               "Content-Type": "application/json",
               Authorization: `Bearer ${apiKey}`,
-              ...(provider === "lovable" ? { "Lovable-API-Key": apiKey! } : {}),
               Accept: "text/event-stream",
             },
       body: JSON.stringify({
@@ -307,7 +301,7 @@ export async function callZai(input: {
       );
     }
     throw new ZaiEngineError(
-      `${provider === "lovable" ? "Lovable AI" : "Z.AI"} request failed: ${detail}`,
+      `Z.AI request failed: ${detail}`,
     );
   }
 
@@ -328,7 +322,7 @@ export async function callZai(input: {
     }
     const detail = (await response.text().catch(() => "")).slice(0, 2000);
     throw new ZaiEngineError(
-      `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : provider === "lovable" ? "Lovable AI" : "Z.AI"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
+      `${provider === "local" ? `The local answer engine (${local!.baseUrl})` : "Z.AI"} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
       response.status,
     );
   }
@@ -342,7 +336,7 @@ export async function callZai(input: {
         ? " returned thinking without a final answer"
         : " returned an empty response";
     throw new ZaiEngineError(
-      `${provider === "local" ? "The local answer engine" : provider === "lovable" ? "Lovable AI" : "Z.AI"}${detail}`,
+      `${provider === "local" ? "The local answer engine" : "Z.AI"}${detail}`,
       response.status,
     );
   }

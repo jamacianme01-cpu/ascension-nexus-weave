@@ -3,6 +3,7 @@ import { asCompletedDesignStep, designPictureReady } from "@/lib/ascension/desig
 import { compileSelectedPathwayDesign } from "@/lib/ascension/design-image-brief";
 import { loadPathwayVisual, pathwayVisualKey } from "@/lib/ascension/pathway-visual";
 import { TreeGuide } from "@/components/ascension/tree-guide";
+import type { VoiceCommand } from "@/lib/ascension/spoken-answer";
 import { V1HunyuanWorkbench, type MeshPart, type HunyuanMode } from "@/components/ascension/v1-hunyuan-workbench";
 
 type Part={name:string;purpose:string;location:string};
@@ -18,12 +19,14 @@ function formatError(reason:unknown){
 }
 
 export function V1HunyuanPathway({
-  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],onPicture,
+  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],onPicture,inspectionCommand = null,prompt = null,
 }:{
   path:Pathway;objective:string;onSpeak:(text:string)=>void; speakingEnabled:boolean;modelCache:Cache;
   imageCache:{current:Map<string,string>};
   alternatives?: Pathway[];
   onPicture?: (ready: boolean) => void;
+  inspectionCommand?: { id: number; command: VoiceCommand } | null;
+  prompt?: { id: number; text: string } | null;
 }) {
   // Display the selected design even when its image prompt exceeds the provider
   // budget. The picture endpoint reports that failure inside the viewer.
@@ -48,6 +51,8 @@ export function V1HunyuanPathway({
   const [move,setMove]=useState<{seq:number;index:number;delta:[number,number,number]}>();
   const [generatorError,setGeneratorError]=useState("");
   const [cameraView,setCameraView]=useState<"perspective"|"front"|"back"|"left"|"right"|"top">("perspective");
+  const [localBusy,setLocalBusy]=useState(false);
+  const heardInspection = useRef<number | null>(null);
 
   useEffect(()=>{
     setMode("assembled");setMeshIndex(null);setInspectModel(false);setComponent(null);
@@ -79,42 +84,8 @@ export function V1HunyuanPathway({
         setPicture(sourceImage);
         onPicture?.(designPictureReady(sourceImage));
       }
-      const match=sourceImage.match(validImage);
-      if(!match)throw new Error("The saved selected invention picture is invalid.");
-      setStatus("Checking the existing Skytech-local Hunyuan3D bridge…");
-      let ready:Response;
-      try{
-        ready=await fetch(LOCAL+"/status",{signal:AbortSignal.any([controller.signal, AbortSignal.timeout(4500)]),cache:"no-store"});
-      }catch{
-        setStatus("3D unavailable: this browser cannot reach Skytech\'s local Hunyuan3D bridge at port 8082. Open ASCENSION on Skytech with its existing bridge running.");
-        return;
-      }
-      if(!ready.ok){
-        setStatus("3D is unavailable: the Windows worker is not ready.");
-        return;
-      }
-      const condition=await ready.json() as {ready?:boolean;engine?:string};
-      if(!condition.ready||condition.engine!=="Hunyuan3D"){
-        setStatus("3D is unavailable: the Hunyuan worker is not connected.");
-        return;
-      }
-      setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
-      const generated=await fetch(LOCAL+"/generate",{
-        method:"POST",signal:controller.signal,headers:{"content-type":"application/json"},
-        body:JSON.stringify({image:match[1]}),
-      });
-      if(!generated.ok){
-        let reason="";
-        try{const error=await generated.json() as {error?:string};reason=error.error||"";}catch{}
-        throw new Error(reason||"Local Hunyuan3D returned HTTP "+generated.status);
-      }
-      const output=await generated.arrayBuffer();
-      if(output.byteLength<20||output.byteLength>60*1024*1024||
-        new TextDecoder().decode(output.slice(0,4))!=="glTF")
-        throw new Error("Hunyuan3D did not return a valid GLB. A fabricated model is not allowed.");
       if(!active)return;
-      modelCache.current.set(key,output);
-      setBytes(output);setStatus("Real Hunyuan3D model ready");setFailure("");
+      setStatus("Picture ready. 3D starts only when you choose Connect local 3D.");
     })().catch(e=>{
       if(!active||controller.signal.aborted)return;
       const message=formatError(e);
@@ -126,6 +97,48 @@ export function V1HunyuanPathway({
   },[key,attempt,modelCache,imageCache]);
 
 
+  async function connectLocal(){
+    if(localBusy||bytes)return;
+    const sourceImage=imageCache.current.get(key)??picture??"";
+    const match=sourceImage.match(validImage);
+    if(!match){setStatus("The selected picture is not ready for a 3D request.");return;}
+    setLocalBusy(true);setFailure("");
+    setStatus("Checking the existing Skytech-local Hunyuan3D bridge…");
+    try{
+      let ready:Response;
+      try{
+        ready=await fetch(LOCAL+"/status",{signal:AbortSignal.timeout(4500),cache:"no-store"});
+      }catch{
+        setStatus("3D unavailable: this browser cannot reach Skytech's local Hunyuan3D bridge at port 8082. Open ASCENSION on Skytech with its existing bridge running.");
+        return;
+      }
+      if(!ready.ok){setStatus("3D is unavailable: the Windows worker is not ready.");return;}
+      const condition=await ready.json() as {ready?:boolean;engine?:string};
+      if(!condition.ready||condition.engine!=="Hunyuan3D"){
+        setStatus("3D is unavailable: the Hunyuan worker is not connected.");
+        return;
+      }
+      setStatus("Hunyuan3D is creating one real 3D GLB for this pathway. All views will reuse it.");
+      const generated=await fetch(LOCAL+"/generate",{
+        method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({image:match[1]}),
+      });
+      if(!generated.ok){
+        let reason="";
+        try{const error=await generated.json() as {error?:string};reason=error.error||"";}catch{}
+        throw new Error(reason||"Local Hunyuan3D returned HTTP "+generated.status);
+      }
+      const output=await generated.arrayBuffer();
+      if(output.byteLength<20||output.byteLength>60*1024*1024||
+        new TextDecoder().decode(output.slice(0,4))!=="glTF")
+        throw new Error("Hunyuan3D did not return a valid GLB. A fabricated model is not allowed.");
+      modelCache.current.set(key,output);
+      setBytes(output);setStatus("Real Hunyuan3D model ready");setFailure("");
+    }catch(error){
+      const message=formatError(error);
+      setFailure(message);setStatus(message);
+    }finally{setLocalBusy(false);}
+  }
   const canInspect=designParts.length>0||Boolean(bytes||picture);
   const changeView=(next:HunyuanMode)=>{if(!canInspect)return;setInspectModel(true);setMode(next);};
   const inspect=(index:number)=>{
@@ -136,6 +149,50 @@ export function V1HunyuanPathway({
   const moveMesh=(delta:[number,number,number])=>{
     if(meshIndex!==null)setMove(prev=>({seq:(prev?.seq??0)+1,index:meshIndex,delta}));
   };
+  const selectDesignPart=(index:number)=>{
+    const part=designParts[index];
+    if(!part)return;
+    setComponent(index);setPartSelection(value=>value+1);
+    const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
+    const match=parts.find(mesh=>normalize(mesh.name)===normalize(part.name));
+    if(match){setInspectModel(true);setMode("assembled");setMeshIndex(match.meshIndex);}
+    else setMeshIndex(null);
+    onSpeak(part.name+". "+(part.purpose||"Function not specified in this design."));
+  };
+  useEffect(()=>{
+    if(!inspectionCommand || heardInspection.current===inspectionCommand.id)return;
+    heardInspection.current=inspectionCommand.id;
+    const command=inspectionCommand.command;
+    const note=(text:string)=>onSpeak(text);
+    if(command.kind==="view"){
+      if(command.view==="picture"){setInspectModel(false);note("Showing the picture.");return;}
+      if(command.view==="assembled"){setInspectModel(true);setMode("assembled");note("Assembled view.");return;}
+      if(!canInspect){note("That view is not ready yet.");return;}
+      if((command.view==="dissect"||command.view==="exploded")&&designParts.length<2){
+        note("This design does not have separate parts to dissect.");return;
+      }
+      changeView(command.view);note("Opening "+command.view+".");return;
+    }
+    if(command.kind==="retry-picture"){setAttempt(value=>value+1);note("Trying the picture again.");return;}
+    if(command.kind==="zoom"){setZoom(value=>command.direction==="in"?Math.min(5,value*1.25):Math.max(.5,value/1.25));note("Zooming "+command.direction+".");return;}
+    if(command.kind==="rotate"){setRotation(value=>value+(command.direction==="left"?-15:15));note("Rotating "+command.direction+".");return;}
+    if(command.kind==="reset-view"){setZoom(1);setRotation(0);setCameraView("perspective");setMode("assembled");setReset(value=>value+1);note("View reset.");return;}
+    if(command.kind==="camera"){
+      if(!bytes){note("Camera views need the 3D model.");return;}
+      setInspectModel(true);setMode("assembled");setCameraView(command.view);note(command.view+" view.");return;
+    }
+    if(command.kind==="move"){
+      if(meshIndex===null){note("Select a part before moving it.");return;}
+      const delta={left:[-.15,0,0],right:[.15,0,0],up:[0,.15,0],down:[0,-.15,0]} as const;
+      moveMesh(delta[command.direction]);note("Moving "+command.direction+".");return;
+    }
+    if(command.kind==="part"){
+      const wanted=command.name.toLowerCase();
+      const index=designParts.findIndex(part=>part.name.toLowerCase().includes(wanted));
+      if(index<0){note("I do not see a part named "+command.name+".");return;}
+      selectDesignPart(index);
+    }
+  },[inspectionCommand]);
   const buttons=<div role="group" aria-label="Actual Hunyuan model controls"
     className="flex flex-wrap gap-2">
     <button type="button" onClick={()=>setZoom(v=>Math.min(5,v*1.25))}
@@ -172,8 +229,10 @@ export function V1HunyuanPathway({
         disabled={!canInspect||designParts.length<2}
         onClick={()=>inspectModel&&mode==="exploded"?changeView("assembled"):changeView("exploded")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">EXPLODED / IMPLODED</button>
+      {!bytes&&<button type="button" disabled={localBusy||!picture} onClick={()=>void connectLocal()}
+        className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">CONNECT LOCAL 3D</button>}
       {!bytes&&<p role="status" className="basis-full text-xs text-foreground/70">
-        {working?"Preparing the design and checking 3D…":status}
+        {working||localBusy?"Preparing the design…":status}
       </p>}
     </div>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.85fr)]">
@@ -249,7 +308,7 @@ export function V1HunyuanPathway({
       <aside className="ascension-pathway-side min-w-0 rounded-xl border border-gold/25 bg-[#08192a] p-4"
         aria-label="Hunyuan design description and parts">
         <div className="ascension-tree-in-pathway">
-          <TreeGuide objective={objective} introduce portrait pathway={path} alternatives={alternatives}
+          <TreeGuide objective={objective} introduce portrait pathway={path} alternatives={alternatives} prompt={prompt}
             enabled={speakingEnabled} onSpeak={onSpeak}
             focusRevision={partSelection} focusedPart={component===null?null:designParts[component]??null}
             view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"}

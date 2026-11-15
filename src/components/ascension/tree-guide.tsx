@@ -27,7 +27,7 @@ type VoiceRecognizer = {
   stop(): void;
 };
 
-export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, portrait = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0, experience = "design" }: {
+export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, portrait = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0, experience = "design", prompt = null }: {
   objective: string;
   pathway: GuidePathway;
   enabled: boolean;
@@ -42,6 +42,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   focusRevision?: number;
   experience?: "guidance" | "design";
   locationSource?: "reference-image"|"mesh"|"unlocated";
+  prompt?: { id: number; text: string } | null;
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -51,18 +52,28 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   const [error, setError] = useState("");
   const pending = useRef<AbortController | null>(null);
   const microphone = useRef<VoiceRecognizer | null>(null);
+  const askRef = useRef<(value: string, replace?: boolean, selectionName?: string, isPathway?: boolean) => void>(() => {});
+  const turnKey = useRef<string | null>(null);
   useEffect(() => {
     const refresh = () => setConversation(conversations.get(objective) ?? []);
     conversationListeners.add(refresh);
     return () => { conversationListeners.delete(refresh); };
   }, [objective]);
   useEffect(() => () => { pending.current?.abort(); microphone.current?.stop(); }, []);
+  // Abort only when the conversation itself changes. Re-running this effect for
+  // the same objective and pathway used to cancel the follow-up request.
   useEffect(() => {
-    pending.current?.abort();
-    setAnswer("");
-    setError("");
-    setQuestion("");
-    setThinking(false);
+    const next = objective + "\n" + pathway.title;
+    const previous = turnKey.current;
+    turnKey.current = next;
+    if (previous === next) return;
+    if (previous !== null) {
+      pending.current?.abort();
+      setAnswer("");
+      setError("");
+      setQuestion("");
+      setThinking(false);
+    }
     setConversation(conversations.get(objective) ?? []);
   }, [pathway.title, objective]);
 
@@ -126,17 +137,25 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       if (!controller.signal.aborted) setThinking(false);
     }
   }
+  askRef.current = ask;
 
   useEffect(() => {
-    if (focusedPart) void ask(`Explain ${focusedPart.name}: how it works in this design, where it belongs, and what it connects to. Explain this component, not the surrounding scene.`, true, focusedPart.name);
+    if (focusedPart) void askRef.current(`Explain ${focusedPart.name}: how it works in this design, where it belongs, and what it connects to. Explain this component, not the surrounding scene.`, true, focusedPart.name);
   }, [focusedPart?.name,focusRevision]);
 
   useEffect(() => {
     if(!introduce || introduced.has(JSON.stringify([objective,pathway.title])))return;
     // Defer so StrictMode's discarded mount cannot send a duplicate introduction.
-    const timer=window.setTimeout(()=>void ask(experience==="guidance"?"Help me use this approach in my real situation. Give one practical first action and ask the most useful question to tailor the next step. Do not invent my numbers or suggest building a financial app.":"Explain the design already on screen: what it is and how its main parts work together. Use two short sentences, at most 45 words. Do not assign research or ask me to specify the design.", true, pathway.title, true),0);
+    const timer=window.setTimeout(()=>void askRef.current(experience==="guidance"?"Help me use this approach in my real situation. Give one practical first action and ask the most useful question to tailor the next step. Do not invent my numbers or suggest building a financial app.":"Explain the design already on screen: what it is and how its main parts work together. Use two short sentences, at most 45 words. Do not assign research or ask me to specify the design.", true, pathway.title, true),0);
     return()=>window.clearTimeout(timer);
   },[introduce,objective,pathway.title,experience]);
+
+  const heardPrompt = useRef<number | null>(null);
+  useEffect(() => {
+    if (!prompt || heardPrompt.current === prompt.id) return;
+    heardPrompt.current = prompt.id;
+    void askRef.current(prompt.text);
+  }, [prompt]);
 
   function listen() {
     if (listening) { microphone.current?.stop(); return; }
@@ -190,9 +209,9 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       </button>
     </form>
     {error && <p role="alert" className="text-sm text-red-200">{error}</p>}
+    {conversation.length > 0 && <div role="log" aria-label="Tree conversation" className="mt-2 space-y-1 text-sm leading-6">
+      {conversation.slice(-4).map((item, index) => <p key={index}>{item.role === "user" ? "You: " : ""}{item.content}</p>)}
+    </div>}
     {answer && <span className="sr-only" aria-live="polite">{answer}</span>}
-    {conversation.length > 0 && <span className="sr-only" role="status">
-      {conversation.length} messages in the Tree conversation
-    </span>}
   </div>;
 }

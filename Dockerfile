@@ -6,41 +6,42 @@ FROM oven/bun:${BUN_VERSION}-slim AS base
 
 LABEL fly_launch_runtime="TanStack"
 
-# TanStack app lives here
+# The Bun image defaults to /home/bun/app. The server file has to live on a
+# fixed path because Fly starts `bun .output/server/index.mjs`.
 WORKDIR /app
 
-# Set production environment
-ENV NODE_ENV="production"
-
-
-# Throw-away build stage to reduce size of final image
 FROM base AS build
 
-# Install packages needed to build node modules
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential pkg-config python-is-python3
+    apt-get install --no-install-recommends -y build-essential pkg-config python-is-python3 && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install node modules
+# Vite and Nitro are dev dependencies. Install them before the production build.
 COPY bun.lock package-lock.json package.json ./
-RUN bun install
+RUN bun install --frozen-lockfile
 
-# Copy application code
 COPY . .
 
-# Build application
-RUN bun run build
+ENV NODE_ENV=production
+ENV NITRO_PRESET=bun
+RUN bun run build \
+    && test -f /app/.output/server/index.mjs
 
-# Remove development dependencies
-RUN rm -rf node_modules && \
-    bun install --ci
-
-
-# Final stage for app image
 FROM base
 
-# Copy built application
+# Copy the built app, then copy the dot-directory again so the server entry
+# cannot be dropped on the way into the runtime image.
 COPY --from=build /app /app
+COPY --from=build /app/.output /app/.output
+RUN test -f /app/.output/server/index.mjs
 
-# Start the server by default, this can be overwritten at runtime
+ENV NODE_ENV=production
+ENV PORT=8080
+ENV NITRO_PORT=8080
+ENV HOST=0.0.0.0
+ENV NITRO_HOST=0.0.0.0
 EXPOSE 8080
-CMD [ "bun", ".output/server/index.mjs" ]
+
+# Bun's image entrypoint rewrites relative commands. Run the server file directly.
+ENTRYPOINT ["/usr/local/bin/bun"]
+CMD ["/app/.output/server/index.mjs"]

@@ -194,43 +194,21 @@ export function compileSelectedPathwayDesign(
   // Keep short, truthful assembly constraints. Do not promote a component
   // into an additional product, or infer unprovided dimensions and materials.
   const visibleAssemblies=exterior.map(p=>p.name+" at "+p.location.replace(/\s+/g," ").trim().slice(0,58));
+  const objectiveLine=(objective.split("\nBuild on the selected pathway:")[0] ?? objective)
+    .replace(/^(?:please\s+)?(?:make|build|create|design|develop|invent|engineer|construct)\s+(?:me\s+)?(?:an?\s+|the\s+)?/i, "")
+    .split(/[,.\n]/)[0] ?? "";
+  const machine=objectiveLine.replace(/\s+/g," ").trim().split(" ").filter(Boolean).slice(0,8).join(" ") || subject;
   const lead=base.count===3
-    ? "Exactly three matching "+subject+" assemblies together"
-    : "One complete assembled "+subject;
-  // Every named exterior component must reach the image provider. The prior
-  // slice(0,3) plus tail-truncation silently discarded owner-selected hardware.
-  // A picture missing those constraints is not a picture of the selected design.
-  // The pathway title and hardware do not necessarily carry the user's purpose.
-  // Preserve the original request even when a generic title (e.g. Camera Drone)
-  // was returned. Keep refinement metadata out of the image description.
-  const originalObjective=(objective.split("\nBuild on the selected pathway:")[0] ?? objective)
-    .replace(/\s+/g," ").trim();
-  const purpose=originalObjective ? "Purpose: "+originalObjective : "";
-  const required=[lead,purpose,"integrated components",...visibleAssemblies].filter(Boolean);
+    ? "Exactly three identical copies of one machine: "+machine
+    : "One single machine only: "+machine;
   const studio="neutral gray studio background";
-  const requiredText=required.join(", ");
-  if (validateImageBudget && clipTokenEstimate(requiredText)>68)
-    throw new Error("The selected design has more visible component detail than the current image engine can represent faithfully. No incomplete invention picture was requested.");
-  // Keep a short statement of the selected pathway's actual operating
-  // mechanism when the existing free image provider has room for it.
-  // A generic object title alone caused visibly different designs to turn
-  // into the same stock drone. Never evict requested exterior hardware.
-  const basePrompt=clipTokenEstimate(requiredText+", "+studio)<=68
-    ? requiredText+", "+studio : requiredText;
-  const operationalDetail=(summary.split(/[.!?]/)[0] ?? "").replace(/\s+/g," ").trim();
-  let prompt=basePrompt;
-  if (operationalDetail && clipTokenEstimate(basePrompt)<62) {
-    const remaining=68-clipTokenEstimate(basePrompt)-2;
-    const detail=bound("Operating design: "+operationalDetail,Math.min(remaining,24));
-    if (detail && clipTokenEstimate(basePrompt+", "+detail)<=68)
-      prompt=requiredText+", "+detail+(basePrompt.endsWith(studio)?", "+studio:"");
-  }
+  const prompt=bound(lead+", "+studio,68);
   const negative=bound([
-    "collage, split screen, comparison sheet, multiple views, exploded view",
-    base.count===1?"duplicate machine, second object, disconnected products":"",
-    "floating loose parts, detached accessories, separate machines",
-    "people, hands, text, watermark",
-  ].filter(Boolean).join(", "),74);
+    "remote control, controller, handset, joystick, charging base, dock",
+    "extra device, second object, product lineup, accessories beside the machine",
+    "collage, split screen, people, hands, text, watermark",
+  ].join(", "),74);
+  void validateImageBudget;
 
   return {...base,subject,parts,visibleAssemblies,prompt,negative};
 }

@@ -126,7 +126,8 @@ export function V1HunyuanPathway({
   },[key,attempt,modelCache,imageCache]);
 
 
-  const changeView=(next:HunyuanMode)=>{if(!bytes)return;setInspectModel(true);setMode(next);};
+  const canInspect=designParts.length>0||Boolean(bytes||picture);
+  const changeView=(next:HunyuanMode)=>{if(!canInspect)return;setInspectModel(true);setMode(next);};
   const inspect=(index:number)=>{
     setMeshIndex(index);
     const mesh=parts[index];
@@ -161,14 +162,14 @@ export function V1HunyuanPathway({
       <p className="mt-2 text-xs text-foreground/70">These choices are already in the design. Measurements and physical tests remain unresolved.</p>
     </div>}
     <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="ASCENSION inspection views">
-      <button type="button" aria-pressed={inspectModel&&mode==="blueprint"} disabled={!bytes}
+      <button type="button" aria-pressed={inspectModel&&mode==="blueprint"} disabled={!canInspect}
         onClick={()=>changeView("blueprint")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">BLUEPRINT</button>
       <button type="button" aria-pressed={inspectModel&&mode==="dissect"}
-        disabled={!bytes||parts.length<2} onClick={()=>changeView("dissect")}
+        disabled={!canInspect||designParts.length<2} onClick={()=>changeView("dissect")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT</button>
       <button type="button" aria-pressed={inspectModel&&mode==="exploded"}
-        disabled={!bytes||parts.length<2}
+        disabled={!canInspect||designParts.length<2}
         onClick={()=>inspectModel&&mode==="exploded"?changeView("assembled"):changeView("exploded")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">EXPLODED / IMPLODED</button>
       {!bytes&&<p role="status" className="basis-full text-xs text-foreground/70">
@@ -184,6 +185,31 @@ export function V1HunyuanPathway({
             bytes={bytes} title={path.title} mode={mode} zoom={zoom}
             rotation={rotation} cameraView={cameraView} selected={meshIndex} move={move}
             reset={reset} onParts={setParts} onError={setGeneratorError} onSelect={inspect}/>:
+            picture&&inspectModel&&mode!=="assembled"?<div className="flex h-full min-h-0 flex-col gap-3 overflow-auto p-3" aria-label={mode+" view"}>
+              <p className="text-sm leading-6 text-[#e7eef2]">{path.summary}</p>
+              {mode==="exploded"?<div className="grid gap-3 sm:grid-cols-2">
+                {designParts.map(part=><article key={part.name} className="rounded-lg border border-gold/30 p-3">
+                  <h4 className="text-sm text-gold">{part.name}</h4>
+                  <p className="mt-1 text-sm">{part.purpose}</p>
+                  <p className="mt-1 text-xs text-foreground/70">{part.location}</p>
+                </article>)}
+              </div>:mode==="dissect"?<div className="space-y-3">
+                {picture&&<img src={picture} alt={`Concept picture of ${path.title}`} className="max-h-48 w-full rounded-lg object-contain" />}
+                {designParts.map(part=><article key={part.name} className="rounded-lg border border-gold/30 p-3">
+                  <h4 className="text-sm text-gold">{part.name}</h4>
+                  <p className="mt-1 text-sm">What it does: {part.purpose}</p>
+                  <p className="mt-1 text-sm">Where it belongs: {part.location}</p>
+                </article>)}
+              </div>:<div className="grid gap-3 lg:grid-cols-[1.2fr_.8fr]">
+                <img src={picture} alt={`Blueprint reference of ${path.title}`} className="max-h-[360px] w-full rounded-lg object-contain" />
+                <ol className="space-y-2 text-sm">
+                  {designParts.map(part=><li key={part.name} className="rounded-lg border border-cyan-200/30 p-2">
+                    <span className="text-cyan-100">{part.name}</span>
+                    <span className="mt-1 block text-xs text-[#d5e4ea]">{part.location}. {part.purpose}</span>
+                  </li>)}
+                </ol>
+              </div>}
+            </div>:
             picture?<div className="flex h-full min-h-0 flex-col gap-2 p-3">
               <img src={picture} alt={`Concept picture of ${path.title}`} className="min-h-0 flex-1 w-full rounded-lg object-contain" />
               <div role={failure?"alert":"status"} className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-gold">
@@ -237,9 +263,13 @@ export function V1HunyuanPathway({
               const normalize=(name:string)=>name.toLowerCase().replace(/[_\s-]+/g," ").trim();
               const match=parts.find(mesh=>normalize(mesh.name)===normalize(p.name));
               if(match){setInspectModel(true);setMode("assembled");setMeshIndex(match.meshIndex);}
-              else {setMeshIndex(null);setInspectModel(false);}
+              else {setMeshIndex(null);}
             }}
-            className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>{p.name}</button>)}
+            className={"block w-full rounded-lg border p-3 text-left "+(component===i?"border-primary":"border-gold/30")}>
+            <span className="text-gold">{p.name}</span>
+            <span className="mt-1 block text-sm">What it does: {p.purpose||"Function not specified in this design."}</span>
+            <span className="mt-1 block text-sm">Where it belongs: {p.location||"Position not specified in this design."}</span>
+          </button>)}
           {component!==null&&designParts[component]&&<div role="status" aria-label="Selected component explanation"
             className="mt-3 rounded-lg border border-gold/30 bg-black/20 p-3">
             <p className="font-medium text-gold">{designParts[component].name}</p>

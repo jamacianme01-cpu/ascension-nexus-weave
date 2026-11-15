@@ -76,7 +76,8 @@ async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
 
 const BOOK_SCENE = "/approved-scene/01-closed-book.jpg";
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
-const GREETING = "Welcome to ASCENSION. What are we working on today?";
+const GREETING = "Welcome to ASCENSION. Tell me what you want to invent, build, investigate, or improve.";
+let treeWelcomed = false;
 type VoiceHeard = { transcript?: string };
 type VoiceSession = {
   lang: string;
@@ -91,9 +92,38 @@ type VoiceSession = {
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
+let spokenAudio: HTMLAudioElement | null = null;
+async function playSpokenFile(text: string, sequence: number, onUnavailable?: (message: string) => void) {
+  if (sequence !== speechSequence) return;
+  try {
+    const response = await fetch("/api/public/ascension/voice", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: text.trim().slice(0, 220) }),
+    });
+    if (!response.ok || sequence !== speechSequence) throw new Error("The Tree could not speak.");
+    const url = URL.createObjectURL(await response.blob());
+    spokenAudio?.pause();
+    const audio = new Audio(url);
+    spokenAudio = audio;
+    audio.onplay = () => {
+      if (sequence === speechSequence) document.documentElement.classList.add("ascension-tree-is-speaking");
+    };
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      if (sequence === speechSequence) document.documentElement.classList.remove("ascension-tree-is-speaking");
+    };
+    await audio.play();
+  } catch {
+    if (sequence === speechSequence)
+      onUnavailable?.("This browser blocked spoken playback. Tap Hear the Tree and I'll speak.");
+  }
+}
 function say(text: string, onStarted?: () => void, onUnavailable?: (message: string) => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
+  spokenAudio?.pause();
+  spokenAudio = null;
   // React to actual speech playback without adding another Tree image.
   document.documentElement.classList.remove("ascension-tree-is-speaking");
   const synth = window.speechSynthesis;
@@ -146,7 +176,10 @@ function say(text: string, onStarted?: () => void, onUnavailable?: (message: str
       if (reason === "canceled" || reason === "interrupted") return;
       activeUtterance = null;
       document.documentElement.classList.remove("ascension-tree-is-speaking");
-      if (!started) onUnavailable?.("This browser blocked spoken playback. Tap Hear the Tree and I'll speak.");
+      if (!started) {
+        index = chunks.length;
+        void playSpokenFile(text, sequence, onUnavailable);
+      }
     };
     try { synth.speak(words); } catch {
       activeUtterance = null;
@@ -160,6 +193,8 @@ function say(text: string, onStarted?: () => void, onUnavailable?: (message: str
 function stopVoice() {
   speechSequence += 1;
   activeUtterance = null;
+  spokenAudio?.pause();
+  spokenAudio = null;
   if (typeof document !== "undefined") document.documentElement.classList.remove("ascension-tree-is-speaking");
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
@@ -175,11 +210,13 @@ function PathwayView(props: {
   onPicture?: (ready: boolean) => void;
   prompt?: { id: number; text: string } | null;
   inspectionCommand?: { id: number; command: VoiceCommand } | null;
+  micListening?: boolean;
+  onMic?: () => void;
 }) {
   if(props.experience==="guidance")return <section className="rounded-2xl border border-gold/30 bg-[#04101cdd] p-4 sm:p-6" aria-label="Selected guidance pathway">
     <h3 className="mb-3 text-xl text-gold">{props.path.title}</h3>
     <p className="mb-4 text-sm leading-6">{props.path.summary}</p>
-    <TreeGuide objective={props.objective} prompt={props.prompt ?? null} pathway={props.path} alternatives={props.alternatives} experience="guidance" introduce portrait enabled={props.speakingEnabled} onSpeak={props.onSpeak}/>
+    <TreeGuide objective={props.objective} prompt={props.prompt ?? null} pathway={props.path} alternatives={props.alternatives} experience="guidance" introduce portrait enabled={props.speakingEnabled} onSpeak={props.onSpeak} micListening={props.micListening} onMic={props.onMic}/>
     {props.path.plan && <section className="mt-6 space-y-4" aria-label="Business plan">
       <h4 className="text-lg text-gold">Business plan</h4>
       {PLAN_LABELS.map(({ field, label }) => <div key={field}>
@@ -191,14 +228,15 @@ function PathwayView(props: {
   return <V1HunyuanPathway
     path={props.path} alternatives={props.alternatives} objective={props.objective} modelCache={props.modelCache} imageCache={props.imageCache}
     onSpeak={props.onSpeak} speakingEnabled={props.speakingEnabled} onPicture={props.onPicture}
-    prompt={props.prompt ?? null} inspectionCommand={props.inspectionCommand ?? null} />;
+    prompt={props.prompt ?? null} inspectionCommand={props.inspectionCommand ?? null}
+    micListening={props.micListening} onMic={props.onMic} />;
 }
 
 /** Hosted Tree entry. The first model answer is backend context, not a public essay. */
 export function IndependentEngage() {
   const [objective, setObjective] = useState("");
   const [section, setSection] = useState<ObjectiveSection | null>(null);
-  const [enteredTree, setEnteredTree] = useState(false);
+  const [enteredTree, setEnteredTree] = useState(true);
   const [attachments, setAttachments] = useState<ObjectiveAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState("");
   const [requested, setRequested] = useState("");
@@ -213,11 +251,15 @@ export function IndependentEngage() {
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const [voiceNotice, setVoiceNotice] = useState("");
-  const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [treeLine, setTreeLine] = useState("");
   const [voicePrompt, setVoicePrompt] = useState<{ id: number; text: string } | null>(null);
   const [inspectionCommand, setInspectionCommand] = useState<{ id: number; command: VoiceCommand } | null>(null);
   const voiceSerial = useRef(0);
   const applyVoiceRef = useRef<(text: string) => void>(() => {});
+  const objectiveRef = useRef("");
+  const welcomed = useRef(false);
+  const toldEngage = useRef(false);
   const [designPicture, setDesignPicture] = useState(false);
   const [designSettled, setDesignSettled] = useState(false);
   const view = useRef<HTMLElement | null>(null);
@@ -229,18 +271,61 @@ export function IndependentEngage() {
   const imageCache = useRef(new Map<string, string>());
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
 
+  function speak(line: string) {
+    setTreeLine(line);
+    setVoiceNotice("");
+    say(line, () => setVoiceNotice(""), message => setVoiceNotice(message));
+  }
+
+  function inferSection(text: string): ObjectiveSection {
+    if (/\b(business|customer|revenue|market|profit|store)\b/i.test(text)) return "business";
+    if (/\b(investigate|improve|help|decide|guidance|advice)\b/i.test(text)) return "guidance";
+    return "build";
+  }
+
+  function alreadyHeard(current: string, heard: string) {
+    const have = new Set(current.toLowerCase().split(/\s+/).filter(Boolean));
+    const words = heard.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return true;
+    const overlap = words.filter(word => have.has(word)).length;
+    return current.toLowerCase().includes(heard.toLowerCase()) || overlap / words.length >= 0.6;
+  }
+
+  function rememberIdea(text: string) {
+    const heard = text.trim().slice(0, 800);
+    if (heard.length < 3) return;
+    const current = objectiveRef.current.trim();
+    if (current && alreadyHeard(current, heard)) return;
+    const next = (current ? current + " " + heard : heard).slice(0, 2400);
+    objectiveRef.current = next;
+    setObjective(next);
+    setEnteredTree(true);
+    setSection(existing => existing ?? inferSection(heard));
+    setVoiceOn(true);
+    if (!current && !toldEngage.current) {
+      toldEngage.current = true;
+      speak("I have that. Say engage for the four pathways.");
+      return;
+    }
+    speak("Added.");
+  }
+
   function enterCategory(id: ObjectiveSection) {
-    // Selecting a category is the user's entry gesture, enabling speech.
     stopVoice();
     setSection(id);
     setEnteredTree(true);
     setVoiceNotice("");
     setVoiceOn(true);
     setTalking(true);
-    const question = id === "business" ? "Tell me about your business. What do you want to work on?"
-      : id === "build" ? "What would you like to create?"
-      : "What would you like help with?";
-    say(GREETING + " " + question, () => setVoiceNotice(""), setVoiceNotice);
+    const question = id === "business" ? "Tell me about the business."
+      : id === "build" ? "Tell me what you want to create."
+      : "Tell me what you want help with.";
+    if (!welcomed.current) {
+      welcomed.current = true;
+      speak("Welcome to ASCENSION. " + question);
+      return;
+    }
+    speak(question);
   }
 
   async function addFiles(files: File[]) {
@@ -283,7 +368,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
-      if (talking) say("I have four approaches. Choose one and I can explain it.");
+      if (talking) speak("Four pathways are ready. Ask me about one, or say enter.");
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.
       window.setTimeout(() => {
@@ -291,8 +376,10 @@ export function IndependentEngage() {
       }, 120);
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
-        setPathwayError(cause instanceof Error ? cause.message : String(cause));
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setPathwayError(message);
         setStage("idle");
+        speak(message);
       }
     }
   }
@@ -365,11 +452,14 @@ export function IndependentEngage() {
     stopVoice();
     modelCache.current.clear(); imageCache.current.clear();
     setObjective(""); setRequested(""); setError(""); setResult(null);
+    objectiveRef.current = "";
+    toldEngage.current = false;
     continuationContext.current = "";
-    setSection(null); setEnteredTree(false); setAttachments([]); setAttachmentError("");
+    setSection(null); setEnteredTree(true); setVoiceOn(true); setAttachments([]); setAttachmentError("");
     setRefinement(""); setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    speak("What do you want to work on?");
   }
 
   const choices = result ? [...result.pathways, result.blend] : [];
@@ -381,18 +471,31 @@ export function IndependentEngage() {
   };
   function hearPathway(index:number) {
     const path=choices[index];if(!path)return;
-    setOrbit(index);setOrbPreview(index);setTalking(true);setVoiceNotice("");
-    void say(spokenPreview(path),()=>setVoiceNotice(""),setVoiceNotice);
+    setOrbit(index);setOrbPreview(index);setTalking(true);
+    const who = path.provider ? path.provider + ". " : "";
+    speak(who + path.title + ". " + briefSpokenAnswer(path.summary, 18));
+  }
+  function askTree(text: string) {
+    voiceSerial.current += 1;
+    setVoicePrompt({ id: voiceSerial.current, text: text.slice(0, 800) });
   }
   function applyVoice(text: string) {
     const command = interpretVoiceCommand(text);
     const screen = !enteredTree ? "book" : choice !== null ? "design" : result ? "orbs" : "objective";
-    const speak = (line: string) => { setVoiceNotice(""); say(line, () => setVoiceNotice(""), setVoiceNotice); };
     if (!command) {
-      if (screen === "book") { speak("Say Business Planner, Build, or Guidance."); return; }
-      if (screen === "objective") setObjective(text.slice(0, 2400));
-      voiceSerial.current += 1;
-      setVoicePrompt({ id: voiceSerial.current, text: text.slice(0, 800) });
+      if (screen === "design" && selected) {
+        const asks = /^(what|why|how|when|who|where|which|can|could|would|should)\b/i.test(text);
+        const refines = /^(?:change|improve|make|add|build on|refine|update)\b/i.test(text) || text.split(/\s+/).length > 8;
+        if (refines && !asks) {
+          buildOn(selected, text);
+          speak("I'll build on that.");
+          return;
+        }
+        askTree(text);
+        return;
+      }
+      if (screen === "orbs") { askTree(text); return; }
+      rememberIdea(text);
       return;
     }
     if (command.kind === "section") { enterCategory(command.section); return; }
@@ -428,7 +531,7 @@ export function IndependentEngage() {
       const index = orbPreview ?? (orbit % choices.length);
       stopVoice();
       setDesignPicture(false); setDesignSettled(false); setChoice(index); setRefinement("");
-      speak("Entering the pathway.");
+      speak("Entering this pathway.");
       return;
     }
     if (command.kind === "back") {
@@ -443,6 +546,19 @@ export function IndependentEngage() {
   }
   applyVoiceRef.current = applyVoice;
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("ascension-tree-is-listening", voiceOn);
+    return () => document.documentElement.classList.remove("ascension-tree-is-listening");
+  }, [voiceOn]);
+
+  useEffect(() => {
+    if (!enteredTree || treeWelcomed) return;
+    treeWelcomed = true;
+    welcomed.current = true;
+    setTalking(true);
+    setVoiceOn(true);
+    speak(GREETING);
+  }, [enteredTree]);
 
   useEffect(() => {
     if (!voiceOn) return;
@@ -518,13 +634,6 @@ export function IndependentEngage() {
     data-book-sequence={stage === "idle" ? undefined : stage} data-has-run={result ? "true" : undefined}
     data-realities={choice !== null ? "true" : undefined}
     data-design-ready={designPicture ? "true" : undefined}>
-    <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
-      <button type="button" aria-pressed={voiceOn} onClick={() => setVoiceOn(on => !on)}
-        className="min-h-12 rounded-full border border-gold/55 px-5 text-sm text-gold">
-        {voiceOn ? "VOICE ON" : "VOICE"}
-      </button>
-      {voiceOn && <p role="status" className="text-sm text-gold">Listening. Say a pathway, Blueprint, Dissect, or the picture.</p>}
-    </div>
     {!enteredTree && <section aria-label="ASCENSION Book entrance" className="ascension-command ascension-book-entry">
       <img className="ascension-book-art" src={BOOK_SCENE} alt="The ASCENSION Knowledge Book" draggable={false} />
       <div className="ascension-book-categories" role="group" aria-label="Choose your ASCENSION section">
@@ -541,13 +650,15 @@ export function IndependentEngage() {
         <div className="ascension-entry-guide" aria-label="Speak to the Tree">
           <TreeGuide objective="Explore an idea with ASCENSION" prompt={voicePrompt}
             pathway={{ title: "Your objective", summary: objective || "Explore an idea with ASCENSION", steps: [], parts: [] }}
-            experience={experience} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
-          {voiceNotice && <p role="status" className="ascension-voice-notice">{voiceNotice}</p>}
+            experience={experience} enabled={talking} onSpeak={text => { if (talking) speak(text); }}
+            micListening={voiceOn} onMic={() => setVoiceOn(on => !on)} />
+          {treeLine && <p role="status" className="ascension-voice-notice" aria-live="polite">{treeLine}</p>}
+          {voiceNotice && <p role="alert" className="ascension-voice-notice">{voiceNotice}</p>}
         </div>
         <label htmlFor="objective">What do you want to accomplish?</label>
         <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
           aria-label="What do you want to accomplish?" placeholder="What do you want to accomplish?"
-          onChange={event => setObjective(event.target.value)}
+          onChange={event => { objectiveRef.current = event.target.value; setObjective(event.target.value); }}
           onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !loading) { event.preventDefault(); void engage(); } }}
         />
         <div className="ascension-evidence-tools relative z-10 flex flex-wrap items-center gap-3 text-xs">
@@ -615,7 +726,9 @@ export function IndependentEngage() {
         onOpen={hearPathway} />
       <div className="ascension-pathway-tree-voice">
         <TreeGuide objective={requested || objective} prompt={voicePrompt} pathway={{ title: "Your objective", summary: requested, steps: [], parts: [] }}
-          experience={experience} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }}/>
+          experience={experience} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) speak(text); }}
+          micListening={voiceOn} onMic={() => setVoiceOn(on => !on)} />
+        {treeLine && <p role="status" className="text-center text-sm text-gold" aria-live="polite">{treeLine}</p>}
       </div>
       {previewPath && <div className="flex flex-wrap items-center justify-center gap-3" aria-label="Pathway introduction">
         <button type="button" onClick={()=>hearPathway(orbPreview!)}
@@ -639,7 +752,8 @@ export function IndependentEngage() {
           prompt={voicePrompt} inspectionCommand={inspectionCommand}
           onPicture={(ready) => { setDesignPicture(ready); setDesignSettled(true); }}
           speakingEnabled={talking}
-          onSpeak={text => { if (talking) say(text); }} />
+          onSpeak={text => { if (talking) speak(text); }}
+          micListening={voiceOn} onMic={() => setVoiceOn(on => !on)} />
         {experience==="guidance"&&<section className="rounded-xl border border-gold/25 bg-[#051b2a]/95 p-4 sm:p-6" aria-label="Choose your next step">
           <h3 className="text-lg text-gold">Next actions</h3>
           {"blend_reason" in selected && <p className="mt-3 text-sm leading-6">{String(selected.blend_reason)}</p>}

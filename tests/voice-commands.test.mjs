@@ -24,6 +24,12 @@ assert.deepEqual(interpretVoiceCommand("rotate left"), { kind: "rotate", directi
 assert.deepEqual(interpretVoiceCommand("top view"), { kind: "camera", view: "top" });
 assert.deepEqual(interpretVoiceCommand("move right"), { kind: "move", direction: "right" });
 assert.deepEqual(interpretVoiceCommand("select the rotor"), { kind: "part", name: "rotor" });
+assert.deepEqual(interpretVoiceCommand("Show me the Blueprint"), { kind: "view", view: "blueprint" });
+assert.deepEqual(interpretVoiceCommand("Rotate it"), { kind: "rotate", direction: "right" });
+assert.deepEqual(interpretVoiceCommand("Dissect that component"), { kind: "view", view: "dissect" });
+assert.deepEqual(interpretVoiceCommand("Explode the assembly"), { kind: "view", view: "exploded" });
+assert.deepEqual(interpretVoiceCommand("Claude"), { kind: "hear", target: 1 });
+assert.deepEqual(interpretVoiceCommand("I want to build a small wind turbine for a cabin"), null);
 assert.equal(voiceCommandSpeech({ kind: "view", view: "blueprint" }), "Opening the blueprint view.");
 assert.ok(briefSpokenAnswer("one two three").length > 0);
 const guide = readFileSync(new URL("../src/components/ascension/tree-guide.tsx", import.meta.url), "utf8");

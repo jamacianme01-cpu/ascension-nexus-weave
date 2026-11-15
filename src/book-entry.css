@@ -2483,9 +2483,13 @@ body:has(.ascension-world > .ascension-command) main {
   0%, 100% { filter: brightness(1.2) saturate(1.12); }
   50% { filter: brightness(1.34) saturate(1.19); }
 }
+.ascension-tree-is-listening .ascension-tree-scene {
+  filter: brightness(1.2) saturate(1.14);
+}
 @media (prefers-reduced-motion: no-preference) {
   .ascension-tree-is-speaking .ascension-knowledgeverse .ascension-tree-character img,
-  .ascension-tree-is-speaking .tree-carousel-art {
+  .ascension-tree-is-speaking .tree-carousel-art,
+  .ascension-tree-is-speaking .ascension-tree-scene {
     animation: ascension-tree-speaking-light 1.7s ease-in-out infinite;
   }
 }

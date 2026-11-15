@@ -33,20 +33,21 @@ export function interpretVoiceCommand(transcript: string): VoiceCommand | null {
   return exact(/^(?:business planner|business)$/, { kind: "section", section: "business" })
     ?? exact(/^(?:build(?: \/ create)?|create|build create)$/, { kind: "section", section: "build" })
     ?? exact(/^guidance$/, { kind: "section", section: "guidance" })
-    ?? exact(/^(?:engage|engage ascension)$/, { kind: "engage" })
+    ?? exact(/^(?:engage|engage ascension|show the pathways|show me the pathways)$/, { kind: "engage" })
     ?? exact(/^(?:next|next pathway|next orb)$/, { kind: "next" })
     ?? exact(/^(?:previous|previous pathway|previous orb|last orb)$/, { kind: "previous" })
-    ?? exact(/^(?:enter|enter pathway|open pathway|go inside|go in)$/, { kind: "enter" })
+    ?? exact(/^(?:enter|enter pathway|open pathway|go inside|go in|take this|take it|go with this)$/, { kind: "enter" })
     ?? exact(/^(?:back|go back|back to pathways)$/, { kind: "back" })
     ?? exact(/^(?:new objective|start over)$/, { kind: "new-objective" })
-    ?? exact(/^(?:blueprint|show blueprint|open blueprint)$/, { kind: "view", view: "blueprint" })
-    ?? exact(/^(?:dissect|dissect it|open dissect|show dissect)$/, { kind: "view", view: "dissect" })
-    ?? exact(/^(?:exploded|explode|exploded view|open exploded)$/, { kind: "view", view: "exploded" })
+    ?? exact(/^(?:blueprint|show blueprint|open blueprint|show the blueprint|show me the blueprint)$/, { kind: "view", view: "blueprint" })
+    ?? exact(/^(?:dissect|dissect it|dissect that|dissect that component|open dissect|show dissect)$/, { kind: "view", view: "dissect" })
+    ?? exact(/^(?:exploded|explode|explode it|explode the assembly|exploded view|open exploded)$/, { kind: "view", view: "exploded" })
     ?? exact(/^(?:implode|imploded|assembled|assemble)$/, { kind: "view", view: "assembled" })
     ?? exact(/^(?:picture|show picture|open picture|show the picture|open the picture)$/, { kind: "view", view: "picture" })
     ?? exact(/^(?:try again|try the picture|try this picture again|retry picture)$/, { kind: "retry-picture" })
     ?? exact(/^zoom in$/, { kind: "zoom", direction: "in" })
     ?? exact(/^zoom out$/, { kind: "zoom", direction: "out" })
+    ?? exact(/^(?:rotate|rotate it|turn it|spin it)$/, { kind: "rotate", direction: "right" })
     ?? exact(/^rotate left$/, { kind: "rotate", direction: "left" })
     ?? exact(/^rotate right$/, { kind: "rotate", direction: "right" })
     ?? exact(/^(?:reset|reset view)$/, { kind: "reset-view" })
@@ -66,7 +67,10 @@ export function interpretVoiceCommand(transcript: string): VoiceCommand | null {
 
 function hearCommand(text: string): VoiceCommand | null {
   if (/^(?:hear|hear this|hear again|hear this orb)$/.test(text)) return { kind: "hear", target: "active" };
-  if (/^(?:open blend|hear blend|blend|select blend|choose blend)$/.test(text)) return { kind: "hear", target: "blend" };
+  if (/^(?:open blend|hear blend|blend|select blend|choose blend|the blend|blend pathway)$/.test(text)) return { kind: "hear", target: "blend" };
+  if (/^(?:openai|open ai|the openai one|openai pathway|hear openai|select openai)$/.test(text)) return { kind: "hear", target: 0 };
+  if (/^(?:claude|the claude one|claude pathway|hear claude|select claude)$/.test(text)) return { kind: "hear", target: 1 };
+  if (/^(?:grok|the grok one|grok pathway|hear grok|select grok)$/.test(text)) return { kind: "hear", target: 2 };
   const words = text.replace(/^(?:hear|open|select|choose)\s+/, "").replace(/\b(?:the|pathway|orb)\b/g, " ").replace(/\s+/g, " ").trim();
   if (!words || !(words in ORDINALS)) return null;
   return { kind: "hear", target: ORDINALS[words]! };

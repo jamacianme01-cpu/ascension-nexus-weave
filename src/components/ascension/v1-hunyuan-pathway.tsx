@@ -19,7 +19,7 @@ function formatError(reason:unknown){
 }
 
 export function V1HunyuanPathway({
-  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],onPicture,inspectionCommand = null,prompt = null,
+  path,objective,onSpeak,speakingEnabled,modelCache,imageCache,alternatives = [],onPicture,inspectionCommand = null,prompt = null,micListening = false,onMic,
 }:{
   path:Pathway;objective:string;onSpeak:(text:string)=>void; speakingEnabled:boolean;modelCache:Cache;
   imageCache:{current:Map<string,string>};
@@ -27,6 +27,8 @@ export function V1HunyuanPathway({
   onPicture?: (ready: boolean) => void;
   inspectionCommand?: { id: number; command: VoiceCommand } | null;
   prompt?: { id: number; text: string } | null;
+  micListening?: boolean;
+  onMic?: () => void;
 }) {
   // Display the selected design even when its image prompt exceeds the provider
   // budget. The picture endpoint reports that failure inside the viewer.
@@ -309,7 +311,7 @@ export function V1HunyuanPathway({
         aria-label="Hunyuan design description and parts">
         <div className="ascension-tree-in-pathway">
           <TreeGuide objective={objective} introduce portrait pathway={path} alternatives={alternatives} prompt={prompt}
-            enabled={speakingEnabled} onSpeak={onSpeak}
+            enabled={speakingEnabled} onSpeak={onSpeak} micListening={micListening} onMic={onMic}
             focusRevision={partSelection} focusedPart={component===null?null:designParts[component]??null}
             view={inspectModel?mode:"assembled"} locationSource={inspectModel&&meshIndex!==null?"mesh":"unlocated"}
             partLocated={inspectModel&&meshIndex!==null}/>

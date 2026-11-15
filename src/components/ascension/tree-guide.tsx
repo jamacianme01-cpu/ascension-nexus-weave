@@ -27,11 +27,14 @@ type VoiceRecognizer = {
   stop(): void;
 };
 
-export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, portrait = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0, experience = "design", prompt = null }: {
+export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = false, portrait = false, focusedPart = null, view = "assembled", partLocated = false, alternatives = [], introduce = false, locationSource = "unlocated", focusRevision = 0, experience = "design", prompt = null, micListening = false, onMic }: {
   objective: string;
   pathway: GuidePathway;
   enabled: boolean;
   onSpeak: (answer: string) => void;
+  /** When the Tree already owns the microphone, SPEAK uses that listener. */
+  micListening?: boolean;
+  onMic?: () => void;
   compact?: boolean;
   portrait?: boolean;
   focusedPart?: GuidePart | null;
@@ -191,8 +194,8 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   return <div className={"ascension-tree-voice " + (compact ? "ascension-tree-voice-compact" : "")}
     aria-label="Speak with the Tree of Knowledge">
     {portrait && <button type="button" className="ascension-tree-character"
-      aria-label="Speak to the Tree" title="Speak to the Tree" onClick={listen}
-      aria-pressed={listening}>
+      aria-label="Speak to the Tree" title="Speak to the Tree" onClick={onMic ?? listen}
+      aria-pressed={onMic ? micListening : listening}>
       <img src="/approved-scene/ascension-tree-behind-book-hq.jpg"
         alt="Tree of Knowledge" draggable={false}/>
     </button>}
@@ -200,9 +203,9 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       <input type="text" aria-label="Ask the Tree" value={question} maxLength={800}
         onChange={event => setQuestion(event.target.value)}
         placeholder="Ask the Tree" disabled={thinking}/>
-      {!portrait && <button type="button" onClick={listen} aria-pressed={listening}
-        aria-label={listening ? "Stop speaking to the Tree" : "Speak to the Tree"}>
-        {listening ? "STOP" : "SPEAK"}
+      {!portrait && <button type="button" onClick={onMic ?? listen} aria-pressed={onMic ? micListening : listening}
+        aria-label={(onMic ? micListening : listening) ? "Stop speaking to the Tree" : "Speak to the Tree"}>
+        {(onMic ? micListening : listening) ? "STOP" : "SPEAK"}
       </button>}
       <button type="submit" disabled={!question.trim() || thinking}>
         {thinking ? "CONNECTING…" : "ASK"}

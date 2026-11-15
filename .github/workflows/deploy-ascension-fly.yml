@@ -6,6 +6,7 @@ on:
     paths:
       - fly.toml
       - Dockerfile
+      - .dockerignore
       - .github/workflows/deploy-ascension-fly.yml
   workflow_dispatch:
 

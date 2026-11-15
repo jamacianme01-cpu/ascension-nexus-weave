@@ -7,12 +7,16 @@ app = 'ascension-nexus-weave'
 primary_region = 'ams'
 
 [build]
+  dockerfile = "Dockerfile"
 
 [env]
   PORT = '8080'
   NITRO_PORT = '8080'
   HOST = '0.0.0.0'
   NITRO_HOST = '0.0.0.0'
+
+[processes]
+  app = "bun /app/.output/server/index.mjs"
 
 [http_service]
   internal_port = 8080

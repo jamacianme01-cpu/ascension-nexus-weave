@@ -1,0 +1,44 @@
+name: Deploy ASCENSION to Fly.io
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - fly.toml
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/deploy-ascension-fly.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ascension-fly-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Verify existing Fly.io authorization
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::FLY_API_TOKEN is not configured in GitHub Actions. No deployment was attempted."
+            exit 1
+          fi
+      - name: Deploy the existing ASCENSION app
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml
+      - name: Check Fly app status
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl status --app ascension-nexus-weave
+      - name: Check deployed web server
+        run: curl --fail --show-error --silent --retry 5 --retry-delay 10 --retry-all-errors https://ascension-nexus-weave.fly.dev/api/health

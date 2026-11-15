@@ -6,6 +6,11 @@
 app = 'ascension-nexus-weave'
 primary_region = 'ams'
 
+[env]
+  PORT = '8080'
+  NITRO_PORT = '8080'
+  NITRO_HOST = '0.0.0.0'
+
 [build]
 [http_service]
   internal_port = 8080

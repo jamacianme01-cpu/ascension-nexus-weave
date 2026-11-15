@@ -41,6 +41,10 @@ FROM base
 # Copy built application
 COPY --from=build /app /app
 
-# Start the server by default, this can be overwritten at runtime
-EXPOSE 3000
+# Fly routes to this port. Nitro listens on PORT and binds HOST.
+ENV PORT=8080
+ENV NITRO_PORT=8080
+ENV HOST=0.0.0.0
+ENV NITRO_HOST=0.0.0.0
+EXPOSE 8080
 CMD [ "bun", ".output/server/index.mjs" ]

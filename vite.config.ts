@@ -10,8 +10,8 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   server: {
-    port: Number(process.env["PORT"]) || 3000,
-    host: true,
+    port: Number(process.env["PORT"]) || 8080,
+    host: "0.0.0.0",
   },
   resolve: {
     alias: {

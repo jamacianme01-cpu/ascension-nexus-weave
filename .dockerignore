@@ -1,3 +1,9 @@
+# Keep Git metadata and local credentials out of the Fly.io container.
+.git/
+.env
+.env.*
+!.env.example
+
 # Logs
 logs
 *.log

@@ -49,3 +49,17 @@ This section preserves the owner's latest corrections. No checklist items are ap
 > I want my fucking app built like the fuck I said. I want the tree in the book. Don't type nothing in. You talk to the tree. It's interactive. That's the whole why the thing. You talk to it. It brings up the four pathways. Chat GGP, Grok, Claude, and my engine. Whatever one is best suited for that question, it takes lead. My motherfucking engines take the motherfucking answer and make their own answer. The fourth one is a blend. That when you click, when you say which one you want, it opens up to that page, to that picture. You can implode and explode, dissect it, get the descriptions all by voice
 
 Do not interpret this quote as an instruction to add separate voice commands for ChatGPT, Claude, or Grok. The four displayed pathways remain three model contributions and BLEND. The owner approval checkboxes remain unchecked.
+
+## Owner-confirmed V1 design lock — November 16, 2026
+
+Owner explicitly said: “Now lock that design in” and “Save it.” Preserve the following design as the V1 target. This is a design lock, NOT a claim that the app is implemented, tested, deployed, or approved as working; keep all implementation/owner-acceptance checkboxes unchecked.
+
+- The original Tree and Book belong together as one interactive voice-driven app. No typed objective or Tree question fields. The person talks to the Tree; she speaks back and stays as the guide throughout the experience.
+- A spoken objective is processed by ASCENSION: ChatGPT, Grok and Claude contribute. In the owner's exact words: “Whatever one is best suited for that question, it takes lead.” ASCENSION's own engines analyze the contributions and make their own answer as internal processing, not as an additional displayed pathway.
+- Display exactly four selectable pathways: ChatGPT, Grok, Claude and BLEND. Do not create a fifth pathway. The person can choose a pathway by voice. No invention pictures inside the selection orbs.
+- Only after the person selects/enters a pathway does that pathway's own design picture and inspection experience open. The Tree remains present and interactive.
+- Through the Tree's voice guidance, the person can inspect the selected design with Blueprint (real dimensions only; unknown measurements remain unresolved), Dissect, Exploded/Imploded, zoom, rotation, and component manipulation where supported. Component descriptions stay in a side list, not on top of the picture; the Tree explains what each part is, where it belongs and what it does.
+- BUILD ON RESULT continues refining the selected design without replacing it or restarting from scratch.
+- Memory is explicitly required for V1. The owner's exact words: “It supposed to have memory too” and “And it still had memory, too.” Persistence scope is not yet specified or verified; do not mark memory implemented.
+- Keep V1 focused on letting people experience what ASCENSION can do before later capabilities are added. Do not add unrequested CAD/editor, simulation, extra screens, pathways, platform overlays, or other V2 functionality. Do not silently substitute an older category-screen sequence for this owner-confirmed Tree-and-Book voice opening.
+- Preserve the existing governed underlying architecture and the old-computer brain requirement. No edits to the published application or main branch are authorized by this design lock.

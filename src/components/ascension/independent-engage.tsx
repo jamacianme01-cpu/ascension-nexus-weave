@@ -383,10 +383,6 @@ export function IndependentEngage() {
     setOrbit(index);setOrbPreview(index);setTalking(true);setVoiceNotice("");
     void say(spokenPreview(path),()=>setVoiceNotice(""),setVoiceNotice);
   }
-  function pathwayByName(target: "chatgpt" | "claude" | "grok" | "blend") {
-    if (target === "blend") return choices.length - 1;
-    return choices.findIndex(path => path.provider?.toLowerCase() === (target === "chatgpt" ? "openai" : target));
-  }
   function openSelectedPathway(index: number) {
     if (!choices[index]) return;
     stopVoice();
@@ -401,21 +397,16 @@ export function IndependentEngage() {
       if (screen === "book") { speak("Say Business Planner, Build, or Guidance."); return; }
       if (screen === "objective") {
         setObjective(text.slice(0, 2400));
-        if (!/^(what|why|how|when|who|where|which|can|could|would|should)\b/i.test(text)) {
-          void engage(text);
-          return;
-        }
+        if (text.trim().length >= 3) { void engage(text); return; }
       }
       voiceSerial.current += 1;
       setVoicePrompt({ id: voiceSerial.current, text: text.slice(0, 800) });
       return;
     }
     if (command.kind === "section") { enterCategory(command.section); return; }
-    if (command.kind === "open-named") {
-      if (!result || choice !== null) { speak("Choose a pathway from the Tree first."); return; }
-      const index = pathwayByName(command.target);
-      if (index < 0) { speak(command.target + " is not connected as a pathway."); return; }
-      openSelectedPathway(index);
+    if (command.kind === "enter-index") {
+      if (!result || choice !== null || !choices[command.index]) { speak("That pathway is not on screen."); return; }
+      openSelectedPathway(command.index);
       return;
     }
     if (command.kind === "build-on-result") {
@@ -443,9 +434,9 @@ export function IndependentEngage() {
     }
     if (command.kind === "hear") {
       if (!result || choice !== null || choices.length === 0) { speak("Pathways are not on screen."); return; }
-      const index = command.target === "active" ? orbit % choices.length
-        : typeof command.target === "number" ? command.target
-        : pathwayByName(command.target);
+      const index = command.target === "blend" ? choices.length - 1
+        : command.target === "active" ? orbit % choices.length
+        : command.target;
       if (index < 0 || index >= choices.length) { speak("That pathway is not on screen."); return; }
       hearPathway(index);
       return;

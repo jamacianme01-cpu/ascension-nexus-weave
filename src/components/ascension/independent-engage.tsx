@@ -189,10 +189,20 @@ export function IndependentEngage() {
       recognition.current?.stop();
       return;
     }
-    if (categoryRef.current) {
-      objectiveRef.current = spoken.slice(0, 2400);
-      setObjective(objectiveRef.current);
+    // An entire spoken Build objective may be the first thing the Tree hears.
+    // Preserve every word of it while entering the existing Build / Create path.
+    if (!categoryRef.current && /^(build|make|design|create|invent|prototype)\s+\S/i.test(spoken))
+      chooseCategory("Build / Create");
+    if (!categoryRef.current) {
+      setVoiceError("Say Business Planner, Build / Create, or Guidance before the objective.");
+      return;
     }
+    objectiveRef.current = spoken.slice(0, 2400);
+    setObjective(objectiveRef.current);
+    recognition.current?.stop();
+    // A spoken objective executes hands-free; the existing button remains
+    // available when speech recognition or a microphone is unavailable.
+    engageRef.current();
   }
 
   function listenForObjective(auto = false) {

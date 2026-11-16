@@ -29,8 +29,8 @@ type ObjectiveSection = "business" | "build" | "guidance";
 type ObjectiveAttachment = { name: string; mime: string; text?: string; data_url?: string };
 const SECTIONS: { id: ObjectiveSection; title: string; lead: string }[] = [
   { id: "business", title: "Business Planner", lead: "Claude" },
-  { id: "build", title: "Build / Create", lead: "OpenAI" },
-  { id: "guidance", title: "Guidance", lead: "Grok" },
+  { id: "build", title: "Build / Create", lead: "Grok" },
+  { id: "guidance", title: "Guidance", lead: "OpenAI" },
 ];
 const ACCEPTED_DOCUMENT = /\.(pdf|docx|txt|md|csv|json)$/i;
 const TEXT_DOCUMENT = /\.(txt|md|csv|json)$/i;
@@ -282,6 +282,12 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       setResult(data);
       setChoice(null);
+      // The Book category selects the preferred first orb; all three providers
+      // still contribute and every one of the four pathways stays selectable.
+      const categoryLead = SECTIONS.find(item => item.id === section)?.lead;
+      const pathways = [...data.pathways, data.blend];
+      const preferredIndex = pathways.findIndex(path => path.provider === categoryLead);
+      setOrbit(preferredIndex >= 0 ? preferredIndex : 0);
       if (talking) say("I have four approaches. Choose one and I can explain it.");
       setStage("idle"); // Restore the unchanged Tree and Book after ENGAGE; no eruption scene.
       // The backend analysis is not read to the user.

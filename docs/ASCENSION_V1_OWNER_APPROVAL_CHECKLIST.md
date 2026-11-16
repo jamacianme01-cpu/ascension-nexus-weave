@@ -3,7 +3,7 @@ Source: user instructions confirmed in conversation, October 28, 2026.
 RULE: Do not mark an item [x] until the owner explicitly approves that item. Implementation and verification are separate from owner approval. Do not infer approval from silence. Do not make unapproved design changes.
 
 ## Approved-design review (all PENDING OWNER APPROVAL)
-- [ ] Original Tree and Book stay; preserve artwork and opening experience.
+- [x] Original Tree and Book stay; preserve artwork and opening experience. (Owner confirmed seeing the original Tree and Book together on November 16, 2026; this marks only the observed visual item.)
 - [ ] Main screen: “What do you want to accomplish?” and ENGAGE ASCENSION.
 - [ ] Tree voice and natural interactive guidance throughout the experience; preserve preferred voice.
 - [ ] Keep adventure picture-book experience.
@@ -62,4 +62,4 @@ Owner explicitly said: “Now lock that design in” and “Save it.” Preserve
 - BUILD ON RESULT continues refining the selected design without replacing it or restarting from scratch.
 - Memory is explicitly required for V1. The owner's exact words: “It supposed to have memory too” and “And it still had memory, too.” Persistence scope is not yet specified or verified; do not mark memory implemented.
 - Keep V1 focused on letting people experience what ASCENSION can do before later capabilities are added. Do not add unrequested CAD/editor, simulation, extra screens, pathways, platform overlays, or other V2 functionality. Do not silently substitute an older category-screen sequence for this owner-confirmed Tree-and-Book voice opening.
-- Preserve the existing governed underlying architecture and the old-computer brain requirement. No edits to the published application or main branch are authorized by this design lock.
+- Preserve the existing governed underlying architecture. No edits to the published application or main branch are authorized by this design lock.

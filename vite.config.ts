@@ -9,7 +9,7 @@ import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   server: {
     port: Number(process.env["PORT"]) || 8080,
     host: "0.0.0.0",
@@ -23,7 +23,9 @@ export default defineConfig({
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),
     tanstackStart(),
-    nitro({ preset: "bun" }),
+    // Nitro replaces the dev SSR environment, which the interface tests load
+    // through ssrLoadModule. The production build still emits the server file.
+    command === "build" ? nitro({ preset: "bun" }) : null,
     viteReact(),
   ],
-});
+}));

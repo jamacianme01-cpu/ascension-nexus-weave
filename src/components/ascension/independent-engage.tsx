@@ -271,110 +271,108 @@ export function IndependentEngage() {
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
+    if (governedWatch.current) clearInterval(governedWatch.current);
+    governedWatch.current = null;
     setLoading(true);
     setError("");
     setResult(null);
     setInternalKnowledge("");
     setGovernedStatus("");
-    if (governedWatch.current) clearInterval(governedWatch.current);
-    governedWatch.current = null;
     setScreen(null);
     setChoice(0);
-    offer("I'm with you. I'll read this and bring back a few ways it could come together.");
     try {
-      const initial = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "initial" }),
-        signal: controller.signal,
-      });
-      const first: { answer?: string; error?: string; contributor?: string; governed_runtime_invoked?: boolean } = await initial.json();
-      if (!initial.ok) throw new Error(first.error || "The reading didn't finish.");
-      if (!first.answer?.trim()) throw new Error("The reading didn't finish.");
+      // The real governed submission MUST NOT depend on knowledge retrieval.
+      // Previously a failed lookup stopped ENGAGE before the runtime saw the objective.
+      const submitted = await submitGuestObjective({ data: { objective: text } });
       if (generation.current !== token) return;
-      if (first.contributor === "ASCENSION_KNOWLEDGE_RETRIEVAL") {
-        // Internal publication is evidence, not newly executed pathways.
-        // Do not fetch the paid-provider pathway route or fabricate four choices.
-        setInternalKnowledge(first.answer);
-        // Use the existing guest-token authorized submission, never a public
-        // unauthenticated queue write. Only the owner's governed runtime can
-        // claim, execute and publish Guardian/AutoSync results.
+      const requestId = submitted.request.id;
+      const guestToken = submitted.guestToken;
+      setGovernedStatus("ASCENSION governed queue: " + submitted.request.status);
+
+      // Show existing Knowledgeverse evidence when available; its failure never
+      // blocks execution, and this phase never invokes a paid model.
+      void (async () => {
         try {
-          const submitted = await submitGuestObjective({ data: { objective: text } });
+          const response = await fetch("/api/public/ascension/independent", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "knowledge" }),
+            signal: controller.signal,
+          });
+          if (!response.ok) return;
+          const first: { contributor?: string; answer?: string } = await response.json();
+          if (generation.current === token && first.contributor === "ASCENSION_KNOWLEDGE_RETRIEVAL" && first.answer)
+            setInternalKnowledge(first.answer);
+        } catch { /* Knowledge retrieval is informational, never an execution gate. */ }
+      })();
+
+      let terminal = false;
+      let polling = false;
+      let failures = 0;
+      const poll = async () => {
+        if (generation.current !== token || terminal || polling) return;
+        polling = true;
+        try {
+          const state = await getGuestObjectiveStatus({ data: { requestId, guestToken } });
           if (generation.current !== token) return;
-          const requestId = submitted.request.id;
-          const guestToken = submitted.guestToken;
-          setGovernedStatus("ASCENSION objective submitted to the governed queue. Status: " + submitted.request.status);
-          offer("I found your recorded knowledge and submitted the objective to ASCENSION's governed runtime.");
-          let terminal = false;
-          const poll = async () => {
+          const run = state.request;
+          if (!run) {
+            setError("ENGAGE: the governed queue did not return this objective's status.");
+            return;
+          }
+          failures = 0;
+          if (run.status === "verified") {
+            // Status VERIFIED is not a delivered pathway. Keep polling the actual
+            // authorized delivery until it is ready; PR 63 checked only once.
+            const delivered = await getGuestObjectiveDelivery({ data: { requestId, guestToken } });
             if (generation.current !== token) return;
-            try {
-              const response = await getGuestObjectiveStatus({ data: { requestId, guestToken } });
-              if (generation.current !== token) return;
-              const run = response.request;
-              if (!run) { setGovernedStatus("Governed submission status unavailable."); return; }
-              const stage = run.stage ? " · " + run.stage : "";
-              setGovernedStatus("ASCENSION governed runtime: " + run.status + stage +
-                (run.error ? " · " + run.error.slice(0, 200) : ""));
-              if (["verified", "failed", "rejected"].includes(run.status)) {
-                terminal = true;
-                if (governedWatch.current) clearInterval(governedWatch.current);
-                governedWatch.current = null;
-                if (run.status === "verified") {
-                  try {
-                    const delivered = await getGuestObjectiveDelivery({ data: { requestId, guestToken } });
-                    if (generation.current !== token) return;
-                    const payload = delivered?.status === "completed" ? delivered.response_payload : null;
-                    const actual = payload ? fromGovernedDelivery(payload) : null;
-                    if (actual) {
-                      setResult(actual);
-                      setScreen("spiral");
-                      setGovernedStatus("ASCENSION delivered three pathways and BLEND.");
-                      offer(guideFor(actual));
-                    } else {
-                      setGovernedStatus("ASCENSION verified this objective but its complete pathways and BLEND were not delivered. " +
-                        (delivered?.error || delivered?.status || "Delivery unavailable"));
-                    }
-                  } catch (cause) {
-                    setGovernedStatus("ASCENSION verified this objective but pathway delivery failed: " +
-                      (cause instanceof Error ? cause.message : String(cause)).slice(0, 280));
-                  }
-                }
-              }
-            } catch {
-              if (generation.current === token) setGovernedStatus("Governed runtime status currently unavailable.");
+            const payload = delivered?.status === "completed" ? delivered.response_payload : null;
+            const actual = payload && delivered?.source === "governed" ? fromGovernedDelivery(payload) : null;
+            if (actual) {
+              setResult(actual);
+              setScreen("spiral");
+              setGovernedStatus("ASCENSION delivered three pathways and BLEND.");
+              offer(guideFor(actual));
+              terminal = true;
+              return;
             }
-          };
-          await poll();
-          if (generation.current === token && !terminal && governedWatch.current === null) {
-            governedWatch.current = setInterval(() => { void poll(); }, 3500);
+            if (delivered?.status === "completed") {
+              const reason = delivered.source === "external_draft"
+                ? "Only an external draft was returned, not the required governed pathways."
+                : delivered.error || "The governed result contains no complete set of three pathways and BLEND.";
+              setError("ENGAGE delivery incomplete: " + reason.slice(0, 350));
+              terminal = true;
+              return;
+            }
+            setGovernedStatus("ASCENSION verified the objective. Waiting for its pathway delivery." +
+              (delivered?.note ? " " + delivered.note.slice(0, 180) : ""));
+            return;
           }
+          if (run.status === "failed" || run.status === "rejected") {
+            setError("ASCENSION governed execution " + run.status + ": " +
+              (run.error || "The runtime did not provide an error message.").slice(0, 350));
+            terminal = true;
+            return;
+          }
+          setGovernedStatus("ASCENSION governed runtime: " + run.status +
+            (run.stage ? " · " + run.stage : ""));
         } catch (cause) {
-          if (generation.current === token) {
-            setGovernedStatus("Governed submission unavailable: " +
-              (cause instanceof Error ? cause.message : "The guest queue could not accept this objective."));
-          }
+          failures += 1;
+          const message = cause instanceof Error ? cause.message : String(cause);
+          setError("ASCENSION runtime connection: " + message.slice(0, 350));
+          if (failures >= 3) terminal = true;
+        } finally {
+          polling = false;
+          if (terminal && governedWatch.current) clearInterval(governedWatch.current);
+          if (terminal) governedWatch.current = null;
         }
-        return;
-      }
-      const pathways = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
-        signal: controller.signal,
-      });
-      const data: Result & { error?: string } = await pathways.json();
-      if (!pathways.ok) throw new Error(data.error || "The pathways didn't finish.");
-      if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend?.title)
-        throw new Error("The pathways didn't finish.");
-      if (generation.current !== token) return;
-      setResult(data);
-      setScreen("spiral");
-      offer(guideFor(data));
+      };
+      await poll();
+      if (generation.current === token && !terminal && governedWatch.current === null)
+        governedWatch.current = setInterval(() => { void poll(); }, 3500);
     } catch (cause) {
-      if (!controller.signal.aborted && generation.current === token) {
+      if (generation.current === token) {
         const message = cause instanceof Error ? cause.message : String(cause);
-        setError("ENGAGE failed: " + message.slice(0, 350));
-        offer("ENGAGE did not finish. The actual error is displayed on the Book.");
+        setError("ENGAGE submission failed: " + message.slice(0, 350));
       }
     } finally {
       if (generation.current === token) setLoading(false);

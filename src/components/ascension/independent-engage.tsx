@@ -74,7 +74,6 @@ async function readObjectiveFile(file: File): Promise<ObjectiveAttachment> {
   return { name, mime, data_url: "data:" + mime + ";base64," + encoded };
 }
 
-const BOOK_SCENE = "/approved-scene/01-closed-book.jpg";
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 const GREETING = "Welcome to ASCENSION. What are we working on today?";
 type VoiceHeard = { transcript?: string };
@@ -206,14 +205,13 @@ export function IndependentEngage() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [pathwayError, setPathwayError] = useState("");
-  const [refinement, setRefinement] = useState("");
   const [choice, setChoice] = useState<number | null>(null);
   const [orbit, setOrbit] = useState(0);
   const [orbPreview,setOrbPreview]=useState<number|null>(null);
   const [stage, setStage] = useState<"idle" | "processing" | "eruption">("idle");
   const [talking, setTalking] = useState(true);
   const [voiceNotice, setVoiceNotice] = useState("");
-  const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
   const [voicePrompt, setVoicePrompt] = useState<{ id: number; text: string } | null>(null);
   const [inspectionCommand, setInspectionCommand] = useState<{ id: number; command: VoiceCommand } | null>(null);
   const voiceSerial = useRef(0);
@@ -227,6 +225,7 @@ export function IndependentEngage() {
   const continuationContext = useRef("");
   const modelCache = useRef(new Map<string, ArrayBuffer>());
   const imageCache = useRef(new Map<string, string>());
+  useEffect(() => { say(GREETING); }, []);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
 
   function enterCategory(id: ObjectiveSection) {
@@ -314,7 +313,7 @@ export function IndependentEngage() {
     setError("");
     setPathwayError("");
     setResult(null);
-    setRefinement("");
+    
     setChoice(null);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
     setStage("processing");
     // ENGAGE is a user action, not a cue for unsolicited voice narration.
@@ -367,7 +366,7 @@ export function IndependentEngage() {
     setObjective(""); setRequested(""); setError(""); setResult(null);
     continuationContext.current = "";
     setSection(null); setEnteredTree(false); setAttachments([]); setAttachmentError("");
-    setRefinement(""); setPathwayError(""); setLoading(false);
+     setPathwayError(""); setLoading(false);
     setStage("idle"); setChoice(null);setOrbit(0);setOrbPreview(null);setDesignPicture(false);setDesignSettled(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -384,18 +383,46 @@ export function IndependentEngage() {
     setOrbit(index);setOrbPreview(index);setTalking(true);setVoiceNotice("");
     void say(spokenPreview(path),()=>setVoiceNotice(""),setVoiceNotice);
   }
+  function pathwayByName(target: "chatgpt" | "claude" | "grok" | "blend") {
+    if (target === "blend") return choices.length - 1;
+    return choices.findIndex(path => path.provider?.toLowerCase() === (target === "chatgpt" ? "openai" : target));
+  }
+  function openSelectedPathway(index: number) {
+    if (!choices[index]) return;
+    stopVoice();
+    setOrbit(index); setOrbPreview(null); setDesignPicture(false); setDesignSettled(false);
+    setChoice(index);
+  }
   function applyVoice(text: string) {
     const command = interpretVoiceCommand(text);
     const screen = !enteredTree ? "book" : choice !== null ? "design" : result ? "orbs" : "objective";
     const speak = (line: string) => { setVoiceNotice(""); say(line, () => setVoiceNotice(""), setVoiceNotice); };
     if (!command) {
       if (screen === "book") { speak("Say Business Planner, Build, or Guidance."); return; }
-      if (screen === "objective") setObjective(text.slice(0, 2400));
+      if (screen === "objective") {
+        setObjective(text.slice(0, 2400));
+        if (!/^(what|why|how|when|who|where|which|can|could|would|should)\b/i.test(text)) {
+          void engage(text);
+          return;
+        }
+      }
       voiceSerial.current += 1;
       setVoicePrompt({ id: voiceSerial.current, text: text.slice(0, 800) });
       return;
     }
     if (command.kind === "section") { enterCategory(command.section); return; }
+    if (command.kind === "open-named") {
+      if (!result || choice !== null) { speak("Choose a pathway from the Tree first."); return; }
+      const index = pathwayByName(command.target);
+      if (index < 0) { speak(command.target + " is not connected as a pathway."); return; }
+      openSelectedPathway(index);
+      return;
+    }
+    if (command.kind === "build-on-result") {
+      if (!selected) { speak("Open a pathway before building on the result."); return; }
+      buildOn(selected, command.change);
+      return;
+    }
     if (command.kind === "new-objective") { reset(); return; }
     if (command.kind === "engage") {
       if (!enteredTree) { speak("Choose a section first."); return; }
@@ -416,9 +443,9 @@ export function IndependentEngage() {
     }
     if (command.kind === "hear") {
       if (!result || choice !== null || choices.length === 0) { speak("Pathways are not on screen."); return; }
-      const index = command.target === "blend" ? choices.length - 1
-        : command.target === "active" ? orbit % choices.length
-        : command.target;
+      const index = command.target === "active" ? orbit % choices.length
+        : typeof command.target === "number" ? command.target
+        : pathwayByName(command.target);
       if (index < 0 || index >= choices.length) { speak("That pathway is not on screen."); return; }
       hearPathway(index);
       return;
@@ -426,8 +453,7 @@ export function IndependentEngage() {
     if (command.kind === "enter") {
       if (!result || choices.length === 0) { speak("Pathways are not on screen."); return; }
       const index = orbPreview ?? (orbit % choices.length);
-      stopVoice();
-      setDesignPicture(false); setDesignSettled(false); setChoice(index); setRefinement("");
+      openSelectedPathway(index);
       speak("Entering the pathway.");
       return;
     }
@@ -526,7 +552,7 @@ export function IndependentEngage() {
       {voiceOn && <p role="status" className="text-sm text-gold">Listening. Say a pathway, Blueprint, Dissect, or the picture.</p>}
     </div>
     {!enteredTree && <section aria-label="ASCENSION Book entrance" className="ascension-command ascension-book-entry">
-      <img className="ascension-book-art" src={BOOK_SCENE} alt="The ASCENSION Knowledge Book" draggable={false} />
+      <img className="ascension-book-art" src={SCENE} alt="The Tree of Knowledge with the ASCENSION Book" draggable={false} />
       <div className="ascension-book-categories" role="group" aria-label="Choose your ASCENSION section">
         {SECTIONS.map(item => <button key={item.id} type="button" onClick={() => enterCategory(item.id)}>
           {item.title}
@@ -544,12 +570,7 @@ export function IndependentEngage() {
             experience={experience} enabled={talking} onSpeak={text => { if (talking) say(text); }} />
           {voiceNotice && <p role="status" className="ascension-voice-notice">{voiceNotice}</p>}
         </div>
-        <label htmlFor="objective">What do you want to accomplish?</label>
-        <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
-          aria-label="What do you want to accomplish?" placeholder="What do you want to accomplish?"
-          onChange={event => setObjective(event.target.value)}
-          onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !loading) { event.preventDefault(); void engage(); } }}
-        />
+        <p className="sr-only" aria-live="polite">Tell the Tree what you want to accomplish. No typing required.</p>
         <div className="ascension-evidence-tools relative z-10 flex flex-wrap items-center gap-3 text-xs">
           <label className="cursor-pointer rounded-full border border-gold/40 px-4 py-2 text-gold">
             Upload pictures
@@ -612,7 +633,7 @@ export function IndependentEngage() {
       <TreePathwayCarousel designs={choices.map(p => ({
         id: p.id, title: p.provider ? p.provider + " · " + p.title : p.title, summary: p.summary,
       }))} active={orbit % choices.length} onRotate={index=>{stopVoice();setOrbPreview(null);setOrbit(index);}}
-        onOpen={hearPathway} />
+        onOpen={openSelectedPathway} />
       <div className="ascension-pathway-tree-voice">
         <TreeGuide objective={requested || objective} prompt={voicePrompt} pathway={{ title: "Your objective", summary: requested, steps: [], parts: [] }}
           experience={experience} alternatives={choices} enabled={talking} onSpeak={text => { if (talking) say(text); }}/>
@@ -620,7 +641,7 @@ export function IndependentEngage() {
       {previewPath && <div className="flex flex-wrap items-center justify-center gap-3" aria-label="Pathway introduction">
         <button type="button" onClick={()=>hearPathway(orbPreview!)}
           className="rounded-full border border-gold/40 px-4 py-2 text-sm text-gold">HEAR AGAIN</button>
-        <button type="button" onClick={()=>{stopVoice();setDesignPicture(false);setDesignSettled(false);setChoice(orbPreview);setRefinement("");}}
+        <button type="button" onClick={()=>{stopVoice();setDesignPicture(false);setDesignSettled(false);setChoice(orbPreview);}}
           className="rounded-full border border-primary/60 bg-primary/10 px-6 py-3 text-sm text-primary">ENTER PATHWAY</button>
         <details className="w-full text-center text-xs text-foreground/70">
           <summary className="cursor-pointer">Read introduction</summary>
@@ -662,13 +683,8 @@ export function IndependentEngage() {
           </div>}
         </section>}
         <div className="rounded-xl border border-primary/25 p-4">
-          <label htmlFor="pathway-refinement" className="mb-2 block text-sm text-primary">Fine-tune this pathway</label>
-          <textarea id="pathway-refinement" rows={2} maxLength={900} value={refinement}
-            onChange={event => setRefinement(event.target.value)}
-            placeholder="What should ASCENSION change or improve?"
-            className="w-full rounded-lg border border-gold/30 bg-black/30 p-3 text-sm text-foreground" />
-          <button type="button" onClick={() => buildOn(selected, refinement)}
-            className="mt-3 rounded-full border border-primary/50 px-4 py-2 text-sm text-primary">
+          <button type="button" onClick={() => buildOn(selected)}
+            className="rounded-full border border-primary/50 px-4 py-2 text-sm text-primary">
             BUILD ON RESULT
           </button>
         </div>

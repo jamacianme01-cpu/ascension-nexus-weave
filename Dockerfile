@@ -33,15 +33,23 @@ FROM base
 # cannot be dropped on the way into the runtime image.
 COPY --from=build /app /app
 COPY --from=build /app/.output /app/.output
-RUN test -f /app/.output/server/index.mjs
+# The process Fly has been launching is `bun .output/server/index.mjs`.
+# That path is relative to the workdir, which may be /app, /home/bun/app, or /.
+RUN test -f /app/.output/server/index.mjs \
+    && mkdir -p /home/bun/app \
+    && ln -sfn /app/.output /home/bun/app/.output \
+    && ln -sfn /app/.output /.output \
+    && printf '%s\n' '#!/bin/sh' 'exec /usr/local/bin/bun /app/.output/server/index.mjs' > /usr/local/bin/ascension-start \
+    && chmod 755 /usr/local/bin/ascension-start
 
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV NITRO_PORT=8080
 ENV HOST=0.0.0.0
 ENV NITRO_HOST=0.0.0.0
+WORKDIR /app
 EXPOSE 8080
 
-# Bun's image entrypoint rewrites relative commands. Run the server file directly.
-ENTRYPOINT ["/usr/local/bin/bun"]
+# Ignore a relative command appended by the Bun image entrypoint.
+ENTRYPOINT ["/usr/local/bin/ascension-start"]
 CMD ["/app/.output/server/index.mjs"]

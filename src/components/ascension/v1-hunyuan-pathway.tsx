@@ -168,7 +168,7 @@ export function V1HunyuanPathway({
       if(command.view==="picture"){setInspectModel(false);note("Showing the picture.");return;}
       if(command.view==="assembled"){setInspectModel(true);setMode("assembled");note("Assembled view.");return;}
       if(!canInspect){note("That view is not ready yet.");return;}
-      if((command.view==="dissect"||command.view==="exploded")&&designParts.length<2){
+      if((command.view==="dissect"||command.view==="exploded"||command.view==="imploded")&&designParts.length<2){
         note("This design does not have separate parts to dissect.");return;
       }
       changeView(command.view);note("Opening "+command.view+".");return;
@@ -227,7 +227,7 @@ export function V1HunyuanPathway({
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">DISSECT</button>
       <button type="button" aria-pressed={inspectModel&&mode==="exploded"}
         disabled={!canInspect||designParts.length<2}
-        onClick={()=>inspectModel&&mode==="exploded"?changeView("assembled"):changeView("exploded")}
+        onClick={()=>inspectModel&&mode==="exploded"?changeView("imploded"):changeView("exploded")}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">EXPLODED / IMPLODED</button>
       {!bytes&&<button type="button" disabled={localBusy||!picture} onClick={()=>void connectLocal()}
         className="rounded-lg border border-gold/40 px-4 py-2 text-sm text-gold disabled:opacity-40">CONNECT LOCAL 3D</button>}

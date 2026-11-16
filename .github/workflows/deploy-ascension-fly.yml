@@ -3,11 +3,6 @@ name: Deploy ASCENSION to Fly.io
 on:
   push:
     branches: [main]
-    paths:
-      - fly.toml
-      - Dockerfile
-      - .dockerignore
-      - .github/workflows/deploy-ascension-fly.yml
   workflow_dispatch:
 
 permissions:

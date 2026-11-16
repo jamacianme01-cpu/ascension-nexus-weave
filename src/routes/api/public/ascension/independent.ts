@@ -99,8 +99,18 @@ async function grok(objective: string): Promise<Contributor> {
   return { provider: "Grok", answer: text.slice(0, 9000) };
 }
 /** A useful, readable first answer is independent of pathway JSON parsing. */
-async function firstAnswer(objective: string) {
-  if (!configured().OpenAI) throw new Error("OpenAI is not configured for the first answer.");
+async function firstAnswer(objective: string, category: string) {
+  const lead = category === "Business Planner" ? "Claude" : category === "Build / Create" ? "Grok" : "OpenAI";
+  const providers = configured();
+  if (!providers[lead]) throw new Error(lead + " is not configured for the selected Book category.");
+  if (lead === "Claude") {
+    const answer = await claude(objective);
+    return { phase: "initial" as const, answer: answer.answer, contributor: "Claude", verified: false };
+  }
+  if (lead === "Grok") {
+    const answer = await grok(objective);
+    return { phase: "initial" as const, answer: answer.answer, contributor: "Grok", verified: false };
+  }
   const response = await callOpenAIResponse({
     timeoutMs: 26000,
     system: [
@@ -153,7 +163,7 @@ const outputSchema = {
   required: ["introduction", "path_one", "path_two", "path_three", "blend"],
   additionalProperties: false,
 };
-async function build(objective: string, firstAnswerText = "") {
+async function build(objective: string, firstAnswerText = "", category = "Guidance") {
   const providerStatus = configured();
   if (!providerStatus.OpenAI) throw new Error("OpenAI answer provider is not configured on this server. No result was fabricated.");
   const external = await Promise.allSettled([
@@ -182,7 +192,7 @@ async function build(objective: string, firstAnswerText = "") {
       "Provide substance specific to the objective. Do not just describe an app interface or repeat the same concept three times.",
       "If the goal requires physical construction or unavailable capabilities, offer a usable conceptual design and label limits; never claim it was built or simulated.",
     ].join(" "),
-    user: "OBJECTIVE (user wording is authoritative):\n" + objective +
+    user: "BOOK CATEGORY: " + category + "\nOBJECTIVE (user wording is authoritative):\n" + objective +
       (firstAnswerText ? "\nINITIAL USER-FACING ANSWER TO BUILD ON (unverified):\n" + firstAnswerText.slice(0, 9000) : "") +
       (sources.length ? "\nINDEPENDENT MODEL ANSWERS (unverified):\n" + sources.map(s => s.provider + ":\n" + s.answer).join("\n\n") : ""),
   });
@@ -225,15 +235,18 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         if (raw.length > 15000) return json({ error: "Objective too long." }, 413);
         const input = obj(JSON.parse(raw));
         const objective = String(input["objective"] ?? "").trim();
+        const category = String(input["category"] ?? "");
+        if (!["Business Planner", "Build / Create", "Guidance"].includes(category))
+          return json({ error: "Choose a Book category first." }, 400);
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
-        if (input["phase"] === "initial") return json(await firstAnswer(objective));
+        if (input["phase"] === "initial") return json(await firstAnswer(objective, category));
         if (input["phase"] === "picture") {
           if (!limit("image-ip:" + address, 4) || !limit("image-global", 24))
             return json({ error: "Image generation limit reached. No credits charged." }, 429);
           return json(await picture(objective, obj(input["pathway"])));
         }
         const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
-        return json(await build(objective, prior));
+        return json(await build(objective, prior, category));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to generate a response.";
         console.error("[ASCENSION answer] " + message.slice(0, 600));

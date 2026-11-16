@@ -1,18 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callOpenAIResponse } from "@/lib/ascension/engine/openai.server";
+import { retrieveKnowledge } from "@/lib/ascension/engine/knowledge.server";
 
-/** Railway-owned public intake: never calls Supabase or claims governed execution. */
+/** Public ASCENSION intake: stored knowledge retrieval is not governed execution. */
 type Part = { name: string; purpose: string; location: string };
 type Path = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[] };
 type Output = { introduction: string; pathways: Path[]; blend: Path & { blend_reason: string } };
 type Contributor = { provider: "OpenAI" | "Claude" | "Grok"; answer: string };
 const counters = new Map<string, { window: number; count: number }>();
 
+/** Paid external model calls require a separate explicit owner opt-in. */
+function paidApisEnabled() {
+  return process.env["ASCENSION_ENABLE_PAID_APIS"] === "true";
+}
 function configured() {
   return {
-    OpenAI: Boolean(process.env["OPENAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true"),
-    Claude: Boolean(process.env["ANTHROPIC_API_KEY"]?.trim()),
-    Grok: Boolean(process.env["XAI_API_KEY"]?.trim()),
+    OpenAI: paidApisEnabled() && Boolean(process.env["OPENAI_API_KEY"]?.trim() && process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true"),
+    Claude: paidApisEnabled() && Boolean(process.env["ANTHROPIC_API_KEY"]?.trim()),
+    Grok: paidApisEnabled() && Boolean(process.env["XAI_API_KEY"]?.trim()),
   };
 }
 function json(value: unknown, status = 200): Response {
@@ -97,6 +102,27 @@ async function grok(objective: string): Promise<Contributor> {
   const text = String(obj(first["message"])["content"] ?? "").trim();
   if (!text) throw new Error("Grok returned no answer.");
   return { provider: "Grok", answer: text.slice(0, 9000) };
+}
+/**
+ * Provider-free read of ASCENSION's existing published Meaning Elements,
+ * Knowledgeverse and governed evidence records. No new outcome is fabricated.
+ */
+async function internalFirstAnswer(objective: string) {
+  const result = await retrieveKnowledge(objective, 5);
+  const lines = result.evidence.map((item, index) =>
+    String(index + 1) + ". " + item.record_kind + " [" + item.source_path + "]: " + item.snippet.slice(0, 750));
+  return {
+    phase: "initial" as const,
+    answer: lines.length
+      ? "Related records from ASCENSION's existing Knowledgeverse (not a new engine run):\\n\\n" +
+          lines.join("\\n\\n") +
+          "\\n\\nThe governed runtime must process this objective before new verified pathways can be presented."
+      : "No matching Knowledgeverse records are published for this objective. The governed runtime must process it before new pathways can be presented.",
+    contributor: "ASCENSION_KNOWLEDGE_RETRIEVAL",
+    source_revision: result.source_revision,
+    verified: false,
+    governed_runtime_invoked: false,
+  };
 }
 /** A useful, readable first answer is independent of pathway JSON parsing. */
 async function firstAnswer(objective: string, category: string) {
@@ -220,8 +246,15 @@ async function picture(_objective: string, _value: Record<string, unknown>) {
 
 export const Route = createFileRoute("/api/public/ascension/independent")({
   server: { handlers: {
-    GET: async () => json({ answer_contract_version: "structured-four-20261028", providers: configured(), supabase_required: false,
-      governed_runtime_connected: false, picture_generation_enabled: false, note: "Only configured providers can contribute. No provider or governed verification is invented." }),
+    GET: async () => json({
+      answer_contract_version: "ascension-internal-first-20261116",
+      providers: configured(),
+      paid_apis_enabled: paidApisEnabled(),
+      internal_knowledge_read_enabled: true,
+      governed_runtime_connected: false,
+      picture_generation_enabled: false,
+      note: "Stored Knowledgeverse retrieval is available when its published source is connected; governed execution requires a claimed run in the existing secured execution queue.",
+    }),
     POST: async ({ request }) => {
       const origin = request.headers.get("origin");
       const fetchSite = request.headers.get("sec-fetch-site");
@@ -239,11 +272,25 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         if (!["Business Planner", "Build / Create", "Guidance"].includes(category))
           return json({ error: "Choose a Book category first." }, 400);
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
-        if (input["phase"] === "initial") return json(await firstAnswer(objective, category));
+        if (input["phase"] === "initial")
+          return json(paidApisEnabled()
+            ? await firstAnswer(objective, category)
+            : await internalFirstAnswer(objective));
         if (input["phase"] === "picture") {
           if (!limit("image-ip:" + address, 4) || !limit("image-global", 24))
             return json({ error: "Image generation limit reached. No credits charged." }, 429);
           return json(await picture(objective, obj(input["pathway"])));
+        }
+        if (!paidApisEnabled()) {
+          // The public route cannot invent Guardian, Spiral or AutoSync output.
+          // Governed objective submissions belong to the existing secured
+          // /api/public/ascension/execution-queue protocol, never a public
+          // unauthenticated insert or a forged "verified" response.
+          return json({
+            error: "Knowledgeverse retrieval completed. New pathways require an actual governed ASCENSION runtime run through the secured execution queue. No paid APIs were called.",
+            governed_runtime_connected: false,
+            paid_apis_enabled: false,
+          }, 503);
         }
         const prior = typeof input["firstAnswer"] === "string" ? input["firstAnswer"].slice(0, 9000) : "";
         return json(await build(objective, prior, category));

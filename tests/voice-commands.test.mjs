@@ -43,6 +43,12 @@ const entry = readFileSync(new URL("../src/components/ascension/independent-enga
 assert.doesNotMatch(entry, /<textarea id="objective"/);
 assert.doesNotMatch(entry, /pathwayByName|open-named/);
 assert.match(entry, /onOpen=\{openSelectedPathway\}/);
+assert.match(entry, /\{ id: "business", title: "Business Planner", lead: "Claude" \}/);
+assert.match(entry, /\{ id: "build", title: "Build \/ Create", lead: "Grok" \}/);
+assert.match(entry, /\{ id: "guidance", title: "Guidance", lead: "OpenAI" \}/);
+assert.match(entry, /const preferredIndex = pathways\.findIndex\(path => path\.provider === categoryLead\)/);
+assert.match(entry, /setOrbit\(preferredIndex >= 0 \? preferredIndex : 0\)/);
+
 const server = readFileSync(new URL("../src/routes/api/public/ascension/independent.ts", import.meta.url), "utf8");
 assert.doesNotMatch(server, /const lead = section ===/);
 assert.match(server, /lead_provider/);

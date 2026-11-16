@@ -4,8 +4,8 @@ export type VoiceCommand =
   | { kind: "engage" }
   | { kind: "next" }
   | { kind: "previous" }
-  | { kind: "hear"; target: number | "blend" | "active" | "chatgpt" | "claude" | "grok" }
-  | { kind: "open-named"; target: "chatgpt" | "claude" | "grok" | "blend" }
+  | { kind: "hear"; target: number | "blend" | "active" }
+  | { kind: "enter-index"; index: number }
   | { kind: "build-on-result"; change: string }
   | { kind: "enter" }
   | { kind: "back" }
@@ -64,29 +64,19 @@ export function interpretVoiceCommand(transcript: string): VoiceCommand | null {
     ?? exact(/^move right$/, { kind: "move", direction: "right" })
     ?? exact(/^move up$/, { kind: "move", direction: "up" })
     ?? exact(/^move down$/, { kind: "move", direction: "down" })
-    ?? openNamedCommand(text)
+    ?? chosenPathway(text)
     ?? hearCommand(text)
     ?? partCommand(text);
 }
 
-function namedProvider(name: string): "chatgpt" | "claude" | "grok" | "blend" | null {
-  const normalized = name.replace(/\s+/g, "");
-  if (normalized === "chatgpt" || normalized === "openai") return "chatgpt";
-  if (normalized === "claude" || normalized === "grok" || normalized === "blend") return normalized;
-  return null;
-}
-
-function openNamedCommand(text: string): VoiceCommand | null {
-  const match = text.match(/^(?:(?:open|choose|select|enter)\s+)?(?:the\s+)?(chat\s*gpt|openai|grok|claude|blend)(?:\s+pathway)?$/);
-  const target = match ? namedProvider(match[1]!) : null;
-  return target ? { kind: "open-named", target } : null;
+function chosenPathway(text: string): VoiceCommand | null {
+  const match = text.match(/^(?:open|choose|select|enter|go to)\s+(?:the\s+)?(first|one|1|second|two|2|third|three|3|fourth|four|4)\s*(?:pathway|orb|one)?$/);
+  return match && match[1]! in ORDINALS ? { kind: "enter-index", index: ORDINALS[match[1]!]! } : null;
 }
 
 function hearCommand(text: string): VoiceCommand | null {
   if (/^(?:hear|hear this|hear again|hear this orb)$/.test(text)) return { kind: "hear", target: "active" };
-  const named = text.match(/^hear (?:the )?(chat\s*gpt|openai|grok|claude|blend)(?: pathway)?$/);
-  const target = named ? namedProvider(named[1]!) : null;
-  if (target) return { kind: "hear", target };
+  if (/^(?:hear blend|hear the blend)$/.test(text)) return { kind: "hear", target: "blend" };
   const words = text.replace(/^(?:hear|open|select|choose)\s+/, "").replace(/\b(?:the|pathway|orb)\b/g, " ").replace(/\s+/g, " ").trim();
   if (!words || !(words in ORDINALS)) return null;
   return { kind: "hear", target: ORDINALS[words]! };
@@ -105,7 +95,7 @@ export function voiceCommandSpeech(command: VoiceCommand): string {
     : command.kind === "next" ? "Next pathway."
     : command.kind === "previous" ? "Previous pathway."
     : command.kind === "hear" ? "Hearing that pathway."
-    : command.kind === "open-named" ? "Opening " + command.target + "."
+    : command.kind === "enter-index" ? "Opening the selected pathway."
     : command.kind === "build-on-result" ? "Building on the selected result."
     : command.kind === "enter" ? "Entering the pathway."
     : command.kind === "back" ? "Back to the pathways."

@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-export type HunyuanMode = "assembled" | "blueprint" | "dissect" | "exploded";
+export type HunyuanMode = "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
 export type MeshPart = { name: string; meshIndex: number };
 type Props = {
   bytes: ArrayBuffer;
@@ -221,10 +221,12 @@ export function V1HunyuanWorkbench({
     if(host.current)host.current.dataset["mode"]=mode;
     const st=live.current;if(!st?.meshes.length)return;
     const blueprint=mode==="blueprint",explode=mode==="exploded" && st.meshes.length>1;
+    const implode=mode==="imploded" && st.meshes.length>1;
+    const starts=implode?st.meshes.map(record=>record.mesh.position.clone()):[];
     st.scene.background=new THREE.Color(blueprint?"#06223a":"#051727");
     st.meshes.forEach((record,i)=>{
       const mesh=record.mesh;
-      mesh.position.copy(record.originalPosition);
+      if(!implode)mesh.position.copy(record.originalPosition);
       mesh.material=record.originalMaterials;
       if(blueprint)mesh.material=record.blueprintMaterials;
       if(i===selected)mesh.material=record.highlightMaterial;
@@ -237,6 +239,20 @@ export function V1HunyuanWorkbench({
         mesh.position.copy(mesh.parent!.worldToLocal(origin.add(offset)));
       }
     });
+    if(implode){
+      const start=performance.now();
+      let frame=0;
+      const draw=(now:number)=>{
+        const fraction=Math.min(1,(now-start)/600);
+        const eased=1-Math.pow(1-fraction,3);
+        st.meshes.forEach((record,i)=>{
+          record.mesh.position.copy(starts[i]!).lerp(record.originalPosition,eased);
+        });
+        if(fraction<1)frame=window.requestAnimationFrame(draw);
+      };
+      frame=window.requestAnimationFrame(draw);
+      return ()=>window.cancelAnimationFrame(frame);
+    }
   },[mode,bytes,revision,selected]);
 
   useEffect(()=>{

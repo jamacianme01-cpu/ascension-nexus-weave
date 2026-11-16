@@ -1,14 +1,18 @@
+/**
+ * Fail-closed compatibility boundary for legacy authenticated server functions.
+ *
+ * ASCENSION V1 has no third-party authentication client. An authenticated
+ * route must never silently become public just because that provider was
+ * removed. Keep the old function exports linkable while an owner-controlled
+ * authentication replacement is developed separately.
+ */
 import { createMiddleware } from "@tanstack/react-start";
 
-function authenticatedRoutesConfigured(): boolean {
-  return false;
-}
-
-/** Authenticated server functions stay gated. This build has no Supabase session. */
-export const requireSupabaseAuth = createMiddleware({ type: "function" }).server(async ({ next }) => {
-  if (!authenticatedRoutesConfigured()) {
-    throw new Error("Authenticated ASCENSION routes are not configured in this build.");
+export const requireSupabaseAuth = createMiddleware({ type: "function" }).server(
+  async () => {
+    throw new Error(
+      "Authenticated legacy operations are unavailable in ASCENSION V1. " +
+      "This operation requires an owner-authorized authentication replacement."
+    );
   }
-  const { supabaseAdmin } = await import("./client.server");
-  return next({ context: { supabase: supabaseAdmin, userId: "" } });
-});
+);

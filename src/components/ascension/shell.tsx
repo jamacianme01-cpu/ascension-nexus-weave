@@ -94,7 +94,7 @@ const GLOSSARY: { term: string; gloss: string; source: string }[] = [
   },
 ];
 
-export function Shell({ children }: { children: ReactNode }) {
+export function InspectionShell({ children }: { children: ReactNode }) {
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const glossaryRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -254,4 +254,17 @@ export function Shell({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+/** The owner-approved public V1 surface; inspection code is retained separately. */
+export function Shell({ children }: { children: ReactNode }) {
+  return <div className="void-field relative min-h-screen">
+    <header className="relative z-30 border-b border-gold/25 bg-[#020913]/90 px-5 py-3">
+      <Link to="/" aria-label="ASCENSION home" className="inline-flex items-center gap-3 text-foreground">
+        <span className="alive size-2.5 rounded-full bg-primary photon-glow" aria-hidden="true" />
+        <span className="font-display text-sm tracking-[0.3em]">ASCENSION</span>
+      </Link>
+    </header>
+    <main className="relative mx-auto max-w-7xl px-3 py-4 sm:px-6">{children}</main>
+  </div>;
 }

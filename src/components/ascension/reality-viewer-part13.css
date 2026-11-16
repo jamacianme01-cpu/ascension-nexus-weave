@@ -36,3 +36,14 @@
     left:auto;right:8px;top:auto;bottom:8px;max-height:55px;max-width:230px;
   }
 }
+
+/* ASCENSION V1: the original Tree remains faintly present during inspection.
+   Reuse owner-approved artwork; no emergence, replacement scene or new UI. */
+.reality-screen[data-v1="true"] {
+  background-image:
+    linear-gradient(rgb(3 10 21 / 92%), rgb(3 10 21 / 94%)),
+    url("/approved-scene/ascension-tree-behind-book-hq.jpg");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}

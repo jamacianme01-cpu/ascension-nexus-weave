@@ -87,6 +87,14 @@ export function IndependentEngage() {
   const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [microphone, setMicrophone] = useState<"checking" | "ready" | "unavailable">("checking");
+  const [textBackup, setTextBackup] = useState(false);
+  const [microphonePrompt, setMicrophonePrompt] = useState(false);
+  const objectiveRef = useRef("");
+  const categoryRef = useRef<typeof category>(null);
+  const engageRef = useRef<() => void>(() => {});
+  const listeningRef = useRef(false);
+  const speechAllowedRef = useRef(true);
   const recognition = useRef<{ stop: () => void } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -99,21 +107,88 @@ export function IndependentEngage() {
   const welcomed = useRef(false);
 
   useEffect(() => {
+    categoryRef.current = category;
+  }, [category]);
+  useEffect(() => { objectiveRef.current = objective; }, [objective]);
+  useEffect(() => {
     if (!category || welcomed.current) return;
     welcomed.current = true;
     if (talking) say(WELCOME + " Speak your objective when you are ready.");
   }, [category, talking]);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); recognition.current?.stop(); stopVoice(); }, []);
 
-  function listenForObjective() {
-    if (listening) { recognition.current?.stop(); setListening(false); return; }
+  useEffect(() => {
+    let closed = false;
+    const getMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+    if (!getMedia) {
+      setMicrophone("unavailable");
+      setTextBackup(true);
+      return;
+    }
+    // Request permission at entry. Some browsers require a user gesture;
+    // the explicit browser-access button is retained for those browsers.
+    setMicrophonePrompt(true);
+    void getMedia({ audio: true }).then(stream => {
+      stream.getTracks().forEach(track => track.stop());
+      if (closed) return;
+      setMicrophone("ready");
+      setMicrophonePrompt(false);
+      listenForObjective(true);
+    }).catch(() => {
+      if (closed) return;
+      setMicrophone("unavailable");
+      setTextBackup(true);
+      setMicrophonePrompt(false);
+    });
+    return () => { closed = true; };
+  }, []);
+
+  function chooseCategory(next: "Business Planner" | "Build / Create" | "Guidance") {
+    categoryRef.current = next;
+    setCategory(next);
+    setObjective("");
+    objectiveRef.current = "";
+    setError("");
+  }
+
+  function handleVoice(text: string) {
+    const spoken = text.trim();
+    const normalized = spoken.toLowerCase().replace(/[.,!?]/g, "").trim();
+    if (!spoken) return;
+    if (normalized === "business planner" || normalized === "business") {
+      chooseCategory("Business Planner"); return;
+    }
+    if (normalized === "build create" || normalized === "build" || normalized === "build and create") {
+      chooseCategory("Build / Create"); return;
+    }
+    if (normalized === "guidance") { chooseCategory("Guidance"); return; }
+    if (normalized === "engage" || normalized === "engage ascension") {
+      engageRef.current();
+      return;
+    }
+    if (normalized === "stop" || normalized === "stop listening") {
+      recognition.current?.stop();
+      return;
+    }
+    if (categoryRef.current) {
+      objectiveRef.current = spoken.slice(0, 2400);
+      setObjective(objectiveRef.current);
+    }
+  }
+
+  function listenForObjective(auto = false) {
+    if (listeningRef.current) {
+      if (!auto) { recognition.current?.stop(); listeningRef.current = false; setListening(false); }
+      return;
+    }
     const browser = window as Window & {
       SpeechRecognition?: new () => SpeechRecognitionLike;
       webkitSpeechRecognition?: new () => SpeechRecognitionLike;
     };
     const Recognition = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
     if (!Recognition) {
-      setVoiceError("This browser does not support speech recognition. Use a browser with speech input to speak your objective.");
+      setVoiceError("Speech recognition is unavailable in this browser. Use the text backup.");
+      setTextBackup(true);
       return;
     }
     stopVoice();
@@ -121,15 +196,42 @@ export function IndependentEngage() {
     const listener = new Recognition();
     recognition.current = listener;
     listener.lang = "en-US";
-    listener.continuous = false;
+    listener.continuous = true;
     listener.interimResults = false;
     listener.onresult = event => {
-      const spoken = event.results[0]?.[0]?.transcript?.trim();
-      if (spoken) setObjective(spoken.slice(0, 2400));
+      const latest = Array.from(event.results).at(-1);
+      const spoken = latest?.[0]?.transcript?.trim();
+      if (spoken) handleVoice(spoken);
     };
-    listener.onerror = event => { setVoiceError("Speech recognition: " + event.error); setListening(false); };
-    listener.onend = () => { setListening(false); recognition.current = null; };
-    try { listener.start(); setListening(true); } catch { setVoiceError("Microphone could not start."); setListening(false); }
+    listener.onerror = event => {
+      setVoiceError("Speech recognition: " + event.error);
+      listeningRef.current = false;
+      setListening(false);
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") setTextBackup(true);
+    };
+    listener.onend = () => {
+      listeningRef.current = false;
+      setListening(false);
+      recognition.current = null;
+    };
+    try { listener.start(); listeningRef.current = true; setListening(true); }
+    catch { setVoiceError("Microphone could not start. Use text backup."); setTextBackup(true); setListening(false); }
+  }
+
+  async function requestMicrophone() {
+    const getMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+    if (!getMedia) { setTextBackup(true); return; }
+    try {
+      const stream = await getMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      setMicrophone("ready");
+      setVoiceError("");
+      setTextBackup(false);
+      listenForObjective(true);
+    } catch {
+      setMicrophone("unavailable");
+      setTextBackup(true);
+    }
   }
 
   function offer(text: string) {
@@ -144,8 +246,8 @@ export function IndependentEngage() {
   }
 
   async function engage() {
-    const text = objective.trim();
-    if (!category || text.length < 3 || loading) return;
+    const text = objectiveRef.current.trim();
+    if (!categoryRef.current || text.length < 3 || loading) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -159,7 +261,7 @@ export function IndependentEngage() {
     try {
       const initial = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, category, phase: "initial" }),
+        body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "initial" }),
         signal: controller.signal,
       });
       const first: { answer?: string; error?: string } = await initial.json();
@@ -168,7 +270,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       const pathways = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, category, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
+        body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await pathways.json();
@@ -192,6 +294,8 @@ export function IndependentEngage() {
       if (generation.current === token) setLoading(false);
     }
   }
+
+  engageRef.current = () => { void engage(); };
 
   function stop() {
     generation.current += 1;
@@ -247,14 +351,14 @@ export function IndependentEngage() {
             <div className="flex flex-wrap justify-center gap-4">
               {(["Business Planner", "Build / Create", "Guidance"] as const).map(option =>
                 <button key={option} type="button" className="min-h-16 rounded-xl border border-amber-400/60 bg-black/85 px-6 text-amber-100"
-                  onClick={() => { setCategory(option); setObjective(""); setError(""); }}>{option}</button>
+                  onClick={() => chooseCategory(option)}>{option}</button>
               )}
             </div>
           </div>
         ) : (
           <div className="absolute bottom-[22%] left-1/2 z-20 flex w-[min(90%,38rem)] -translate-x-1/2 flex-col items-center gap-3 text-center">
             <span className="text-sm text-amber-200">{category}</span>
-            <button type="button" onClick={listenForObjective} disabled={loading}
+            <button type="button" onClick={() => listenForObjective()} disabled={loading}
               className="min-h-12 rounded-full border border-amber-400/70 bg-black/85 px-5 text-amber-100">
               {listening ? "STOP LISTENING" : "SPEAK OBJECTIVE"}
             </button>
@@ -262,8 +366,19 @@ export function IndependentEngage() {
               {objective || (listening ? "Listening…" : "Your spoken objective will appear here.")}
             </p>
             {voiceError && <p role="alert" className="text-sm text-red-200">{voiceError}</p>}
+            {textBackup && <label className="w-full text-sm text-amber-100">Text backup
+              <textarea rows={2} value={objective} maxLength={2400}
+                className="mt-1 block w-full rounded border border-amber-300/50 bg-black/90 p-2 text-white"
+                placeholder="Enter your objective" onChange={event => {
+                  setObjective(event.target.value);
+                  objectiveRef.current = event.target.value;
+                }} />
+            </label>}
           </div>
         )}
+        {microphonePrompt && microphone === "checking" && <p className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded bg-black/85 p-3 text-sm text-white" role="status">Allow microphone access to control ASCENSION by voice.</p>}
+        {microphone === "unavailable" && <button type="button" onClick={() => void requestMicrophone()}
+          className="absolute right-4 top-4 z-30 rounded border border-amber-400 bg-black/90 p-3 text-amber-100">Enable microphone</button>}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button type="button" disabled={!category || loading || objective.trim().length < 3} onClick={() => void engage()}
             className="ascension-engage min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">

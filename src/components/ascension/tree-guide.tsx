@@ -44,7 +44,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
   locationSource?: "reference-image"|"mesh"|"unlocated";
   prompt?: { id: number; text: string } | null;
 }) {
-  const [question, setQuestion] = useState("");
+  const [, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [conversation, setConversation] = useState<Exchange[]>(() => conversations.get(objective) ?? []);
   const [thinking, setThinking] = useState(false);
@@ -165,7 +165,7 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
     };
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!Recognition) {
-      setError("This browser has no speech input. You can type your question.");
+      setError("This browser has no speech input. Voice input is required to speak to the Tree.");
       return;
     }
     try {
@@ -178,13 +178,13 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
         const text = event.results[0]?.[0]?.transcript?.trim() ?? "";
         if (text) { setQuestion(text); void ask(text); }
       };
-      recognizer.onerror = () => { setListening(false); setError("Microphone input stopped. You can type your question."); };
+      recognizer.onerror = () => { setListening(false); setError("Microphone input stopped. Voice input is required to speak to the Tree."); };
       recognizer.onend = () => setListening(false);
       recognizer.start();
       setListening(true);
     } catch {
       setListening(false);
-      setError("Microphone unavailable. You can type your question.");
+      setError("Microphone unavailable. Voice input is required to speak to the Tree.");
     }
   }
 
@@ -196,18 +196,13 @@ export function TreeGuide({ objective, pathway, enabled, onSpeak, compact = fals
       <img src="/approved-scene/ascension-tree-behind-book-hq.jpg"
         alt="Tree of Knowledge" draggable={false}/>
     </button>}
-    <form className="ascension-tree-conversation" onSubmit={event => { event.preventDefault(); void ask(question); }}>
-      <input type="text" aria-label="Ask the Tree" value={question} maxLength={800}
-        onChange={event => setQuestion(event.target.value)}
-        placeholder="Ask the Tree" disabled={thinking}/>
+    <div className="ascension-tree-conversation">
       {!portrait && <button type="button" onClick={listen} aria-pressed={listening}
         aria-label={listening ? "Stop speaking to the Tree" : "Speak to the Tree"}>
         {listening ? "STOP" : "SPEAK"}
       </button>}
-      <button type="submit" disabled={!question.trim() || thinking}>
-        {thinking ? "CONNECTING…" : "ASK"}
-      </button>
-    </form>
+      {thinking && <span role="status" className="text-sm">Tree responding…</span>}
+    </div>
     {error && <p role="alert" className="text-sm text-red-200">{error}</p>}
     {conversation.length > 0 && <div role="log" aria-label="Tree conversation" className="mt-2 space-y-1 text-sm leading-6">
       {conversation.slice(-4).map((item, index) => <p key={index}>{item.role === "user" ? "You: " : ""}{item.content}</p>)}

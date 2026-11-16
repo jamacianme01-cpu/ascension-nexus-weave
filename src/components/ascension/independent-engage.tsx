@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
+import { submitGuestObjective, getGuestObjectiveStatus } from "@/lib/ascension/guest.functions";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; blend_reason?: string };
@@ -100,6 +101,8 @@ export function IndependentEngage() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [internalKnowledge, setInternalKnowledge] = useState("");
+  const [governedStatus, setGovernedStatus] = useState("");
+  const governedWatch = useRef<ReturnType<typeof setInterval> | null>(null);
   const [screen, setScreen] = useState<DesignedScreen | null>(null);
   const [choice, setChoice] = useState(0);
   const [talking, setTalking] = useState(true);
@@ -116,7 +119,7 @@ export function IndependentEngage() {
     welcomed.current = true;
     if (talking) say(WELCOME + " Speak your objective when you are ready.");
   }, [category, talking]);
-  useEffect(() => () => { generation.current += 1; abort.current?.abort(); recognition.current?.stop(); stopVoice(); }, []);
+  useEffect(() => () => { generation.current += 1; abort.current?.abort(); recognition.current?.stop(); if (governedWatch.current) clearInterval(governedWatch.current); stopVoice(); }, []);
 
   useEffect(() => {
     let closed = false;
@@ -257,6 +260,9 @@ export function IndependentEngage() {
     setError("");
     setResult(null);
     setInternalKnowledge("");
+    setGovernedStatus("");
+    if (governedWatch.current) clearInterval(governedWatch.current);
+    governedWatch.current = null;
     setScreen(null);
     setChoice(0);
     offer("I'm with you. I'll read this and bring back a few ways it could come together.");
@@ -274,7 +280,49 @@ export function IndependentEngage() {
         // Internal publication is evidence, not newly executed pathways.
         // Do not fetch the paid-provider pathway route or fabricate four choices.
         setInternalKnowledge(first.answer);
-        offer("I found existing Knowledgeverse records. New pathway analysis requires your governed ASCENSION runtime.");
+        // Use the existing guest-token authorized submission, never a public
+        // unauthenticated queue write. Only the owner's governed runtime can
+        // claim, execute and publish Guardian/AutoSync results.
+        try {
+          const submitted = await submitGuestObjective({ data: { objective: text } });
+          if (generation.current !== token) return;
+          const requestId = submitted.request.id;
+          const guestToken = submitted.guestToken;
+          setGovernedStatus("ASCENSION objective submitted to the governed queue. Status: " + submitted.request.status);
+          offer("I found your recorded knowledge and submitted the objective to ASCENSION's governed runtime.");
+          const poll = async () => {
+            if (generation.current !== token) return;
+            try {
+              const response = await getGuestObjectiveStatus({ data: { requestId, guestToken } });
+              if (generation.current !== token) return;
+              const run = response.request;
+              if (!run) { setGovernedStatus("Governed submission status unavailable."); return; }
+              const stage = run.stage ? " · " + run.stage : "";
+              setGovernedStatus("ASCENSION governed runtime: " + run.status + stage +
+                (run.error ? " · " + run.error.slice(0, 200) : ""));
+              if (["verified", "failed", "rejected"].includes(run.status)) {
+                if (governedWatch.current) clearInterval(governedWatch.current);
+                governedWatch.current = null;
+                if (run.status === "verified") {
+                  setGovernedStatus("ASCENSION runtime returned VERIFIED. " +
+                    (run.transition_id ? "Transition: " + run.transition_id + ". " : "") +
+                    "Check the governed result and actual delivery before claiming created pathways.");
+                }
+              }
+            } catch {
+              if (generation.current === token) setGovernedStatus("Governed runtime status currently unavailable.");
+            }
+          };
+          await poll();
+          if (generation.current === token && governedWatch.current === null) {
+            governedWatch.current = setInterval(() => { void poll(); }, 3500);
+          }
+        } catch (cause) {
+          if (generation.current === token) {
+            setGovernedStatus("Governed submission unavailable: " +
+              (cause instanceof Error ? cause.message : "The guest queue could not accept this objective."));
+          }
+        }
         return;
       }
       const pathways = await fetch("/api/public/ascension/independent", {
@@ -309,6 +357,8 @@ export function IndependentEngage() {
   function stop() {
     generation.current += 1;
     abort.current?.abort();
+    if (governedWatch.current) clearInterval(governedWatch.current);
+    governedWatch.current = null;
     setLoading(false);
     offer("Stopped. The book can wait until you want to try again.");
   }
@@ -399,6 +449,7 @@ export function IndependentEngage() {
           <button type="button" onClick={stop}>Stop</button>
         </p>}
         {error && <p className="ascension-tree-status" role="status">{error}</p>}
+        {governedStatus && <p className="ascension-tree-status" role="status">{governedStatus}</p>}
         {internalKnowledge && <section className="ascension-tree-status" aria-label="ASCENSION existing knowledge">
           <p className="whitespace-pre-wrap">{internalKnowledge}</p>
           <p>New pathways are not verified or available until the governed ASCENSION runtime processes the objective.</p>

@@ -41,3 +41,9 @@ This section preserves the owner's latest corrections. No checklist items are ap
 - The initial answer/engineering research belongs **in the backend only**. Do **not** show a long essay, a shortened initial answer, or a separate initial-answer panel. The visible result is the three selectable pathways plus fourth BLEND.
 - The Tree remains a persistent spoken, knowledgeable interactive guide through the approved Tree-and-Book entrance, pathway descriptions, component labels, and V1 views.
 - Do not treat any code change, static check, or build success as owner approval. All approval boxes above stay unchecked.
+
+## Owner instruction, November 16, 2026 — exact transcript wording
+
+> I want my fucking app built like the fuck I said. I want the tree in the book. Don't type nothing in. You talk to the tree. It's interactive. That's the whole why the thing. You talk to it. It brings up the four pathways. Chat GGP, Grok, Claude, and my engine. Whatever one is best suited for that question, it takes lead. My motherfucking engines take the motherfucking answer and make their own answer. The fourth one is a blend. That when you click, when you say which one you want, it opens up to that page, to that picture. You can implode and explode, dissect it, get the descriptions all by voice
+
+Do not interpret this quote as an instruction to add separate voice commands for ChatGPT, Claude, or Grok. The four displayed pathways remain three model contributions and BLEND. The owner approval checkboxes remain unchecked.

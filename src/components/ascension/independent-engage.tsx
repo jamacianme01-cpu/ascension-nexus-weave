@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
-import { submitGuestObjective, getGuestObjectiveStatus } from "@/lib/ascension/guest.functions";
+import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
+import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; blend_reason?: string };
@@ -74,6 +75,20 @@ function guideFor(result: Result): string {
   if (intro.length > 40 && intro.length < 320) return intro;
   const [first, second, third] = result.pathways;
   return `Three readings came back: ${first?.title}, ${second?.title}, and ${third?.title}. The fourth is a blend, ${result.blend.title}. Any of them can be opened if a closer look would help.`;
+}
+
+function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
+  if (delivery.pathways.length !== 3 || !delivery.blend) return null;
+  const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
+    id: path.id, title: path.label, summary: path.summary,
+    steps: path.steps, tradeoffs: path.tradeoffs, parts: [],
+  });
+  const pathways = delivery.pathways.map(toPath);
+  const blend = { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason };
+  if (new Set(pathways.map(path => path.id)).size !== 3 ||
+      pathways.some(path => !path.title.trim() || !path.summary.trim()) ||
+      !blend.title.trim() || !blend.summary.trim()) return null;
+  return { introduction: delivery.body, pathways, blend };
 }
 
 function openLine(path: Pathway, blend: boolean): string {
@@ -290,6 +305,7 @@ export function IndependentEngage() {
           const guestToken = submitted.guestToken;
           setGovernedStatus("ASCENSION objective submitted to the governed queue. Status: " + submitted.request.status);
           offer("I found your recorded knowledge and submitted the objective to ASCENSION's governed runtime.");
+          let terminal = false;
           const poll = async () => {
             if (generation.current !== token) return;
             try {
@@ -301,12 +317,28 @@ export function IndependentEngage() {
               setGovernedStatus("ASCENSION governed runtime: " + run.status + stage +
                 (run.error ? " · " + run.error.slice(0, 200) : ""));
               if (["verified", "failed", "rejected"].includes(run.status)) {
+                terminal = true;
                 if (governedWatch.current) clearInterval(governedWatch.current);
                 governedWatch.current = null;
                 if (run.status === "verified") {
-                  setGovernedStatus("ASCENSION runtime returned VERIFIED. " +
-                    (run.transition_id ? "Transition: " + run.transition_id + ". " : "") +
-                    "Check the governed result and actual delivery before claiming created pathways.");
+                  try {
+                    const delivered = await getGuestObjectiveDelivery({ data: { requestId, guestToken } });
+                    if (generation.current !== token) return;
+                    const payload = delivered?.status === "completed" ? delivered.response_payload : null;
+                    const actual = payload ? fromGovernedDelivery(payload) : null;
+                    if (actual) {
+                      setResult(actual);
+                      setScreen("spiral");
+                      setGovernedStatus("ASCENSION delivered three pathways and BLEND.");
+                      offer(guideFor(actual));
+                    } else {
+                      setGovernedStatus("ASCENSION verified this objective but its complete pathways and BLEND were not delivered. " +
+                        (delivered?.error || delivered?.status || "Delivery unavailable"));
+                    }
+                  } catch (cause) {
+                    setGovernedStatus("ASCENSION verified this objective but pathway delivery failed: " +
+                      (cause instanceof Error ? cause.message : String(cause)).slice(0, 280));
+                  }
                 }
               }
             } catch {
@@ -314,7 +346,7 @@ export function IndependentEngage() {
             }
           };
           await poll();
-          if (generation.current === token && governedWatch.current === null) {
+          if (generation.current === token && !terminal && governedWatch.current === null) {
             governedWatch.current = setInterval(() => { void poll(); }, 3500);
           }
         } catch (cause) {
@@ -341,11 +373,8 @@ export function IndependentEngage() {
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === token) {
         const message = cause instanceof Error ? cause.message : String(cause);
-        const quiet = /not configured|unavailable|did not respond/i.test(message)
-          ? "The reading engines aren't connected from here, so I don't have that analysis yet. The book can wait if you want to try again."
-          : "That reading didn't finish. The book can wait if you want to try again.";
-        setError(quiet);
-        offer(quiet);
+        setError("ENGAGE failed: " + message.slice(0, 350));
+        offer("ENGAGE did not finish. The actual error is displayed on the Book.");
       }
     } finally {
       if (generation.current === token) setLoading(false);

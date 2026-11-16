@@ -16,6 +16,8 @@ RULE: Do not mark an item [x] until the owner explicitly approves that item. Imp
 - [ ] Preserve existing work, architecture, and Guardian boundaries.
 - [ ] No V2, unrequested redesign, or replacement of working features.
 
+- [ ] Memory — owner added: "It supposed to have memory too" (November 16, 2026). Requirement recorded exactly; scope and persistence behavior not yet specified, implemented, tested, or approved.
+
 ## Work verification
 Track each feature's code, test evidence, and runtime result separately. Do not claim deployed equals working. Do not check off owner approval for code changes, automated checks, or successful deployment.
 

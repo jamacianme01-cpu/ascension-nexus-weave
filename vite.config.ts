@@ -22,9 +22,12 @@ export default defineConfig(({ command }) => ({
   plugins: [
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),
-    tanstackStart(),
+    // Legacy authenticated pages still import the removed third-party auth client.
+    // Public Tree, Book, and Inspect routes stay active.
+    tanstackStart({ router: { routeFileIgnorePattern: "_authenticated" } }),
     // Nitro replaces the dev SSR environment, which the interface tests load
-    // through ssrLoadModule. The production build still emits the server file.
+    // through ssrLoadModule. The production build still emits the server file
+    // Fly starts with bun.
     command === "build" ? nitro({ preset: "bun" }) : null,
     viteReact(),
   ],

@@ -10,7 +10,7 @@ export type VoiceCommand =
   | { kind: "enter" }
   | { kind: "back" }
   | { kind: "new-objective" }
-  | { kind: "view"; view: "blueprint" | "dissect" | "exploded" | "assembled" | "picture" }
+  | { kind: "view"; view: "blueprint" | "dissect" | "exploded" | "imploded" | "assembled" | "picture" }
   | { kind: "retry-picture" }
   | { kind: "zoom"; direction: "in" | "out" }
   | { kind: "rotate"; direction: "left" | "right" }
@@ -46,7 +46,8 @@ export function interpretVoiceCommand(transcript: string): VoiceCommand | null {
     ?? exact(/^(?:blueprint|show blueprint|open blueprint)$/, { kind: "view", view: "blueprint" })
     ?? exact(/^(?:dissect|dissect it|open dissect|show dissect)$/, { kind: "view", view: "dissect" })
     ?? exact(/^(?:exploded|explode|exploded view|open exploded)$/, { kind: "view", view: "exploded" })
-    ?? exact(/^(?:implode|imploded|assembled|assemble)$/, { kind: "view", view: "assembled" })
+    ?? exact(/^(?:implode|imploded|imploded view)$/, { kind: "view", view: "imploded" })
+    ?? exact(/^(?:assembled|assemble)$/, { kind: "view", view: "assembled" })
     ?? exact(/^(?:picture|show picture|open picture|show the picture|open the picture)$/, { kind: "view", view: "picture" })
     ?? exact(/^(?:try again|try the picture|try this picture again|retry picture)$/, { kind: "retry-picture" })
     ?? exact(/^zoom in$/, { kind: "zoom", direction: "in" })
@@ -70,6 +71,7 @@ export function interpretVoiceCommand(transcript: string): VoiceCommand | null {
 }
 
 function chosenPathway(text: string): VoiceCommand | null {
+  if (/^(?:blend|the blend|open blend|choose blend|select blend|enter blend)$/.test(text)) return { kind: "enter-index", index: 3 };
   const match = text.match(/^(?:open|choose|select|enter|go to)\s+(?:the\s+)?(first|one|1|second|two|2|third|three|3|fourth|four|4)\s*(?:pathway|orb|one)?$/);
   return match && match[1]! in ORDINALS ? { kind: "enter-index", index: ORDINALS[match[1]!]! } : null;
 }

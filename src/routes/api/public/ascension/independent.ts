@@ -272,6 +272,8 @@ export const Route = createFileRoute("/api/public/ascension/independent")({
         if (!["Business Planner", "Build / Create", "Guidance"].includes(category))
           return json({ error: "Choose a Book category first." }, 400);
         if (objective.length < 3 || objective.length > 2400) return json({ error: "Enter an objective between 3 and 2400 characters." }, 400);
+        // Provider-free knowledge lookup does not prevent governed execution.
+        if (input["phase"] === "knowledge") return json(await internalFirstAnswer(objective));
         if (input["phase"] === "initial")
           return json(paidApisEnabled()
             ? await firstAnswer(objective, category)

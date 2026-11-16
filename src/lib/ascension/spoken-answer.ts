@@ -4,7 +4,9 @@ export type VoiceCommand =
   | { kind: "engage" }
   | { kind: "next" }
   | { kind: "previous" }
-  | { kind: "hear"; target: number | "blend" | "active" }
+  | { kind: "hear"; target: number | "blend" | "active" | "chatgpt" | "claude" | "grok" }
+  | { kind: "open-named"; target: "chatgpt" | "claude" | "grok" | "blend" }
+  | { kind: "build-on-result"; change: string }
   | { kind: "enter" }
   | { kind: "back" }
   | { kind: "new-objective" }
@@ -27,6 +29,8 @@ const ORDINALS: Record<string, number> = {
 /** Spoken app commands. A question or a long sentence stays a Tree question. */
 export function interpretVoiceCommand(transcript: string): VoiceCommand | null {
   const text = transcript.toLowerCase().replace(/[?.!,]/g, " ").replace(/\s+/g, " ").trim();
+  const build = text.match(/^build on (?:the |this )?result(?:\s+(?:with|by|and|to)\s+(.+))?$/);
+  if (build) return { kind: "build-on-result", change: (build[1] ?? "").trim() };
   if (!text || text.split(" ").length > 8) return null;
   if (/^(what|why|how|when|who|where|which|can|could|would|should)\b/.test(text)) return null;
   const exact = (pattern: RegExp, command: VoiceCommand) => pattern.test(text) ? command : null;
@@ -60,13 +64,29 @@ export function interpretVoiceCommand(transcript: string): VoiceCommand | null {
     ?? exact(/^move right$/, { kind: "move", direction: "right" })
     ?? exact(/^move up$/, { kind: "move", direction: "up" })
     ?? exact(/^move down$/, { kind: "move", direction: "down" })
+    ?? openNamedCommand(text)
     ?? hearCommand(text)
     ?? partCommand(text);
 }
 
+function namedProvider(name: string): "chatgpt" | "claude" | "grok" | "blend" | null {
+  const normalized = name.replace(/\s+/g, "");
+  if (normalized === "chatgpt" || normalized === "openai") return "chatgpt";
+  if (normalized === "claude" || normalized === "grok" || normalized === "blend") return normalized;
+  return null;
+}
+
+function openNamedCommand(text: string): VoiceCommand | null {
+  const match = text.match(/^(?:(?:open|choose|select|enter)\s+)?(?:the\s+)?(chat\s*gpt|openai|grok|claude|blend)(?:\s+pathway)?$/);
+  const target = match ? namedProvider(match[1]!) : null;
+  return target ? { kind: "open-named", target } : null;
+}
+
 function hearCommand(text: string): VoiceCommand | null {
   if (/^(?:hear|hear this|hear again|hear this orb)$/.test(text)) return { kind: "hear", target: "active" };
-  if (/^(?:open blend|hear blend|blend|select blend|choose blend)$/.test(text)) return { kind: "hear", target: "blend" };
+  const named = text.match(/^hear (?:the )?(chat\s*gpt|openai|grok|claude|blend)(?: pathway)?$/);
+  const target = named ? namedProvider(named[1]!) : null;
+  if (target) return { kind: "hear", target };
   const words = text.replace(/^(?:hear|open|select|choose)\s+/, "").replace(/\b(?:the|pathway|orb)\b/g, " ").replace(/\s+/g, " ").trim();
   if (!words || !(words in ORDINALS)) return null;
   return { kind: "hear", target: ORDINALS[words]! };
@@ -85,6 +105,8 @@ export function voiceCommandSpeech(command: VoiceCommand): string {
     : command.kind === "next" ? "Next pathway."
     : command.kind === "previous" ? "Previous pathway."
     : command.kind === "hear" ? "Hearing that pathway."
+    : command.kind === "open-named" ? "Opening " + command.target + "."
+    : command.kind === "build-on-result" ? "Building on the selected result."
     : command.kind === "enter" ? "Entering the pathway."
     : command.kind === "back" ? "Back to the pathways."
     : command.kind === "new-objective" ? "Starting a new objective."

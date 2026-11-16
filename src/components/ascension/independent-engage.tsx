@@ -373,7 +373,7 @@ export function IndependentEngage() {
                   setObjective(event.target.value);
                   objectiveRef.current = event.target.value;
                 }} />
-            </label>}}
+            </label>}
           </div>
         )}
         {microphonePrompt && microphone === "checking" && <p className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded bg-black/85 p-3 text-sm text-white" role="status">Allow microphone access to control ASCENSION by voice.</p>}

@@ -4,6 +4,13 @@ import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayRea
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; blend_reason?: string };
 type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
+type SpeechRecognitionLike = {
+  lang: string; continuous: boolean; interimResults: boolean;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void; stop: () => void;
+};
 
 const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 
@@ -77,6 +84,10 @@ function openLine(path: Pathway, blend: boolean): string {
 /** Hosted Tree entry. Engines analyze the answer; the fourth pathway is the blend. */
 export function IndependentEngage() {
   const [objective, setObjective] = useState("");
+  const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>(null);
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const recognition = useRef<{ stop: () => void } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
@@ -88,11 +99,38 @@ export function IndependentEngage() {
   const welcomed = useRef(false);
 
   useEffect(() => {
-    if (welcomed.current) return;
+    if (!category || welcomed.current) return;
     welcomed.current = true;
-    say(WELCOME);
-  }, []);
-  useEffect(() => () => { generation.current += 1; abort.current?.abort(); stopVoice(); }, []);
+    if (talking) say(WELCOME + " Speak your objective when you are ready.");
+  }, [category, talking]);
+  useEffect(() => () => { generation.current += 1; abort.current?.abort(); recognition.current?.stop(); stopVoice(); }, []);
+
+  function listenForObjective() {
+    if (listening) { recognition.current?.stop(); setListening(false); return; }
+    const browser = window as Window & {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const Recognition = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
+    if (!Recognition) {
+      setVoiceError("This browser does not support speech recognition. Use a browser with speech input to speak your objective.");
+      return;
+    }
+    stopVoice();
+    setVoiceError("");
+    const listener = new Recognition();
+    recognition.current = listener;
+    listener.lang = "en-US";
+    listener.continuous = false;
+    listener.interimResults = false;
+    listener.onresult = event => {
+      const spoken = event.results[0]?.[0]?.transcript?.trim();
+      if (spoken) setObjective(spoken.slice(0, 2400));
+    };
+    listener.onerror = event => { setVoiceError("Speech recognition: " + event.error); setListening(false); };
+    listener.onend = () => { setListening(false); recognition.current = null; };
+    try { listener.start(); setListening(true); } catch { setVoiceError("Microphone could not start."); setListening(false); }
+  }
 
   function offer(text: string) {
     if (talking) say(text);
@@ -107,7 +145,7 @@ export function IndependentEngage() {
 
   async function engage() {
     const text = objective.trim();
-    if (text.length < 3 || loading) return;
+    if (!category || text.length < 3 || loading) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -121,7 +159,7 @@ export function IndependentEngage() {
     try {
       const initial = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "initial" }),
+        body: JSON.stringify({ objective: text, category, phase: "initial" }),
         signal: controller.signal,
       });
       const first: { answer?: string; error?: string } = await initial.json();
@@ -130,7 +168,7 @@ export function IndependentEngage() {
       if (generation.current !== token) return;
       const pathways = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
+        body: JSON.stringify({ objective: text, category, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
         signal: controller.signal,
       });
       const data: Result & { error?: string } = await pathways.json();
@@ -203,14 +241,31 @@ export function IndependentEngage() {
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
         </div>
-        <label htmlFor="objective">What do you want to accomplish?</label>
-        <textarea id="objective" rows={3} value={objective} maxLength={2400} disabled={loading}
-          aria-label="What do you want to accomplish?" placeholder="Type your intention..."
-          onChange={event => setObjective(event.target.value)}
-          onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !loading) { event.preventDefault(); void engage(); } }}
-        />
+        {!category ? (
+          <div role="group" aria-label="Choose a Book category" className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-black/70 px-4">
+            <h1 className="font-serif text-3xl text-amber-200">ASCENSION</h1>
+            <div className="flex flex-wrap justify-center gap-4">
+              {(["Business Planner", "Build / Create", "Guidance"] as const).map(option =>
+                <button key={option} type="button" className="min-h-16 rounded-xl border border-amber-400/60 bg-black/85 px-6 text-amber-100"
+                  onClick={() => { setCategory(option); setObjective(""); setError(""); }}>{option}</button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="absolute bottom-[22%] left-1/2 z-20 flex w-[min(90%,38rem)] -translate-x-1/2 flex-col items-center gap-3 text-center">
+            <span className="text-sm text-amber-200">{category}</span>
+            <button type="button" onClick={listenForObjective} disabled={loading}
+              className="min-h-12 rounded-full border border-amber-400/70 bg-black/85 px-5 text-amber-100">
+              {listening ? "STOP LISTENING" : "SPEAK OBJECTIVE"}
+            </button>
+            <p role="status" aria-live="polite" className="max-h-24 overflow-auto rounded-lg bg-black/85 px-3 py-2 text-sm text-white">
+              {objective || (listening ? "Listening…" : "Your spoken objective will appear here.")}
+            </p>
+            {voiceError && <p role="alert" className="text-sm text-red-200">{voiceError}</p>}
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" disabled={loading || objective.trim().length < 3} onClick={() => void engage()}
+          <button type="button" disabled={!category || loading || objective.trim().length < 3} onClick={() => void engage()}
             className="ascension-engage min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
             {loading ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
           </button>
@@ -220,9 +275,9 @@ export function IndependentEngage() {
           <button type="button" onClick={stop}>Stop</button>
         </p>}
         {error && <p className="ascension-tree-status" role="status">{error}</p>}
-        <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
+        {category && <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
           {talking ? "MUTE TREE" : "HEAR TREE"}
-        </button>
+        </button>}
       </div>
     </section>
     {screen && result && <DesignedFlow screen={screen} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}

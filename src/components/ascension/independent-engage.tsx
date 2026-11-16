@@ -99,6 +99,7 @@ export function IndependentEngage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  const [internalKnowledge, setInternalKnowledge] = useState("");
   const [screen, setScreen] = useState<DesignedScreen | null>(null);
   const [choice, setChoice] = useState(0);
   const [talking, setTalking] = useState(true);
@@ -255,6 +256,7 @@ export function IndependentEngage() {
     setLoading(true);
     setError("");
     setResult(null);
+    setInternalKnowledge("");
     setScreen(null);
     setChoice(0);
     offer("I'm with you. I'll read this and bring back a few ways it could come together.");
@@ -264,10 +266,17 @@ export function IndependentEngage() {
         body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "initial" }),
         signal: controller.signal,
       });
-      const first: { answer?: string; error?: string } = await initial.json();
+      const first: { answer?: string; error?: string; contributor?: string; governed_runtime_invoked?: boolean } = await initial.json();
       if (!initial.ok) throw new Error(first.error || "The reading didn't finish.");
       if (!first.answer?.trim()) throw new Error("The reading didn't finish.");
       if (generation.current !== token) return;
+      if (first.contributor === "ASCENSION_KNOWLEDGE_RETRIEVAL") {
+        // Internal publication is evidence, not newly executed pathways.
+        // Do not fetch the paid-provider pathway route or fabricate four choices.
+        setInternalKnowledge(first.answer);
+        offer("I found existing Knowledgeverse records. New pathway analysis requires your governed ASCENSION runtime.");
+        return;
+      }
       const pathways = await fetch("/api/public/ascension/independent", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
@@ -390,6 +399,10 @@ export function IndependentEngage() {
           <button type="button" onClick={stop}>Stop</button>
         </p>}
         {error && <p className="ascension-tree-status" role="status">{error}</p>}
+        {internalKnowledge && <section className="ascension-tree-status" aria-label="ASCENSION existing knowledge">
+          <p className="whitespace-pre-wrap">{internalKnowledge}</p>
+          <p>New pathways are not verified or available until the governed ASCENSION runtime processes the objective.</p>
+        </section>}
         {category && <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
           {talking ? "MUTE TREE" : "HEAR TREE"}
         </button>}

@@ -11,6 +11,7 @@ case "$role" in
     test -f /app/ASCENSION_CORE/cloud_queue_worker.py || { echo >&2 "Private ASCENSION_CORE missing"; exit 2; }
     test -f /app/clarity/core_runtime.py || { echo >&2 "Private CLARITY support package missing"; exit 2; }
     test -d /data/ascension || { echo >&2 "Persistent ASCENSION state volume not mounted"; exit 2; }
+    test -f /data/ascension/published/governed_state.json || { echo >&2 "Authoritative ASCENSION state not yet migrated to Fly volume; worker will not claim objectives"; exit 2; }
     test -n "${ASCENSION_PUBLISH_TOKEN:-}" || { echo >&2 "ASCENSION_PUBLISH_TOKEN Fly secret missing"; exit 2; }
     cd /app
     exec python3 -u -m ASCENSION_CORE.cloud_queue_worker \

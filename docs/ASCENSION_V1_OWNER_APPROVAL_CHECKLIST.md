@@ -6,7 +6,6 @@ RULE: Do not mark an item [x] until the owner explicitly approves that item. Imp
 - [ ] Original Tree and Book stay; preserve artwork and opening experience.
 - [ ] Main screen: “What do you want to accomplish?” and ENGAGE ASCENSION.
 - [ ] Tree voice and natural interactive guidance throughout the experience; preserve preferred voice.
-- [ ] Keep adventure picture-book experience.
 - [ ] Objective delivers a useful initial answer, then three distinct pathways and fourth BLEND.
 - [ ] ChatGPT, Claude, and Grok contribute approaches; governed ASCENSION engines analyze them. Distinguish real engine output from unverified model output.
 - [ ] Let user select any pathway, refine it, and BUILD ON RESULT.

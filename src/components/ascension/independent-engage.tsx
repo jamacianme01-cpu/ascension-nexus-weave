@@ -467,13 +467,16 @@ export function IndependentEngage() {
   guideCommandRef.current = spoken => {
     if (!result) return false;
     const choices: Record<string, number> = {
-      chatgpt: 0, "open ai": 0, openai: 0, claude: 1, grok: 2,
       blend: 3, "the blend": 3,
       "pathway one": 0, "pathway two": 1, "pathway three": 2, "pathway four": 3,
     };
     const selection = spoken.replace(/^(?:open|enter|choose|select|show)\s+/, "");
-    if (choices[selection] !== undefined) {
-      openPathway(choices[selection]); return true;
+    const index = choices[selection] ??
+      [...result.pathways, result.blend].findIndex(path =>
+        path.title.toLowerCase() === selection ||
+        path.title.toLowerCase().includes(selection) && selection.length > 3);
+    if (index >= 0 && index < 4) {
+      openPathway(index); return true;
     }
     if (/^(?:show )?(?:pathways|four pathways|all pathways)$/.test(spoken)) {
       show("spiral"); return true;

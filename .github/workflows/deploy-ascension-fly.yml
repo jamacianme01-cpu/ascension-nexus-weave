@@ -18,6 +18,25 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      # The web repository is public; existing governed engines are private.
+      # This is deliberately a protected main-branch deploy, not a PR secret job.
+      - name: Require private governed engine source permission
+        env:
+          ASCENSION_CORE_READ_TOKEN: ${{ secrets.ASCENSION_CORE_READ_TOKEN }}
+        run: |
+          if [ -z "$ASCENSION_CORE_READ_TOKEN" ]; then
+            echo "::error::Private core read access is missing. The Fly site will not be replaced by an incomplete web-only image."
+            exit 1
+          fi
+      - name: Stage owner's current private ASCENSION and CLARITY engines
+        uses: actions/checkout@v4
+        with:
+          repository: jamacianme01-cpu/ascensionweave
+          token: ${{ secrets.ASCENSION_CORE_READ_TOKEN }}
+          path: .private_runtime
+          persist-credentials: false
+      - name: Validate private runtime before cloud build
+        run: python3 scripts/verify_fly_private_core.py .private_runtime
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Verify existing Fly.io authorization
         env:
@@ -27,11 +46,20 @@ jobs:
             echo "::error::FLY_API_TOKEN is not configured in GitHub Actions. No deployment was attempted."
             exit 1
           fi
+      - name: Verify protected worker state and queue credentials
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if ! flyctl secrets list --app ascension-nexus-weave | grep -q 'ASCENSION_PUBLISH_TOKEN'; then
+            echo "::error::Fly worker credential missing; deployment blocked before replacing the running site."
+            exit 1
+          fi
+          flyctl volumes list --app ascension-nexus-weave --json | python3 -c 'import json,sys; vols=json.load(sys.stdin); assert "ascension_state" in json.dumps(vols), "ASCENSION persistent Fly volume is missing"'
       - name: Deploy the existing ASCENSION app
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml
-      - name: Check Fly app status
+      - name: Check Fly web and governed worker status
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl status --app ascension-nexus-weave

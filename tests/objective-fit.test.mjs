@@ -14,8 +14,10 @@ const server = await createServer({ configFile: false, server: { middlewareMode:
 const originalFetch = globalThis.fetch;
 const priorKey = process.env.LOVABLE_API_KEY;
 const priorHostedOptIn = process.env.ASCENSION_ALLOW_LOVABLE_AI;
+const priorZai = process.env.ZAI_API_KEY;
 process.env.LOVABLE_API_KEY = "test-only";
 process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
+process.env.ZAI_API_KEY = "objective-fit-test-only";
 let passed = 0;
 function pass(name) { passed++; console.log(`PASS ${name}`); }
 function gateway(responses) {
@@ -173,6 +175,7 @@ try {
   globalThis.fetch = originalFetch;
   if (priorKey === undefined) delete process.env.LOVABLE_API_KEY; else process.env.LOVABLE_API_KEY = priorKey;
   if (priorHostedOptIn === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI; else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptIn;
+  if (priorZai === undefined) delete process.env.ZAI_API_KEY; else process.env.ZAI_API_KEY = priorZai;
   await server.close();
 }
 

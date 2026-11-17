@@ -816,13 +816,12 @@ export async function resolveDelivery(args: {
   const now = args.now ?? Date.now();
   const generate = args.generate ?? externalProductDraft;
   const review = args.review ?? reviewObjectiveFit;
-  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim()) && process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true";
   const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
   const hasFreeCloud = Boolean(process.env["OPENROUTER_API_KEY"]?.trim());
   const hasZaiFree = Boolean(process.env["ZAI_API_KEY"]?.trim());
   const hasOpenAI = process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
     Boolean(process.env["OPENAI_API_KEY"]?.trim());
-  const canReview = hasFreeCloud || hasZaiFree || hasLovableAi || hasExplicitLocal || hasOpenAI || Boolean(args.review);
+  const canReview = hasFreeCloud || hasZaiFree || hasExplicitLocal || hasOpenAI || Boolean(args.review);
   let rejectedFit: ObjectiveFitReview | undefined;
   const base = {
     created_at: run.completed_at ?? run.updated_at ?? run.created_at,
@@ -1015,7 +1014,7 @@ export async function resolveDelivery(args: {
   };
   // The website does NOT implicitly spend credits on hosted AI. The owner must
   // explicitly opt in; otherwise allow the ASCENSION local worker to deliver.
-  if (!args.generate && !hasFreeCloud && !hasZaiFree && !hasLovableAi && !hasExplicitLocal && !hasOpenAI) {
+  if (!args.generate && !hasFreeCloud && !hasZaiFree && !hasExplicitLocal && !hasOpenAI) {
     if (!TERMINAL_STATUSES.has(run.status))
       return pending("Awaiting a connected ASCENSION answer provider or governed runtime. No paid AI credits will be used.", {
         engine_label: "ASCENSION_LOCAL_RESULT_PENDING",

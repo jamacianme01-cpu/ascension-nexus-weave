@@ -14,23 +14,32 @@ primary_region = 'ams'
   NITRO_PORT = '8080'
   HOST = '0.0.0.0'
   NITRO_HOST = '0.0.0.0'
+  ASCENSION_QUEUE_URL = 'https://ascension-nexus-weave.fly.dev/api/public/ascension/execution-queue'
 
-# flyctl clears a nil entrypoint, which leaves the Bun image's
-# docker-entrypoint.sh and its relative command in place.
+# Both process groups use the same image. The worker runs the owner's
+# private ASCENSION_CORE package, not a replacement AI or external computer.
 [processes]
-  app = "/app/.output/server/index.mjs"
+  web = "web"
+  worker = "worker"
 
 [experimental]
-  entrypoint = ["/usr/local/bin/bun"]
-  cmd = ["/app/.output/server/index.mjs"]
+  entrypoint = ["/usr/local/bin/ascension-start"]
 
 [http_service]
+  processes = ['web']
   internal_port = 8080
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
   processes = ['app']
+
+# Governed state and crash-recovery journal must survive restarts.
+# Provision the named Fly volume before deploying the worker.
+[[mounts]]
+  source = 'ascension_state'
+  destination = '/data/ascension'
+  processes = ['worker']
 
 [[vm]]
   memory = '1gb'

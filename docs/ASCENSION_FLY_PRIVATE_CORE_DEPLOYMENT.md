@@ -49,6 +49,14 @@ in the app's chosen region and attach it to the `worker` process group at
 Fly volumes are per-Machine; never scale the stateful worker to multiple
 Machines without a data-coordination design and owner approval.
 
+**Preserve existing ASCENSION memory:** the original governed runtime expects
+`/data/ascension/published/governed_state.json` from the owner's authoritative
+live state, together with the rest of that same state directory. The Fly
+launcher refuses to claim objectives on a new/blank volume. Migrate and verify
+the **current** live state onto the persistent volume before starting the
+worker. Historical demonstration snapshots are not authorized substitutes.
+Never initialize a fresh core and call it the owner's existing Knowledgeverse.
+
 The existing deploy workflow refuses to deploy when the private current core
 is missing, incomplete, or syntactically invalid. It does not expose the engine
 source in the public GitHub repository. The running Fly image may contain

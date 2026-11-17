@@ -191,13 +191,18 @@ export function IndependentEngage() {
     if (!spoken) return;
     // Keep spoken pathway and viewing commands available after ENGAGE.
     if (guideCommandRef.current(normalized)) return;
-    if (normalized === "business planner" || normalized === "business") {
-      chooseCategory("Business Planner"); return;
+    // A Book category is a navigation choice, not a domain filter for objectives.
+    const categoryCommand = normalized.replace(/^(?:choose|select|change category to|switch to)\s+/, "");
+    const explicitlySelectingCategory = categoryCommand !== normalized;
+    if (!categoryRef.current || explicitlySelectingCategory) {
+      if (categoryCommand === "business planner" || categoryCommand === "business") {
+        chooseCategory("Business Planner"); return;
+      }
+      if (categoryCommand === "build create" || categoryCommand === "build" || categoryCommand === "build and create") {
+        chooseCategory("Build / Create"); return;
+      }
+      if (categoryCommand === "guidance") { chooseCategory("Guidance"); return; }
     }
-    if (normalized === "build create" || normalized === "build" || normalized === "build and create") {
-      chooseCategory("Build / Create"); return;
-    }
-    if (normalized === "guidance") { chooseCategory("Guidance"); return; }
     if (normalized === "engage" || normalized === "engage ascension") {
       engageRef.current();
       return;
@@ -206,15 +211,13 @@ export function IndependentEngage() {
       recognition.current?.stop();
       return;
     }
-    // An entire spoken Build objective may be the first thing the Tree hears.
-    // Preserve every word of it while entering the existing Build / Create path.
-    if (!categoryRef.current && /^(build|make|design|create|invent|prototype)\s+\S/i.test(spoken))
-      chooseCategory("Build / Create");
     if (!categoryRef.current) {
-      setVoiceError("Say Business Planner, Build / Create, or Guidance before the objective.");
+      setVoiceError("Choose a Book category before stating your objective.");
       return;
     }
-    objectiveRef.current = spoken.slice(0, 2400);
+    // No keyword or objective-domain gate: every valid objective is submitted
+    // to the same governed ASCENSION execution pipeline without reinterpretation.
+    objectiveRef.current = spoken.slice(0, 4000);
     setObjective(objectiveRef.current);
     recognition.current?.stop();
     // A spoken objective executes hands-free; the existing button remains
@@ -297,7 +300,7 @@ export function IndependentEngage() {
 
   async function engage() {
     const text = objectiveRef.current.trim();
-    if (!categoryRef.current || text.length < 3 || loading) return;
+    if (!categoryRef.current || !text || loading) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -532,7 +535,7 @@ export function IndependentEngage() {
             </p>
             {voiceError && <p role="alert" className="text-sm text-red-200">{voiceError}</p>}
             {textBackup && <label className="w-full text-sm text-amber-100">Text backup
-              <textarea rows={2} value={objective} maxLength={2400}
+              <textarea rows={2} value={objective} maxLength={4000}
                 className="mt-1 block w-full rounded border border-amber-300/50 bg-black/90 p-2 text-white"
                 placeholder="Enter your objective" onChange={event => {
                   setObjective(event.target.value);
@@ -545,7 +548,7 @@ export function IndependentEngage() {
         {microphone === "unavailable" && <button type="button" onClick={() => void requestMicrophone()}
           className="absolute right-4 top-4 z-30 rounded border border-amber-400 bg-black/90 p-3 text-amber-100">Enable microphone</button>}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" disabled={!category || loading || objective.trim().length < 3} onClick={() => void engage()}
+          <button type="button" disabled={!category || loading || !objective.trim()} onClick={() => void engage()}
             className="ascension-engage min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
             {loading ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
           </button>

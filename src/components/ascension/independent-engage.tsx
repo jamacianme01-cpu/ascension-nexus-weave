@@ -18,7 +18,7 @@ const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
-function say(text: string) {
+function say(text: string, onFinished?: () => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
   const synth = window.speechSynthesis;
@@ -37,7 +37,10 @@ function say(text: string) {
   let index = 0;
   const next = () => {
     if (sequence !== speechSequence || index >= chunks.length) {
-      if (sequence === speechSequence) activeUtterance = null;
+      if (sequence === speechSequence) {
+        activeUtterance = null;
+        onFinished?.();
+      }
       return;
     }
     const words = new SpeechSynthesisUtterance(chunks[index++]!);
@@ -139,7 +142,12 @@ export function IndependentEngage() {
   useEffect(() => {
     if (!category || welcomed.current) return;
     welcomed.current = true;
-    if (talking) say(WELCOME + " Speak your objective when you are ready.");
+    if (talking) {
+      recognition.current?.stop();
+      say(WELCOME + " Speak your objective when you are ready.", () => {
+        if (categoryRef.current) listenForObjective(true);
+      });
+    }
   }, [category, talking]);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); recognition.current?.stop(); if (governedWatch.current) clearInterval(governedWatch.current); stopVoice(); }, []);
 
@@ -273,7 +281,11 @@ export function IndependentEngage() {
   }
 
   function offer(text: string) {
-    if (talking) say(text);
+    if (!talking) return;
+    recognition.current?.stop();
+    say(text, () => {
+      if (categoryRef.current) listenForObjective(true);
+    });
   }
   function toggleTalking() {
     if (talking) { stopVoice(); setTalking(false); }
@@ -474,6 +486,20 @@ export function IndependentEngage() {
     }
     if (spoken === "back" && screen) {
       show(screen === "spiral" ? "book" : "spiral"); return true;
+    }
+    const selected = choice === 3 ? result.blend : result.pathways[choice];
+    if (screen && screen !== "spiral" && selected) {
+      if (/^(?:explain|explain this|what is this|what does this do|tell me about this|how does this work)$/.test(spoken)) {
+        offer(openLine(selected, choice === 3)); return true;
+      }
+      if (/^(?:what are the steps|tell me the steps|how do i build it)$/.test(spoken)) {
+        offer(selected.steps.length ? selected.steps.join(". ") : "No construction steps were delivered for this pathway."); return true;
+      }
+      const part = selected.parts.find(item => spoken.includes(item.name.toLowerCase()));
+      if (part && /^(?:explain|what|where|describe|tell)/.test(spoken)) {
+        offer([part.name, part.purpose, part.location].filter(Boolean).join(". ") ||
+          "ASCENSION has not delivered a component description."); return true;
+      }
     }
     return false;
   };

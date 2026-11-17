@@ -26,7 +26,8 @@ ENV NODE_ENV=production
 ENV NITRO_PRESET=bun
 RUN bun run build \
     && test -f /app/.output/server/index.mjs \
-    && python scripts/verify_fly_private_core.py .private_runtime
+    && python scripts/verify_fly_private_core.py .private_runtime \
+    && PYTHONPATH=/app/.private_runtime python -c 'import ASCENSION_CORE.cloud_queue_worker; import ASCENSION_CORE.objective_runtime'
 
 FROM base
 

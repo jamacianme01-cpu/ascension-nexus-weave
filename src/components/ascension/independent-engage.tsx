@@ -4,7 +4,7 @@ import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDeliver
 import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
-type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; blend_reason?: string };
+type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; modelUrl: string | null; blend_reason?: string };
 type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
@@ -81,7 +81,13 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
   if (delivery.pathways.length !== 3 || !delivery.blend) return null;
   const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
     id: path.id, title: path.label, summary: path.summary,
-    steps: path.steps, tradeoffs: path.tradeoffs, parts: [],
+    steps: path.steps, tradeoffs: path.tradeoffs,
+    // Retain real delivered assets, not the same stock drone picture for all objectives.
+    parts: path.model_spec?.parts.map(part => ({
+      name: part.name, purpose: "", location: "",
+    })) ?? [],
+    imageUrl: path.generated_image_url ?? null,
+    modelUrl: path.model_url ?? null,
   });
   const pathways = delivery.pathways.map(toPath);
   const blend = { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason };
@@ -109,6 +115,7 @@ export function IndependentEngage() {
   const objectiveRef = useRef("");
   const categoryRef = useRef<typeof category>(null);
   const engageRef = useRef<() => void>(() => {});
+  const guideCommandRef = useRef<(spoken: string) => boolean>(() => false);
   const listeningRef = useRef(false);
   const speechAllowedRef = useRef(true);
   const recognition = useRef<{ stop: () => void } | null>(null);
@@ -174,6 +181,8 @@ export function IndependentEngage() {
     const spoken = text.trim();
     const normalized = spoken.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!spoken) return;
+    // Keep spoken pathway and viewing commands available after ENGAGE.
+    if (guideCommandRef.current(normalized)) return;
     if (normalized === "business planner" || normalized === "business") {
       chooseCategory("Business Planner"); return;
     }
@@ -405,6 +414,10 @@ export function IndependentEngage() {
         title: path.title,
         line: cardLine(path.summary),
         blend: index === 3,
+        summary: path.summary,
+        imageUrl: path.imageUrl,
+        modelUrl: path.modelUrl,
+        parts: path.parts,
       }))
     : [];
 
@@ -434,6 +447,36 @@ export function IndependentEngage() {
     offer(openLine(path, index === 3));
     setScreen("assembled");
   }
+
+  // Browser speech recognition must always dispatch against the current screen.
+  guideCommandRef.current = spoken => {
+    if (!result) return false;
+    const choices: Record<string, number> = {
+      chatgpt: 0, "open ai": 0, openai: 0, claude: 1, grok: 2,
+      blend: 3, "the blend": 3,
+      "pathway one": 0, "pathway two": 1, "pathway three": 2, "pathway four": 3,
+    };
+    const selection = spoken.replace(/^(?:open|enter|choose|select|show)\s+/, "");
+    if (choices[selection] !== undefined) {
+      openPathway(choices[selection]); return true;
+    }
+    if (/^(?:show )?(?:pathways|four pathways|all pathways)$/.test(spoken)) {
+      show("spiral"); return true;
+    }
+    const view = spoken.replace(/^(?:show|open|view|go to)\s+/, "");
+    const views: Record<string, DesignedTarget> = {
+      blueprint: "blueprint", dissect: "dissect", explode: "exploded",
+      exploded: "exploded", implode: "imploded", imploded: "imploded",
+      assembled: "assembled", assembly: "assembled",
+    };
+    if (screen && screen !== "spiral" && views[view]) {
+      show(views[view]); return true;
+    }
+    if (spoken === "back" && screen) {
+      show(screen === "spiral" ? "book" : "spiral"); return true;
+    }
+    return false;
+  };
 
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none">
     <section aria-label="Engage ASCENSION" className="ascension-command" hidden={screen !== null}>
@@ -496,6 +539,8 @@ export function IndependentEngage() {
         </button>}
       </div>
     </section>
-    {screen && result && <DesignedFlow screen={screen} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
+    {screen && result && <DesignedFlow screen={screen} readings={readings} selectedIndex={choice}
+      talking={talking} listening={listening} onListen={() => listenForObjective()}
+      onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
   </div>;
 }

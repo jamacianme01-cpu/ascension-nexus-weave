@@ -71,23 +71,20 @@ try {
     assert.equal(failedApp.files.length, 0);
     assert.match(failedApp.body, /has not been created/);
   });
-  const { callZai, zaiModel } = await server.ssrLoadModule(
-    "/src/lib/ascension/engine/zai.server.ts",
+  const { callApprovedAnswer, approvedAnswerModel } = await server.ssrLoadModule(
+    "/src/lib/ascension/engine/approved-answer.server.ts",
   );
   const deliveryEngine = await server.ssrLoadModule(
     "/src/lib/ascension/engine/delivery.server.ts",
   );
-  const names = [
-    "OPENAI_API_KEY", "ASCENSION_ALLOW_OPENAI_AI", "OPENROUTER_API_KEY",
-    "ZAI_API_KEY", "LOVABLE_API_KEY", "ASCENSION_ALLOW_LOVABLE_AI",
-    "LOCAL_LLM_BASE_URL",
-  ];
+  const names = ["OPENAI_API_KEY", "ASCENSION_ALLOW_OPENAI_AI", "ASCENSION_ENABLE_PAID_APIS"];
   const originals = Object.fromEntries(names.map(name => [name, process.env[name]]));
   const originalFetch = globalThis.fetch;
   try {
     for (const name of names) delete process.env[name];
     process.env.OPENAI_API_KEY = "sk-test-only-do-not-use";
     process.env.ASCENSION_ALLOW_OPENAI_AI = "true";
+    process.env.ASCENSION_ENABLE_PAID_APIS = "true";
     globalThis.fetch = async (url, opts) => {
       assert.equal(url, "https://api.openai.com/v1/responses");
       assert.equal(JSON.parse(opts.body).tools, undefined);
@@ -98,19 +95,19 @@ try {
         ] }],
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     };
-    const result = await callZai({
+    const result = await callApprovedAnswer({
       system: "Test", user: "make worker drones", includeInternalKnowledge: false,
     });
-    check("OpenAI can serve existing ASCENSION inference without a separate Z.AI key", () => {
-      assert.ok(zaiModel().startsWith("gpt-"));
+    check("approved OpenAI can serve inference only after explicit owner opt-in", () => {
+      assert.ok(approvedAnswerModel().startsWith("gpt-"));
       assert.deepEqual(result.json?.meaning_elements, []);
     });
-    process.env.ZAI_API_KEY = "test-stale-zai-key";
-    const stillOpenAI = await callZai({
+
+    const stillOpenAI = await callApprovedAnswer({
       system: "Test", user: "make worker drones", includeInternalKnowledge: false,
     });
-    check("explicit OpenAI opt-in takes priority over a leftover Z.AI key", () => {
-      assert.equal(stillOpenAI.model, zaiModel());
+    check("approved provider remains stable across repeated requests", () => {
+      assert.equal(stillOpenAI.model, approvedAnswerModel());
       assert.ok(stillOpenAI.model.startsWith("gpt-"));
     });
     const run = {
@@ -133,15 +130,15 @@ try {
     const oldFailed = await deliveryEngine.resolveDelivery({
       run, artifactStage: null, retry: false,
       draft: { status: "failed", source_key: deliveryEngine.artifactSourceKey(run.id, []),
-        error: 'Z.AI returned HTTP 429: {"error":{"code":"1305"}}',
-        created_at: new Date().toISOString(), engine_model: "glm-4.7-flash" },
+        error: 'A prior external provider returned HTTP 429',
+        created_at: new Date().toISOString(), engine_model: "historical-external" },
       store: {
         claim: async () => { throw new Error("should not retry failed row automatically"); },
         complete: async () => { throw new Error("should not write this historical row"); },
         fail: async () => { throw new Error("should not fail this historical row"); },
       },
     });
-    check("a recorded Z.AI 429 failure displays honest pathways instead of no result", () => {
+    check("a recorded legacy external failure does not invent engine execution", () => {
       assert.equal(oldFailed.error, null);
       assert.equal(oldFailed.response_payload?.pathways.length, 3);
       assert.ok(oldFailed.response_payload?.blend);

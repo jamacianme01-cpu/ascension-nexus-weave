@@ -14,11 +14,14 @@ primary_region = 'ams'
   NITRO_PORT = '8080'
   HOST = '0.0.0.0'
   NITRO_HOST = '0.0.0.0'
+  ASCENSION_VOLUME_TRANSPORT_URL = 'http://worker.process.ascension-nexus-weave.internal:9091'
+  ASCENSION_STATE_BOOTSTRAP = '0'
 
 # flyctl clears a nil entrypoint, which leaves the Bun image's
 # docker-entrypoint.sh and its relative command in place.
 [processes]
   app = "/app/.output/server/index.mjs"
+  worker = "worker"
 
 [experimental]
   entrypoint = ["/usr/local/bin/bun"]
@@ -32,8 +35,19 @@ primary_region = 'ams'
   min_machines_running = 0
   processes = ['app']
 
+[[mounts]]
+  source = 'ascension_state'
+  destination = '/data/ascension'
+  processes = ['worker']
+
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 256
+
+[[vm]]
+  memory = '2gb'
+  cpu_kind = 'shared'
+  cpus = 2
+  processes = ['worker']

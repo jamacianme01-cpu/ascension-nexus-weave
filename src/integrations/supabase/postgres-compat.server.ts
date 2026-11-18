@@ -193,8 +193,14 @@ export async function rpcDatabase(name: string, args: Record<string, unknown> = 
 export async function databaseConnectivity() {
   if (!connectionString()) return {connected:false,reason:"DATABASE_URL_NOT_CONFIGURED"};
   try {
-    const rows = await database().unsafe("SELECT to_regclass('public.ascension_execution_requests')::text AS queue, to_regclass('public.ascension_run_stages')::text AS stages");
-    if (!rows[0]?.queue || !rows[0]?.stages) return {connected:false,reason:"EXISTING_ASCENSION_SCHEMA_MISSING"};
+    const rows = await database().unsafe(
+      "SELECT to_regclass('public.ascension_execution_requests')::text AS queue, " +
+      "to_regclass('public.ascension_run_stages')::text AS stages, " +
+      "(SELECT count(distinct proname) FROM pg_proc WHERE pronamespace = 'public'::regnamespace " +
+      "AND proname IN ('ascension_guest_submit','ascension_guest_status','ascension_guest_bundle','ascension_guest_draft')) AS rpc_count"
+    );
+    if (!rows[0]?.queue || !rows[0]?.stages || Number(rows[0]?.rpc_count) !== 4)
+      return {connected:false,reason:"EXISTING_ASCENSION_SCHEMA_INCOMPLETE"};
     return {connected:true,reason:null};
   } catch {
     return {connected:false,reason:"DATABASE_CONNECTION_FAILED"};

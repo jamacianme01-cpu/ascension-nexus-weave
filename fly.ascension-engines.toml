@@ -1,0 +1,47 @@
+# Separate manual rollout for real authored ASCENSION engines.
+# Normal fly.toml and its production deployment remain unchanged.
+app = 'ascension-nexus-weave'
+primary_region = 'ams'
+
+[build]
+  dockerfile = 'Dockerfile.ascension-engines'
+
+[env]
+  PORT = '8080'
+  NITRO_PORT = '8080'
+  HOST = '0.0.0.0'
+  NITRO_HOST = '0.0.0.0'
+  ASCENSION_LIVE_ROOT = '/data/ascension/state/live'
+  ASCENSION_QUEUE_URL = 'https://ascension-nexus-weave.fly.dev/api/public/ascension/execution-queue'
+
+[processes]
+  app = '/app/.output/server/index.mjs'
+  worker = 'worker'
+
+[experimental]
+  entrypoint = ['/app/scripts/ascension-fly-governed-entrypoint.sh']
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[mounts]]
+  source = 'ascension_state'
+  destination = '/data/ascension'
+  processes = ['worker']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  processes = ['app']
+
+[[vm]]
+  memory = '2gb'
+  cpu_kind = 'shared'
+  cpus = 2
+  processes = ['worker']

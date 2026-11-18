@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ascensionSession } from "@/lib/ascension/data/session.client";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
 
 import {
@@ -983,7 +983,7 @@ export function Engage() {
     queryKey: ["ascension", "my-objectives"],
     enabled: historyOpen,
     queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data } = await ascensionSession.auth.getUser();
       return data.user ? listMyObjectives() : { items: [] };
     },
     retry: false,
@@ -1025,7 +1025,7 @@ export function Engage() {
     mutationFn: async (input: SubmissionInput) => {
       const { parentAccess, parentGuestToken, ...payload } = input;
 
-      const { data } = await supabase.auth.getUser();
+      const { data } = await ascensionSession.auth.getUser();
       if (parentAccess === "auth" || (data.user && !parentGuestToken)) {
         return {
           request: (await submitObjective({ data: payload })).request,

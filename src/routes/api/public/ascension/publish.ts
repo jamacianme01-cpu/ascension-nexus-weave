@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import type { Json } from "@/integrations/supabase/types";
+import type { Json } from "@/lib/ascension/data/types";
 import { timingSafeEqual } from "crypto";
 
 /**
@@ -83,8 +83,8 @@ export const Route = createFileRoute("/api/public/ascension/publish")({
           payload: (payload ?? null) as Json,
         }));
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { error } = await supabaseAdmin
+        const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+        const { error } = await ascensionDb
           .from("ascension_publications")
           .upsert(rows, { onConflict: "revision,surface" });
         if (error) {

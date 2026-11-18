@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
-import { ascensionSession } from "@/lib/ascension/data/session.client";
+import { ascensionSession } from "@/lib/ascension/data/session";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,

@@ -4,7 +4,7 @@ import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDeliver
 import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
-type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; blend_reason?: string };
+type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; modelUrl: string | null; blend_reason?: string };
 type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
@@ -18,7 +18,7 @@ const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
-function say(text: string) {
+function say(text: string, onFinished?: () => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
   const synth = window.speechSynthesis;
@@ -37,7 +37,10 @@ function say(text: string) {
   let index = 0;
   const next = () => {
     if (sequence !== speechSequence || index >= chunks.length) {
-      if (sequence === speechSequence) activeUtterance = null;
+      if (sequence === speechSequence) {
+        activeUtterance = null;
+        onFinished?.();
+      }
       return;
     }
     const words = new SpeechSynthesisUtterance(chunks[index++]!);
@@ -81,7 +84,13 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
   if (delivery.pathways.length !== 3 || !delivery.blend) return null;
   const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
     id: path.id, title: path.label, summary: path.summary,
-    steps: path.steps, tradeoffs: path.tradeoffs, parts: [],
+    steps: path.steps, tradeoffs: path.tradeoffs,
+    // Retain real delivered assets, not the same stock drone picture for all objectives.
+    parts: path.model_spec?.parts.map(part => ({
+      name: part.name, purpose: "", location: "",
+    })) ?? [],
+    imageUrl: path.generated_image_url ?? null,
+    modelUrl: path.model_url ?? null,
   });
   const pathways = delivery.pathways.map(toPath);
   const blend = { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason };
@@ -109,6 +118,7 @@ export function IndependentEngage() {
   const objectiveRef = useRef("");
   const categoryRef = useRef<typeof category>(null);
   const engageRef = useRef<() => void>(() => {});
+  const guideCommandRef = useRef<(spoken: string) => boolean>(() => false);
   const listeningRef = useRef(false);
   const speechAllowedRef = useRef(true);
   const recognition = useRef<{ stop: () => void } | null>(null);
@@ -132,7 +142,12 @@ export function IndependentEngage() {
   useEffect(() => {
     if (!category || welcomed.current) return;
     welcomed.current = true;
-    if (talking) say(WELCOME + " Speak your objective when you are ready.");
+    if (talking) {
+      recognition.current?.stop();
+      say(WELCOME + " Speak your objective when you are ready.", () => {
+        if (categoryRef.current) listenForObjective(true);
+      });
+    }
   }, [category, talking]);
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); recognition.current?.stop(); if (governedWatch.current) clearInterval(governedWatch.current); stopVoice(); }, []);
 
@@ -174,13 +189,20 @@ export function IndependentEngage() {
     const spoken = text.trim();
     const normalized = spoken.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!spoken) return;
-    if (normalized === "business planner" || normalized === "business") {
-      chooseCategory("Business Planner"); return;
+    // Keep spoken pathway and viewing commands available after ENGAGE.
+    if (guideCommandRef.current(normalized)) return;
+    // A Book category is a navigation choice, not a domain filter for objectives.
+    const categoryCommand = normalized.replace(/^(?:choose|select|change category to|switch to)\s+/, "");
+    const explicitlySelectingCategory = categoryCommand !== normalized;
+    if (!categoryRef.current || explicitlySelectingCategory) {
+      if (categoryCommand === "business planner" || categoryCommand === "business") {
+        chooseCategory("Business Planner"); return;
+      }
+      if (categoryCommand === "build create" || categoryCommand === "build" || categoryCommand === "build and create") {
+        chooseCategory("Build / Create"); return;
+      }
+      if (categoryCommand === "guidance") { chooseCategory("Guidance"); return; }
     }
-    if (normalized === "build create" || normalized === "build" || normalized === "build and create") {
-      chooseCategory("Build / Create"); return;
-    }
-    if (normalized === "guidance") { chooseCategory("Guidance"); return; }
     if (normalized === "engage" || normalized === "engage ascension") {
       engageRef.current();
       return;
@@ -189,10 +211,18 @@ export function IndependentEngage() {
       recognition.current?.stop();
       return;
     }
-    if (categoryRef.current) {
-      objectiveRef.current = spoken.slice(0, 2400);
-      setObjective(objectiveRef.current);
+    if (!categoryRef.current) {
+      setVoiceError("Choose a Book category before stating your objective.");
+      return;
     }
+    // No keyword or objective-domain gate: every valid objective is submitted
+    // to the same governed ASCENSION execution pipeline without reinterpretation.
+    objectiveRef.current = spoken.slice(0, 4000);
+    setObjective(objectiveRef.current);
+    recognition.current?.stop();
+    // A spoken objective executes hands-free; the existing button remains
+    // available when speech recognition or a microphone is unavailable.
+    engageRef.current();
   }
 
   function listenForObjective(auto = false) {
@@ -254,7 +284,11 @@ export function IndependentEngage() {
   }
 
   function offer(text: string) {
-    if (talking) say(text);
+    if (!talking) return;
+    recognition.current?.stop();
+    say(text, () => {
+      if (categoryRef.current) listenForObjective(true);
+    });
   }
   function toggleTalking() {
     if (talking) { stopVoice(); setTalking(false); }
@@ -266,115 +300,113 @@ export function IndependentEngage() {
 
   async function engage() {
     const text = objectiveRef.current.trim();
-    if (!categoryRef.current || text.length < 3 || loading) return;
+    if (!categoryRef.current || !text || loading) return;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
+    if (governedWatch.current) clearInterval(governedWatch.current);
+    governedWatch.current = null;
     setLoading(true);
     setError("");
     setResult(null);
     setInternalKnowledge("");
     setGovernedStatus("");
-    if (governedWatch.current) clearInterval(governedWatch.current);
-    governedWatch.current = null;
     setScreen(null);
     setChoice(0);
-    offer("I'm with you. I'll read this and bring back a few ways it could come together.");
     try {
-      const initial = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "initial" }),
-        signal: controller.signal,
-      });
-      const first: { answer?: string; error?: string; contributor?: string; governed_runtime_invoked?: boolean } = await initial.json();
-      if (!initial.ok) throw new Error(first.error || "The reading didn't finish.");
-      if (!first.answer?.trim()) throw new Error("The reading didn't finish.");
+      // The real governed submission MUST NOT depend on knowledge retrieval.
+      // Previously a failed lookup stopped ENGAGE before the runtime saw the objective.
+      const submitted = await submitGuestObjective({ data: { objective: text } });
       if (generation.current !== token) return;
-      if (first.contributor === "ASCENSION_KNOWLEDGE_RETRIEVAL") {
-        // Internal publication is evidence, not newly executed pathways.
-        // Do not fetch the paid-provider pathway route or fabricate four choices.
-        setInternalKnowledge(first.answer);
-        // Use the existing guest-token authorized submission, never a public
-        // unauthenticated queue write. Only the owner's governed runtime can
-        // claim, execute and publish Guardian/AutoSync results.
+      const requestId = submitted.request.id;
+      const guestToken = submitted.guestToken;
+      setGovernedStatus("ASCENSION governed queue: " + submitted.request.status);
+
+      // Show existing Knowledgeverse evidence when available; its failure never
+      // blocks execution, and this phase never invokes a paid model.
+      void (async () => {
         try {
-          const submitted = await submitGuestObjective({ data: { objective: text } });
+          const response = await fetch("/api/public/ascension/independent", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "knowledge" }),
+            signal: controller.signal,
+          });
+          if (!response.ok) return;
+          const first: { contributor?: string; answer?: string } = await response.json();
+          if (generation.current === token && first.contributor === "ASCENSION_KNOWLEDGE_RETRIEVAL" && first.answer)
+            setInternalKnowledge(first.answer);
+        } catch { /* Knowledge retrieval is informational, never an execution gate. */ }
+      })();
+
+      let terminal = false;
+      let polling = false;
+      let failures = 0;
+      const poll = async () => {
+        if (generation.current !== token || terminal || polling) return;
+        polling = true;
+        try {
+          const state = await getGuestObjectiveStatus({ data: { requestId, guestToken } });
           if (generation.current !== token) return;
-          const requestId = submitted.request.id;
-          const guestToken = submitted.guestToken;
-          setGovernedStatus("ASCENSION objective submitted to the governed queue. Status: " + submitted.request.status);
-          offer("I found your recorded knowledge and submitted the objective to ASCENSION's governed runtime.");
-          let terminal = false;
-          const poll = async () => {
+          const run = state.request;
+          if (!run) {
+            setError("ENGAGE: the governed queue did not return this objective's status.");
+            return;
+          }
+          failures = 0;
+          if (run.status === "verified") {
+            // Status VERIFIED is not a delivered pathway. Keep polling the actual
+            // authorized delivery until it is ready; PR 63 checked only once.
+            const delivered = await getGuestObjectiveDelivery({ data: { requestId, guestToken } });
             if (generation.current !== token) return;
-            try {
-              const response = await getGuestObjectiveStatus({ data: { requestId, guestToken } });
-              if (generation.current !== token) return;
-              const run = response.request;
-              if (!run) { setGovernedStatus("Governed submission status unavailable."); return; }
-              const stage = run.stage ? " · " + run.stage : "";
-              setGovernedStatus("ASCENSION governed runtime: " + run.status + stage +
-                (run.error ? " · " + run.error.slice(0, 200) : ""));
-              if (["verified", "failed", "rejected"].includes(run.status)) {
-                terminal = true;
-                if (governedWatch.current) clearInterval(governedWatch.current);
-                governedWatch.current = null;
-                if (run.status === "verified") {
-                  try {
-                    const delivered = await getGuestObjectiveDelivery({ data: { requestId, guestToken } });
-                    if (generation.current !== token) return;
-                    const payload = delivered?.status === "completed" ? delivered.response_payload : null;
-                    const actual = payload ? fromGovernedDelivery(payload) : null;
-                    if (actual) {
-                      setResult(actual);
-                      setScreen("spiral");
-                      setGovernedStatus("ASCENSION delivered three pathways and BLEND.");
-                      offer(guideFor(actual));
-                    } else {
-                      setGovernedStatus("ASCENSION verified this objective but its complete pathways and BLEND were not delivered. " +
-                        (delivered?.error || delivered?.status || "Delivery unavailable"));
-                    }
-                  } catch (cause) {
-                    setGovernedStatus("ASCENSION verified this objective but pathway delivery failed: " +
-                      (cause instanceof Error ? cause.message : String(cause)).slice(0, 280));
-                  }
-                }
-              }
-            } catch {
-              if (generation.current === token) setGovernedStatus("Governed runtime status currently unavailable.");
+            const payload = delivered?.status === "completed" ? delivered.response_payload : null;
+            const actual = payload && delivered?.source === "governed" ? fromGovernedDelivery(payload) : null;
+            if (actual) {
+              setResult(actual);
+              setScreen("spiral");
+              setGovernedStatus("ASCENSION delivered three pathways and BLEND.");
+              offer(guideFor(actual));
+              terminal = true;
+              return;
             }
-          };
-          await poll();
-          if (generation.current === token && !terminal && governedWatch.current === null) {
-            governedWatch.current = setInterval(() => { void poll(); }, 3500);
+            if (delivered?.status === "completed") {
+              const reason = delivered.source === "external_draft"
+                ? "Only an external draft was returned, not the required governed pathways."
+                : delivered.error || "The governed result contains no complete set of three pathways and BLEND.";
+              setError("ENGAGE delivery incomplete: " + reason.slice(0, 350));
+              terminal = true;
+              return;
+            }
+            setGovernedStatus("ASCENSION verified the objective. Waiting for its pathway delivery." +
+              (delivered?.note ? " " + delivered.note.slice(0, 180) : ""));
+            return;
           }
+          if (run.status === "failed" || run.status === "rejected") {
+            setError("ASCENSION governed execution " + run.status + ": " +
+              (run.error || "The runtime did not provide an error message.").slice(0, 350));
+            terminal = true;
+            return;
+          }
+          setGovernedStatus("ASCENSION governed runtime: " + run.status +
+            (run.stage ? " · " + run.stage : ""));
         } catch (cause) {
-          if (generation.current === token) {
-            setGovernedStatus("Governed submission unavailable: " +
-              (cause instanceof Error ? cause.message : "The guest queue could not accept this objective."));
-          }
+          failures += 1;
+          const message = cause instanceof Error ? cause.message : String(cause);
+          setError("ASCENSION runtime connection: " + message.slice(0, 350));
+          if (failures >= 3) terminal = true;
+        } finally {
+          polling = false;
+          if (terminal && governedWatch.current) clearInterval(governedWatch.current);
+          if (terminal) governedWatch.current = null;
         }
-        return;
-      }
-      const pathways = await fetch("/api/public/ascension/independent", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ objective: text, category: categoryRef.current, phase: "pathways", firstAnswer: first.answer.slice(0, 6000) }),
-        signal: controller.signal,
-      });
-      const data: Result & { error?: string } = await pathways.json();
-      if (!pathways.ok) throw new Error(data.error || "The pathways didn't finish.");
-      if (!Array.isArray(data.pathways) || data.pathways.length !== 3 || !data.blend?.title)
-        throw new Error("The pathways didn't finish.");
-      if (generation.current !== token) return;
-      setResult(data);
-      setScreen("spiral");
-      offer(guideFor(data));
+      };
+      await poll();
+      if (generation.current === token && !terminal && governedWatch.current === null)
+        governedWatch.current = setInterval(() => { void poll(); }, 3500);
     } catch (cause) {
-      if (!controller.signal.aborted && generation.current === token) {
+      if (generation.current === token) {
         const message = cause instanceof Error ? cause.message : String(cause);
-        setError("ENGAGE failed: " + message.slice(0, 350));
-        offer("ENGAGE did not finish. The actual error is displayed on the Book.");
+        setError("ENGAGE submission failed: " + message.slice(0, 350));
       }
     } finally {
       if (generation.current === token) setLoading(false);
@@ -397,6 +429,10 @@ export function IndependentEngage() {
         title: path.title,
         line: cardLine(path.summary),
         blend: index === 3,
+        summary: path.summary,
+        imageUrl: path.imageUrl,
+        modelUrl: path.modelUrl,
+        parts: path.parts,
       }))
     : [];
 
@@ -427,6 +463,53 @@ export function IndependentEngage() {
     setScreen("assembled");
   }
 
+  // Browser speech recognition must always dispatch against the current screen.
+  guideCommandRef.current = spoken => {
+    if (!result) return false;
+    const choices: Record<string, number> = {
+      blend: 3, "the blend": 3,
+      "pathway one": 0, "pathway two": 1, "pathway three": 2, "pathway four": 3,
+    };
+    const selection = spoken.replace(/^(?:open|enter|choose|select|show)\s+/, "");
+    const index = choices[selection] ??
+      [...result.pathways, result.blend].findIndex(path =>
+        path.title.toLowerCase() === selection ||
+        path.title.toLowerCase().includes(selection) && selection.length > 3);
+    if (index >= 0 && index < 4) {
+      openPathway(index); return true;
+    }
+    if (/^(?:show )?(?:pathways|four pathways|all pathways)$/.test(spoken)) {
+      show("spiral"); return true;
+    }
+    const view = spoken.replace(/^(?:show|open|view|go to)\s+/, "");
+    const views: Record<string, DesignedTarget> = {
+      blueprint: "blueprint", dissect: "dissect", explode: "exploded",
+      exploded: "exploded", implode: "imploded", imploded: "imploded",
+      assembled: "assembled", assembly: "assembled",
+    };
+    if (screen && screen !== "spiral" && views[view]) {
+      show(views[view]); return true;
+    }
+    if (spoken === "back" && screen) {
+      show(screen === "spiral" ? "book" : "spiral"); return true;
+    }
+    const selected = choice === 3 ? result.blend : result.pathways[choice];
+    if (screen && screen !== "spiral" && selected) {
+      if (/^(?:explain|explain this|what is this|what does this do|tell me about this|how does this work)$/.test(spoken)) {
+        offer(openLine(selected, choice === 3)); return true;
+      }
+      if (/^(?:what are the steps|tell me the steps|how do i build it)$/.test(spoken)) {
+        offer(selected.steps.length ? selected.steps.join(". ") : "No construction steps were delivered for this pathway."); return true;
+      }
+      const part = selected.parts.find(item => spoken.includes(item.name.toLowerCase()));
+      if (part && /^(?:explain|what|where|describe|tell)/.test(spoken)) {
+        offer([part.name, part.purpose, part.location].filter(Boolean).join(". ") ||
+          "ASCENSION has not delivered a component description."); return true;
+      }
+    }
+    return false;
+  };
+
   return <div className="ascension-world relative isolate mx-auto w-full max-w-none">
     <section aria-label="Engage ASCENSION" className="ascension-command" hidden={screen !== null}>
       <div className="ascension-stage">
@@ -455,7 +538,7 @@ export function IndependentEngage() {
             </p>
             {voiceError && <p role="alert" className="text-sm text-red-200">{voiceError}</p>}
             {textBackup && <label className="w-full text-sm text-amber-100">Text backup
-              <textarea rows={2} value={objective} maxLength={2400}
+              <textarea rows={2} value={objective} maxLength={4000}
                 className="mt-1 block w-full rounded border border-amber-300/50 bg-black/90 p-2 text-white"
                 placeholder="Enter your objective" onChange={event => {
                   setObjective(event.target.value);
@@ -468,7 +551,7 @@ export function IndependentEngage() {
         {microphone === "unavailable" && <button type="button" onClick={() => void requestMicrophone()}
           className="absolute right-4 top-4 z-30 rounded border border-amber-400 bg-black/90 p-3 text-amber-100">Enable microphone</button>}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" disabled={!category || loading || objective.trim().length < 3} onClick={() => void engage()}
+          <button type="button" disabled={!category || loading || !objective.trim()} onClick={() => void engage()}
             className="ascension-engage min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
             {loading ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
           </button>
@@ -488,6 +571,8 @@ export function IndependentEngage() {
         </button>}
       </div>
     </section>
-    {screen && result && <DesignedFlow screen={screen} readings={readings} talking={talking} onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
+    {screen && result && <DesignedFlow screen={screen} readings={readings} selectedIndex={choice}
+      talking={talking} listening={listening} onListen={() => listenForObjective()}
+      onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
   </div>;
 }

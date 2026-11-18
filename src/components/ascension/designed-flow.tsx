@@ -16,7 +16,15 @@ const PICTURE: Record<DesignedScreen, string> = {
   imploded: "/designed-flow/imploded.jpg",
 };
 
-export type PathwayReading = { title: string; line: string; blend?: boolean };
+export type PathwayReading = {
+  title: string;
+  line: string;
+  summary?: string;
+  blend?: boolean;
+  imageUrl?: string | null;
+  modelUrl?: string | null;
+  parts?: { name: string; purpose: string; location: string }[];
+};
 
 type Hit = { label: string; x: number; y: number; w: number; h: number; to: DesignedTarget; index?: number };
 
@@ -128,6 +136,9 @@ export function DesignedFlow({
   screen,
   readings,
   talking,
+  listening,
+  selectedIndex,
+  onListen,
   onToggleTalking,
   onScreen,
   onOpen,
@@ -135,6 +146,9 @@ export function DesignedFlow({
   screen: DesignedScreen;
   readings: PathwayReading[];
   talking: boolean;
+  listening: boolean;
+  selectedIndex: number;
+  onListen: () => void;
   onToggleTalking: () => void;
   onScreen: (next: DesignedTarget) => void;
   onOpen: (index: number) => void;
@@ -149,14 +163,56 @@ export function DesignedFlow({
   }, [onScreen, screen]);
 
   const back = screen === "spiral" ? "book" : "spiral";
+  const chosen = readings[selectedIndex];
+  const selectedPicture = chosen?.imageUrl ?? null;
   return (
     <div className="designed-screen">
-      <button type="button" className="designed-tree-hear" aria-pressed={!talking} onClick={onToggleTalking}>
-        {talking ? "MUTE TREE" : "HEAR TREE"}
-      </button>
+      <div className="designed-voice-controls">
+        <button type="button" className="designed-tree-hear" aria-pressed={!talking} onClick={onToggleTalking}>
+          {talking ? "MUTE TREE" : "HEAR TREE"}
+        </button>
+        <button type="button" className="designed-tree-hear" aria-pressed={listening} onClick={onListen}>
+          {listening ? "STOP LISTENING" : "SPEAK TO TREE"}
+        </button>
+      </div>
       <button type="button" className="designed-margin" aria-label="Back" onClick={() => onScreen(back)} />
       <div className="designed-frame" data-screen={screen}>
         <img src={PICTURE[screen]} alt="" draggable={false} />
+        {screen === "spiral" && CARD_BOXES.map(([x, , w], index) => (
+          <div key={index} aria-hidden="true" className="designed-spiral-conceal"
+            style={{
+              left: `${((x + 9) / FRAME.width) * 100}%`,
+              width: `${((w - 18) / FRAME.width) * 100}%`,
+            }} />
+        ))}
+        {screen !== "spiral" && chosen && (
+          <section className="designed-live-panel" aria-label="Selected ASCENSION pathway">
+            <h2>{chosen.title}</h2>
+            <div className="designed-live-content">
+              <div className="designed-live-artwork">
+                {selectedPicture
+                  ? <img src={selectedPicture} alt={`Generated design for ${chosen.title}`} draggable={false} />
+                  : <p role="status">ASCENSION has not delivered a design picture for this pathway.</p>}
+                <p className="designed-live-summary">{chosen.summary}</p>
+                {screen !== "assembled" && <p className="designed-live-limitation">
+                  {screen === "blueprint"
+                    ? "A measured blueprint must come from the actual engineering output; none is verified here."
+                    : "This inspection view requires the corresponding delivered design geometry."}
+                </p>}
+              </div>
+              <aside className="designed-live-parts" aria-label="Delivered components">
+                <h3>Components</h3>
+                {chosen.parts?.length
+                  ? <ul>{chosen.parts.map((part, index) => <li key={`${part.name}-${index}`}>
+                    {part.name}
+                    {part.purpose && <p>{part.purpose}</p>}
+                    {part.location && <p>{part.location}</p>}
+                  </li>)}</ul>
+                  : <p>No component descriptions were delivered for this pathway.</p>}
+              </aside>
+            </div>
+          </section>
+        )}
         {screen === "spiral" && CARD_BOXES.map(([x, , w], index) => {
           const reading = readings[index];
           if (!reading) return null;

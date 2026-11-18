@@ -9,71 +9,12 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Query, rpcDatabase } from "./postgres-compat.server";
 
 const STORAGE_DIR = process.env["ASCENSION_STORAGE_DIR"]?.trim() || ".ascension-storage";
 const REMOTE_BASE = process.env["ASCENSION_STORAGE_BASE_URL"]?.trim() || "";
 const REMOTE_TOKEN = process.env["ASCENSION_STORAGE_TOKEN"]?.trim() || "";
-const OFFLINE = { message: "ASCENSION database is not connected.", code: "ASCENSION_DB_OFFLINE" };
 
-interface Row {
-  id: string;
-  body: any;
-  path: string;
-  note: any;
-  created_at: string;
-  updated_at: string;
-  result: any;
-  objective: string;
-  response_payload: any;
-  status: string;
-  request_id: string;
-  http_status: number;
-  evidence: any;
-  constraints: any;
-  label: string;
-  revision: number;
-  name: string;
-  message: string;
-  [key: string]: any;
-}
-
-type QueryResult<T> = {
-  data: T | null;
-  error: { message: string; code?: string } | null;
-  count: number | null;
-};
-
-class Query<T = Row[]> implements PromiseLike<QueryResult<T>> {
-  select(..._args: unknown[]) { return this; }
-  insert(..._args: unknown[]) { return this; }
-  update(..._args: unknown[]) { return this; }
-  upsert(..._args: unknown[]) { return this; }
-  delete(..._args: unknown[]) { return this; }
-  eq(..._args: unknown[]) { return this; }
-  neq(..._args: unknown[]) { return this; }
-  gt(..._args: unknown[]) { return this; }
-  gte(..._args: unknown[]) { return this; }
-  lt(..._args: unknown[]) { return this; }
-  lte(..._args: unknown[]) { return this; }
-  in(..._args: unknown[]) { return this; }
-  or(..._args: unknown[]) { return this; }
-  not(..._args: unknown[]) { return this; }
-  is(..._args: unknown[]) { return this; }
-  filter(..._args: unknown[]) { return this; }
-  match(..._args: unknown[]) { return this; }
-  order(..._args: unknown[]) { return this; }
-  limit(..._args: unknown[]) { return this; }
-  range(..._args: unknown[]) { return this; }
-  contains(..._args: unknown[]) { return this; }
-  single(): Query<Row> { return this as unknown as Query<Row>; }
-  maybeSingle(): Query<Row> { return this as unknown as Query<Row>; }
-  then<TResult1 = QueryResult<T>, TResult2 = never>(
-    onfulfilled?: ((value: QueryResult<T>) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-  ): Promise<TResult1 | TResult2> {
-    return Promise.resolve({ data: null, error: OFFLINE, count: null } as QueryResult<T>).then(onfulfilled, onrejected);
-  }
-}
 
 function publicUrl(bucket: string, filePath: string): string {
   if (REMOTE_BASE) {
@@ -145,11 +86,11 @@ function bucketName(api: object): string {
 }
 
 export const supabaseAdmin = {
-  from(_table: string) {
-    return new Query();
+  from(table: string) {
+    return new Query(table);
   },
-  async rpc(_name: string, _args?: Record<string, unknown>) {
-    return { data: null, error: OFFLINE };
+  async rpc(name: string, args?: Record<string, unknown>) {
+    return rpcDatabase(name, args);
   },
   auth: {
     async getUser(_token?: string) {

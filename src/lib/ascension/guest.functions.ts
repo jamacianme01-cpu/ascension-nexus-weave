@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 
-import type { Json } from "@/integrations/supabase/types";
+import type { Json } from "@/lib/ascension/data/types";
 import type { ObjectiveRun } from "./objectives.functions";
 import type { ObjectiveDelivery } from "./result-model";
 import { priorResultContext } from "./iteration-model";
@@ -11,8 +11,8 @@ type RpcResult<T> = { data: T | null; error: { message: string } | null };
 async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T | null> {
   // Guest functions execute on the server against the existing ASCENSION database.
   // This never sends database credentials or an admin client to the browser.
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = (await supabaseAdmin.rpc(name, args)) as RpcResult<T>;
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+  const { data, error } = (await ascensionDb.rpc(name, args)) as RpcResult<T>;
   if (error) throw new Error(error.message);
   return data;
 }
@@ -154,8 +154,8 @@ async function projectGuestDelivery(
   const engine = await import("./engine/delivery.server");
   // Guest access is established first by the token-checked bundle RPC.
   // Fetch only this guest-authorized run's supplemental source outputs.
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: guestVersionStage, error: versionStageError } = await supabaseAdmin
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+  const { data: guestVersionStage, error: versionStageError } = await ascensionDb
     .from("ascension_run_stages")
     .select("status,response_payload")
     .eq("request_id", requestId)

@@ -59,3 +59,17 @@ jobs:
           else
             echo "Fly.io machine inventory unavailable"
           fi
+
+      - name: Confirm owner-created ASCENSION publishing token exists on Fly
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "FLY_API_TOKEN not accessible to the read-only verification"
+            exit 1
+          fi
+          flyctl secrets list --app ascension-nexus-weave --json |
+            jq -e 'any(.[]; (.name // .Name // "") == "ASCENSION_PUBLISH_TOKEN")' >/dev/null
+          echo "VERIFIED: owner-controlled ASCENSION_PUBLISH_TOKEN is present in the existing Fly app vault."

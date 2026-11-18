@@ -51,28 +51,21 @@ jobs:
           bun install --frozen-lockfile
           bun run build
           test -f .output/server/index.mjs
-      - name: Use only the current owner's PRIVATE Fly engine image
+      - name: Restore and verify the ORIGINAL owner engine image
         id: image
         shell: bash
         run: |
           set -euo pipefail
-          # Machine metadata names the image of the ORIGINAL owner worker.
-          # Its private authored source is never checked into this repository.
-          metadata="$(curl --fail --silent --show-error --max-time 20 \
-            -H "Authorization: Bearer $FLY_API_TOKEN" \
-            "https://api.machines.dev/v1/apps/$FLY_APP/machines/$OWNER_WORKER_ID")"
-          base="$(printf '%s' "$metadata" | jq -r '.config.image // empty')"
-          case "$base" in
-            registry.fly.io/ascension-nexus-weave:deployment-*|registry.fly.io/ascension-nexus-weave@sha256:*|registry.fly.io/ascension-nexus-weave:owner-queue-*) ;;
-            *) echo "::error::Original private owner image not found; refusing image substitution."; exit 1 ;;
-          esac
-          echo "ASCENSION_ORIGINAL_PRIVATE_FLY_IMAGE_FOUND"
-          echo "original_base=$base" >> "$GITHUB_OUTPUT"
+          # PINNED from the OWNER'S successful November 18 original private
+          # Python source deployment, never from a later public web build.
+          # A routine Fly web deploy had changed the worker machine image.
+          base='registry.fly.io/ascension-nexus-weave:deployment-01M7QA1AHCPVMA39KRBSC1YCZ9'
           flyctl auth docker
           docker pull "$base"
           docker run --rm --entrypoint /bin/sh "$base" -c \
-            'test -f /app/ASCENSION_CORE/cloud_queue_worker.py && test -f /app/clarity/core_runtime.py && test -f /app/ASCENSION_CORE/live_publication.py'
-          echo "ASCENSION_ORIGINAL_AUTHOR_SOURCE_PRESERVED"
+            'test -f /app/ASCENSION_CORE/cloud_queue_worker.py && test -f /app/clarity/core_runtime.py && test -f /app/ASCENSION_CORE/live_publication.py && test -f /app/verify_state.py'
+          echo 'ASCENSION_ORIGINAL_AUTHOR_SOURCE_PRESERVED_BY_PINNED_PRIVATE_IMAGE'
+          echo "original_base=$base" >> "$GITHUB_OUTPUT"
       - name: Build and publish owner-only Fly image overlay
         id: overlay
         shell: bash

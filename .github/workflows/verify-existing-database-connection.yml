@@ -59,3 +59,16 @@ jobs:
           else
             echo "Fly.io machine inventory unavailable"
           fi
+
+      - name: Inspect Fly volumes and existing mount attachments read-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Existing ASCENSION persistent volumes:"
+          flyctl volumes list --app ascension-nexus-weave --json |
+            jq -r '.[] | [.id, .name, .region, ((.size_gb // .size // 0)|tostring), (.attached_machine_id // "unattached")] | @tsv'
+          echo "ASCENSION running machine mount targets:"
+          flyctl machine list --app ascension-nexus-weave --json |
+            jq -r '.[] | [.id, (.name // ""), (.config.image // ""), ([.config.mounts[]? | (.path // .destination // "")] | join(","))] | @tsv'

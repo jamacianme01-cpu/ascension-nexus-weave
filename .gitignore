@@ -30,6 +30,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Owner's proprietary, privately staged Fly engine source.
-/.private_runtime/

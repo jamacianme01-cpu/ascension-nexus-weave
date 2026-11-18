@@ -138,8 +138,8 @@ export async function retrieveKnowledge(
   limit = 12,
 ): Promise<KnowledgeRetrievalResult> {
   const cleanQuery = query.trim();
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+  const { data, error } = await ascensionDb
     .from("ascension_relay_documents")
     .select("path, body, http_status")
     .in("path", [...INTERNAL_PATHS])

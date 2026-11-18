@@ -50,7 +50,7 @@ jobs:
       - name: Deploy the existing ASCENSION app
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml
+        run: flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml --process-groups app
       - name: Check Fly app status
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

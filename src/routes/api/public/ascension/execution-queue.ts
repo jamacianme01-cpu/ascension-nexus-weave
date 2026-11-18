@@ -121,6 +121,16 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         const runner =
           optionalString(new URL(request.url).searchParams.get("runner"), 200) ?? "ascension-runtime";
 
+        const volume = await import("@/lib/ascension/data/volume-transport.server");
+        if (volume.ownerVolumeTransportEnabled()) {
+          try {
+            return json(await volume.callOwnerVolumeTransport<{item:unknown}>(
+              "/queue/claim?runner=" + encodeURIComponent(runner), "GET"), 200);
+          } catch (cause) {
+            console.error("[ASCENSION queue bridge] owner transport unavailable", cause instanceof Error ? cause.message : "unknown");
+            return json({error:"owner_queue_transport_unavailable"}, 503);
+          }
+        }
         const { ascensionDb } = await import("@/lib/ascension/data/client.server");
         const { data: pending, error: readError } = await ascensionDb
           .from("ascension_execution_requests")
@@ -192,6 +202,18 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
             if (localDraft.kind === "not_produced") return json({ error: "draft_not_produced" }, 422);
           } catch {
             return json({ error: "invalid_local_draft" }, 400);
+          }
+        }
+
+        const volume = await import("@/lib/ascension/data/volume-transport.server");
+        if (volume.ownerVolumeTransportEnabled()) {
+          if (localDraft) return json({error:"private_owner_transport_does_not_accept_unverified_drafts"},422);
+          try {
+            return json(await volume.callOwnerVolumeTransport<{ok:boolean}>(
+              "/queue/report", "POST", body), 200);
+          } catch (cause) {
+            console.error("[ASCENSION queue bridge] owner report unavailable", cause instanceof Error ? cause.message : "unknown");
+            return json({error:"owner_queue_report_unavailable"}, 503);
           }
         }
 

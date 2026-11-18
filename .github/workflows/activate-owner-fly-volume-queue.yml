@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 # Share the existing production deployment lock; do not replace the worker
 # with a public-source image lacking the original owner ASCENSION_CORE.
@@ -114,3 +115,27 @@ jobs:
           done
           echo "::error::ENGAGE website has not confirmed private worker connectivity."
           exit 1
+
+      - name: Publish non-secret deployment status to ASCENSION commit
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINAL_JOB_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ "$FINAL_JOB_RESULT" = 'success' ]; then
+            state=success
+            message='Original ASCENSION queue connected and verified'
+          else
+            state=failure
+            message='Original ASCENSION private queue deployment failed; see run'
+          fi
+          jq -n --arg state "$state" --arg msg "$message" \
+            --arg target "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state: $state, description: $msg, context: "ASCENSION original Fly volume queue", target_url: $target}' |
+            curl --fail --silent --show-error -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'Content-Type: application/json' \
+              -d @- "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" >/dev/null

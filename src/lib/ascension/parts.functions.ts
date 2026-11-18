@@ -54,13 +54,13 @@ export const getDissectedDesign = createServerFn({ method: 'POST' })
       if(data.view==='assembled') {
         // Stable, persisted source: reopening a pathway must not charge for or
         // generate another image when the exact one has already been saved.
-        const {supabaseAdmin}=await import('@/integrations/supabase/client.server');
-        const stored=await supabaseAdmin.storage.from('ascension-models').list('assembled',{
+        const {ascensionDb}=await import('@/lib/ascension/data/client.server');
+        const stored=await ascensionDb.storage.from('ascension-models').list('assembled',{
           search:`${hash}.png`,limit:10
         });
         if(stored.error)throw new Error(`Unable to check saved assembled artwork: ${stored.error.message}`);
         if((stored.data??[]).some(item=>item.name===`${hash}.png`)) {
-          return {imageUrl:supabaseAdmin.storage.from('ascension-models').getPublicUrl(`assembled/${hash}.png`).data.publicUrl,parts:[] as DesignPart[]};
+          return {imageUrl:ascensionDb.storage.from('ascension-models').getPublicUrl(`assembled/${hash}.png`).data.publicUrl,parts:[] as DesignPart[]};
         }
         // A saved source remains available without billing. A missing one must
         // not trigger image generation without explicit owner opt-in.
@@ -82,8 +82,8 @@ export const getDissectedDesign = createServerFn({ method: 'POST' })
         // in this same ASCENSION storage bucket is an approved reference.
         const match=data.referenceImageUrl.match(/\/storage\/v1\/object\/public\/ascension-models\/(assembled\/[a-f0-9]{64}\.png|references\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.png)$/);
         if(match) {
-          const {supabaseAdmin}=await import('@/integrations/supabase/client.server');
-          const canonical=supabaseAdmin.storage.from('ascension-models').getPublicUrl(match[1]!).data.publicUrl;
+          const {ascensionDb}=await import('@/lib/ascension/data/client.server');
+          const canonical=ascensionDb.storage.from('ascension-models').getPublicUrl(match[1]!).data.publicUrl;
           if(canonical===data.referenceImageUrl) {
             const response=await fetch(canonical,{signal:AbortSignal.timeout(15000)});
             if(response.ok){const bytes=new Uint8Array(await response.arrayBuffer());if(bytes.length<=8_000_000){let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);referenceDataUrl=`data:image/png;base64,${btoa(binary)}`;}}

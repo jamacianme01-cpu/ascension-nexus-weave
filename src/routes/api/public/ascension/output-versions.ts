@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { authorizeAscensionHub } from "@/lib/ascension/hub-auth.server";
 import { normalizeOutputVersions, needsVersionCompletion } from "@/lib/ascension/output-versions.server";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import type { Json } from "@/integrations/supabase/types";
+import { ascensionDb } from "@/lib/ascension/data/client.server";
+import type { Json } from "@/lib/ascension/data/types";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -35,7 +35,7 @@ function planning(value: unknown) {
 }
 
 async function target(id: string) {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await ascensionDb
     .from("ascension_execution_requests")
     .select("id, objective, engine, status, result")
     .eq("id", id)
@@ -61,7 +61,7 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
           if (!runner || !/^[A-Za-z0-9_.-]{1,120}$/.test(runner))
             return json({ error: "invalid_runner" }, 400);
           const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-          const { data: candidates, error: candidateError } = await supabaseAdmin
+          const { data: candidates, error: candidateError } = await ascensionDb
             .from("ascension_execution_requests")
             .select("id,objective,result,completed_at")
             .eq("engine", "governed_runtime")
@@ -78,7 +78,7 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
               new Set(branches.map((branch) => branch.id)).size === 3;
           });
           if (!eligible.length) return json({ item: null });
-          const { data: stages, error: stagesError } = await supabaseAdmin
+          const { data: stages, error: stagesError } = await ascensionDb
             .from("ascension_run_stages")
             .select("request_id,status,response_payload")
             .in("request_id", eligible.map((row) => row.id))
@@ -112,7 +112,7 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
           return json({ error: "three_distinct_governed_branches_required" }, 422);
         // Hub-key access only: recover existing generated source files so a
         // retry does not waste compute or overwrite three successful versions.
-        const { data: versionStage, error: versionError } = await supabaseAdmin
+        const { data: versionStage, error: versionError } = await ascensionDb
           .from("ascension_run_stages")
           .select("status,response_payload")
           .eq("request_id", id!)
@@ -144,7 +144,7 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
         catch (e) { return json({ error: "invalid_output_versions", reason: e instanceof Error ? e.message : String(e) }, 422); }
         // Fail closed: a recovery may fill unavailable slots, but must never
         // silently erase or replace a previously saved created version.
-        const { data: existingStage, error: existingError } = await supabaseAdmin
+        const { data: existingStage, error: existingError } = await ascensionDb
           .from("ascension_run_stages")
           .select("status,response_payload")
           .eq("request_id", id)
@@ -169,7 +169,7 @@ export const Route = createFileRoute("/api/public/ascension/output-versions")({
           }
         }
         const now = new Date().toISOString();
-        const { error } = await supabaseAdmin.from("ascension_run_stages").upsert({
+        const { error } = await ascensionDb.from("ascension_run_stages").upsert({
           request_id: id,
           ordinal: 103,
           stage: "output_versions",

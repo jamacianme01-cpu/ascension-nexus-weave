@@ -36,15 +36,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Keep private Git metadata, state snapshots and credentials out of images.
-.private_runtime/.git/
-.private_runtime/**/.git/
-.private_runtime/**/.env
-.private_runtime/**/.env.*
-.private_runtime/**/__pycache__/
-.private_runtime/**/.pytest_cache/
-.private_runtime/ASCENSION_CORE/state/
-.private_runtime/ASCENSION_CORE/state_demo/
-.private_runtime/clarity/**/__pycache__/
-*.pyc

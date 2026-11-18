@@ -38,10 +38,10 @@ const clean = (value: unknown, max: number) =>
   typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
 
 async function ensureModelBucket() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin.storage.getBucket(BUCKET);
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+  const { data } = await ascensionDb.storage.getBucket(BUCKET);
   if (!data) {
-    const created = await supabaseAdmin.storage.createBucket(BUCKET, {
+    const created = await ascensionDb.storage.createBucket(BUCKET, {
       public: true,
       fileSizeLimit: MAX_MODEL_BYTES,
       allowedMimeTypes: [MODEL_MIME, "application/octet-stream"],
@@ -50,14 +50,14 @@ async function ensureModelBucket() {
       throw new Error(created.error.message);
     }
   } else if (!data.public) {
-    const updated = await supabaseAdmin.storage.updateBucket(BUCKET, {
+    const updated = await ascensionDb.storage.updateBucket(BUCKET, {
       public: true,
       fileSizeLimit: MAX_MODEL_BYTES,
       allowedMimeTypes: [MODEL_MIME, "application/octet-stream"],
     });
     if (updated.error) throw new Error(updated.error.message);
   }
-  return supabaseAdmin;
+  return ascensionDb;
 }
 
 export const Route = createFileRoute("/api/public/ascension/model-queue")({
@@ -69,14 +69,14 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
 
         const runner =
           clean(new URL(request.url).searchParams.get("runner"), 200) ?? "hunyuan-windows";
-        let supabaseAdmin;
+        let ascensionDb;
         try {
-          supabaseAdmin = await ensureModelBucket();
+          ascensionDb = await ensureModelBucket();
         } catch {
           return json({ error: "model_storage_unavailable" }, 503);
         }
 
-        const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
+        const table = ascensionDb.from("ascension_model_jobs" as never) as any;
 
         // A worker can successfully claim a job and then lose connectivity before
         // reporting "running". Recover only stale "claimed" jobs; never recycle an
@@ -148,7 +148,7 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         // ENGAGE has already persisted and returned the answer by this point.
         if (!claimed.source_image_url) {
           try {
-            const { data: run, error: runError } = await supabaseAdmin
+            const { data: run, error: runError } = await ascensionDb
               .from("ascension_execution_requests")
               .select("objective")
               .eq("id", claimed.request_id)
@@ -186,7 +186,7 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         }
 
         const objectPath = claimed.request_id + "/" + claimed.id + ".glb";
-        const signed = await supabaseAdmin.storage
+        const signed = await ascensionDb.storage
           .from(BUCKET)
           .createSignedUploadUrl(objectPath, { upsert: true });
         if (signed.error || !signed.data) {
@@ -201,7 +201,7 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
             .eq("status", "claimed");
           return json({ error: "model_upload_sign_failed" }, 500);
         }
-        const publicData = supabaseAdmin.storage.from(BUCKET).getPublicUrl(objectPath).data;
+        const publicData = ascensionDb.storage.from(BUCKET).getPublicUrl(objectPath).data;
 
         return json({
           item: {
@@ -231,13 +231,13 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
           return json({ error: "invalid_status" }, 400);
         }
 
-        let supabaseAdmin;
+        let ascensionDb;
         try {
-          supabaseAdmin = await ensureModelBucket();
+          ascensionDb = await ensureModelBucket();
         } catch {
           return json({ error: "model_storage_unavailable" }, 503);
         }
-        const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
+        const table = ascensionDb.from("ascension_model_jobs" as never) as any;
         const { data: job, error: readError } = await table
           .select("id, request_id, pathway_id, status")
           .eq("id", jobId)
@@ -267,14 +267,14 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         }
 
         const objectPath = job.request_id + "/" + job.id + ".glb";
-        const folder = await supabaseAdmin.storage.from(BUCKET).list(job.request_id, {
+        const folder = await ascensionDb.storage.from(BUCKET).list(job.request_id, {
           limit: 100,
           search: job.id + ".glb",
         });
         if (folder.error || !(folder.data ?? []).some((item) => item.name === job.id + ".glb")) {
           return json({ error: "model_upload_missing" }, 409);
         }
-        const publicUrl = supabaseAdmin.storage.from(BUCKET).getPublicUrl(objectPath)
+        const publicUrl = ascensionDb.storage.from(BUCKET).getPublicUrl(objectPath)
           .data.publicUrl;
         const { error } = await table
           .update({

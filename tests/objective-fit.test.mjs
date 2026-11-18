@@ -12,33 +12,45 @@ const server = await createServer({ configFile: false, server: { middlewareMode:
     `;
   } }] });
 const originalFetch = globalThis.fetch;
-const priorKey = process.env.LOVABLE_API_KEY;
-const priorHostedOptIn = process.env.ASCENSION_ALLOW_LOVABLE_AI;
-process.env.LOVABLE_API_KEY = "test-only";
-process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
+const priorKey = process.env.OPENAI_API_KEY;
+const priorAllow = process.env.ASCENSION_ALLOW_OPENAI_AI;
+const priorPaid = process.env.ASCENSION_ENABLE_PAID_APIS;
+process.env.OPENAI_API_KEY = "test-only";
+process.env.ASCENSION_ALLOW_OPENAI_AI = "true";
+process.env.ASCENSION_ENABLE_PAID_APIS = "true";
 let passed = 0;
 function pass(name) { passed++; console.log(`PASS ${name}`); }
 function gateway(responses) {
   const calls = [];
   let lastDraft = null;
-  globalThis.fetch = async (_url, init) => {
-    const request = JSON.parse(init.body);
-    // These scenarios isolate objective-meaning repairs. The Spiral engine may
-    // independently request one extra expansion; deliberately return the same
-    // underexpanded draft to verify meaning repair still catches wrong subjects,
-    // without consuming the meaning-review verdict fixtures.
-    if (String(request.messages?.[0]?.content ?? "").includes("SPIRAL REPAIR REQUIRED") && lastDraft) {
-      return new Response("data: " + JSON.stringify({
-        choices: [{ delta: { content: JSON.stringify(lastDraft) } }],
-      }) + "\n");
+  globalThis.fetch = async (url, init) => {
+    assert.equal(url, "https://api.openai.com/v1/responses");
+    const payload = JSON.parse(init.body);
+    // Preserve the logical provider-message assertion surface in these isolated tests.
+    const request = { ...payload, messages: [
+      { content: payload.instructions },
+      { content: payload.input[0].content },
+    ] };
+    // Spiral expansion can repeat the prior incomplete draft without consuming
+    // the next meaning-check verdict fixture.
+    if (String(request.messages[0].content ?? "").includes("SPIRAL REPAIR REQUIRED") && lastDraft) {
+      return responseWith(lastDraft);
     }
     calls.push(request);
     assert.ok(responses.length, "Unexpected additional provider call");
     const response = responses.shift();
     if (response?.kind) lastDraft = response;
-    return new Response("data: " + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(response) } }] }) + "\n");
+    return responseWith(response);
   };
   return calls;
+}
+function responseWith(value) {
+  return new Response(JSON.stringify({
+    status: "completed",
+    output: [{ type: "message", content: [
+      { type: "output_text", text: JSON.stringify(value) },
+    ] }],
+  }), { headers: { "content-type": "application/json" } });
 }
 function verdict(delivery, rejected = [], question = null) {
   const targets = ["result", ...delivery.pathways.map((_, i) => `pathway_${i + 1}`), ...(delivery.blend ? ["blend"] : [])];
@@ -171,8 +183,9 @@ try {
   console.log(`${passed} objective meaning checks passed`);
 } finally {
   globalThis.fetch = originalFetch;
-  if (priorKey === undefined) delete process.env.LOVABLE_API_KEY; else process.env.LOVABLE_API_KEY = priorKey;
-  if (priorHostedOptIn === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI; else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptIn;
+  if (priorKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = priorKey;
+  if (priorAllow === undefined) delete process.env.ASCENSION_ALLOW_OPENAI_AI; else process.env.ASCENSION_ALLOW_OPENAI_AI = priorAllow;
+  if (priorPaid === undefined) delete process.env.ASCENSION_ENABLE_PAID_APIS; else process.env.ASCENSION_ENABLE_PAID_APIS = priorPaid;
   await server.close();
 }
 

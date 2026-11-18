@@ -19,14 +19,31 @@ try {
   const screen=mesh.localToWorld(anchor.clone()).project(camera);
   const nextRay=new THREE.Raycaster();nextRay.setFromCamera(new THREE.Vector2(screen.x,screen.y),camera);
   assert.ok(nextRay.ray.distanceToPoint(mesh.localToWorld(anchor.clone()))<1e-6);
-  const {callZai}=await server.ssrLoadModule('/src/lib/ascension/engine/zai.server.ts');
-  const prior=process.env.LOVABLE_API_KEY;const priorOptIn=process.env.ASCENSION_ALLOW_LOVABLE_AI;process.env.LOVABLE_API_KEY='test-only';process.env.ASCENSION_ALLOW_LOVABLE_AI='true';const original=globalThis.fetch;
-  let sent;
-  globalThis.fetch=async(url,init)=>{
-    if(String(url).includes('/chat/completions')){sent=JSON.parse(init.body);return new Response('data: '+JSON.stringify({choices:[{delta:{content:JSON.stringify({parts:[part]})}}]})+'\n\ndata: [DONE]\n\n');}
-    throw new Error('No internal retrieval in isolated test');
-  };
-  try {await callZai({system:'Describe visible parts.',user:'Housing',imageDataUrl:'data:image/jpeg;base64,AAAA'});assert.equal(sent.messages[1].content[1].image_url.url,'data:image/jpeg;base64,AAAA');}
-  finally{globalThis.fetch=original;if(prior===undefined)delete process.env.LOVABLE_API_KEY;else process.env.LOVABLE_API_KEY=prior;if(priorOptIn===undefined)delete process.env.ASCENSION_ALLOW_LOVABLE_AI;else process.env.ASCENSION_ALLOW_LOVABLE_AI=priorOptIn;}
+  const {callApprovedAnswer}=await server.ssrLoadModule('/src/lib/ascension/engine/approved-answer.server.ts');
+  const keys=['ASCENSION_ENABLE_PAID_APIS','ASCENSION_ALLOW_OPENAI_AI','OPENAI_API_KEY'];
+  const originalEnv=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
+  const original=globalThis.fetch;
+  try {
+    for(const key of keys)delete process.env[key];
+    let calls=0;globalThis.fetch=async()=>{calls++;throw new Error('Unexpected outside provider');};
+    await assert.rejects(()=>callApprovedAnswer({system:'Describe visible parts.',user:'Housing',includeInternalKnowledge:false}),/owner-approved/);
+    assert.equal(calls,0);
+    process.env.ASCENSION_ENABLE_PAID_APIS='true';
+    process.env.ASCENSION_ALLOW_OPENAI_AI='true';
+    process.env.OPENAI_API_KEY='test-only';
+    let sent;
+    globalThis.fetch=async(url,init)=>{
+      assert.equal(url,'https://api.openai.com/v1/responses');
+      sent=JSON.parse(init.body);
+      return new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({parts:[part]})}]}]}));
+    };
+    const approved=await callApprovedAnswer({system:'Describe visible parts.',user:'Housing',imageDataUrl:'data:image/jpeg;base64,AAAA',includeInternalKnowledge:false});
+    assert.equal(sent.input[0].content[1].type,'input_image');
+    assert.equal(sent.input[0].content[1].image_url,'data:image/jpeg;base64,AAAA');
+    assert.equal(approved.json.parts[0].name,'Housing');
+  }finally{
+    globalThis.fetch=original;
+    for(const key of keys){if(originalEnv[key]===undefined)delete process.env[key];else process.env[key]=originalEnv[key];}
+  }
   console.log('PASS part validation, picture grounding, and anchors after camera movement');
 }finally{await server.close();}

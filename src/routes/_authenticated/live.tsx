@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { ascensionSession } from "@/lib/ascension/data/session.client";
+import { ascensionSession } from "@/lib/ascension/data/session";
 import {
   deleteObservation,
   getGovernedPublication,

@@ -27,6 +27,26 @@ jobs:
             echo "::error::FLY_API_TOKEN is not configured in GitHub Actions. No deployment was attempted."
             exit 1
           fi
+      - name: Secure original ASCENSION internal publish channel
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The owner supplies no external service credential. This token is
+          # generated once, stored only in the existing owner's Fly app vault,
+          # and shared by the web queue and original ASCENSION worker process.
+          # Never rotate an already-configured value on a normal deployment.
+          if flyctl secrets list --app ascension-nexus-weave --json |
+               jq -e 'any(.[]; (.name // .Name // "") == "ASCENSION_PUBLISH_TOKEN")' >/dev/null; then
+            echo "ASCENSION internal publish token exists; retaining existing credential."
+          else
+            token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+            echo "::add-mask::$token"
+            flyctl secrets set --app ascension-nexus-weave --stage "ASCENSION_PUBLISH_TOKEN=$token" >/dev/null
+            unset token
+            echo "ASCENSION internal publish token securely staged in Fly for this deploy."
+          fi
       - name: Deploy the existing ASCENSION app
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -35,5 +55,14 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl status --app ascension-nexus-weave
+      - name: Verify ASCENSION internal token was stored without displaying its value
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          flyctl secrets list --app ascension-nexus-weave --json |
+            jq -e 'any(.[]; (.name // .Name // "") == "ASCENSION_PUBLISH_TOKEN")'
+          echo "Owner-controlled ASCENSION web/worker publish token is stored in Fly."
       - name: Check deployed web server
         run: curl --fail --show-error --silent --retry 5 --retry-delay 10 --retry-all-errors https://ascension-nexus-weave.fly.dev/api/health

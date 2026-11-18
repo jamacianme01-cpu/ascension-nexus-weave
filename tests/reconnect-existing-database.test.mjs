@@ -4,7 +4,7 @@ import test from "node:test";
 const read = name => fs.readFileSync(new URL("../" + name, import.meta.url), "utf8");
 
 test("real server transport preserves existing database, never silently creates a new one", () => {
-  const adapter = read("src/integrations/supabase/postgres-compat.server.ts");
+  const adapter = read("src/lib/ascension/data/postgres.server.ts");
   assert.match(adapter, /import postgres from "postgres"/);
   assert.match(adapter, /ASCENSION_DATABASE_URL/);
   assert.match(adapter, /DATABASE_URL/);
@@ -16,12 +16,12 @@ test("real server transport preserves existing database, never silently creates 
 });
 
 test("admin table queries and stored functions no longer always return offline", () => {
-  const server = read("src/integrations/supabase/client.server.ts");
+  const server = read("src/lib/ascension/data/client.server.ts");
   assert.match(server, /new Query\(table\)/);
   assert.match(server, /rpcDatabase\(name, args\)/);
   assert.doesNotMatch(server, /Promise\.resolve\(\{ data: null, error: OFFLINE/);
   const guest = read("src/lib/ascension/guest.functions.ts");
-  assert.match(guest, /import\("@\/integrations\/supabase\/client\.server"\)/);
+  assert.match(guest, /import\("@\/lib\/ascension\/data\/client\.server"\)/);
   assert.doesNotMatch(guest, /supabase\.rpc\(/);
 });
 

@@ -8,9 +8,9 @@ export async function authorizeAscensionHub(request: Request): Promise<Response 
               request.headers.get("x-ascension-publish-token");
   if (!raw || !/^[a-f0-9]{96}$/i.test(raw)) return denied("hub_not_paired", 401);
   const providedHash = createHash("sha256").update(raw.toLowerCase()).digest();
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
   // The new migration is not yet reflected in Lovable's generated DB types.
-  const db = supabaseAdmin as unknown as {
+  const db = ascensionDb as unknown as {
     from(name: string): {
       select(cols: string): {eq(k:string,v:string): {
         is(k:string,v:null): {maybeSingle(): Promise<{

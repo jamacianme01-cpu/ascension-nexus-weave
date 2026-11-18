@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { ascensionDb } from "@/lib/ascension/data/client.server";
 import { supportsEnvisionObjective, type ObjectiveDelivery } from "./result-model";
 
 /**
@@ -39,7 +39,7 @@ export async function enqueueDeliveryModels(
 
   // The generated Database type does not know about this just-added table yet;
   // keep the escape hatch isolated to this server-only boundary.
-  const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
+  const table = ascensionDb.from("ascension_model_jobs" as never) as any;
   const { error } = await table.upsert(rows, {
     onConflict: "request_id,pathway_id",
     ignoreDuplicates: true,
@@ -58,7 +58,7 @@ export async function attachCompletedModels(
 ): Promise<ObjectiveDelivery | null> {
   if (!delivery) return null;
 
-  const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
+  const table = ascensionDb.from("ascension_model_jobs" as never) as any;
   const { data, error } = await table
     .select("pathway_id, model_url, source_image_url, status, error")
     .eq("request_id", requestId);

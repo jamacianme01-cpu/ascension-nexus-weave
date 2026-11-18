@@ -48,6 +48,7 @@ interface GuestBundle {
     status: string;
   } | null;
   draft_stage?: unknown;
+  artifacts?: {name:string;content:string}[];
 }
 
 export interface GuestDeliveryState {
@@ -91,6 +92,12 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }) => {
+    // The owner's existing Fly state volume is the authoritative queue transport
+    // whenever the former web database is absent. Never create a substitute DB.
+    const volume = await import("@/lib/ascension/data/volume-transport.server");
+    if (volume.ownerVolumeTransportEnabled()) {
+      return volume.callOwnerVolumeTransport<GuestSubmission>("/guest/submit", "POST", data);
+    }
     let evidence = data.evidence;
     if (data.parentRequestId) {
       if (!/^[a-f0-9-]{36}$/i.test(data.parentRequestId) ||
@@ -133,6 +140,10 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
 export const getGuestObjectiveStatus = createServerFn({ method: "GET" })
   .inputValidator(validateRequest)
   .handler(async ({ data }) => {
+    const volume = await import("@/lib/ascension/data/volume-transport.server");
+    if (volume.ownerVolumeTransportEnabled()) {
+      return volume.callOwnerVolumeTransport<{request:ObjectiveRun|null}>("/guest/status", "POST", data);
+    }
     const row = await rpc<ObjectiveRun>("ascension_guest_status", {
       p_request_id: data.requestId,
       p_guest_token: data.guestToken,
@@ -145,6 +156,39 @@ async function projectGuestDelivery(
   guestToken: string,
   retry: boolean,
 ): Promise<GuestDeliveryState | null> {
+  const volume = await import("@/lib/ascension/data/volume-transport.server");
+  if (volume.ownerVolumeTransportEnabled()) {
+    const snapshot = await volume.callOwnerVolumeTransport<{
+      run: ObjectiveRun | null;
+      artifacts?: {name:string;content:string}[];
+    }>("/guest/bundle", "POST", {requestId,guestToken});
+    if (!snapshot.run) return null;
+    const run = snapshot.run;
+    const base = {
+      created_at: run.completed_at || run.updated_at || run.created_at,
+      engine_model: "ASCENSION_CORE",
+      engine_label: "GOVERNED_RUNTIME_RESULT_V2",
+    };
+    if (run.status === "failed" || run.status === "rejected") {
+      return {...base,status:"completed",response_payload:null,
+        error: run.error || "The owner's governed runtime did not verify this objective.",
+        source:null};
+    }
+    if (run.status !== "verified") {
+      return {...base,status:"running",response_payload:null,error:null,source:null,
+        note:"Your original ASCENSION worker is processing this objective."};
+    }
+    // Only project files and pathways actually returned by the ORIGINAL runtime.
+    // Neither the transport nor the website invents a Claude/Grok/OpenAI answer.
+    const engine = await import("./engine/delivery.server");
+    const delivered = engine.governedDelivery(run, snapshot.artifacts || []);
+    const complete = delivered?.kind !== "not_produced" &&
+      delivered?.pathways.length === 3 && Boolean(delivered?.blend);
+    return {...base,status:"completed",response_payload: delivered,
+      error: complete ? null : "The governed objective finished, but three complete pathways and BLEND have not been produced.",
+      note:complete?null:"Only original runtime output was returned; no provider output was fabricated.",
+      source:"governed"};
+  }
   const bundle = await rpc<GuestBundle>("ascension_guest_bundle", {
     p_request_id: requestId,
     p_guest_token: guestToken,

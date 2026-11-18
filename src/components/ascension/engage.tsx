@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ascensionSession } from "@/lib/ascension/data/session.client";
+import { ascensionSession } from "@/lib/ascension/data/session";
 import { RealityViewer, type RealityMode } from "@/components/ascension/RealityViewer";
 
 import {

@@ -1,12 +1,10 @@
 name: Activate original ASCENSION Fly worker queue
 
+# Every website change must preserve the owner's original private engine image.
+# Do NOT publish a public-source image that removes authored ASCENSION_CORE.
 on:
   push:
     branches: [main]
-    paths:
-      - 'scripts/ascension-owner-queue/**'
-      - 'fly.owner-queue.toml'
-      - '.github/workflows/activate-owner-fly-volume-queue.yml'
   workflow_dispatch:
 
 permissions:

@@ -386,7 +386,9 @@ export async function externalProductDraft(
   let openaiAnswer = "";
   let openaiSources: OpenAIWebSource[] = [];
   let openaiError = "";
-  if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
+  if (process.env["ASCENSION_ENABLE_PAID_APIS"] === "true" &&
+      process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
+      process.env["ASCENSION_ENABLE_OPENAI_WEB_SEARCH"] === "true" &&
       process.env["OPENAI_API_KEY"]?.trim()) {
     try {
       const research = await callOpenAIResponse({

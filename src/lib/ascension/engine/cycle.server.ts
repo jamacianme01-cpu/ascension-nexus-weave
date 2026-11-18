@@ -3,7 +3,7 @@
  *
  * Runs ONE stage of the canonical chain per call and persists it before
  * returning, so no single request holds a long connection open. Every value
- * stored here comes from the external Z.AI engine verbatim — this module
+ * stored here comes from an explicitly approved external answer engine verbatim — this module
  * decides nothing, verifies nothing itself, and can never mark a run as
  * ASCENSION · VERIFIED / PERSISTED. That label belongs to the governed core
  * alone.
@@ -11,7 +11,7 @@
 import { ascensionDb } from "@/lib/ascension/data/client.server";
 
 import { EPISTEMIC_LABELS, STAGE_CHAIN, type StageSpec } from "./stages";
-import { callZai, ZaiEngineError, zaiModel } from "./zai.server";
+import { callApprovedAnswer, ApprovedAnswerError, approvedAnswerModel } from "./approved-answer.server";
 
 const SYSTEM = [
   "You are an external reasoning engine invoked by the ASCENSION governed system.",
@@ -146,7 +146,7 @@ export async function advanceRun(requestId: string): Promise<AdvanceResult> {
     stage: spec.stage,
     engine_status: `running · ${spec.stage}`,
     epistemic_label: spec.label,
-    claimed_by: `zai:${zaiModel()}`,
+    claimed_by: `approved:${approvedAnswerModel()}`,
     claimed_at: new Date().toISOString(),
   });
 
@@ -154,10 +154,10 @@ export async function advanceRun(requestId: string): Promise<AdvanceResult> {
 
   let result;
   try {
-    result = await callZai({ system: SYSTEM, user: prompt, knowledgeQuery: typedRun.objective });
+    result = await callApprovedAnswer({ system: SYSTEM, user: prompt, knowledgeQuery: typedRun.objective });
   } catch (cause) {
     const message =
-      cause instanceof ZaiEngineError
+      cause instanceof ApprovedAnswerError
         ? cause.message
         : cause instanceof Error
           ? cause.message
@@ -169,7 +169,7 @@ export async function advanceRun(requestId: string): Promise<AdvanceResult> {
         stage: spec.stage,
         engine_label: spec.label,
         status: "failed",
-        engine_model: zaiModel(),
+        engine_model: approvedAnswerModel(),
         request_payload: { system: SYSTEM, user: prompt } as never,
         error: message,
         completed_at: new Date().toISOString(),

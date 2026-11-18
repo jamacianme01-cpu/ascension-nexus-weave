@@ -1,25 +1,16 @@
 /**
- * Independent ASCENSION storage layer.
- * Replaces the removed third-party admin client with a self-hosted object store.
- * Configure ASCENSION_STORAGE_DIR (local filesystem) or ASCENSION_STORAGE_BASE_URL
- * + ASCENSION_STORAGE_TOKEN for a remote store. No third-party platform required.
- *
- * Table and RPC calls fail closed. This build does not connect a hosted database.
+ * ASCENSION-owned persistence. SQL uses native PostgreSQL from DATABASE_URL.
+ * Object files use the owner's explicitly mounted ASCENSION_STORAGE_DIR.
+ * Never create a replacement database or claim transient files are durable.
  */
 
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Query, rpcDatabase } from "./postgres.server";
 
-const STORAGE_DIR = process.env["ASCENSION_STORAGE_DIR"]?.trim() || ".ascension-storage";
-const REMOTE_BASE = process.env["ASCENSION_STORAGE_BASE_URL"]?.trim() || "";
-const REMOTE_TOKEN = process.env["ASCENSION_STORAGE_TOKEN"]?.trim() || "";
-
+const STORAGE_DIR = process.env["ASCENSION_STORAGE_DIR"]?.trim() || "";
 
 function publicUrl(bucket: string, filePath: string): string {
-  if (REMOTE_BASE) {
-    return `${REMOTE_BASE.replace(/\/$/, "")}/${bucket}/${filePath}`;
-  }
   const rel = path.join(bucket, filePath).split(path.sep).join("/");
   const base = process.env["ASCENSION_PUBLIC_BASE_URL"]?.replace(/\/$/, "") || "";
   return base ? `${base}/storage/${rel}` : `/storage/${rel}`;
@@ -33,19 +24,10 @@ function bucketApi() {
       options?: { contentType?: string; upsert?: boolean },
     ): Promise<{ error: { message: string } | null } | { error: null }> {
       try {
-        if (REMOTE_BASE) {
-          const url = publicUrl(bucketName(this), filePath);
-          const res = await fetch(url, {
-            method: "PUT",
-            headers: {
-              "Content-Type": options?.contentType || "application/octet-stream",
-              ...(REMOTE_TOKEN ? { Authorization: `Bearer ${REMOTE_TOKEN}` } : {}),
-            },
-            body: Buffer.from(bytes),
-          });
-          if (!res.ok) return { error: { message: `remote storage upload failed: HTTP ${res.status}` } };
-          return { error: null };
-        }
+        if (!STORAGE_DIR || !path.isAbsolute(STORAGE_DIR))
+          return { error: { message: "ASCENSION_STORAGE_DIR must be a mounted absolute persistent directory." } };
+        if (filePath.split(/[\\/]/).includes(".."))
+          return { error: { message: "Invalid stored file path." } };
         const full = path.join(STORAGE_DIR, bucketName(this), filePath);
         await fs.mkdir(path.dirname(full), { recursive: true });
         if (!options?.upsert) {
@@ -110,10 +92,11 @@ export const ascensionDb = {
       return api;
     },
     async getBucket(_bucket: string) {
-      return { data: null as { public: boolean } | null, error: null };
+      return { data: STORAGE_DIR && path.isAbsolute(STORAGE_DIR) ? {public:true} : null,
+        error: STORAGE_DIR ? null : {message:"ASCENSION_STORAGE_DIR is not configured"} };
     },
     async createBucket(_bucket: string, _options?: Record<string, unknown>) {
-      return { data: null, error: { message: "Object buckets are stored on the local filesystem; no remote bucket was created." } };
+      return { data: null, error: { message: "Persistent filesystem storage must be explicitly configured first." } };
     },
     async updateBucket(_bucket: string, _options?: Record<string, unknown>) {
       return { data: null, error: { message: "Object bucket settings are not configurable in this independent build." } };

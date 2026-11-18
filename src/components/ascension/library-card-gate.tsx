@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { ascensionSession } from "@/lib/ascension/data/session.client";
 import {
   getMyLibraryCard,
   saveMyLibraryCard,
@@ -92,7 +92,7 @@ export function LibraryCardGate() {
     void (async () => {
       const forceCard = new URL(window.location.href).searchParams.get("library") === "1";
       try {
-        const { data } = await supabase.auth.getUser();
+        const { data } = await ascensionSession.auth.getUser();
         if (cancelled) return;
 
         if (!data.user) {
@@ -125,7 +125,7 @@ export function LibraryCardGate() {
 
   const openCard = async () => {
     setError(null);
-    const { data } = await supabase.auth.getUser();
+    const { data } = await ascensionSession.auth.getUser();
     if (!data.user) {
       window.location.href = `/auth?next=${encodeURIComponent("/?library=1")}`;
       return;

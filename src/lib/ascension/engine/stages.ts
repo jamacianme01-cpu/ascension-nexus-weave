@@ -1,5 +1,5 @@
 /**
- * Canonical stage chain for a hosted Z.AI execution run.
+ * Canonical stage chain for external draft provenance; never a governed run.
  *
  * Client-safe: names and labels only, no engine access. The web layer shows
  * these labels so external engine output is never mistaken for ASCENSION
@@ -7,20 +7,20 @@
  */
 
 export const EPISTEMIC_LABELS = {
-  external: "ZAI_EXTERNAL_RESULT",
-  pending: "ZAI_VERIFICATION_PENDING",
-  verified: "ZAI_VERIFIED_EXTERNAL_RESULT",
-  rejected: "ZAI_REJECTED_EXTERNAL_RESULT",
+  external: "EXTERNAL_RESULT_UNVERIFIED",
+  pending: "EXTERNAL_VERIFICATION_PENDING",
+  verified: "EXTERNAL_RESULT_REVIEWED",
+  rejected: "EXTERNAL_RESULT_REJECTED",
   persisted: "ASCENSION_VERIFIED_PERSISTED",
 } as const;
 
 export type EpistemicLabel = (typeof EPISTEMIC_LABELS)[keyof typeof EPISTEMIC_LABELS];
 
 export const EPISTEMIC_LABEL_TEXT: Record<string, string> = {
-  ZAI_EXTERNAL_RESULT: "Z.AI · EXTERNAL RESULT",
-  ZAI_VERIFICATION_PENDING: "Z.AI · VERIFICATION PENDING",
-  ZAI_VERIFIED_EXTERNAL_RESULT: "Z.AI · VERIFIED EXTERNAL RESULT",
-  ZAI_REJECTED_EXTERNAL_RESULT: "Z.AI · REJECTED EXTERNAL RESULT",
+  EXTERNAL_RESULT_UNVERIFIED: "UNVERIFIED · EXTERNAL RESULT",
+  EXTERNAL_VERIFICATION_PENDING: "UNVERIFIED · VERIFICATION PENDING",
+  EXTERNAL_RESULT_REVIEWED: "UNVERIFIED · VERIFIED EXTERNAL RESULT",
+  EXTERNAL_RESULT_REJECTED: "UNVERIFIED · REJECTED EXTERNAL RESULT",
   ASCENSION_VERIFIED_PERSISTED: "ASCENSION · VERIFIED / PERSISTED",
 };
 

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Json } from "@/integrations/supabase/types";
+import { requireAscensionAuth } from "@/lib/ascension/data/auth-middleware";
+import type { Json } from "@/lib/ascension/data/types";
 import { priorResultContext } from "./iteration-model";
 
 /**
@@ -41,7 +41,7 @@ const RUN_COLUMNS =
   "engine, id, objective, evidence, constraints, status, stage, claimed_at, claimed_by, completed_at, runtime_revision, transition_id, guardian_verdict, outcome_status, accepted_delta, result, error, created_at, updated_at";
 
 export const submitObjective = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .inputValidator(
     (input: {
       objective: string;
@@ -79,7 +79,7 @@ export const submitObjective = createServerFn({ method: "POST" })
         !["continue", "refine", "simulate", "execute"].includes(data.followUp ?? "")
       )
         throw new Error("Invalid follow-up reference.");
-      const { data: parent, error: parentError } = await context.supabase
+      const { data: parent, error: parentError } = await context.ascensionDb
         .from("ascension_execution_requests")
         .select("id, objective, result")
         .eq("id", data.parentRequestId)
@@ -87,7 +87,7 @@ export const submitObjective = createServerFn({ method: "POST" })
         .maybeSingle();
       if (parentError) throw new Error(parentError.message);
       if (!parent) throw new Error("The earlier objective is unavailable to your account.");
-      const { data: delivery, error: deliveryError } = await context.supabase
+      const { data: delivery, error: deliveryError } = await context.ascensionDb
         .from("ascension_run_stages")
         .select("response_payload")
         .eq("request_id", parent.id)
@@ -139,7 +139,7 @@ export const submitObjective = createServerFn({ method: "POST" })
 
     // If the user has established a Library Card, carry that source of truth
     // into every objective automatically. The Book never has to recollect it.
-    const { data: cardRow, error: cardError } = await context.supabase
+    const { data: cardRow, error: cardError } = await context.ascensionDb
       .from("ascension_user_observations")
       .select("note, updated_at")
       .eq("user_id", context.userId)
@@ -166,7 +166,7 @@ export const submitObjective = createServerFn({ method: "POST" })
       evidence = [...(evidence ?? []), libraryCardContext];
     }
 
-    const { data: row, error } = await context.supabase
+    const { data: row, error } = await context.ascensionDb
       .from("ascension_execution_requests")
       .insert({
         engine: "governed_runtime",
@@ -183,9 +183,9 @@ export const submitObjective = createServerFn({ method: "POST" })
   });
 
 export const listMyObjectives = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await context.ascensionDb
       .from("ascension_execution_requests")
       .select(RUN_COLUMNS)
       .order("created_at", { ascending: false })
@@ -195,14 +195,14 @@ export const listMyObjectives = createServerFn({ method: "GET" })
   });
 
 export const getObjectiveStatus = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .inputValidator((input: { requestId: string }) => {
     const requestId = input.requestId?.trim();
     if (!requestId) throw new Error("A request id is required.");
     return { requestId };
   })
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
+    const { data: row, error } = await context.ascensionDb
       .from("ascension_execution_requests")
       .select(RUN_COLUMNS)
       .eq("id", data.requestId)

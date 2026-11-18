@@ -55,5 +55,14 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl status --app ascension-nexus-weave
+      - name: Verify ASCENSION internal token was stored without displaying its value
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          flyctl secrets list --app ascension-nexus-weave --json |
+            jq -e 'any(.[]; (.name // .Name // "") == "ASCENSION_PUBLISH_TOKEN")'
+          echo "Owner-controlled ASCENSION web/worker publish token is stored in Fly."
       - name: Check deployed web server
         run: curl --fail --show-error --silent --retry 5 --retry-delay 10 --retry-all-errors https://ascension-nexus-weave.fly.dev/api/health

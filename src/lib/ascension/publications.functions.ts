@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Json } from "@/integrations/supabase/types";
+import { requireAscensionAuth } from "@/lib/ascension/data/auth-middleware";
+import type { Json } from "@/lib/ascension/data/types";
 
 /**
  * Authenticated reads of the mirrored LIVE_GOVERNED publication.
@@ -24,9 +24,9 @@ export interface GovernedSurface {
 }
 
 export const getGovernedPublication = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await context.ascensionDb
       .from("ascension_publications")
       .select(
         "surface, revision, source_classification, snapshot_hash, content_hash, payload, published_at, received_at",
@@ -51,9 +51,9 @@ export const getGovernedPublication = createServerFn({ method: "GET" })
   });
 
 export const listMyObservations = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await context.ascensionDb
       .from("ascension_user_observations")
       .select("id, surface, entity_id, revision, label, note, created_at")
       .order("created_at", { ascending: false });
@@ -62,7 +62,7 @@ export const listMyObservations = createServerFn({ method: "GET" })
   });
 
 export const saveObservation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .inputValidator(
     (input: {
       label: string;
@@ -83,7 +83,7 @@ export const saveObservation = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("ascension_user_observations").insert({
+    const { error } = await context.ascensionDb.from("ascension_user_observations").insert({
       user_id: context.userId,
       label: data.label,
       note: data.note,
@@ -96,13 +96,13 @@ export const saveObservation = createServerFn({ method: "POST" })
   });
 
 export const deleteObservation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .inputValidator((input: { id: string }) => {
     if (!input.id) throw new Error("Missing observation id.");
     return { id: input.id };
   })
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { error } = await context.ascensionDb
       .from("ascension_user_observations")
       .delete()
       .eq("id", data.id);

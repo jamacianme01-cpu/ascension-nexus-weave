@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { databaseConnectivity } from "@/integrations/supabase/postgres-compat.server";
+import { databaseConnectivity } from "@/lib/ascension/data/postgres.server";
 
 /**
  * Report actual database reachability. Web availability is not proof that

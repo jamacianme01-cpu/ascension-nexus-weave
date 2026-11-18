@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { authorizeAscensionHub } from "@/lib/ascension/hub-auth.server";
 import { normalizeQueueClaim } from "@/lib/ascension/queue-claim";
 
-import type { Database, Json } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/lib/ascension/data/types";
 import { assessResult, parseDelivery, type ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type QueuePatch = Database["public"]["Tables"]["ascension_execution_requests"]["Update"];
@@ -121,8 +121,8 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         const runner =
           optionalString(new URL(request.url).searchParams.get("runner"), 200) ?? "ascension-runtime";
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: pending, error: readError } = await supabaseAdmin
+        const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+        const { data: pending, error: readError } = await ascensionDb
           .from("ascension_execution_requests")
           .select("id, objective, evidence, constraints, submitted_by, submitted_via, created_at")
           .eq("engine", "governed_runtime")
@@ -142,7 +142,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         }
 
         // Conditional claim so two runtime pollers cannot take the same item.
-        const { data: claimed, error: claimError } = await supabaseAdmin
+        const { data: claimed, error: claimError } = await ascensionDb
           .from("ascension_execution_requests")
           .update({
             status: "claimed",
@@ -219,11 +219,11 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
         if (has("error")) patch["error"] = optionalString(body["error"], 4000);
         if (terminal) patch["completed_at"] = new Date().toISOString();
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { ascensionDb } = await import("@/lib/ascension/data/client.server");
         // Keep valid local ASCENSION drafts regardless of web hosting provider.
         // The transport remains separately labelled; it never becomes core verification.
         if (localDraft) {
-          const { data: target, error: targetError } = await supabaseAdmin
+          const { data: target, error: targetError } = await ascensionDb
             .from("ascension_execution_requests")
             .select("objective")
             .eq("id", id)
@@ -242,7 +242,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
           };
         }
 
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await ascensionDb
           .from("ascension_execution_requests")
           .update(patch)
           .eq("id", id)
@@ -254,7 +254,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
 
         if (localDraft) {
           const now = new Date().toISOString();
-          const { error: draftError } = await supabaseAdmin.from("ascension_run_stages").upsert(
+          const { error: draftError } = await ascensionDb.from("ascension_run_stages").upsert(
             {
               request_id: id,
               ordinal: 102,
@@ -276,7 +276,7 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
 
         if (normalizedArtifacts && "files" in normalizedArtifacts) {
           const now = new Date().toISOString();
-          const { error: artifactError } = await supabaseAdmin.from("ascension_run_stages").upsert(
+          const { error: artifactError } = await ascensionDb.from("ascension_run_stages").upsert(
             {
               request_id: id,
               ordinal: ARTIFACT_ORDINAL,

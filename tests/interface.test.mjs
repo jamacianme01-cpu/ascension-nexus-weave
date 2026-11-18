@@ -17,7 +17,7 @@ function check(name, fn) {
 try {
   const model = await server.ssrLoadModule("/src/lib/ascension/result-model.ts");
   const { knowledgeWorld } = await server.ssrLoadModule("/src/lib/ascension/world-model.ts");
-  const { callZai } = await server.ssrLoadModule("/src/lib/ascension/engine/zai.server.ts");
+  const { callApprovedAnswer } = await server.ssrLoadModule("/src/lib/ascension/engine/approved-answer.server.ts");
   const access = await server.ssrLoadModule("/src/lib/ascension/source-access.ts");
   const codeWalker = await server.ssrLoadModule("/src/lib/ascension/code-walker.ts");
   const manifestation = await server.ssrLoadModule("/src/lib/ascension/manifestation.ts");
@@ -61,7 +61,7 @@ try {
     assert.equal(model.governedPersisted({ ...run, result: {} }), false);
   });
   check("external verified status never becomes ASCENSION verification", () => {
-    assert.equal(model.governedPersisted({ ...run, engine: "zai" }), false);
+    assert.equal(model.governedPersisted({ ...run, engine: "external" }), false);
   });
   check("missing persisted delta fails closed", () => {
     const x = structuredClone(run);
@@ -443,61 +443,43 @@ try {
     assert.equal(repeat.source, "external_draft");
     assert.equal(repeat.response_payload.body, draftAnswer.body);
   });
-  const priorPaidDrafts = process.env.ASCENSION_ALLOW_PAID_DRAFTS;
-  const priorLovableAi = process.env.LOVABLE_API_KEY;
-  const priorLocalBaseNoEngine = process.env.LOCAL_LLM_BASE_URL;
-  const priorZaiNoEngine = process.env.ZAI_API_KEY;
-  const priorOpenRouterNoEngine = process.env.OPENROUTER_API_KEY;
-  delete process.env.ZAI_API_KEY;
-  delete process.env.OPENROUTER_API_KEY;
-  delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
-  delete process.env.LOVABLE_API_KEY;
-  delete process.env.LOCAL_LLM_BASE_URL;
+  const formerAllow = process.env.ASCENSION_ALLOW_OPENAI_AI;
+  const formerPaid = process.env.ASCENSION_ENABLE_PAID_APIS;
+  const formerKey = process.env.OPENAI_API_KEY;
+  delete process.env.ASCENSION_ALLOW_OPENAI_AI;
+  delete process.env.ASCENSION_ENABLE_PAID_APIS;
+  delete process.env.OPENAI_API_KEY;
   try {
-    const waitingLocal = await deliveryEngine.resolveDelivery({
-      run: runShoe,
-      artifactStage: null,
-      draft: null,
-      store: noStore,
-      retry: false,
+    const waiting = await deliveryEngine.resolveDelivery({
+      run: runShoe, artifactStage: null, draft: null,
+      store: noStore, retry: false,
     });
-    check("no paid engine waits for ASCENSION runtime without invoking Lovable", () => {
-      assert.equal(waitingLocal.status, "running");
-      assert.equal(waitingLocal.source, null);
-      assert.equal(waitingLocal.response_payload, null);
-      assert.equal(waitingLocal.error, null);
-      assert.match(waitingLocal.note, /Awaiting a connected ASCENSION answer provider/);
+    check("unconfigured external drafting waits for the governed runtime", () => {
+      assert.equal(waiting.status, "running");
+      assert.equal(waiting.source, null);
+      assert.equal(waiting.response_payload, null);
+      assert.equal(waiting.error, null);
     });
-  // Hosting Lovable must not hide a real delivered local result.
-  process.env.LOVABLE_API_KEY = "host-key-does-not-override-local";
-  const localDraft = await deliveryEngine.resolveDelivery({
-    run: runShoe,
-    artifactStage: null,
-    draft: {
-      status: "completed",
-      source_key: `local:${runShoe.id}`,
-      created_at: "2026-09-28T13:06:08Z",
-      response_payload: draftAnswer,
-      error: null,
-      engine_model: "qwen3-ascension",
-    },
-    store: noStore,
-    retry: false,
-  });
-  check("a local model draft appears even with a Lovable hosting key", () => {
-    assert.equal(localDraft.status, "completed");
-    assert.equal(localDraft.source, "external_draft");
-    assert.match(localDraft.response_payload.body, /heel pod/);
-  });
+    const delivered = await deliveryEngine.resolveDelivery({
+      run: runShoe, artifactStage: null,
+      draft: {
+        status: "completed", source_key: `local:${runShoe.id}`,
+        created_at: "2026-09-28T13:06:08Z", response_payload: draftAnswer,
+        error: null, engine_model: "owner-authored-model",
+      }, store: noStore, retry: false,
+    });
+    check("a recorded local model draft remains readable without outside services", () => {
+      assert.equal(delivered.status, "completed");
+      assert.equal(delivered.source, "external_draft");
+      assert.match(delivered.response_payload.body, /heel pod/);
+    });
   } finally {
-    if (priorPaidDrafts === undefined) delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
-    else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorPaidDrafts;
-    if (priorLovableAi === undefined) delete process.env.LOVABLE_API_KEY;
-    else process.env.LOVABLE_API_KEY = priorLovableAi;
-    if (priorLocalBaseNoEngine === undefined) delete process.env.LOCAL_LLM_BASE_URL;
-    else process.env.LOCAL_LLM_BASE_URL = priorLocalBaseNoEngine;
-    if (priorZaiNoEngine !== undefined) process.env.ZAI_API_KEY = priorZaiNoEngine;
-    if (priorOpenRouterNoEngine !== undefined) process.env.OPENROUTER_API_KEY = priorOpenRouterNoEngine;
+    if (formerAllow === undefined) delete process.env.ASCENSION_ALLOW_OPENAI_AI;
+    else process.env.ASCENSION_ALLOW_OPENAI_AI = formerAllow;
+    if (formerPaid === undefined) delete process.env.ASCENSION_ENABLE_PAID_APIS;
+    else process.env.ASCENSION_ENABLE_PAID_APIS = formerPaid;
+    if (formerKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = formerKey;
   }
   const verifiedShoe = { ...runShoe, status: "verified", completed_at: "2026-09-28T13:06:48Z" };
   const noFilesYet = await deliveryEngine.resolveDelivery({
@@ -560,347 +542,48 @@ try {
     assert.equal(lateResult.source, "governed");
     assert.match(lateResult.response_payload.body, /dual-density TPU gel heel pod/);
   });
-  const original = globalThis.fetch;
-  const priorKey = process.env.ZAI_API_KEY;
-  const priorLovableKey = process.env.LOVABLE_API_KEY;
-  const priorZaiOptIn = process.env.ASCENSION_ALLOW_PAID_DRAFTS;
-  const priorZaiModel = process.env.ZAI_MODEL;
-  delete process.env.LOVABLE_API_KEY;
-  process.env.ZAI_API_KEY = "test-only";
-  process.env.ASCENSION_ALLOW_PAID_DRAFTS = "true";
-  process.env.ZAI_MODEL = "glm-4.6"; // A historically configured paid model must not be selected.
+  // No unapproved external application may be contacted for inference.
+  const originalFetch = globalThis.fetch;
+  const originalPaid = process.env.ASCENSION_ENABLE_PAID_APIS;
+  const originalAllow = process.env.ASCENSION_ALLOW_OPENAI_AI;
+  const originalApiKey = process.env.OPENAI_API_KEY;
   try {
-    const payload = JSON.stringify(valid);
-    const bytes = new TextEncoder().encode(
-      "data: " + JSON.stringify({ choices: [{ delta: { content: payload } }] }),
-    );
-    globalThis.fetch = async (_url, init) => {
-      assert.ok(init.signal instanceof AbortSignal);
-      assert.equal(String(_url), "https://api.z.ai/api/paas/v4/chat/completions");
-      assert.equal(JSON.parse(String(init.body)).model, "glm-4.7-flash");
-      assert.equal(init.headers.Authorization, "Bearer test-only");
-      return new Response(
-        new ReadableStream({
-          start(c) {
-            c.enqueue(bytes.slice(0, 19));
-            c.enqueue(bytes.slice(19));
-            c.close();
-          },
-        }),
-      );
-    };
-    const response = await callZai({ system: "test", user: "test" });
-    check("zero-charge Z.AI Flash streams and overrides the old paid model", () => {
-      assert.deepEqual(response.json, valid);
-      assert.equal(response.model, "glm-4.7-flash");
-    });
-    globalThis.fetch = async () => new Response('data: {"error":{"message":"engine failed"}}\n');
-    await assert.rejects(() => callZai({ system: "test", user: "test" }), /engine failed/);
-    passed++;
-    process.stdout.write("PASS upstream stream errors reach the user\n");
-
-    const visualDraft = {
-      kind: "artifact",
-      title: "Programmable modular cubes",
-      body: "A modular cube has six docking faces, a central controller, and replaceable sensor panels. Power and data contacts run through the face connectors so connected units can exchange signals.",
-      files: [],
-      limitations: ["Conceptual design; hardware operation has not been tested."],
-      pathways: [{
-        id: "modular-cube",
-        label: "Docking cube",
-        summary: "Six square panels surround a central controller, with recessed edge contacts and a replaceable sensor panel on the front face.",
-        steps: ["Arrange the controller in the center and leave clearance between the board and each face.", "Place recessed data and power contacts along the edges of each docking face."],
-        tradeoffs: ["Detachable panels require robust connectors."],
-        visual_svg: null,
-        model_spec: null,
-        model_url: "https://example.invalid/model-invented-by-text.glb",
-      }],
-      blend: null,
-    };
-    const matchingReview = (init) => {
-      try {
-        const body = JSON.parse(init.body);
-        const input = JSON.parse(body.messages[1].content);
-        if (!input.proposed_targets) return null;
-        return { interpretation: input.original_objective, question: null,
-          checks: input.proposed_targets.map(target => ({ target: target.target, matches: true, reason: "Matches this test's submitted objective." })) };
-      } catch { return null; }
-    };
-    const streamed = value => new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify(value) } }] }) + '\n');
-    globalThis.fetch = async (_url, init) => streamed(matchingReview(init) ?? visualDraft);
-    const prepared = await deliveryEngine.externalProductDraft({
-      id: "drawing-request", objective: "draw programmable cubits", result: null, status: "running",
-    }, []);
-    check("drawing specifications reach the Hunyuan handoff without a fake completed drawing", () => {
-      assert.equal(prepared.kind, "answer");
-      assert.equal(prepared.pathways[0].model_url, null);
-      assert.equal(prepared.files.length, 0);
-      assert.equal(model.assessResult("draw programmable cubits", prepared.body, prepared.files).produced, false);
-      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", prepared), true);
-      assert.equal(model.hasEnvisionPreparation("draw a folding workbench", prepared), true);
-      assert.equal(model.hasEnvisionPreparation("draw a gel support shoe", prepared), true);
-      assert.equal(model.hasEnvisionPreparation("make a web app", prepared), false);
-      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", { ...prepared, pathways: [] }), false);
-      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", { ...prepared, body: "draw programmable cubits" }), false);
-      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", { ...prepared, pathways: [{ ...prepared.pathways[0], summary: "cube", steps: ["draw"] }] }), false);
-      assert.match(prepared.limitations.join(" "), /not a completed drawing/);
-    });
-    let drawingCalls = 0;
-    globalThis.fetch = async (_url, init) => {
-      const reviewed = matchingReview(init);
-      if (reviewed) return streamed(reviewed);
-      // Count only model generation calls. Internal knowledge retrieval may
-      // also issue fetch requests, but they are not extra Spiral repairs.
-      let isModelRequest = false;
-      try { isModelRequest = Array.isArray(JSON.parse(init?.body ?? "{}").messages); } catch { /* not a model call */ }
-      if (!isModelRequest) return streamed(visualDraft);
-      const response = ++drawingCalls === 1
-        ? { ...visualDraft, kind: "answer", pathways: [] }
-        : { ...visualDraft, kind: "answer" };
-      return streamed(response);
-    };
-    const repairedDrawing = await deliveryEngine.externalProductDraft({
-      id: "repair-drawing-request", objective: "draw programmable cubits", result: null,
-    }, []);
-    check("prose-only drawing response gets one bounded geometry repair", () => {
-      assert.equal(drawingCalls, 2);
-      assert.equal(model.hasEnvisionPreparation("draw programmable cubits", repairedDrawing), true);
-      assert.equal(repairedDrawing.pathways[0].model_url, null);
-    });
-    const oldFailedDrawing = {
-      status: "failed", created_at: "2026-10-07T20:00:00Z", response_payload: null,
-      error: "the external engine did not return a substantive result (no visual drawing was returned)",
-      engine_model: "external", source_key: deliveryEngine.artifactSourceKey("old-drawing", []),
-    };
-    const drawingRun = { ...runShoe, id: "old-drawing", objective: "draw programmable cubits", result: null };
-    let recoveryClaims = 0;
-    let persistedFailure = "";
-    const recoveryStore = {
-      claim: async () => { recoveryClaims++; return true; },
-      complete: async () => {},
-      fail: async (_key, message) => { persistedFailure = message; },
-    };
-    const recovered = await deliveryEngine.resolveDelivery({
-      run: drawingRun, draft: oldFailedDrawing, artifactStage: null, store: recoveryStore,
-      retry: false, generate: async () => repairedDrawing,
-    });
-    check("old drawing-contract failure recovers without manual retry", () => {
-      assert.equal(recovered.source, "external_draft");
-      assert.equal(recoveryClaims, 1);
-    });
-    await deliveryEngine.resolveDelivery({
-      run: drawingRun, draft: oldFailedDrawing, artifactStage: null, store: recoveryStore,
-      retry: false, generate: async () => { throw new Error("no visual drawing"); },
-    });
-    const failedAgain = await deliveryEngine.resolveDelivery({
-      run: drawingRun, draft: { ...oldFailedDrawing, error: persistedFailure }, artifactStage: null,
-      store: noStore, retry: false, generate: async () => { throw new Error("must not regenerate"); },
-    });
-    check("drawing recovery failure stays bounded across polling", () => {
-      assert.match(persistedFailure, /^Drawing handoff repair:/);
-      assert.match(failedAgain.error, /Drawing handoff repair:/);
-      assert.equal(recoveryClaims, 2);
-    });
-    globalThis.fetch = async () => new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ ...visualDraft, kind: "answer", pathways: [] }) } }] }) + '\n');
-    await assert.rejects(() => deliveryEngine.externalProductDraft({
-      id: "empty-drawing-request", objective: "draw programmable cubits", result: null,
-    }, []), /no visual drawing/);
-    passed++;
-    process.stdout.write("PASS drawing text without a generation pathway remains rejected\n");
-  } finally {
-    globalThis.fetch = original;
-    if (priorKey === undefined) delete process.env.ZAI_API_KEY;
-    else process.env.ZAI_API_KEY = priorKey;
-    if (priorLovableKey === undefined) delete process.env.LOVABLE_API_KEY;
-    else process.env.LOVABLE_API_KEY = priorLovableKey;
-    if (priorZaiOptIn === undefined) delete process.env.ASCENSION_ALLOW_PAID_DRAFTS;
-    else process.env.ASCENSION_ALLOW_PAID_DRAFTS = priorZaiOptIn;
-    if (priorZaiModel === undefined) delete process.env.ZAI_MODEL;
-    else process.env.ZAI_MODEL = priorZaiModel;
-  }
-
-  // Free cloud inference must remain server-side, zero-price, and privacy-gated.
-  const priorFreeCloudKey = process.env.OPENROUTER_API_KEY;
-  const priorFreeLocalBase = process.env.LOCAL_LLM_BASE_URL;
-  const priorHostedOptInForFree = process.env.ASCENSION_ALLOW_LOVABLE_AI;
-  const priorFreeHostedKey = process.env.LOVABLE_API_KEY;
-  process.env.OPENROUTER_API_KEY = "free-cloud-test-only";
-  process.env.LOCAL_LLM_BASE_URL = "http://127.0.0.1:11434/v1";
-  process.env.LOVABLE_API_KEY = "should-not-be-used";
-  process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
-  try {
-    let sentUrl = "";
-    let sentHeaders = null;
-    let sentPayload = null;
-    globalThis.fetch = async (url, init) => {
-      sentUrl = String(url);
-      sentHeaders = init.headers;
-      sentPayload = JSON.parse(String(init.body));
-      return new Response(
-        'data: ' + JSON.stringify({ choices: [{ delta: { content: "Three possible designs." } }] }) + '\n\n' +
-        'data: [DONE]\n\n'
-      );
-    };
-    const freeResult = await callZai({ system: "ASCENSION", user: "Create three pathways.", includeInternalKnowledge: false });
-    check("free cloud route uses only no-charge inference with privacy restrictions", () => {
-      assert.equal(sentUrl, "https://openrouter.ai/api/v1/chat/completions");
-      assert.equal(sentHeaders.Authorization, "Bearer free-cloud-test-only");
-      assert.equal(sentHeaders["Lovable-API-Key"], undefined);
-      assert.equal(sentPayload.model, "openrouter/free");
-      assert.equal(sentPayload.provider.zdr, true);
-      assert.equal(sentPayload.provider.data_collection, "deny");
-      assert.deepEqual(sentPayload.provider.max_price, { prompt: 0, completion: 0 });
-      assert.equal(freeResult.model, "openrouter/free");
-      assert.equal(freeResult.text, "Three possible designs.");
-    });
-    globalThis.fetch = async () => new Response("Free model quota exhausted", { status: 429 });
+    delete process.env.ASCENSION_ENABLE_PAID_APIS;
+    delete process.env.ASCENSION_ALLOW_OPENAI_AI;
+    delete process.env.OPENAI_API_KEY;
+    let externalCalls = 0;
+    globalThis.fetch = async () => { externalCalls++; throw new Error("Unexpected external call"); };
     await assert.rejects(
-      () => callZai({ system: "ASCENSION", user: "Another question", includeInternalKnowledge: false }),
-      /HTTP 429/
+      () => callApprovedAnswer({ system: "test", user: "test", includeInternalKnowledge: false }),
+      /No owner-approved external draft provider enabled/
     );
-    passed++;
-    process.stdout.write("PASS free quota exhaustion fails without paid fallback\n");
-  } finally {
-    globalThis.fetch = original;
-    if (priorFreeCloudKey === undefined) delete process.env.OPENROUTER_API_KEY;
-    else process.env.OPENROUTER_API_KEY = priorFreeCloudKey;
-    if (priorFreeLocalBase === undefined) delete process.env.LOCAL_LLM_BASE_URL;
-    else process.env.LOCAL_LLM_BASE_URL = priorFreeLocalBase;
-    if (priorHostedOptInForFree === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI;
-    else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptInForFree;
-    if (priorFreeHostedKey === undefined) delete process.env.LOVABLE_API_KEY;
-    else process.env.LOVABLE_API_KEY = priorFreeHostedKey;
-  }
-
-  // Explicitly opted-in hosted path: Lovable is available only when authorized,
-  // credential exists, and it never calls localhost.
-  const priorLovableModel = process.env.LOVABLE_AI_MODEL;
-  const priorHostedOptIn = process.env.ASCENSION_ALLOW_LOVABLE_AI;
-  process.env.ASCENSION_ALLOW_LOVABLE_AI = "true";
-  process.env.LOVABLE_API_KEY = "lovable-test-only";
-  process.env.ZAI_API_KEY = "stale-zai-key";
-  delete process.env.LOCAL_LLM_BASE_URL;
-  try {
-    let sentUrl = "";
-    let sentAuth = null;
-    let sentLovableKey = null;
-    let sentBody = null;
-    globalThis.fetch = async (url, init) => {
-      sentUrl = String(url);
-      sentAuth = init.headers["Authorization"] ?? null;
-      sentLovableKey = init.headers["Lovable-API-Key"] ?? null;
-      sentBody = JSON.parse(String(init.body));
-      return new Response(
-        'data: ' +
-          JSON.stringify({ choices: [{ delta: { content: "Hosted answer." } }] }) +
-          '\n' +
-          'data: [DONE]\n',
-      );
+    check("unapproved providers cannot consume user objectives", () => {
+      assert.equal(externalCalls, 0);
+    });
+    process.env.ASCENSION_ENABLE_PAID_APIS = "true";
+    process.env.ASCENSION_ALLOW_OPENAI_AI = "true";
+    process.env.OPENAI_API_KEY = "test-only";
+    globalThis.fetch = async (url) => {
+      assert.equal(url, "https://api.openai.com/v1/responses");
+      return new Response(JSON.stringify({
+        status: "completed",
+        output: [{type: "message", content: [{type: "output_text",text: '{"meaning_elements":[],"notes":"test"}'}]}],
+      }), {status:200,headers:{"content-type":"application/json"}});
     };
-    const hosted = await callZai({ system: "test", user: "test" });
-    check("explicit Lovable opt-in uses hosted inference and not localhost", () => {
-      assert.equal(sentUrl, "https://ai.gateway.lovable.dev/v1/chat/completions");
-      assert.equal(sentAuth, "Bearer lovable-test-only");
-      assert.equal(sentLovableKey, "lovable-test-only");
-      assert.equal(sentBody.model, "google/gemini-3.1-flash-lite");
-      assert.ok(!sentUrl.includes("localhost"));
-      assert.equal(hosted.text, "Hosted answer.");
+    const result = await callApprovedAnswer({
+      system: "test", user: "test", includeInternalKnowledge: false,
+    });
+    check("double owner opt-in is required for the approved answer path", () => {
+      assert.deepEqual(result.json.meaning_elements, []);
     });
   } finally {
-    globalThis.fetch = original;
-    if (priorLovableKey === undefined) delete process.env.LOVABLE_API_KEY;
-    else process.env.LOVABLE_API_KEY = priorLovableKey;
-    if (priorLovableModel === undefined) delete process.env.LOVABLE_AI_MODEL;
-    else process.env.LOVABLE_AI_MODEL = priorLovableModel;
-    if (priorHostedOptIn === undefined) delete process.env.ASCENSION_ALLOW_LOVABLE_AI;
-    else process.env.ASCENSION_ALLOW_LOVABLE_AI = priorHostedOptIn;
-    if (priorKey === undefined) delete process.env.ZAI_API_KEY;
-    else process.env.ZAI_API_KEY = priorKey;
-  }
-
-  // Local engine fallback: no hosted key → explicit local OpenAI-compatible provider,
-  // reasoning deltas ignored, inline <think> stripped, no credentials sent.
-  const priorLocalBase = process.env.LOCAL_LLM_BASE_URL;
-  const priorLocalModel = process.env.LOCAL_LLM_MODEL;
-  delete process.env.ZAI_API_KEY;
-  delete process.env.LOVABLE_API_KEY;
-  process.env.LOCAL_LLM_BASE_URL = "http://localhost:11444/v1";
-  process.env.LOCAL_LLM_MODEL = "test-local-model";
-  try {
-    const frames = [
-      JSON.stringify({ choices: [{ delta: { content: "", reasoning: "internal thinking" } }] }),
-      JSON.stringify({ choices: [{ delta: { content: "<think>hidden reasoning</think>" } }] }),
-      JSON.stringify({ choices: [{ delta: { content: "Visible answer text." } }] }),
-    ];
-    let sentAuth = null;
-    let sentBody = null;
-    let sentUrl = "";
-    globalThis.fetch = async (url, init) => {
-      sentUrl = String(url);
-      sentAuth = init.headers["Authorization"] ?? null;
-      sentBody = JSON.parse(String(init.body));
-      return new Response(frames.map((frame) => `data: ${frame}\n`).join("") + "data: [DONE]\n");
-    };
-    const localResult = await callZai({ system: "test", user: "test" });
-    check("local answer engine serves ENGAGE without any credential", () => {
-      assert.equal(sentUrl, "http://localhost:11444/v1/chat/completions");
-      assert.equal(sentAuth, null);
-      assert.equal(sentBody.model, "test-local-model");
-      assert.equal(sentBody.max_tokens, 4096);
-      assert.equal(localResult.text, "Visible answer text.");
-      assert.equal(localResult.model, "test-local-model");
-    });
-
-    process.env.LOCAL_LLM_BASE_URL = "http://127.0.0.1:11434/v1";
-    process.env.LOCAL_LLM_MODEL = "qwen3-ascension:latest";
-    globalThis.fetch = async (url, init) => {
-      sentUrl = String(url);
-      sentBody = JSON.parse(String(init.body));
-      assert.equal(init.headers.Authorization, undefined);
-      assert.equal(init.headers.Accept, "application/x-ndjson");
-      const bytes = new TextEncoder().encode([
-        JSON.stringify({ message: { thinking: "private reasoning", content: "" }, done: false }),
-        JSON.stringify({ message: { content: "Visible café " }, done: false }),
-        JSON.stringify({ message: { content: "answer." }, done: true, done_reason: "stop" }),
-      ].join("\n"));
-      return new Response(new ReadableStream({ start(controller) {
-        // Split inside UTF-8 and JSON frames; the final frame has no newline.
-        for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
-        controller.close();
-      } }));
-    };
-    const native = await callZai({ system: "test", user: "draw programmable cubits" });
-    check("installed Qwen3 uses native Ollama with thinking disabled and preserves answer chunks", () => {
-      assert.equal(sentUrl, "http://127.0.0.1:11434/api/chat");
-      assert.equal(sentBody.model, "qwen3-ascension:latest");
-      assert.equal(sentBody.think, false);
-      assert.equal(sentBody.options.num_predict, 4096);
-      assert.equal(native.text, "Visible café answer.");
-    });
-    globalThis.fetch = async () => new Response(JSON.stringify({
-      message: { content: "", thinking: "unfinished reasoning" }, done: true, done_reason: "length",
-    }));
-    await assert.rejects(() => callZai({ system: "test", user: "test" }), /output limit before producing an answer/);
-    globalThis.fetch = async () => new Response(JSON.stringify({
-      message: { content: "<think>unfinished reasoning" }, done: true,
-    }));
-    await assert.rejects(() => callZai({ system: "test", user: "test" }), /thinking without a final answer/);
-    globalThis.fetch = async () => new Response('{"error":"Ollama model failed"}\n');
-    await assert.rejects(() => callZai({ system: "test", user: "test" }), /Ollama model failed/);
-    globalThis.fetch = async () => new Response('{"message":{"content":""},"done":true}\n');
-    await assert.rejects(() => callZai({ system: "test", user: "test" }), /empty response/);
-    passed++;
-    process.stdout.write("PASS native engine failures and thinking-only responses remain errors\n");
-  } finally {
-    globalThis.fetch = original;
-    if (priorLocalBase === undefined) delete process.env.LOCAL_LLM_BASE_URL;
-    else process.env.LOCAL_LLM_BASE_URL = priorLocalBase;
-    if (priorLocalModel === undefined) delete process.env.LOCAL_LLM_MODEL;
-    else process.env.LOCAL_LLM_MODEL = priorLocalModel;
-    if (priorLovableKey === undefined) delete process.env.LOVABLE_API_KEY;
-    else process.env.LOVABLE_API_KEY = priorLovableKey;
-    if (priorKey === undefined) delete process.env.ZAI_API_KEY;
-    else process.env.ZAI_API_KEY = priorKey;
+    globalThis.fetch = originalFetch;
+    if (originalPaid === undefined) delete process.env.ASCENSION_ENABLE_PAID_APIS;
+    else process.env.ASCENSION_ENABLE_PAID_APIS = originalPaid;
+    if (originalAllow === undefined) delete process.env.ASCENSION_ALLOW_OPENAI_AI;
+    else process.env.ASCENSION_ALLOW_OPENAI_AI = originalAllow;
+    if (originalApiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalApiKey;
   }
   /* -------------------- ENVISION manifestation + model provider -------------------- */
 

@@ -1,8 +1,9 @@
 name: Deploy ASCENSION to Fly.io
 
+# Public-source web-image releases are manual-only: the auto-deploy now
+# derives from the owner's original PRIVATE engine image and updates both
+# required process groups together, preserving ASCENSION_CORE and state.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

@@ -8,6 +8,11 @@ case "$role" in
     exec /usr/local/bin/bun /app/.output/server/index.mjs
     ;;
   worker)
+    # Bootstrap claims no work; the existing governed state is migrated first.
+    if [ "${ASCENSION_STATE_BOOTSTRAP:-0}" = '1' ]; then
+      mkdir -p /data/ascension
+      exec sleep infinity
+    fi
     root="${ASCENSION_LIVE_ROOT:-/data/ascension/state/live}"
     test -f /app/ASCENSION_CORE/cloud_queue_worker.py || { echo >&2 'Original queue worker missing'; exit 2; }
     test -f /app/clarity/core_runtime.py || { echo >&2 'Original CLARITY support missing'; exit 2; }

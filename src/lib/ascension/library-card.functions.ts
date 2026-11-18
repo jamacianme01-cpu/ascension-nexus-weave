@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAscensionAuth } from "@/lib/ascension/data/auth-middleware";
 
 const LIBRARY_CARD_LABEL = "ASCENSION_LIBRARY_CARD_V1";
 const LIBRARY_CARD_SURFACE = "library_card_profile";
@@ -54,9 +54,9 @@ function parseCard(note: string | null): PersonalLibraryCard | null {
 }
 
 export const getMyLibraryCard = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await context.ascensionDb
       .from("ascension_user_observations")
       .select("note, created_at, updated_at")
       .eq("user_id", context.userId)
@@ -70,7 +70,7 @@ export const getMyLibraryCard = createServerFn({ method: "GET" })
   });
 
 export const saveMyLibraryCard = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .inputValidator(
     (input: {
       who: string;
@@ -101,7 +101,7 @@ export const saveMyLibraryCard = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { data: existing, error: readError } = await context.supabase
+    const { data: existing, error: readError } = await context.ascensionDb
       .from("ascension_user_observations")
       .select("id, note, created_at")
       .eq("user_id", context.userId)
@@ -122,14 +122,14 @@ export const saveMyLibraryCard = createServerFn({ method: "POST" })
     const note = JSON.stringify(card);
 
     if (existing) {
-      const { error } = await context.supabase
+      const { error } = await context.ascensionDb
         .from("ascension_user_observations")
         .update({ note, updated_at: now })
         .eq("id", existing.id)
         .eq("user_id", context.userId);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await context.supabase.from("ascension_user_observations").insert({
+      const { error } = await context.ascensionDb.from("ascension_user_observations").insert({
         user_id: context.userId,
         label: LIBRARY_CARD_LABEL,
         surface: LIBRARY_CARD_SURFACE,

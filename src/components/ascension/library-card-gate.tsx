@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { ascensionSession } from "@/lib/ascension/data/session.client";
+import { ascensionSession } from "@/lib/ascension/data/session";
 import {
   getMyLibraryCard,
   saveMyLibraryCard,

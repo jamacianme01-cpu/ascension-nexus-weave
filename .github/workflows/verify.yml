@@ -21,6 +21,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install
+      - run: node --test tests/no-unauthorized-apps.test.mjs
       - run: npm run test:interface
       - run: node tests/tree-voice.test.mjs
       - run: npm run build

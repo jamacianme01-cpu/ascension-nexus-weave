@@ -39,13 +39,13 @@ function base64ToBytes(b64: string): Uint8Array {
 }
 
 async function persist(storagePath: string, bytes: Uint8Array): Promise<string> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { error } = await supabaseAdmin.storage.from(BUCKET).upload(storagePath, bytes, {
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+  const { error } = await ascensionDb.storage.from(BUCKET).upload(storagePath, bytes, {
     contentType: "application/octet-stream",
     upsert: true,
   });
   if (error) throw new Error(`reference image storage failed: ${error.message}`);
-  return supabaseAdmin.storage.from(BUCKET).getPublicUrl(storagePath).data.publicUrl;
+  return ascensionDb.storage.from(BUCKET).getPublicUrl(storagePath).data.publicUrl;
 }
 
 /** Generate and persist one reference image. Throws the real provider/storage error. */

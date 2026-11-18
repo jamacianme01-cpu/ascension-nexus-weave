@@ -1,0 +1,40 @@
+# Explicit alternate build for the ORIGINAL private ASCENSION engines.
+# The existing production Dockerfile and auto-deploy pipeline remain untouched.
+ARG BUN_VERSION=1.3.14
+FROM oven/bun:${BUN_VERSION}-slim AS build
+WORKDIR /app
+RUN apt-get update -qq && apt-get install --no-install-recommends -y \
+      build-essential pkg-config python-is-python3 && rm -rf /var/lib/apt/lists/*
+COPY bun.lock package-lock.json package.json ./
+RUN bun install --frozen-lockfile
+COPY . .
+ENV NODE_ENV=production
+ENV NITRO_PRESET=bun
+RUN bun run build && test -f /app/.output/server/index.mjs
+# Fail the image build if either privately supplied authored package is missing.
+RUN test -f /app/.private_runtime/ASCENSION_CORE/cloud_queue_worker.py \
+    && test -f /app/.private_runtime/ASCENSION_CORE/engine_mesh.py \
+    && test -f /app/.private_runtime/clarity/core_runtime.py \
+    && PYTHONPATH=/app/.private_runtime python -c 'import ASCENSION_CORE.cloud_queue_worker, ASCENSION_CORE.engine_mesh, ASCENSION_CORE.objective_runtime, ASCENSION_CORE.live_runtime, clarity.core_runtime'
+
+FROM oven/bun:${BUN_VERSION}-slim
+WORKDIR /app
+RUN apt-get update -qq && apt-get install --no-install-recommends -y python3 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app /app
+COPY --from=build /app/.output /app/.output
+RUN cp -a /app/.private_runtime/ASCENSION_CORE /app/ASCENSION_CORE \
+    && cp -a /app/.private_runtime/clarity /app/clarity \
+    && mkdir -p /home/bun/app \
+    && ln -sfn /app/.output /home/bun/app/.output \
+    && ln -sfn /app/.output /.output \
+    && chmod 0755 /app/scripts/ascension-fly-governed-entrypoint.sh
+ENV NODE_ENV=production
+ENV PYTHONPATH=/app
+ENV PORT=8080
+ENV NITRO_PORT=8080
+ENV HOST=0.0.0.0
+ENV NITRO_HOST=0.0.0.0
+EXPOSE 8080
+ENTRYPOINT ["/app/scripts/ascension-fly-governed-entrypoint.sh"]
+CMD ["app"]

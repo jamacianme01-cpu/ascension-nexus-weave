@@ -1,4 +1,4 @@
-import type { Json } from "@/integrations/supabase/types";
+import type { Json } from "@/lib/ascension/data/types";
 import { ASCENSION_GUIDE_INSTRUCTIONS } from "./guide-personality.server";
 import { buildGuideFallbackDelivery } from "./guide-fallback.server";
 import { callOpenAIResponse, type OpenAIWebSource } from "./openai.server";
@@ -1084,8 +1084,8 @@ export async function resolveDelivery(args: {
 
 /** Signed-in path: stage writes go through the server-only admin client. */
 export async function adminDraftStore(runId: string): Promise<DraftStore> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const table = () => supabaseAdmin.from("ascension_run_stages");
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+  const table = () => ascensionDb.from("ascension_run_stages");
   return {
     async claim(sourceKey, expectedCreatedAt) {
       if (expectedCreatedAt === null) {

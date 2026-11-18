@@ -3,15 +3,15 @@
  *
  * Runs ONE stage of the canonical chain per call and persists it before
  * returning, so no single request holds a long connection open. Every value
- * stored here comes from the external Z.AI engine verbatim — this module
+ * stored here comes from an explicitly approved external answer engine verbatim — this module
  * decides nothing, verifies nothing itself, and can never mark a run as
  * ASCENSION · VERIFIED / PERSISTED. That label belongs to the governed core
  * alone.
  */
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { ascensionDb } from "@/lib/ascension/data/client.server";
 
 import { EPISTEMIC_LABELS, STAGE_CHAIN, type StageSpec } from "./stages";
-import { callZai, ZaiEngineError, zaiModel } from "./zai.server";
+import { callApprovedAnswer, ApprovedAnswerError, approvedAnswerModel } from "./approved-answer.server";
 
 const SYSTEM = [
   "You are an external reasoning engine invoked by the ASCENSION governed system.",
@@ -85,7 +85,7 @@ async function finish(
   requestId: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { error } = await ascensionDb
     .from("ascension_execution_requests")
     .update(patch as never)
     .eq("id", requestId);
@@ -94,7 +94,7 @@ async function finish(
 
 /** Runs the next unfinished stage of a hosted run. Idempotent per ordinal. */
 export async function advanceRun(requestId: string): Promise<AdvanceResult> {
-  const { data: run, error: runError } = await supabaseAdmin
+  const { data: run, error: runError } = await ascensionDb
     .from("ascension_execution_requests")
     .select("id, objective, evidence, constraints, status, engine")
     .eq("id", requestId)
@@ -106,7 +106,7 @@ export async function advanceRun(requestId: string): Promise<AdvanceResult> {
     throw new Error("This submission is queued for the governed runtime, not the hosted engine.");
   }
 
-  const { data: stageData, error: stageError } = await supabaseAdmin
+  const { data: stageData, error: stageError } = await ascensionDb
     .from("ascension_run_stages")
     .select("ordinal, stage, status, response_payload, response_text")
     .eq("request_id", requestId)
@@ -146,7 +146,7 @@ export async function advanceRun(requestId: string): Promise<AdvanceResult> {
     stage: spec.stage,
     engine_status: `running · ${spec.stage}`,
     epistemic_label: spec.label,
-    claimed_by: `zai:${zaiModel()}`,
+    claimed_by: `approved:${approvedAnswerModel()}`,
     claimed_at: new Date().toISOString(),
   });
 
@@ -154,22 +154,22 @@ export async function advanceRun(requestId: string): Promise<AdvanceResult> {
 
   let result;
   try {
-    result = await callZai({ system: SYSTEM, user: prompt, knowledgeQuery: typedRun.objective });
+    result = await callApprovedAnswer({ system: SYSTEM, user: prompt, knowledgeQuery: typedRun.objective });
   } catch (cause) {
     const message =
-      cause instanceof ZaiEngineError
+      cause instanceof ApprovedAnswerError
         ? cause.message
         : cause instanceof Error
           ? cause.message
           : String(cause);
-    await supabaseAdmin.from("ascension_run_stages").upsert(
+    await ascensionDb.from("ascension_run_stages").upsert(
       {
         request_id: requestId,
         ordinal: spec.ordinal,
         stage: spec.stage,
         engine_label: spec.label,
         status: "failed",
-        engine_model: zaiModel(),
+        engine_model: approvedAnswerModel(),
         request_payload: { system: SYSTEM, user: prompt } as never,
         error: message,
         completed_at: new Date().toISOString(),
@@ -199,7 +199,7 @@ export async function advanceRun(requestId: string): Promise<AdvanceResult> {
   const blocked = spec.stage === "guardian_review" && verdict === "block";
   const failedVerification = spec.stage === "autosync_verification" && autosync === "failed";
 
-  await supabaseAdmin.from("ascension_run_stages").upsert(
+  await ascensionDb.from("ascension_run_stages").upsert(
     {
       request_id: requestId,
       ordinal: spec.ordinal,

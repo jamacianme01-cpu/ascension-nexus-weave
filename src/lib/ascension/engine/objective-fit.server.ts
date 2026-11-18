@@ -1,6 +1,6 @@
-import type { Json } from "@/integrations/supabase/types";
+import type { Json } from "@/lib/ascension/data/types";
 import type { ObjectiveDelivery } from "../result-model";
-import { callZai } from "./zai.server";
+import { callApprovedAnswer } from "./approved-answer.server";
 import { repeatedRevisionTargets } from "../iteration-model";
 
 type ObjectiveInput = { objective: string; evidence?: Json | null; constraints?: Json | null };
@@ -25,7 +25,7 @@ export async function reviewObjectiveFit(
     ...(delivery.blend ? [{ target: "blend", label: delivery.blend.label,
       summary: delivery.blend.summary, steps: delivery.blend.steps, reason: delivery.blend.blend_reason }] : []),
   ];
-  const response = await callZai({
+  const response = await callApprovedAnswer({
     includeInternalKnowledge: false,
     temperature: 0,
     system: [

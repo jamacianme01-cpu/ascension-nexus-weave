@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ascensionSession } from "@/lib/ascension/data/session";
 
 import {
   listMyObjectives,
@@ -42,7 +42,7 @@ function HubPairing() {
     setError(null);
     setKey(null);
     try {
-      const {data: {session}} = await supabase.auth.getSession();
+      const {data: {session}} = await ascensionSession.auth.getSession();
       if (!session) throw new Error("Sign in as the ASCENSION owner first.");
       const response = await fetch("/api/public/ascension/hub-pair", {
         method:"POST",

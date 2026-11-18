@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAscensionAuth } from "@/lib/ascension/data/auth-middleware";
 
 type ReferenceInput = { requestId:string; pathwayId:string; imageUrl:string };
 function validate(input: ReferenceInput): ReferenceInput {
@@ -15,19 +15,19 @@ function validate(input: ReferenceInput): ReferenceInput {
  * Owner or guest authorization is required before invoking this function.
  */
 async function recordReference(data: ReferenceInput) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
   const match = data.imageUrl.match(/\/storage\/v1\/object\/public\/ascension-models\/(assembled\/[a-f0-9]{64}\.png)$/);
   if (!match) throw new Error("Only an ASCENSION-generated assembled image can be linked");
   const objectPath = match[1]!;
-  const publicUrl = supabaseAdmin.storage.from("ascension-models").getPublicUrl(objectPath).data.publicUrl;
+  const publicUrl = ascensionDb.storage.from("ascension-models").getPublicUrl(objectPath).data.publicUrl;
   if (publicUrl !== data.imageUrl) throw new Error("Image URL is not from ASCENSION storage");
   const name = objectPath.split("/").at(-1)!;
-  const found = await supabaseAdmin.storage.from("ascension-models").list("assembled", {search:name,limit:10});
+  const found = await ascensionDb.storage.from("ascension-models").list("assembled", {search:name,limit:10});
   if (found.error) throw new Error(found.error.message);
   if (!(found.data ?? []).some(item => item.name === name))
     throw new Error("Reference image was not saved");
 
-  const table = supabaseAdmin.from("ascension_model_jobs" as never) as any;
+  const table = ascensionDb.from("ascension_model_jobs" as never) as any;
   const { data: job, error: jobError } = await table
     .select("id,status,source_image_url")
     .eq("request_id",data.requestId)
@@ -48,10 +48,10 @@ async function recordReference(data: ReferenceInput) {
 }
 
 export const bindViewerReference = createServerFn({method:"POST"})
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .inputValidator(validate)
   .handler(async ({data,context}) => {
-    const {data:owner,error} = await context.supabase
+    const {data:owner,error} = await context.ascensionDb
       .from("ascension_execution_requests").select("id")
       .eq("id",data.requestId).eq("submitted_by",context.userId).maybeSingle();
     if(error)throw new Error(error.message);
@@ -70,8 +70,8 @@ export const bindGuestViewerReference = createServerFn({method:"POST"})
     return {...data,guestToken:input.guestToken};
   })
   .handler(async ({data})=>{
-    const {supabaseAdmin}=await import("@/integrations/supabase/client.server");
-    const {data:bundle,error}=await supabaseAdmin.rpc("ascension_guest_bundle",{
+    const {ascensionDb}=await import("@/lib/ascension/data/client.server");
+    const {data:bundle,error}=await ascensionDb.rpc("ascension_guest_bundle",{
       p_request_id:data.requestId,p_guest_token:data.guestToken
     });
     if(error)throw new Error(error.message);

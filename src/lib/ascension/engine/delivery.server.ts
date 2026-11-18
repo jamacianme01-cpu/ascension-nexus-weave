@@ -1,4 +1,4 @@
-import type { Json } from "@/integrations/supabase/types";
+import type { Json } from "@/lib/ascension/data/types";
 import { ASCENSION_GUIDE_INSTRUCTIONS } from "./guide-personality.server";
 import { buildGuideFallbackDelivery } from "./guide-fallback.server";
 import { callOpenAIResponse, type OpenAIWebSource } from "./openai.server";
@@ -272,7 +272,7 @@ export async function externalProductDraft(
     });
   }
 
-  const { callZai } = await import("./zai.server");
+  const { callApprovedAnswer } = await import("./approved-answer.server");
 
   const artifactContext = transportedFiles
     .filter((file) => !/^knowledgeform_/i.test(file.name))
@@ -386,7 +386,9 @@ export async function externalProductDraft(
   let openaiAnswer = "";
   let openaiSources: OpenAIWebSource[] = [];
   let openaiError = "";
-  if (process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
+  if (process.env["ASCENSION_ENABLE_PAID_APIS"] === "true" &&
+      process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
+      process.env["ASCENSION_ENABLE_OPENAI_WEB_SEARCH"] === "true" &&
       process.env["OPENAI_API_KEY"]?.trim()) {
     try {
       const research = await callOpenAIResponse({
@@ -426,7 +428,7 @@ export async function externalProductDraft(
 
   let generated;
   try {
-    generated = await callZai({
+    generated = await callApprovedAnswer({
       system,
       user: synthesisUser,
       knowledgeQuery: run.objective,
@@ -504,7 +506,7 @@ export async function externalProductDraft(
     // A streamed answer can contain a useful but malformed/truncated JSON
     // envelope. Repair the schema ONCE, preserving the original objective;
     // do not publish an unvalidated draft or silently mark the run verified.
-    const corrected = await callZai({
+    const corrected = await callApprovedAnswer({
       includeInternalKnowledge: false,
       temperature: 0.15,
       system: [
@@ -547,7 +549,7 @@ export async function externalProductDraft(
     run.objective, run.evidence, spiralForms, parsed,
   );
   if (disclaimerOnly || missingDrawingPathways || missingSpiralExpansion) {
-    const repaired = await callZai({
+    const repaired = await callApprovedAnswer({
       system: [
         system,
         missingDrawingPathways
@@ -597,7 +599,7 @@ export async function externalProductDraft(
       // Retry with a narrow pathway-only synthesis. Small free cloud models
       // often return prose when asked for the full ASCENSION delivery schema.
       // This retry never invents proof, media URLs, or executed artifacts.
-      const spiralRetry = await callZai({
+      const spiralRetry = await callApprovedAnswer({
         includeInternalKnowledge: false,
         temperature: 0.35,
         system: [
@@ -669,7 +671,7 @@ export async function externalProductDraft(
   let fit = await reviewObjectiveFit(run, parsed);
   if (fit.question) throw new Error(`A detail is needed to preserve your meaning: ${fit.question}`);
   if (!fit.matches) {
-    const repair = await callZai({
+    const repair = await callApprovedAnswer({
       includeInternalKnowledge: false,
       temperature: 0.15,
       system: [system,
@@ -816,13 +818,10 @@ export async function resolveDelivery(args: {
   const now = args.now ?? Date.now();
   const generate = args.generate ?? externalProductDraft;
   const review = args.review ?? reviewObjectiveFit;
-  const hasLovableAi = Boolean(process.env["LOVABLE_API_KEY"]?.trim()) && process.env["ASCENSION_ALLOW_LOVABLE_AI"] === "true";
-  const hasExplicitLocal = Boolean(process.env["LOCAL_LLM_BASE_URL"]?.trim());
-  const hasFreeCloud = Boolean(process.env["OPENROUTER_API_KEY"]?.trim());
-  const hasZaiFree = Boolean(process.env["ZAI_API_KEY"]?.trim());
-  const hasOpenAI = process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
+  const hasOpenAI = process.env["ASCENSION_ENABLE_PAID_APIS"] === "true" &&
+    process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
     Boolean(process.env["OPENAI_API_KEY"]?.trim());
-  const canReview = hasFreeCloud || hasZaiFree || hasLovableAi || hasExplicitLocal || hasOpenAI || Boolean(args.review);
+  const canReview = hasOpenAI || Boolean(args.review);
   let rejectedFit: ObjectiveFitReview | undefined;
   const base = {
     created_at: run.completed_at ?? run.updated_at ?? run.created_at,
@@ -966,7 +965,7 @@ export async function resolveDelivery(args: {
   }
   const failed = (message: string): ResolvedDelivery => {
     // Older runs recorded before the resilient guide was deployed can retain
-    // their Z.AI 429 / timeout as a sticky failed draft. Show an honest draft
+    // a provider timeout as a sticky failed draft. Show an honest draft
     // immediately rather than leaving ENGAGE with no readable result.
     if (/\b429\b|HTTP (?:502|503|504)|temporarily overloaded|operation was aborted|\btimeout\b|timed out/i.test(message)) {
       const fallback = buildGuideFallbackDelivery(run.objective);
@@ -1015,7 +1014,7 @@ export async function resolveDelivery(args: {
   };
   // The website does NOT implicitly spend credits on hosted AI. The owner must
   // explicitly opt in; otherwise allow the ASCENSION local worker to deliver.
-  if (!args.generate && !hasFreeCloud && !hasZaiFree && !hasLovableAi && !hasExplicitLocal && !hasOpenAI) {
+  if (!args.generate && !hasOpenAI) {
     if (!TERMINAL_STATUSES.has(run.status))
       return pending("Awaiting a connected ASCENSION answer provider or governed runtime. No paid AI credits will be used.", {
         engine_label: "ASCENSION_LOCAL_RESULT_PENDING",
@@ -1084,8 +1083,8 @@ export async function resolveDelivery(args: {
 
 /** Signed-in path: stage writes go through the server-only admin client. */
 export async function adminDraftStore(runId: string): Promise<DraftStore> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const table = () => supabaseAdmin.from("ascension_run_stages");
+  const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+  const table = () => ascensionDb.from("ascension_run_stages");
   return {
     async claim(sourceKey, expectedCreatedAt) {
       if (expectedCreatedAt === null) {

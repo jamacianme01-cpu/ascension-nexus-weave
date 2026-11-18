@@ -1,8 +1,8 @@
 /**
- * Browser auth entry kept so route modules still resolve after the Supabase
+ * Browser auth entry kept so route modules still resolve after the third-party
  * client was removed. Public ASCENSION does not require a signed-in session.
  */
-export const supabase = {
+export const ascensionSession = {
   auth: {
     async getUser() {
       return { data: { user: null }, error: null };
@@ -28,11 +28,5 @@ export const supabase = {
     async signOut() {
       return { error: null };
     },
-  },
-  async rpc(_name: string, _args?: Record<string, unknown>) {
-    return {
-      data: null,
-      error: { message: "ASCENSION database is not connected." },
-    };
   },
 };

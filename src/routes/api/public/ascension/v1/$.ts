@@ -48,8 +48,8 @@ export const Route = createFileRoute("/api/public/ascension/v1/$")({
         const splat = (params as Record<string, string | undefined>)["_splat"] ?? "";
         const path = `/${splat}`.replace(/\/+$/, "") || "/";
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data, error } = await supabaseAdmin
+        const { ascensionDb } = await import("@/lib/ascension/data/client.server");
+        const { data, error } = await ascensionDb
           .from("ascension_relay_documents")
           .select("body, http_status")
           .eq("path", path)

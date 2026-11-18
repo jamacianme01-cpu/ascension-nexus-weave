@@ -13,13 +13,13 @@ export const Route = createFileRoute("/api/public/ascension/hub-pair")({
     const configuredOwnerId = process.env["ASCENSION_HUB_OWNER_USER_ID"]?.trim();
     const auth = /^Bearer\s+([^\s]+)$/.exec(request.headers.get("authorization")??"");
     if (!auth) return respond({error:"authentication_required"},401);
-    const {supabaseAdmin} = await import("@/integrations/supabase/client.server");
-    const {data,error:authError} = await supabaseAdmin.auth.getUser(auth[1]);
+    const {ascensionDb} = await import("@/lib/ascension/data/client.server");
+    const {data,error:authError} = await ascensionDb.auth.getUser(auth[1]);
     if (authError || !data.user) return respond({error:"authentication_required"},401);
     let authorized = configuredOwnerId === data.user.id;
     if (!authorized) {
       // Operator-approved owner allowlist; service role only, no public RLS.
-      const ownerDb = supabaseAdmin as unknown as {
+      const ownerDb = ascensionDb as unknown as {
         from(name:string): {select(cols:string): {
           eq(column:string,value:string): {
             maybeSingle():Promise<{data:{user_id:string}|null;error:unknown}>
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/api/public/ascension/hub-pair")({
 
     const key=randomBytes(48).toString("hex");
     const hash=createHash("sha256").update(key).digest("hex");
-    const db=supabaseAdmin as unknown as {
+    const db=ascensionDb as unknown as {
       from(name:string): {
         upsert(row:Record<string,string|null>,options:{onConflict:string}):
           Promise<{error:unknown}>

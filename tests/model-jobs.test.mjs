@@ -38,8 +38,8 @@ const server = await createServer({
       name: "isolated-model-database",
       enforce: "pre",
       load(id) {
-        if (id.endsWith("/integrations/supabase/client.server.ts"))
-          return "export const supabaseAdmin = globalThis.__modelJobTestDatabase;";
+        if (id.endsWith("/lib/ascension/data/client.server.ts"))
+          return "export const ascensionDb = globalThis.__modelJobTestDatabase;";
       },
     },
   ],
@@ -49,13 +49,11 @@ try {
   const { imageProvider, generateConceptImage } = await server.ssrLoadModule(
     "/src/lib/ascension/engine/image.server.ts",
   );
-  const priorKey = process.env.LOVABLE_API_KEY;
   const priorOptIn = process.env.ASCENSION_ALLOW_PAID_IMAGES;
   const priorOpenAI = process.env.OPENAI_API_KEY;
   const priorOpenAIAllow = process.env.ASCENSION_ALLOW_OPENAI_AI;
   const originalFetch = globalThis.fetch;
   try {
-    process.env.LOVABLE_API_KEY = "test-only";
     delete process.env.ASCENSION_ALLOW_PAID_IMAGES;
     delete process.env.OPENAI_API_KEY;
     delete process.env.ASCENSION_ALLOW_OPENAI_AI;
@@ -71,8 +69,6 @@ try {
     assert.equal(imageProvider()?.provider, "openai");
   } finally {
     globalThis.fetch = originalFetch;
-    if (priorKey === undefined) delete process.env.LOVABLE_API_KEY;
-    else process.env.LOVABLE_API_KEY = priorKey;
     if (priorOptIn === undefined) delete process.env.ASCENSION_ALLOW_PAID_IMAGES;
     else process.env.ASCENSION_ALLOW_PAID_IMAGES = priorOptIn;
     if (priorOpenAI === undefined) delete process.env.OPENAI_API_KEY;

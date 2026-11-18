@@ -1,0 +1,61 @@
+name: Verify ASCENSION existing database connection
+on:
+  pull_request:
+    paths:
+      - 'src/lib/ascension/data/postgres.server.ts'
+      - 'src/lib/ascension/data/client.server.ts'
+      - 'src/routes/api/public/ascension/answer-readiness.ts'
+      - 'src/lib/ascension/guest.functions.ts'
+      - 'src/routes/api/health.ts'
+      - 'tests/reconnect-existing-database.test.mjs'
+      - '.github/workflows/verify-existing-database-connection.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate ASCENSION storage and existing schema preservation
+        run: node --test tests/reconnect-existing-database.test.mjs
+
+      - name: Prepare Fly read-only inspection
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Inspect existing Fly database and worker configuration without exposing secret values
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "Fly.io access not available to this read-only inspection"
+            exit 0
+          fi
+          echo "ASCENSION existing Fly machine and secret inventory:"
+          if ! flyctl secrets list --app ascension-nexus-weave --json > /tmp/ascension-fly-secrets.json; then
+            echo "Fly.io secrets could not be inspected (authorization or service issue)"
+            exit 0
+          fi
+          for key in DATABASE_URL ASCENSION_DATABASE_URL ASCENSION_PUBLISH_TOKEN; do
+            if jq -e --arg key "$key" 'any(.[]; (.name // .Name // "") == $key)' /tmp/ascension-fly-secrets.json >/dev/null; then
+              echo "$key: CONFIGURED (value never shown)"
+            else
+              echo "$key: MISSING"
+            fi
+          done
+          rm -f /tmp/ascension-fly-secrets.json
+          if flyctl machine list --app ascension-nexus-weave --json > /tmp/ascension-machines.json; then
+            jq -r '
+              "Total machines: " + (length | tostring),
+              "Worker-process machines: " +
+                ([.[] | select(
+                  (.config.metadata.fly_process_group // .config.metadata.process_group // .process_group // "") == "worker"
+                )] | length | tostring)
+            ' /tmp/ascension-machines.json
+            rm -f /tmp/ascension-machines.json
+          else
+            echo "Fly.io machine inventory unavailable"
+          fi

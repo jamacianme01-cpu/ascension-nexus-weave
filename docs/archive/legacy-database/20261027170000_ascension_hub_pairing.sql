@@ -1,3 +1,4 @@
+-- ARCHIVE ONLY: Never apply this old identity-provider-specific migration to ASCENSION native storage.
 -- Dedicated operator hub pairing. Key material is never stored in plaintext.
 CREATE TABLE IF NOT EXISTS public.ascension_hub_connections (
   id text PRIMARY KEY CHECK (id='primary'),

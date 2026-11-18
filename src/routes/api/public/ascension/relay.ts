@@ -114,13 +114,13 @@ export const Route = createFileRoute("/api/public/ascension/relay")({
           });
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { ascensionDb } = await import("@/lib/ascension/data/client.server");
 
         // Whole-set replacement keeps relayed surfaces coherent: a stale surface
         // from an earlier revision is never served alongside a newer one.
         if (body.replace !== false) {
           const keep = rows.map((row) => row.path);
-          const { error: pruneError } = await supabaseAdmin
+          const { error: pruneError } = await ascensionDb
             .from("ascension_relay_documents")
             .delete()
             .not("path", "in", `(${keep.map((path) => `"${path}"`).join(",")})`);
@@ -130,7 +130,7 @@ export const Route = createFileRoute("/api/public/ascension/relay")({
           }
         }
 
-        const { error } = await supabaseAdmin
+        const { error } = await ascensionDb
           .from("ascension_relay_documents")
           .upsert(rows, { onConflict: "path" });
         if (error) {

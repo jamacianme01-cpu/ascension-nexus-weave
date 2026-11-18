@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { ascensionSession } from "@/lib/ascension/data/session";
 import {
   deleteObservation,
   getGovernedPublication,
@@ -54,7 +54,7 @@ function LivePage() {
     setHubError(null);
     setPairing(true);
     try {
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await ascensionSession.auth.getSession();
       if (error || !data.session?.access_token) {
         throw new Error("Sign in to ASCENSION before pairing your hub.");
       }
@@ -130,7 +130,7 @@ function LivePage() {
           <button
             type="button"
             onClick={async () => {
-              await supabase.auth.signOut();
+              await ascensionSession.auth.signOut();
               void navigate({ to: "/auth", search: { next: "/live" } });
             }}
             className="min-h-9 rounded-sm border border-border px-3 py-1.5 font-mono text-[0.66rem] tracking-[0.2em] text-muted-foreground uppercase hover:border-gold/50 hover:text-gold"

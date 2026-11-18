@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAscensionAuth } from "@/lib/ascension/data/auth-middleware";
 import type { ObjectiveDelivery } from "./result-model";
 
 export const DELIVERY_ORDINAL = 100;
@@ -21,12 +21,12 @@ function validate(input: { requestId: string; retry?: boolean }) {
 
 async function resolveForOwner(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  ascensionDb: any,
   userId: string,
   requestId: string,
   retry: boolean,
 ): Promise<DeliveryState | null> {
-  const { data: run, error } = await supabase
+  const { data: run, error } = await ascensionDb
     .from("ascension_execution_requests")
     .select(
       "id, objective, evidence, constraints, status, result, completed_at, updated_at, created_at",
@@ -36,7 +36,7 @@ async function resolveForOwner(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!run) return null;
-  const { data: stages, error: stageError } = await supabase
+  const { data: stages, error: stageError } = await ascensionDb
     .from("ascension_run_stages")
     .select("ordinal, status, response_payload, error, engine_model, created_at, request_payload")
     .eq("request_id", requestId)
@@ -77,19 +77,19 @@ async function resolveForOwner(
 
 /** Read what the answer panel should show for this run (never terminal mid-run). */
 export const getObjectiveDelivery = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) =>
-    resolveForOwner(context.supabase, context.userId, data.requestId, false),
+    resolveForOwner(context.ascensionDb, context.userId, data.requestId, false),
   );
 
 /** Same as above, but a retry re-runs a failed external draft. */
 export const prepareObjectiveDelivery = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAscensionAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
     const state = await resolveForOwner(
-      context.supabase,
+      context.ascensionDb,
       context.userId,
       data.requestId,
       data.retry,

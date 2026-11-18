@@ -1,0 +1,22 @@
+name: Verify ASCENSION existing database connection
+on:
+  pull_request:
+    paths:
+      - 'src/integrations/supabase/postgres-compat.server.ts'
+      - 'src/integrations/supabase/client.server.ts'
+      - 'src/lib/ascension/guest.functions.ts'
+      - 'src/routes/api/health.ts'
+      - 'tests/reconnect-existing-database.test.mjs'
+      - '.github/workflows/verify-existing-database-connection.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate ASCENSION storage and existing schema preservation
+        run: node --test tests/reconnect-existing-database.test.mjs

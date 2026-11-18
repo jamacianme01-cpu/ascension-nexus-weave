@@ -1,4 +1,4 @@
-import type { Json } from "@/integrations/supabase/types";
+import type { Json } from "@/lib/ascension/data/types";
 import type { ObjectiveDelivery } from "../result-model";
 import { callZai } from "./zai.server";
 import { repeatedRevisionTargets } from "../iteration-model";

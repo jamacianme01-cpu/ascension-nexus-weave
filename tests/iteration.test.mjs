@@ -29,7 +29,7 @@ globalThis.__iterationDatabase = {
     return query;
   },
 };
-globalThis.__iterationAuthContext = { supabase: globalThis.__iterationDatabase, userId: "test-user" };
+globalThis.__iterationAuthContext = { ascensionDb: globalThis.__iterationDatabase, userId: "test-user" };
 const server = await createServer({ configFile: false, server: { middlewareMode: true },
   ssr: { noExternal: ["@tanstack/react-start"] },
   resolve: { alias: { "@": resolve("src") } }, plugins: [{ name: "isolated-iteration-intake", enforce: "pre",
@@ -41,8 +41,8 @@ const server = await createServer({ configFile: false, server: { middlewareMode:
           handler(fn) { return async options => fn({ data: validate(options?.data), context: globalThis.__iterationAuthContext }); } };
         return chain;
       }`;
-      if (id.endsWith("/integrations/supabase/client.ts")) return "export const supabase = globalThis.__iterationDatabase;";
-      if (id.endsWith("/integrations/supabase/auth-middleware.ts")) return "export const requireSupabaseAuth = {};";
+      if (id.endsWith("/lib/ascension/data/client.server.ts")) return "export const ascensionDb = globalThis.__iterationDatabase;";
+      if (id.endsWith("/lib/ascension/data/auth-middleware.ts")) return "export const requireAscensionAuth = {};";
     },
   }] });
 let passed = 0;

@@ -1,0 +1,116 @@
+name: Activate original ASCENSION Fly worker queue
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/ascension-owner-queue/**'
+      - 'fly.owner-queue.toml'
+      - '.github/workflows/activate-owner-fly-volume-queue.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Share the existing production deployment lock; do not replace the worker
+# with a public-source image lacking the original owner ASCENSION_CORE.
+concurrency:
+  group: ascension-fly-production
+  cancel-in-progress: false
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: ascension-nexus-weave
+      OWNER_WORKER_ID: 7813e23b336938
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Validate owner-only engine prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly authorization missing"; exit 1; }
+          flyctl machine status "$OWNER_WORKER_ID" --app "$FLY_APP"
+          flyctl volumes list --app "$FLY_APP"
+          python3 -m py_compile scripts/ascension-owner-queue/*.py
+          sh -n scripts/ascension-owner-queue/ascension-start.sh
+          echo "No external database or hosted AI provider configured or changed."
+      - name: Build existing ASCENSION web source
+        shell: bash
+        env:
+          NODE_ENV: production
+          NITRO_PRESET: bun
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun run build
+          test -f .output/server/index.mjs
+      - name: Use only the current owner's PRIVATE Fly engine image
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Machine metadata names the image of the ORIGINAL owner worker.
+          # Its private authored source is never checked into this repository.
+          metadata="$(curl --fail --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer $FLY_API_TOKEN" \
+            "https://api.machines.dev/v1/apps/$FLY_APP/machines/$OWNER_WORKER_ID")"
+          base="$(printf '%s' "$metadata" | jq -r '.config.image // empty')"
+          case "$base" in
+            registry.fly.io/ascension-nexus-weave:deployment-*|registry.fly.io/ascension-nexus-weave@sha256:*|registry.fly.io/ascension-nexus-weave:owner-queue-*) ;;
+            *) echo "::error::Original private owner image not found; refusing image substitution."; exit 1 ;;
+          esac
+          echo "ASCENSION_ORIGINAL_PRIVATE_FLY_IMAGE_FOUND"
+          echo "original_base=$base" >> "$GITHUB_OUTPUT"
+          flyctl auth docker
+          docker pull "$base"
+          docker run --rm --entrypoint /bin/sh "$base" -c \
+            'test -f /app/ASCENSION_CORE/cloud_queue_worker.py && test -f /app/clarity/core_runtime.py && test -f /app/ASCENSION_CORE/live_publication.py'
+          echo "ASCENSION_ORIGINAL_AUTHOR_SOURCE_PRESERVED"
+      - name: Build and publish owner-only Fly image overlay
+        id: overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ascension-owner-overlay"
+          cp -a .output "$RUNNER_TEMP/ascension-owner-overlay/.output"
+          cp scripts/ascension-owner-queue/*.py "$RUNNER_TEMP/ascension-owner-overlay/"
+          cp scripts/ascension-owner-queue/ascension-start.sh "$RUNNER_TEMP/ascension-owner-overlay/"
+          cp scripts/ascension-owner-queue/Dockerfile.overlay "$RUNNER_TEMP/ascension-owner-overlay/Dockerfile"
+          new_image="registry.fly.io/$FLY_APP:owner-queue-${GITHUB_SHA:0:12}"
+          docker build -t "$new_image" --build-arg \
+            "ORIGINAL_OWNER_IMAGE=${{ steps.image.outputs.original_base }}" \
+            "$RUNNER_TEMP/ascension-owner-overlay"
+          docker push "$new_image"
+          echo "new_image=$new_image" >> "$GITHUB_OUTPUT"
+      - name: Update only existing ASCENSION app and worker processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          flyctl deploy --app "$FLY_APP" --config fly.owner-queue.toml \
+            --image "${{ steps.overlay.outputs.new_image }}" \
+            --process-groups app,worker --yes
+      - name: Validate ORIGINAL governed publication and private transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          flyctl ssh console --app "$FLY_APP" --machine "$OWNER_WORKER_ID" \
+            --command 'python3 /app/verify_state.py /data/ascension/state/live'
+          flyctl ssh console --app "$FLY_APP" --machine "$OWNER_WORKER_ID" \
+            --command 'python3 /app/probe-ascension-private.py'
+          for attempt in $(seq 1 10); do
+            response="$(curl --fail --show-error --silent --max-time 20 \
+              https://ascension-nexus-weave.fly.dev/api/public/ascension/answer-readiness || true)"
+            if printf '%s' "$response" | jq -e '.owner_queue_transport_connected == true' >/dev/null 2>&1; then
+              echo "ASCENSION_ENGAGE_BACKEND_CONNECTED_TO_ORIGINAL_GOVERNED_WORKER"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::ENGAGE website has not confirmed private worker connectivity."
+          exit 1

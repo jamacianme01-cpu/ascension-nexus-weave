@@ -167,7 +167,7 @@ export class Query<T = Row[]> implements PromiseLike<Result<T>> {
       return {data:(this.action !== "select" && !this.returning ? null : rows) as T,error:null,count:rows.length};
     } catch (error) {
       const e = error as Error & { code?: string };
-      return {data:null,error:{message:e.message,code:e.code},count:null};
+      return {data:null,error:{message:e.message,...(e.code ? {code:e.code} : {})},count:null};
     }
   }
   then<TResult1 = Result<T>, TResult2 = never>(
@@ -183,10 +183,10 @@ export async function rpcDatabase(name: string, args: Record<string, unknown> = 
     const named = Object.entries(args).map(([k,v])=>identifier(k)+" => "+bind(params,v));
     const statement = "SELECT public."+identifier(name)+"("+named.join(",")+") AS payload";
     const rows = await database().unsafe(statement, params as any[]);
-    return {data:rows[0]?.payload ?? null,error:null,count:rows.length};
+    return {data:rows[0]?.['payload'] ?? null,error:null,count:rows.length};
   } catch (error) {
     const e = error as Error & {code?:string};
-    return {data:null,error:{message:e.message,code:e.code},count:null};
+    return {data:null,error:{message:e.message,...(e.code ? {code:e.code} : {})},count:null};
   }
 }
 
@@ -199,7 +199,7 @@ export async function databaseConnectivity() {
       "(SELECT count(distinct proname) FROM pg_proc WHERE pronamespace = 'public'::regnamespace " +
       "AND proname IN ('ascension_guest_submit','ascension_guest_status','ascension_guest_bundle','ascension_guest_draft')) AS rpc_count"
     );
-    if (!rows[0]?.queue || !rows[0]?.stages || Number(rows[0]?.rpc_count) !== 4)
+    if (!rows[0]?.['queue'] || !rows[0]?.['stages'] || Number(rows[0]?.['rpc_count']) !== 4)
       return {connected:false,reason:"EXISTING_ASCENSION_SCHEMA_INCOMPLETE"};
     return {connected:true,reason:null};
   } catch {

@@ -68,3 +68,51 @@ have been migrated, or that ASCENSION engines are running on Fly.
 **Owner's steps 2–7 remain pending until a real arbitrary objective is run
 through the hosted existing engines and the four actual pathways, selected
 picture, and Tree's spoken explanation are demonstrated.**
+
+
+## November 18 owner-uploaded engine package: executable wiring prepared
+
+The owner uploaded `ASCENSION_CORE_REVIEW(1).zip` directly in the current chat.
+All **48 authored Python modules** from that archive were copied byte-for-byte
+into a **private** Fly connection bundle. No source module was changed. The
+bundle contains **317 supplemental CLARITY support modules** from the
+September 13 source archive for compatibility inspection. Those modules are
+historical, not proven current, and the deployment script refuses to use
+them for deployment without explicit opt-in.
+
+Six engine imports passed. A local HTTP mock verified the exact original
+`QueueClient` claim/status transport and `x-ascension-publish-token` header.
+Those tests demonstrate source compatibility and the bridge protocol, not
+any actual execution by Fly or completion of an objective.
+
+The alternate, **manual** Fly configuration is:
+- `Dockerfile.ascension-engines`: bundles original private engines only from
+  a local `.private_runtime` build-context directory and compiles the
+  current website. Does not fetch from the empty private GitHub repository.
+- `fly.ascension-engines.toml`: web process `app`, original engine
+  `worker`, published objective queue URL, worker-only persistent volume.
+- `scripts/ascension-fly-governed-entrypoint.sh`: starts the original worker
+  with the code-confirmed root `/data/ascension/state/live`. The original
+  `publication_contract.classify_source` requires the final three segments
+  `state/live/published`. The earlier `--root /data/ascension` was incorrect.
+- The worker refuses missing/invalid authoritative governed publication and
+  never initializes an empty Knowledgeverse. Temporary bootstrap starts a
+  paused process **without claiming any objectives** while state is transferred.
+- `scripts/ascension-verify-live-state.py` validates the original signed
+  `LIVE_GOVERNED` publication and reports revision/hash, read-only.
+- `tests/test_ascension_fly_governed_contract.py` statically checks the
+  process groups, state root, queue URL, and protected build separation.
+
+The user-facing private bundle includes `Deploy-ASCENSION-Fly.ps1` for
+a one-command, guarded rollout using existing Fly credentials **from an
+authorized computer holding the owner's original live state**. It clones the
+unchanged website `main`, privately stages code, provisions the worker
+volume only when needed, migrates the authoritative state without overwriting
+existing Fly data, validates the publication, starts the worker, and checks
+the website. The ChatGPT session cannot run this PowerShell script against
+the owner's Windows files or Fly account.
+
+**No private source was committed to this public repository. No alternate
+worker was deployed; production default config and GitHub auto-deploy remain
+unchanged. This is a tested source-and-configuration integration pending an
+actual Fly run and real ENGAGE output verification.**

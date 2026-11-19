@@ -1,5 +1,6 @@
 import { useEffect, type CSSProperties } from "react";
 import "./designed-flow.css";
+import { V1DesignViewport } from "./v1-design-viewport";
 
 /** Screens taken from the designed flow, unchanged. */
 export type DesignedScreen = "spiral" | "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
@@ -142,6 +143,8 @@ export function DesignedFlow({
   onToggleTalking,
   onScreen,
   onOpen,
+  onExplainPart,
+  onBuildOnResult,
 }: {
   screen: DesignedScreen;
   readings: PathwayReading[];
@@ -152,6 +155,8 @@ export function DesignedFlow({
   onToggleTalking: () => void;
   onScreen: (next: DesignedTarget) => void;
   onOpen: (index: number) => void;
+  onExplainPart: (part: { name: string; purpose: string; location: string }) => void;
+  onBuildOnResult: () => void;
 }) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -187,26 +192,19 @@ export function DesignedFlow({
         ))}
         {screen !== "spiral" && chosen && (
           <section className="designed-live-panel" aria-label="Selected ASCENSION pathway">
-            <h2>{chosen.title}</h2>
+            <div className="v1-design-title"><h2>{chosen.title}</h2><button type="button" onClick={onBuildOnResult}>BUILD ON RESULT</button></div>
             <div className="designed-live-content">
               <div className="designed-live-artwork">
-                {selectedPicture
-                  ? <img src={selectedPicture} alt={`Generated design for ${chosen.title}`} draggable={false} />
-                  : <p role="status">ASCENSION has not delivered a design picture for this pathway.</p>}
-                <p className="designed-live-summary">{chosen.summary}</p>
-                {screen !== "assembled" && <p className="designed-live-limitation">
-                  {screen === "blueprint"
-                    ? "A measured blueprint must come from the actual engineering output; none is verified here."
-                    : "This inspection view requires the corresponding delivered design geometry."}
-                </p>}
+                <V1DesignViewport modelUrl={chosen.modelUrl ?? null} imageUrl={selectedPicture} mode={screen} />
+                <p className="designed-live-summary">{chosen.summary}</p>}
               </div>
               <aside className="designed-live-parts" aria-label="Delivered components">
                 <h3>Components</h3>
                 {chosen.parts?.length
                   ? <ul>{chosen.parts.map((part, index) => <li key={`${part.name}-${index}`}>
-                    {part.name}
-                    {part.purpose && <p>{part.purpose}</p>}
-                    {part.location && <p>{part.location}</p>}
+                    <button type="button" className="v1-part-name" onClick={() => onExplainPart(part)}>{part.name}</button>
+                    {part.purpose && <p><strong>Does:</strong> {part.purpose}</p>}
+                    {part.location && <p><strong>Where:</strong> {part.location}</p>}
                   </li>)}</ul>
                   : <p>No component descriptions were delivered for this pathway.</p>}
               </aside>

@@ -1,0 +1,56 @@
+name: Verify ASCENSION V1 real objective through original Fly worker
+
+# Unlike a connectivity probe, this submits one harmless real objective and
+# requires the owner's ORIGINAL engine to author all four V1 pathways.
+# Never merge or deploy, and never manufacture replacement results.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/ascension-owner-queue/ascension-v1-live-objective-smoke.py'
+      - '.github/workflows/verify-ascension-v1-real-objective.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-real-objective:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: ascension-nexus-weave
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Use only the original machine attached to the owner state volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly credentials unavailable"; exit 1; }
+          volume_table="$(flyctl volumes list --app "$FLY_APP")"
+          worker_id="$(awk -F '│' '$2 ~ /created/ && $3 ~ /ascension_state/ {
+            machine=$8; gsub(/[[:space:]]/, "", machine); print machine
+          }' <<< "$volume_table")"
+          if ! [[ "$worker_id" =~ ^[a-f0-9]{14}$ ]]; then
+            echo "::error::Original owner worker could not be uniquely resolved"
+            exit 1
+          fi
+          worker_status="$(flyctl machine status "$worker_id" --app "$FLY_APP")"
+          state="$(awk '/^State:/ {sub(/^State:[[:space:]]*/, ""); gsub(/[[:space:]]/, ""); print}' <<< "$worker_status")"
+          if [ "$state" = stopped ]; then
+            flyctl machine start "$worker_id" --app "$FLY_APP"
+          elif [ "$state" != started ]; then
+            echo "::error::Unexpected state of original owner worker: $state"
+            exit 1
+          fi
+          echo "ORIGINAL_WORKER_ID=$worker_id" >> "$GITHUB_ENV"
+      - name: Submit one real objective and require owner-authored four-pathway delivery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/ascension-owner-queue/ascension-v1-live-objective-smoke.py
+          script="$(base64 -w0 scripts/ascension-owner-queue/ascension-v1-live-objective-smoke.py)"
+          remote="python3 -c 'import base64;exec(base64.b64decode(\"$script\"))'"
+          flyctl ssh console --app "$FLY_APP" --machine "$ORIGINAL_WORKER_ID" --command "$remote"

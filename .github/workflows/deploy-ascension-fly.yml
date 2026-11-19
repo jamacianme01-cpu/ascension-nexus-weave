@@ -1,7 +1,8 @@
 name: Deploy ASCENSION to Fly.io
 
-# Manual deploy of the existing Fly app. Preserves ASCENSION_CORE worker volume
-# and process groups. Does not introduce Lovable, Supabase, or external AI hosts.
+# Manual APP-ONLY deploy. Never updates the worker process group or its image.
+# The original private worker + volume are owned by activate-owner-fly-volume<queue.yml.
+# Do not introduce Lovable, Supabase, or external AI hosts.
 on:
   workflow_dispatch:
 
@@ -46,43 +47,20 @@ jobs:
             echo "ASCENSION internal publish token securely staged in Fly for this deploy."
           fi
 
-      - name: Ensure FLY_API_TOKEN is available to the running app (worker wake)
+      - name: Confirm original worker + volume still present (read-only)
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          # The web process needs this secret at runtime so ENGAGE can wake the
-          # worker process group when min_machines_running is 0.
-          if flyctl secrets list --app ascension-nexus-weave --json |
-               jq -e 'any(.[]; (.name // .Name // "") == "FLY_API_TOKEN")' >/dev/null; then
-            echo "FLY_API_TOKEN already present on the Fly app; retaining."
-          else
-            flyctl secrets set --app ascension-nexus-weave --stage "FLY_API_TOKEN=$FLY_API_TOKEN" >/dev/null
-            echo "FLY_API_TOKEN staged on the Fly app for worker wake on ENGAGE."
-          fi
+          flyctl machines list --app ascension-nexus-weave --json |
+            jq -e 'any(.[]; .config.metadata.fly_process_group == "worker" and any(.config.mounts[]?; .volume != null))'
+          echo "Original worker process group with volume is present. This job will not modify it."
 
-      - name: Deploy the existing ASCENSION app process
+      - name: Deploy APP process only (never worker image)
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml --process-groups app
-
-      - name: Ensure worker process group has a machine (stays auto-stop capable)
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Create a worker machine if none exists. min_machines_running stays 0
-          # in fly.toml so the machine can stop when idle; ENGAGE wakes it.
-          count="$(flyctl machines list --app ascension-nexus-weave --json 2>/dev/null | jq '[.[] | select((.config.metadata.fly_process_group // .process_group // "") == "worker")] | length')"
-          if [ "${count:-0}" -eq 0 ]; then
-            echo "No worker machine found. Scaling worker process group to 1 once."
-            flyctl scale count worker=1 --app ascension-nexus-weave --yes || \
-              flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml --process-groups worker
-          else
-            echo "Worker machine count: $count (wake-on-ENGAGE; min_machines remains 0)."
-          fi
+        run: flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml --process-groups app --update-only
 
       - name: Check Fly app status
         env:

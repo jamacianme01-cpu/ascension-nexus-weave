@@ -483,8 +483,23 @@ export function IndependentEngage() {
     const path = index === 3 ? result?.blend : result?.pathways[index];
     if (!path) return;
     setChoice(index);
-    offer(openLine(path, index === 3));
     setScreen("assembled");
+    // Introduce the selected picture and its actual delivered components,
+    // without inventing a physical location, function, or measurement.
+    const picture = path.imageUrl || path.modelUrl
+      ? "This is the selected design."
+      : "A design picture has not been delivered for this pathway.";
+    const componentReading = path.parts.length
+      ? "The delivered components are: " + path.parts.map(part => {
+          const details = [
+            part.name,
+            part.location ? "where it belongs: " + part.location : "",
+            part.purpose ? "what it does: " + part.purpose : "",
+          ].filter(Boolean);
+          return details.join(", ");
+        }).join("; ") + "."
+      : "Component details have not been delivered yet.";
+    offer([openLine(path, index === 3), picture, componentReading].join(" "));
   }
 
   function explainPart(part: Part) {

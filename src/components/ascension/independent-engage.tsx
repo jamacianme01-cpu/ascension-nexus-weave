@@ -112,14 +112,14 @@ function openLine(path: Pathway, blend: boolean): string {
 /** Hosted Tree entry. Engines analyze the answer; the fourth pathway is the blend. */
 export function IndependentEngage() {
   const [objective, setObjective] = useState("");
-  const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>(null);
+  const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>("Build / Create");
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [microphone, setMicrophone] = useState<"checking" | "ready" | "unavailable">("checking");
   const [textBackup, setTextBackup] = useState(false);
   const [microphonePrompt, setMicrophonePrompt] = useState(false);
   const objectiveRef = useRef("");
-  const categoryRef = useRef<typeof category>(null);
+  const categoryRef = useRef<typeof category>("Build / Create");
   const engageRef = useRef<() => void>(() => {});
   const guideCommandRef = useRef<(spoken: string) => boolean>(() => false);
   const listeningRef = useRef(false);
@@ -222,7 +222,7 @@ export function IndependentEngage() {
       setMicrophone("ready");
       setMicrophonePrompt(false);
       // Do not interrupt the Tree's welcome by starting recognition here.
-      // The welcome completion starts listening after the Book category is chosen.
+      // The welcome completion starts listening when ASCENSION opens.
     }).catch(() => {
       if (closed) return;
       setMicrophone("unavailable");
@@ -278,10 +278,7 @@ export function IndependentEngage() {
       recognition.current?.stop();
       return;
     }
-    if (!categoryRef.current) {
-      setVoiceError("Choose a Book category before stating your objective.");
-      return;
-    }
+    // The Tree accepts objectives immediately; a category click is not a gate.
     // Recognition callbacks can hold a stale React render. Use the live lock.
     if (loadingRef.current) return;
     // No keyword or objective-domain gate: every valid objective is submitted
@@ -372,7 +369,7 @@ export function IndependentEngage() {
 
   async function engage() {
     const text = objectiveRef.current.trim();
-    if (!categoryRef.current || !text || loadingRef.current) return;
+    if (!text || loadingRef.current) return;
     loadingRef.current = true;
     const token = ++generation.current;
     abort.current?.abort();
@@ -676,19 +673,7 @@ export function IndependentEngage() {
         <div className="ascension-scene-hero" aria-hidden="true">
           <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
         </div>
-        {!category ? (
-          <div role="group" aria-label="Choose a Book category" className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-black/70 px-4">
-            <h1 className="font-serif text-3xl text-amber-200">ASCENSION</h1>
-            <div className="flex flex-wrap justify-center gap-4">
-              {(["Business Planner", "Build / Create", "Guidance"] as const).map(option =>
-                <button key={option} type="button" className="min-h-16 rounded-xl border border-amber-400/60 bg-black/85 px-6 text-amber-100"
-                  onClick={() => chooseCategory(option)}>{option}</button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="absolute bottom-[22%] left-1/2 z-20 flex w-[min(90%,38rem)] -translate-x-1/2 flex-col items-center gap-3 text-center">
-            <span className="text-sm text-amber-200">{category}</span>
+        <div className="absolute bottom-[22%] left-1/2 z-20 flex w-[min(90%,38rem)] -translate-x-1/2 flex-col items-center gap-3 text-center">
             <button type="button" onClick={() => listenForObjective()} disabled={loading}
               className="min-h-12 rounded-full border border-amber-400/70 bg-black/85 px-5 text-amber-100">
               {listening ? "STOP LISTENING" : "SPEAK OBJECTIVE"}
@@ -706,12 +691,11 @@ export function IndependentEngage() {
                 }} />
             </label>}
           </div>
-        )}
         {microphonePrompt && microphone === "checking" && <p className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded bg-black/85 p-3 text-sm text-white" role="status">Allow microphone access to control ASCENSION by voice.</p>}
         {microphone === "unavailable" && <button type="button" onClick={() => void requestMicrophone()}
           className="absolute right-4 top-4 z-30 rounded border border-amber-400 bg-black/90 p-3 text-amber-100">Enable microphone</button>}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" disabled={!category || loading || !objective.trim()} onClick={() => void engage()}
+          <button type="button" disabled={loading || !objective.trim()} onClick={() => void engage()}
             className="ascension-engage min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
             {loading ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
           </button>
@@ -726,9 +710,9 @@ export function IndependentEngage() {
           <p className="whitespace-pre-wrap">{internalKnowledge}</p>
           <p>New pathways are not verified or available until the governed ASCENSION runtime processes the objective.</p>
         </section>}
-        {category && <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
+        <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
           {talking ? "MUTE TREE" : "HEAR TREE"}
-        </button>}
+        </button>
       </div>
     </section>
     {screen && result && <DesignedFlow screen={screen} readings={readings} selectedIndex={choice}

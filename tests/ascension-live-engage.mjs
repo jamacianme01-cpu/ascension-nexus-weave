@@ -5,7 +5,7 @@ if (!process.env.PLAYWRIGHT_MODULE) throw Error("Missing Playwright location");
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
 const website = process.env.ASCENSION_V1_WEBSITE || "https://ascension-nexus-weave.fly.dev/";
 const objective = "I want to make Worker drones for people with dementia.";
-const browser = await chromium.launch({headless:true,args:["--no-sandbox"]});
+const browser = await chromium.launch({headless:true,executablePath:process.env.ASCENSION_CHROME_BIN,args:["--no-sandbox"]});
 const context = await browser.newContext({viewport:{width:1280,height:800}});
 await context.addInitScript(() => {
   // Test the supported text alternative on a device with no microphone.

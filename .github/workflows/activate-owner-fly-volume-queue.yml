@@ -153,7 +153,11 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/ascension-live-browser"
           npm install --no-save --prefix "$RUNNER_TEMP/ascension-live-browser" playwright@1.56.1
-          "$RUNNER_TEMP/ascension-live-browser/node_modules/.bin/playwright" install chromium
+          # GitHub ubuntu-26.04 is unsupported by Playwright's bundled installer.
+          # Use the already installed Chrome or Chromium browser on this runner.
+          browser="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || command -v microsoft-edge-stable || true)"
+          test -n "$browser" || { echo "::error::No Chromium-compatible browser present on runner."; exit 1; }
+          ASCENSION_CHROME_BIN="$browser" \
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/ascension-live-browser/node_modules/playwright/index.mjs" \
             node tests/ascension-live-engage.mjs
       - name: Save actual ASCENSION browser-test image

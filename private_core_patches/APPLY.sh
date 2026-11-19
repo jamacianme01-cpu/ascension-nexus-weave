@@ -7,26 +7,6 @@ if [[ -z "$ROOT" ]]; then
 fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CORE="$SCRIPT_DIR/ASCENSION_CORE"
-if [[ -f "$CORE/capabilities.py" ]]; then
-  SRC="$CORE/capabilities.py"
-elif [[ -f "$CORE/capabilities.complete.part1.txt" && -f "$CORE/capabilities.complete.part2.txt" && -f "$CORE/capabilities.complete.part3.txt" ]]; then
-  SRC="$CORE/capabilities.py.assembled"
-  cat "$CORE/capabilities.complete.part1.txt" "$CORE/capabilities.complete.part2.txt" "$CORE/capabilities.complete.part3.txt" > "$SRC"
-elif [[ -f "$CORE/capabilities.py.b64" ]]; then
-  SRC="$CORE/capabilities.py.assembled"
-  base64 -d < "$CORE/capabilities.py.b64" > "$SRC" 2>/dev/null || base64 --decode "$CORE/capabilities.py.b64" > "$SRC"
-else
-  echo "REFUSING: complete capabilities.py missing" >&2
-  exit 1
-fi
-if ! grep -q 'class PhysicalDesignCapability' "$SRC"; then
-  echo "REFUSING: assembled file missing PhysicalDesignCapability" >&2
-  exit 1
-fi
-if ! grep -q 'PhysicalDesignCapability()' "$SRC"; then
-  echo "REFUSING: assembled file missing REGISTRY registration" >&2
-  exit 1
-fi
 if [[ -d "$ROOT/ASCENSION_CORE" ]]; then
   TARGET="$ROOT/ASCENSION_CORE/capabilities.py"
 elif [[ -f "$ROOT/capabilities.py" ]]; then
@@ -36,6 +16,22 @@ else
   exit 1
 fi
 cp -a "$TARGET" "${TARGET}.bak.$(date +%Y%m%d%H%M%S)"
-cp "$SRC" "$TARGET"
-echo "Applied COMPLETE physical_design capability registration to $TARGET"
+if [[ -f "$CORE/capabilities.py" ]] && grep -q 'class PhysicalDesignCapability' "$CORE/capabilities.py"; then
+  cp "$CORE/capabilities.py" "$TARGET"
+elif [[ -f "$CORE/capabilities.py.unified.patch" ]]; then
+  (cd "$(dirname "$TARGET")/.." && patch -p1 < "$CORE/capabilities.py.unified.patch") || \
+    (cd "$(dirname "$TARGET")" && patch -p1 < "$CORE/capabilities.py.unified.patch")
+else
+  echo "REFUSING: no complete capabilities.py or unified.patch" >&2
+  exit 1
+fi
+if ! grep -q 'class PhysicalDesignCapability' "$TARGET"; then
+  echo "REFUSING: post-apply file missing PhysicalDesignCapability — restore from .bak" >&2
+  exit 1
+fi
+if ! grep -q 'PhysicalDesignCapability()' "$TARGET"; then
+  echo "REFUSING: post-apply REGISTRY missing PhysicalDesignCapability() — restore from .bak" >&2
+  exit 1
+fi
+echo "Applied physical_design capability registration to $TARGET"
 echo "Restart the ASCENSION worker / Fly engine process to load the registry."

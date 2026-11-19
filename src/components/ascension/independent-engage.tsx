@@ -134,6 +134,8 @@ export function IndependentEngage() {
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const welcomed = useRef(false);
+  const restored = useRef(false);
+  const MEMORY_KEY = "ascension-v1-current-session";
   // Continuation retains the existing governed run and its guest authorization.
   const activeRun = useRef<{ requestId: string; guestToken: string } | null>(null);
   const continuation = useRef<{ requestId: string; guestToken: string; selected: Pathway; blend: boolean } | null>(null);
@@ -141,6 +143,49 @@ export function IndependentEngage() {
   useEffect(() => {
     categoryRef.current = category;
   }, [category]);
+  // Restore the same authorized guest run and actual delivered pathways after
+  // a reload of this tab. Session storage expires with the browser tab.
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    try {
+      const raw = window.sessionStorage.getItem(MEMORY_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        savedAt: number; category: typeof category; objective: string;
+        result: Result; run: { requestId: string; guestToken: string };
+        screen: DesignedScreen | null; choice: number;
+      };
+      if (!saved || !Number.isFinite(saved.savedAt) ||
+          Date.now() - saved.savedAt > 24 * 60 * 60 * 1000 ||
+          !["Business Planner", "Build / Create", "Guidance"].includes(saved.category || "") ||
+          !saved.result || saved.result.pathways?.length !== 3 || !saved.result.blend ||
+          !/^[a-f0-9-]{36}$/i.test(saved.run?.requestId || "") ||
+          !/^[a-f0-9-]{36}$/i.test(saved.run?.guestToken || "")) {
+        window.sessionStorage.removeItem(MEMORY_KEY);
+        return;
+      }
+      activeRun.current = saved.run;
+      categoryRef.current = saved.category;
+      setCategory(saved.category);
+      objectiveRef.current = saved.objective;
+      setObjective(saved.objective);
+      setResult(saved.result);
+      setChoice(Number.isInteger(saved.choice) && saved.choice >= 0 && saved.choice < 4 ? saved.choice : 0);
+      setScreen(saved.screen && ["spiral", "assembled", "blueprint", "dissect", "exploded", "imploded"].includes(saved.screen) ? saved.screen : "spiral");
+    } catch {
+      window.sessionStorage.removeItem(MEMORY_KEY);
+    }
+  }, []);
+  useEffect(() => {
+    if (!restored.current || !category || !result || !activeRun.current) return;
+    try {
+      window.sessionStorage.setItem(MEMORY_KEY, JSON.stringify({
+        savedAt: Date.now(), category, objective, result, run: activeRun.current,
+        screen, choice,
+      }));
+    } catch { /* Browser storage may be restricted. */ }
+  }, [category, objective, result, screen, choice]);
   useEffect(() => { objectiveRef.current = objective; }, [objective]);
   useEffect(() => {
     if (!category || welcomed.current) return;
@@ -183,6 +228,11 @@ export function IndependentEngage() {
   function chooseCategory(next: "Business Planner" | "Build / Create" | "Guidance") {
     categoryRef.current = next;
     continuation.current = null;
+    activeRun.current = null;
+    try { window.sessionStorage.removeItem(MEMORY_KEY); } catch { /* Restricted storage. */ }
+    setResult(null);
+    setScreen(null);
+    setChoice(0);
     setCategory(next);
     setObjective("");
     objectiveRef.current = "";
@@ -313,11 +363,15 @@ export function IndependentEngage() {
     governedWatch.current = null;
     setLoading(true);
     setError("");
-    setResult(null);
+    // Keep the selected design available during BUILD ON RESULT.
+    // Only replace it when the continued governed delivery succeeds.
+    if (!continuation.current) setResult(null);
     setInternalKnowledge("");
     setGovernedStatus("");
-    setScreen(null);
-    setChoice(0);
+    if (!continuation.current) {
+      setScreen(null);
+      setChoice(0);
+    }
     try {
       // The real governed submission MUST NOT depend on knowledge retrieval.
       // Previously a failed lookup stopped ENGAGE before the runtime saw the objective.

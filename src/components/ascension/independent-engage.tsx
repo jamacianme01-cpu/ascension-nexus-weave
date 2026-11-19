@@ -495,8 +495,12 @@ export function IndependentEngage() {
             return;
           }
           if (run.status === "failed" || run.status === "rejected") {
-            setError("ASCENSION governed execution " + run.status + ": " +
-              (run.error || "The runtime did not provide an error message.").slice(0, 350));
+            // Report the original runtime's recorded outcome, never substitute
+            // a vague connection failure when a capability is unavailable.
+            const actualReason = run.error?.trim() ||
+              (run.outcome_status ? "Governed outcome: " + run.outcome_status : "") ||
+              "The runtime did not provide an error message.";
+            setError("ASCENSION governed execution " + run.status + ": " + actualReason.slice(0, 350));
             terminal = true;
             return;
           }

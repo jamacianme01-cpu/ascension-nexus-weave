@@ -4,7 +4,7 @@ import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDeliver
 import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
-type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; modelUrl: string | null; blend_reason?: string };
+type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; blueprintUrl: string | null; modelUrl: string | null; blend_reason?: string };
 type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
@@ -92,6 +92,7 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
       location: part.location ?? "",
     })) ?? [],
     imageUrl: path.generated_image_url ?? null,
+    blueprintUrl: path.generated_blueprint_url ?? null,
     modelUrl: path.model_url ?? null,
   });
   const pathways = delivery.pathways.map(toPath);
@@ -551,6 +552,7 @@ export function IndependentEngage() {
         blend: index === 3,
         summary: path.summary,
         imageUrl: path.imageUrl,
+        blueprintUrl: path.blueprintUrl,
         modelUrl: path.modelUrl,
         parts: path.parts,
       }))

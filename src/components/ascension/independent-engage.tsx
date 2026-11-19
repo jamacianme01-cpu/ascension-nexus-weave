@@ -432,6 +432,7 @@ export function IndependentEngage() {
           const run = state.request;
           if (!run) {
             setError("ENGAGE: the governed queue did not return this objective's status.");
+            terminal = true;
             return;
           }
           failures = 0;
@@ -478,8 +479,11 @@ export function IndependentEngage() {
           if (failures >= 3) terminal = true;
         } finally {
           polling = false;
-          if (terminal && governedWatch.current) clearInterval(governedWatch.current);
-          if (terminal) governedWatch.current = null;
+          if (terminal && generation.current === token) {
+            if (governedWatch.current) clearInterval(governedWatch.current);
+            governedWatch.current = null;
+            setLoading(false);
+          }
         }
       };
       await poll();
@@ -489,11 +493,11 @@ export function IndependentEngage() {
       if (generation.current === token) {
         const message = cause instanceof Error ? cause.message : String(cause);
         setError("ENGAGE submission failed: " + message.slice(0, 350));
+        setLoading(false);
       }
     } finally {
-      // ENGAGE submission finishes here, but a governed run can still be active.
-      // Polling continues separately and does not falsely imply delivery is ready.
-      if (generation.current === token) setLoading(false);
+      // Do not re-enable ENGAGE while the governed runtime is still processing.
+      // The poll's terminal path clears loading after a delivered result or error.
     }
   }
 

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
 import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
-import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
+import type { ObjectiveDelivery, ObjectiveModelSpec } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
-type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; modelUrl: string | null; blend_reason?: string };
+type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; modelUrl: string | null; modelSpec: ObjectiveModelSpec | null; blend_reason?: string };
 type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
@@ -87,10 +87,13 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
     steps: path.steps, tradeoffs: path.tradeoffs,
     // Retain real delivered assets, not the same stock drone picture for all objectives.
     parts: path.model_spec?.parts.map(part => ({
-      name: part.name, purpose: "", location: "",
+      name: part.name,
+      purpose: "",
+      location: `Concept model coordinates: ${part.position.join(", ")} (normalized units)`,
     })) ?? [],
     imageUrl: path.generated_image_url ?? null,
     modelUrl: path.model_url ?? null,
+    modelSpec: path.model_spec ?? null,
   });
   const pathways = delivery.pathways.map(toPath);
   const blend = { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason };
@@ -456,6 +459,7 @@ export function IndependentEngage() {
         summary: path.summary,
         imageUrl: path.imageUrl,
         modelUrl: path.modelUrl,
+        modelSpec: path.modelSpec,
         parts: path.parts,
       }))
     : [];

@@ -117,7 +117,6 @@ export function IndependentEngage() {
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [microphone, setMicrophone] = useState<"checking" | "ready" | "unavailable">("checking");
-  const [textBackup, setTextBackup] = useState(false);
   const [microphonePrompt, setMicrophonePrompt] = useState(false);
   const objectiveRef = useRef("");
   const categoryRef = useRef<typeof category>(null);
@@ -163,7 +162,7 @@ export function IndependentEngage() {
     const getMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
     if (!getMedia) {
       setMicrophone("unavailable");
-      setTextBackup(true);
+      setVoiceError("Microphone access is unavailable in this browser.");
       return;
     }
     // Request permission at entry. Some browsers require a user gesture;
@@ -178,7 +177,7 @@ export function IndependentEngage() {
     }).catch(() => {
       if (closed) return;
       setMicrophone("unavailable");
-      setTextBackup(true);
+      setVoiceError("Microphone access is required for the Tree's voice interface.");
       setMicrophonePrompt(false);
     });
     return () => { closed = true; };
@@ -254,8 +253,7 @@ export function IndependentEngage() {
     };
     const Recognition = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
     if (!Recognition) {
-      setVoiceError("Speech recognition is unavailable in this browser. Use the text backup.");
-      setTextBackup(true);
+      setVoiceError("Speech recognition is unavailable in this browser. Use a browser that supports spoken input.");
       return;
     }
     stopVoice();
@@ -274,7 +272,6 @@ export function IndependentEngage() {
       setVoiceError("Speech recognition: " + event.error);
       listeningRef.current = false;
       setListening(false);
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") setTextBackup(true);
     };
     listener.onend = () => {
       listeningRef.current = false;
@@ -282,22 +279,21 @@ export function IndependentEngage() {
       recognition.current = null;
     };
     try { listener.start(); listeningRef.current = true; setListening(true); }
-    catch { setVoiceError("Microphone could not start. Use text backup."); setTextBackup(true); setListening(false); }
+    catch { setVoiceError("Microphone could not start."); setListening(false); }
   }
 
   async function requestMicrophone() {
     const getMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
-    if (!getMedia) { setTextBackup(true); return; }
+    if (!getMedia) { setVoiceError("Microphone access is unavailable in this browser."); return; }
     try {
       const stream = await getMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       setMicrophone("ready");
       setVoiceError("");
-      setTextBackup(false);
       listenForObjective(true);
     } catch {
       setMicrophone("unavailable");
-      setTextBackup(true);
+      setVoiceError("Microphone access is required for the Tree's voice interface.");
     }
   }
 
@@ -601,14 +597,6 @@ export function IndependentEngage() {
               {objective || (listening ? "Listening…" : "Your spoken objective will appear here.")}
             </p>
             {voiceError && <p role="alert" className="text-sm text-red-200">{voiceError}</p>}
-            {textBackup && <label className="w-full text-sm text-amber-100">Text backup
-              <textarea rows={2} value={objective} maxLength={4000}
-                className="mt-1 block w-full rounded border border-amber-300/50 bg-black/90 p-2 text-white"
-                placeholder="Enter your objective" onChange={event => {
-                  setObjective(event.target.value);
-                  objectiveRef.current = event.target.value;
-                }} />
-            </label>}
           </div>
         )}
         {microphonePrompt && microphone === "checking" && <p className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded bg-black/85 p-3 text-sm text-white" role="status">Allow microphone access to control ASCENSION by voice.</p>}

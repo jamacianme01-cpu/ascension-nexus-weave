@@ -93,6 +93,10 @@ export type ObjectiveModelMaterial =
 
 export interface ObjectiveModelPart {
   name: string;
+  /** Authored design description, not a verified physical measurement. */
+  purpose?: string;
+  /** Authored position within the proposed design, if supplied. */
+  location?: string;
   primitive: ObjectiveModelPrimitive;
   position: [number, number, number];
   rotation: [number, number, number];
@@ -255,6 +259,8 @@ export function parseDelivery(value: unknown): ObjectiveDelivery {
       return [
         {
           name,
+          purpose: typeof p["purpose"] === "string" ? p["purpose"].trim().slice(0, 600) : "",
+          location: typeof p["location"] === "string" ? p["location"].trim().slice(0, 600) : "",
           primitive,
           position: number3(p["position"], [0, 0, 0], -3.5, 3.5),
           rotation: number3(p["rotation"], [0, 0, 0], -Math.PI * 2, Math.PI * 2),

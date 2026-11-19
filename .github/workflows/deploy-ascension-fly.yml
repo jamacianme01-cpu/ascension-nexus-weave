@@ -1,8 +1,7 @@
 name: Deploy ASCENSION to Fly.io
 
-# Public-source web-image releases are manual-only: the auto-deploy now
-# derives from the owner's original PRIVATE engine image and updates both
-# required process groups together, preserving ASCENSION_CORE and state.
+# Manual deploy of the existing Fly app. Preserves ASCENSION_CORE worker volume
+# and process groups. Does not introduce Lovable, Supabase, or external AI hosts.
 on:
   workflow_dispatch:
 
@@ -20,6 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+
       - name: Verify existing Fly.io authorization
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -28,16 +28,13 @@ jobs:
             echo "::error::FLY_API_TOKEN is not configured in GitHub Actions. No deployment was attempted."
             exit 1
           fi
+
       - name: Secure original ASCENSION internal publish channel
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          # The owner supplies no external service credential. This token is
-          # generated once, stored only in the existing owner's Fly app vault,
-          # and shared by the web queue and original ASCENSION worker process.
-          # Never rotate an already-configured value on a normal deployment.
           if flyctl secrets list --app ascension-nexus-weave --json |
                jq -e 'any(.[]; (.name // .Name // "") == "ASCENSION_PUBLISH_TOKEN")' >/dev/null; then
             echo "ASCENSION internal publish token exists; retaining existing credential."
@@ -48,14 +45,50 @@ jobs:
             unset token
             echo "ASCENSION internal publish token securely staged in Fly for this deploy."
           fi
-      - name: Deploy the existing ASCENSION app
+
+      - name: Ensure FLY_API_TOKEN is available to the running app (worker wake)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The web process needs this secret at runtime so ENGAGE can wake the
+          # worker process group when min_machines_running is 0.
+          if flyctl secrets list --app ascension-nexus-weave --json |
+               jq -e 'any(.[]; (.name // .Name // "") == "FLY_API_TOKEN")' >/dev/null; then
+            echo "FLY_API_TOKEN already present on the Fly app; retaining."
+          else
+            flyctl secrets set --app ascension-nexus-weave --stage "FLY_API_TOKEN=$FLY_API_TOKEN" >/dev/null
+            echo "FLY_API_TOKEN staged on the Fly app for worker wake on ENGAGE."
+          fi
+
+      - name: Deploy the existing ASCENSION app process
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml --process-groups app
+
+      - name: Ensure worker process group has a machine (stays auto-stop capable)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Create a worker machine if none exists. min_machines_running stays 0
+          # in fly.toml so the machine can stop when idle; ENGAGE wakes it.
+          count="$(flyctl machines list --app ascension-nexus-weave --json 2>/dev/null | jq '[.[] | select((.config.metadata.fly_process_group // .process_group // "") == "worker")] | length')"
+          if [ "${count:-0}" -eq 0 ]; then
+            echo "No worker machine found. Scaling worker process group to 1 once."
+            flyctl scale count worker=1 --app ascension-nexus-weave --yes || \
+              flyctl deploy --remote-only --app ascension-nexus-weave --config fly.toml --process-groups worker
+          else
+            echo "Worker machine count: $count (wake-on-ENGAGE; min_machines remains 0)."
+          fi
+
       - name: Check Fly app status
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl status --app ascension-nexus-weave
+
       - name: Verify ASCENSION internal token was stored without displaying its value
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -65,5 +98,6 @@ jobs:
           flyctl secrets list --app ascension-nexus-weave --json |
             jq -e 'any(.[]; (.name // .Name // "") == "ASCENSION_PUBLISH_TOKEN")'
           echo "Owner-controlled ASCENSION web/worker publish token is stored in Fly."
+
       - name: Check deployed web server
         run: curl --fail --show-error --silent --retry 5 --retry-delay 10 --retry-all-errors https://ascension-nexus-weave.fly.dev/api/health

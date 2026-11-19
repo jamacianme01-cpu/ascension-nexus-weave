@@ -166,6 +166,8 @@ export function IndependentEngage() {
         return;
       }
       activeRun.current = saved.run;
+      // Restoring an existing pathway is not a fresh entry welcome.
+      welcomed.current = true;
       categoryRef.current = saved.category;
       setCategory(saved.category);
       objectiveRef.current = saved.objective;
@@ -489,6 +491,8 @@ export function IndependentEngage() {
         setError("ENGAGE submission failed: " + message.slice(0, 350));
       }
     } finally {
+      // ENGAGE submission finishes here, but a governed run can still be active.
+      // Polling continues separately and does not falsely imply delivery is ready.
       if (generation.current === token) setLoading(false);
     }
   }

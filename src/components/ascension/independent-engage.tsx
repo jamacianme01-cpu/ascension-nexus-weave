@@ -126,6 +126,7 @@ export function IndependentEngage() {
   const speechAllowedRef = useRef(true);
   const recognition = useRef<{ stop: () => void } | null>(null);
   const [loading, setLoading] = useState(false);
+  const runInFlight = useRef(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [internalKnowledge, setInternalKnowledge] = useState("");
@@ -314,7 +315,8 @@ export function IndependentEngage() {
 
   async function engage() {
     const text = objectiveRef.current.trim();
-    if (!categoryRef.current || !text || loading) return;
+    if (!categoryRef.current || !text || runInFlight.current) return;
+    runInFlight.current = true;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -385,6 +387,7 @@ export function IndependentEngage() {
           const run = state.request;
           if (!run) {
             setError("ENGAGE: the governed queue did not return this objective's status.");
+            terminal = true;
             return;
           }
           failures = 0;
@@ -431,7 +434,13 @@ export function IndependentEngage() {
         } finally {
           polling = false;
           if (terminal && governedWatch.current) clearInterval(governedWatch.current);
-          if (terminal) governedWatch.current = null;
+          if (terminal) {
+            governedWatch.current = null;
+            if (generation.current === token) {
+              runInFlight.current = false;
+              setLoading(false);
+            }
+          }
         }
       };
       await poll();
@@ -443,7 +452,12 @@ export function IndependentEngage() {
         setError("ENGAGE submission failed: " + message.slice(0, 350));
       }
     } finally {
-      if (generation.current === token) setLoading(false);
+      // A queued or running objective retains the ENGAGE lock until its
+      // original governed result is delivered or stops with an error.
+      if (generation.current === token && !governedWatch.current) {
+        runInFlight.current = false;
+        setLoading(false);
+      }
     }
   }
 
@@ -451,6 +465,7 @@ export function IndependentEngage() {
 
   function stop() {
     generation.current += 1;
+    runInFlight.current = false;
     abort.current?.abort();
     if (governedWatch.current) clearInterval(governedWatch.current);
     governedWatch.current = null;

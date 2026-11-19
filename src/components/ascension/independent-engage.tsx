@@ -322,12 +322,15 @@ export function IndependentEngage() {
       if (spoken) handleVoice(spoken);
     };
     listener.onerror = event => {
+      // A stopped older listener must never overwrite the current listener.
+      if (recognition.current !== listener) return;
       setVoiceError("Speech recognition: " + event.error);
       listeningRef.current = false;
       setListening(false);
       if (event.error === "not-allowed" || event.error === "service-not-allowed") setTextBackup(true);
     };
     listener.onend = () => {
+      if (recognition.current !== listener) return;
       listeningRef.current = false;
       setListening(false);
       recognition.current = null;

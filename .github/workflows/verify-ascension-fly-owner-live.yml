@@ -34,11 +34,14 @@ jobs:
           test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly authorization is unavailable to this PR runner"; exit 1; }
           flyctl status --app "$FLY_APP"
           flyctl volumes list --app "$FLY_APP"
-          owner_worker_id="$(flyctl volumes list --app "$FLY_APP" --json |
-            jq -er '[.[] | select(.name == "ascension_state" and
-              .state == "created" and (.attached_machine_id // "") != "")] |
-              if length == 1 then .[0].attached_machine_id
-              else error("Original owner volume must have exactly one attached machine") end')"
+          owner_worker_id="$(flyctl machine list --app "$FLY_APP" --json |
+            jq -er '[.[] | select(
+              (.state == "started" or .state == "stopped") and
+              .config.metadata.fly_process_group == "worker" and
+              ([.config.mounts[]? | select(.path == "/data/ascension")] | length == 1)
+            )] |
+            if length == 1 then .[0].id
+            else error("Exactly one live owner worker must mount the existing /data/ascension volume") end')"
           machine="$(flyctl machine status "$owner_worker_id" --app "$FLY_APP" --json)"
           state="$(printf '%s' "$machine" | jq -er '.state // .State')"
           if [ "$state" = stopped ]; then

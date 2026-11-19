@@ -196,6 +196,8 @@ jobs:
           worker_id="$(printf '%s' "$machines" | jq -r '[.[] | select(.config.metadata.fly_process_group == "worker") | .id][0] // empty')"
           if [ -n "$worker_id" ]; then
             flyctl machine status "$worker_id" --app "$FLY_APP"
+            flyctl ssh console --app "$FLY_APP" --machine "$worker_id" \
+              --command 'python3 /app/probe-ascension-private.py' || true
           fi
           timeout 12s flyctl logs --app "$FLY_APP" --no-tail 2>&1 |
             grep -E 'ASCENSION_|cloud_queue|Traceback|Exception|[Ee]rror|exit' | tail -n 80 || true

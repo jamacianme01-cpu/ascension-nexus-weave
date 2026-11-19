@@ -6,12 +6,16 @@ if [[ -z "$ROOT" ]]; then
   exit 2
 fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [[ -f "$SCRIPT_DIR/ASCENSION_CORE/capabilities.py" ]]; then
-  SRC="$SCRIPT_DIR/ASCENSION_CORE/capabilities.py"
-elif [[ -f "$SCRIPT_DIR/ASCENSION_CORE/capabilities.part1.py.txt" ]]; then
-  SRC="$SCRIPT_DIR/ASCENSION_CORE/capabilities.py.assembled"
-  cat "$SCRIPT_DIR/ASCENSION_CORE/capabilities.part1.py.txt" \
-      "$SCRIPT_DIR/ASCENSION_CORE/capabilities.part2.py.txt" > "$SRC"
+CORE="$SCRIPT_DIR/ASCENSION_CORE"
+if [[ -f "$CORE/capabilities.py" ]]; then
+  SRC="$CORE/capabilities.py"
+elif [[ -f "$CORE/capabilities.py.b64" ]]; then
+  SRC="$CORE/capabilities.py.assembled"
+  base64 -d < "$CORE/capabilities.py.b64" > "$SRC" 2>/dev/null || base64 --decode < "$CORE/capabilities.py.b64" > "$SRC"
+elif [[ -f "$CORE/capabilities.py.b64.part1" ]]; then
+  SRC="$CORE/capabilities.py.assembled"
+  cat "$CORE/capabilities.py.b64.part1" "$CORE/capabilities.py.b64.part2" | base64 -d > "$SRC" 2>/dev/null || \
+    cat "$CORE/capabilities.py.b64.part1" "$CORE/capabilities.py.b64.part2" | base64 --decode > "$SRC"
 else
   echo "Patch source missing" >&2
   exit 1

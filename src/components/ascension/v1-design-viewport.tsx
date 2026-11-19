@@ -26,7 +26,7 @@ function geometryFromSpec(spec: ObjectiveModelSpec): THREE.Group {
       default: shape = new THREE.BoxGeometry(1, 1, 1);
     }
     const mesh = new THREE.Mesh(shape, new THREE.MeshStandardMaterial({
-      color: colors[part.material] ?? colors.steel, metalness: 0.38, roughness: 0.46,
+      color: colors[part.material] ?? 0x899ba9, metalness: 0.38, roughness: 0.46,
       side: THREE.DoubleSide,
     }));
     mesh.name = part.name;

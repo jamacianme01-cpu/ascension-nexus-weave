@@ -6,14 +6,14 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 export type DesignView = "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
 
 export function V1DesignViewport({
-  modelUrl, imageUrl, mode,
-}: { modelUrl: string | null; imageUrl: string | null; mode: DesignView }) {
+  modelUrl, imageUrl, blueprintUrl, mode,
+}: { modelUrl: string | null; imageUrl: string | null; blueprintUrl: string | null; mode: DesignView }) {
   const container = useRef<HTMLDivElement>(null);
   const [problem, setProblem] = useState("");
   const [dimensions, setDimensions] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
 
-  useEffect(() => { setScale(1); }, [imageUrl, modelUrl]);
+  useEffect(() => { setScale(1); }, [imageUrl, blueprintUrl, modelUrl, mode]);
   useEffect(() => {
     if (!modelUrl || !container.current) return;
     const host = container.current;
@@ -136,10 +136,11 @@ export function V1DesignViewport({
   }, [modelUrl, mode]);
 
   if (!modelUrl) {
+    const displayedImage = mode === "blueprint" ? blueprintUrl : imageUrl;
     return <div className="v1-design-image-view">
-      {imageUrl ? <>
+      {displayedImage ? <>
         <div className="v1-design-zoom-frame">
-          <img src={imageUrl} alt="Selected pathway design" draggable={false}
+          <img src={displayedImage} alt={mode === "blueprint" ? "Delivered pathway blueprint" : "Selected pathway design"} draggable={false}
             style={{ transform: `scale(${scale})`, objectFit: "contain", width: "100%", height: "100%" }} />
         </div>
         <div className="v1-zoom-controls">
@@ -147,8 +148,8 @@ export function V1DesignViewport({
           <button type="button" aria-label="Zoom in" onClick={() => setScale(n => Math.min(5, n + 0.25))}>+</button>
           <button type="button" onClick={() => setScale(1)}>Reset</button>
         </div>
-        {mode !== "assembled" && <p role="status">This view needs the matching 3D model or measured drawing. The original design picture is preserved.</p>}
-      </> : <p role="status">The selected pathway has not delivered its design picture or 3D model.</p>}
+        {mode !== "assembled" && !(mode === "blueprint" && blueprintUrl) && <p role="status">This view needs the matching 3D model or measured drawing. The original design picture is preserved.</p>}
+      </> : <p role="status">{mode === "blueprint" ? "No blueprint drawing with verified dimensions has been delivered." : "The selected pathway has not delivered its design picture or 3D model."}</p>}
     </div>;
   }
 

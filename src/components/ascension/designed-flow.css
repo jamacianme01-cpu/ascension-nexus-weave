@@ -217,3 +217,22 @@
   .designed-live-panel { inset: 1% 8% 19%; padding: 1%; }
   .designed-live-content { grid-template-columns: minmax(0, 1fr) 35%; }
 }
+
+
+/* Selected pathway inspection uses only the design's delivered assets. */
+.v1-design-title { display:flex; gap:.8rem; align-items:center; justify-content:space-between; }
+.v1-design-title h2 { min-width:0; }
+.v1-design-title button, .v1-part-name, .v1-zoom-controls button {
+  cursor:pointer; border:1px solid rgba(220,177,91,.7); border-radius:.45rem;
+  background:#111c29; color:#f2d9a0; padding:.4rem .6rem;
+  font:inherit;
+}
+.v1-design-title button { white-space:nowrap; font-size:clamp(.65rem,1vw,.9rem); }
+.v1-part-name { text-align:left; font-weight:600; }
+.v1-design-image-view, .v1-design-model { display:flex; flex-direction:column; flex:1; width:100%; min-height:0; overflow:hidden; }
+.v1-design-zoom-frame, .v1-model-canvas { position:relative; flex:1; min-height:0; overflow:hidden; width:100%; touch-action:none; }
+.v1-design-zoom-frame { display:grid; place-items:center; }
+.v1-design-zoom-frame img { position:relative; inset:auto; max-width:100%; max-height:100%; pointer-events:none; transition:transform .12s ease; }
+.v1-model-canvas canvas { display:block; }
+.v1-zoom-controls { display:flex; gap:.5rem; justify-content:center; padding:.3rem; }
+.v1-design-image-view p, .v1-design-model p { font-size:clamp(.65rem,1vw,.8rem); margin:.3rem; text-align:center; color:#d0b77d; }

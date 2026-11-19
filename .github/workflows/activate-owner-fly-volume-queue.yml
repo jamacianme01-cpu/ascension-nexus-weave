@@ -130,7 +130,10 @@ jobs:
                   importlib.util.find_spec("clarity.autosync.construction_engine") is not None,
           }, sort_keys=True), flush=True)
           if isinstance(selected, str) and selected.startswith("unavailable:"):
-              raise SystemExit("ASCENSION_AUTHORED_PHYSICAL_EXECUTOR_MISSING: do not deploy an image claiming V1 success")
+              # An incomplete physical-design feature must NOT block repairing
+              # the separately existing authored worker/queue. V1 acceptance
+              # remains gated by real objective/browser verification below.
+              print("::warning::ASCENSION_AUTHORED_PHYSICAL_EXECUTOR_MISSING: physical designs remain unsupported; this deployment repairs transport only", flush=True)
           PY
       - name: Build and publish owner-only Fly image overlay
         id: overlay
@@ -193,16 +196,18 @@ jobs:
           worker_count="$(printf '%s' "$machines" | jq '[.[] | select(.config.metadata.fly_process_group == "worker" and any(.config.mounts[]?; .volume != null))] | length')"
           test "$worker_count" -eq 1 || { echo "::error::Owner worker volume selection is ambiguous."; exit 1; }
           worker_id="$(printf '%s' "$machines" | jq -r '.[] | select(.config.metadata.fly_process_group == "worker" and any(.config.mounts[]?; .volume != null)) | .id')"
-          entrypoint="$(printf '%s' "$machines" | jq -r --arg id "$worker_id" '.[] | select(.id == $id) | .config.init.entrypoint[0] // empty')"
-          if [ "$entrypoint" != "/app/ascension-start.sh" ]; then
-            flyctl machine update "$worker_id" --app "$FLY_APP" --config fly.owner-queue.toml \
-              --entrypoint "/app/ascension-start.sh" --command "worker" \
-              --image "${{ steps.overlay.outputs.new_image }}" --yes
-          fi
+          # A Fly machine previously REPORTED this entrypoint while still
+          # launching Bun as "bun worker". Never skip a real machine rewrite
+          # based on the stale metadata; apply the original Python entrypoint.
+          mount_volume="$(printf '%s' "$machines" | jq -r --arg id "$worker_id" '.[] | select(.id == $id) | [.config.mounts[]?.volume] | first // empty')"
+          test -n "$mount_volume" || { echo "::error::Original worker volume was not identified."; exit 1; }
+          flyctl machine update "$worker_id" --app "$FLY_APP" --config fly.owner-queue.toml \
+            --entrypoint "/app/ascension-start.sh" --command "worker" \
+            --image "${{ steps.overlay.outputs.new_image }}" --yes
           refreshed="$(flyctl machines list --app "$FLY_APP" --json)"
-          printf '%s' "$refreshed" | jq -e --arg id "$worker_id" \
-            'any(.[]; .id == $id and .config.init.entrypoint[0] == "/app/ascension-start.sh")'
-          echo "ASCENSION_ORIGINAL_OWNER_WORKER_ENTRYPOINT_RESTORED"
+          printf '%s' "$refreshed" | jq -e --arg id "$worker_id" --arg volume "$mount_volume" \
+            'any(.[]; .id == $id and .config.init.entrypoint == ["/app/ascension-start.sh"] and .config.init.cmd == ["worker"] and any(.config.mounts[]?; .volume == $volume))'
+          echo "ASCENSION_ORIGINAL_OWNER_WORKER_ENTRYPOINT_RESTORED_WITH_VOLUME"
       - name: Validate ORIGINAL governed publication and private transport
         shell: bash
         run: |

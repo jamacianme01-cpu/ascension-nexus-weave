@@ -40,7 +40,6 @@ jobs:
           flyctl volumes list --app "$FLY_APP"
           python3 -m py_compile scripts/ascension-owner-queue/*.py
           python3 -m unittest discover -s tests -p test_ascension_private_supervisor.py -v
-          python3 -m unittest discover -s tests -p test_ascension_volume_transport_alias.py -v
           sh -n scripts/ascension-owner-queue/ascension-start.sh
           echo "No external database or hosted AI provider configured or changed."
       - name: Build existing ASCENSION web source
@@ -111,7 +110,27 @@ jobs:
           set -euo pipefail
           flyctl deploy --app "$FLY_APP" --config fly.owner-queue.toml \
             --image "${{ steps.overlay.outputs.new_image }}" \
-            --process-groups app,worker --yes
+            --process-groups app,worker --update-only --yes
+      - name: Restore existing Fly volume worker ENTRYPOINT
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The existing worker inherited a Bun ENTRYPOINT and immediately died
+          # with "Script not found worker". Only its runtime ENTRYPOINT changes.
+          machines="$(flyctl machines list --app "$FLY_APP" --json)"
+          worker_count="$(printf '%s' "$machines" | jq '[.[] | select(.config.metadata.fly_process_group == "worker" and any(.config.mounts[]?; .volume != null))] | length')"
+          test "$worker_count" -eq 1 || { echo "::error::Owner worker volume selection is ambiguous."; exit 1; }
+          worker_id="$(printf '%s' "$machines" | jq -r '.[] | select(.config.metadata.fly_process_group == "worker" and any(.config.mounts[]?; .volume != null)) | .id')"
+          entrypoint="$(printf '%s' "$machines" | jq -r --arg id "$worker_id" '.[] | select(.id == $id) | .config.init.entrypoint[0] // empty')"
+          if [ "$entrypoint" != "/app/ascension-start.sh" ]; then
+            flyctl machine update "$worker_id" --app "$FLY_APP" --config fly.owner-queue.toml \
+              --entrypoint "/app/ascension-start.sh" --command "worker" \
+              --image "${{ steps.overlay.outputs.new_image }}" --yes
+          fi
+          refreshed="$(flyctl machines list --app "$FLY_APP" --json)"
+          printf '%s' "$refreshed" | jq -e --arg id "$worker_id" \
+            'any(.[]; .id == $id and .config.init.entrypoint[0] == "/app/ascension-start.sh")'
+          echo "ASCENSION_ORIGINAL_OWNER_WORKER_ENTRYPOINT_RESTORED"
       - name: Validate ORIGINAL governed publication and private transport
         shell: bash
         run: |
@@ -190,10 +209,10 @@ jobs:
           set -euo pipefail
           if [ "$FINAL_JOB_RESULT" = 'success' ]; then
             state=success
-            message='Original ASCENSION queue connected and verified'
+            message='ASCENSION V1 live Tree and four pathways verified'
           else
             state=failure
-            message='Original ASCENSION private queue deployment failed; see run'
+            message='ASCENSION V1 end-to-end execution not yet verified; see run'
           fi
           jq -n --arg state "$state" --arg msg "$message" \
             --arg target "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \

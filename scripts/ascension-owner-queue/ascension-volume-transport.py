@@ -228,10 +228,6 @@ class Handler(BaseHTTPRequestHandler):
     def handle_request(self):
         expected = os.environ.get('ASCENSION_PUBLISH_TOKEN', '').strip()
         provided = self.headers.get('x-ascension-publish-token', '')
-        if not provided:
-            authorization = self.headers.get('authorization', '')
-            if authorization.lower().startswith('bearer '):
-                provided = authorization[7:].strip()
         if not expected or not hmac.compare_digest(expected, provided):
             return self.respond(401, {'error': 'unauthorized'})
         store = self.server.ascension_store
@@ -241,13 +237,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(200, {'status': 'LIVE_GOVERNED_TRANSPORT',
                                               'original_publication_revision_at_start': store.initial_revision,
                                               'persistent_volume': True})
-                # The original authored Python worker uses the existing web
-                # execution-queue route. Handle it directly on this same private
-                # volume to avoid sleeping web Machines delaying worker claims.
-                from urllib.parse import urlsplit, parse_qs
-                route = urlsplit(self.path)
-                if route.path in ('/queue/claim', '/api/public/ascension/execution-queue'):
-                    runner = parse_qs(route.query).get('runner', ['fly-ascension-core'])[0]
+                if self.path.startswith('/queue/claim?'):
+                    from urllib.parse import urlsplit, parse_qs
+                    runner = parse_qs(urlsplit(self.path).query).get('runner', ['fly-ascension-core'])[0]
                     return self.respond(200, store.claim(runner))
                 return self.respond(404, {'error':'not_found'})
             if self.command != 'POST':
@@ -264,7 +256,6 @@ class Handler(BaseHTTPRequestHandler):
                 '/guest/status': store.status,
                 '/guest/bundle': store.bundle,
                 '/queue/report': store.report,
-                '/api/public/ascension/execution-queue': store.report,
             }
             action = routes.get(self.path)
             if not action:

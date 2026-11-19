@@ -1,0 +1,41 @@
+name: Diagnose original ASCENSION owner worker lifecycle
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-ascension-owner-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: ascension-nexus-weave
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Diagnose existing owner worker without changing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FLY_API_TOKEN" || { echo "ERROR owner credentials unavailable"; exit 1; }
+          flyctl status --app "$FLY_APP"
+          table="$(flyctl volumes list --app "$FLY_APP")"
+          worker="$(awk -F '│' '$2 ~ /created/ && $3 ~ /ascension_state/ {
+            machine=$8; gsub(/[[:space:]]/, "", machine); print machine
+          }' <<< "$table")"
+          if ! [[ "$worker" =~ ^[a-f0-9]{14}$ ]]; then echo 'ERROR original worker not uniquely resolved'; exit 1; fi
+          echo "ORIGINAL_OWNER_MACHINE=$worker"
+          flyctl machine status "$worker" --app "$FLY_APP"
+          echo 'OWNER_READINESS:'
+          curl -fsS --max-time 25 "https://$FLY_APP.fly.dev/api/public/ascension/answer-readiness" | python3 -c 'import sys,json; p=json.load(sys.stdin); print({k:p.get(k) for k in ("owner_queue_transport_connected", "owner_publication_revision_at_worker_start", "live_inference_tested")})'
+          echo 'OWNER_PROCESS_INSPECTION:'
+          # Do not print env or runtime artifacts.
+          flyctl ssh console --app "$FLY_APP" --machine "$worker" --command 'python3 -c "import os;print([(x,open(\"/proc/\"+x+\"/comm\").read().strip()) for x in os.listdir(\"/proc\") if x.isdecimal() and os.path.exists(\"/proc/\"+x+\"/comm\")][:24])"' || true
+          echo 'OWNER_RECENT_PROCESS_FAILURE_MARKERS:'
+          flyctl logs --app "$FLY_APP" --no-tail 2>&1 | grep -E 'ASCENSION_PRIVATE_PROCESS_STOPPED|ASCENSION_OWNER_TRANSPORT_READY|Traceback|exited|exit_code|error' | tail -n 24 || true

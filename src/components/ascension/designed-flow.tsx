@@ -23,6 +23,7 @@ export type PathwayReading = {
   summary?: string;
   blend?: boolean;
   imageUrl?: string | null;
+  blueprintUrl?: string | null;
   modelUrl?: string | null;
   parts?: { name: string; purpose: string; location: string }[];
 };
@@ -201,7 +202,7 @@ export function DesignedFlow({
             </nav>
             <div className="designed-live-content">
               <div className="designed-live-artwork">
-                <V1DesignViewport modelUrl={chosen.modelUrl ?? null} imageUrl={selectedPicture} mode={screen} />
+                <V1DesignViewport modelUrl={chosen.modelUrl ?? null} imageUrl={selectedPicture} blueprintUrl={chosen.blueprintUrl ?? null} mode={screen} />
                 <p className="designed-live-summary">{chosen.summary}</p>
               </div>
               <aside className="designed-live-parts" aria-label="Delivered components">

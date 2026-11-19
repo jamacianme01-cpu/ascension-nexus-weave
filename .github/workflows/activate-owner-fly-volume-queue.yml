@@ -114,8 +114,8 @@ jobs:
             echo "::error::Cannot uniquely resolve the worker attached to ascension_state"
             exit 1
           fi
-          machine_state="$(flyctl machine status "$owner_worker_id" --app "$FLY_APP" |
-            awk -F '│' '/^[[:space:]]*State:/ {state=$1; sub(/.*State:[[:space:]]*/,"",state); gsub(/[[:space:]]/,"",state); print state; exit}')"
+          machine_status="$(flyctl machine status "$owner_worker_id" --app "$FLY_APP")"
+          machine_state="$(awk '/^State:/ {sub(/^State:[[:space:]]*/, ""); gsub(/[[:space:]]/, ""); print}' <<< "$machine_status")"
           if [ "$machine_state" = stopped ]; then
             flyctl machine start "$owner_worker_id" --app "$FLY_APP"
           elif [ "$machine_state" != started ]; then

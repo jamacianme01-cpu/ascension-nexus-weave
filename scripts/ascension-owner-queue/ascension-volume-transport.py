@@ -158,6 +158,37 @@ class TransportStore:
                                                        'constraints', 'submitted_by',
                                                        'submitted_via', 'created_at')}}
 
+    def worker_exited(self, payload):
+        """Make abandoned original-worker objectives explicitly failed, never requeue.
+
+        Only the authenticated transport's supervisor can submit this event. A
+        worker exit cannot justify inventing a verified outcome or redoing the
+        original objective (which may have side effects).
+        """
+        runner = payload.get('runner')
+        if not isinstance(runner, str) or not 1 <= len(runner) <= 200:
+            raise ValueError('Invalid original runner')
+        failed = []
+        with lock:
+            for path in self.runs.glob('*.json'):
+                item = load_json(path)
+                if not item:
+                    continue
+                run = item.get('run', {})
+                if (run.get('status') not in ('claimed', 'running') or
+                    run.get('claimed_by') != runner):
+                    continue
+                now = utc_now()
+                run['status'] = 'failed'
+                run['stage'] = 'original_worker_exited'
+                run['error'] = ('Original ASCENSION_CORE queue worker exited before '
+                                'reporting a verified result. This run was not retried.')
+                run['completed_at'] = now
+                run['updated_at'] = now
+                atomic_json(path, item)
+                failed.append(run['id'])
+        return {'ok': True, 'failed_count': len(failed)}
+
     def report(self, payload):
         request_id = payload.get('request_id')
         status = payload.get('status')
@@ -234,8 +265,18 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.command == 'GET':
                 if self.path.startswith('/health'):
+                    health = load_json(store.root / 'worker-health.json') or {}
+                    owner_running = False
+                    try:
+                        changed = datetime.fromisoformat(str(health['updated_at']).replace('Z', '+00:00'))
+                        owner_running = (health.get('state') == 'running' and
+                                         0 <= (datetime.now(timezone.utc) - changed).total_seconds() < 30)
+                    except (KeyError, ValueError, TypeError):
+                        pass
                     return self.respond(200, {'status': 'LIVE_GOVERNED_TRANSPORT',
                                               'original_publication_revision_at_start': store.initial_revision,
+                                              'original_worker_running': owner_running,
+                                              'original_worker_state': health.get('state', 'unknown'),
                                               'persistent_volume': True})
                 if self.path.startswith('/queue/claim?'):
                     from urllib.parse import urlsplit, parse_qs
@@ -256,6 +297,7 @@ class Handler(BaseHTTPRequestHandler):
                 '/guest/status': store.status,
                 '/guest/bundle': store.bundle,
                 '/queue/report': store.report,
+                '/queue/worker-exited': store.worker_exited,
             }
             action = routes.get(self.path)
             if not action:

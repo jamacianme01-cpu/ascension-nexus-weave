@@ -88,7 +88,8 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
     // Retain real delivered assets, not the same stock drone picture for all objectives.
     parts: path.model_spec?.parts.map(part => ({
       name: part.name,
-      purpose: "",
+      // Describe only functions stated in this pathway's delivered steps.
+      purpose: path.steps.find(step => step.toLowerCase().includes(part.name.toLowerCase())) ?? "",
       location: `Concept model coordinates: ${part.position.join(", ")} (normalized units)`,
     })) ?? [],
     imageUrl: path.generated_image_url ?? null,

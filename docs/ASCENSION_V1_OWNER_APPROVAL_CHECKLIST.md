@@ -5,13 +5,12 @@ This is my standard for how the app should start and work all together. Start at
 1. [x] Original Tree and Book together. **Approved:** I said I see the original Tree and Book all together.
 2. [ ] No typing. Talk to the Tree. The Tree is interactive and stays the spoken guide.
 3. [ ] After I speak the objective, exactly four pathways appear: ChatGPT, Grok, Claude, and BLEND.
-4. [ ] “Whatever one is best suited for that question, it takes lead.”
-5. [ ] My engines take their answers and make their own answer.
-6. [ ] No invention pictures appear until after a pathway is selected.
-7. [ ] The selected pathway opens its own design picture, and the Tree explains it by voice.
-8. [ ] Grab, rotate, and zoom the selected design.
-9. [ ] Blueprint with real dimensions and measurements.
-10. [ ] Dissect, Exploded, and Imploded views of the selected design.
-11. [ ] Component descriptions in a side list, not over the picture; the Tree explains what each part is, where it belongs, and what it does.
-12. [ ] BUILD ON RESULT continues the selected design without starting over.
-13. [ ] “It supposed to have memory too.”
+4. [ ] My engines take their answers and make their own answer.
+5. [ ] No invention pictures appear until after a pathway is selected.
+6. [ ] The selected pathway opens its own design picture, and the Tree explains it by voice.
+7. [ ] Grab, rotate, and zoom the selected design.
+8. [ ] Blueprint with real dimensions and measurements.
+9. [ ] Dissect, Exploded, and Imploded views of the selected design.
+10. [ ] Component descriptions in a side list, not over the picture; the Tree explains what each part is, where it belongs, and what it does.
+11. [ ] BUILD ON RESULT continues the selected design without starting over.
+12. [ ] “It supposed to have memory too.”

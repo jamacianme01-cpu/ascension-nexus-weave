@@ -446,9 +446,24 @@ export function IndependentEngage() {
             if (actual) {
               activeRun.current = { requestId, guestToken };
               setResult(actual);
-              setScreen("spiral");
+              if (parent) {
+                // BUILD ON RESULT remains in the design inspection experience.
+                // Match the continuing pathway by its recorded ID when possible;
+                // otherwise retain the original pathway position, including BLEND.
+                const updated = [...actual.pathways, actual.blend];
+                const originalIndex = parent.blend ? 3 : result?.pathways.findIndex(p => p.id === parent.selected.id) ?? 0;
+                const matchedIndex = updated.findIndex(p => p.id === parent.selected.id);
+                const nextIndex = matchedIndex >= 0 ? matchedIndex : Math.max(0, Math.min(3, originalIndex));
+                setChoice(nextIndex);
+                setScreen(previous => previous && previous !== "spiral" ? previous : "assembled");
+                const selected = updated[nextIndex]!;
+                offer("The continued design is ready. " + openLine(selected, nextIndex === 3));
+              } else {
+                setChoice(0);
+                setScreen("spiral");
+                offer(guideFor(actual));
+              }
               setGovernedStatus("ASCENSION delivered three pathways and BLEND.");
-              offer(guideFor(actual));
               terminal = true;
               return;
             }

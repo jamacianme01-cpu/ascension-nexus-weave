@@ -17,6 +17,10 @@ spec.loader.exec_module(module)
 
 class Store:
     initial_revision=124
+    # Handler resolves all routes when it builds its dispatch table.
+    def submit(self,payload): return {"request":None}
+    def status(self,payload): return {"request":None}
+    def bundle(self,payload): return {"run":None}
     def claim(self,runner):
         return {"item":{"id":"unit-test","runner":runner}}
     def report(self,payload):

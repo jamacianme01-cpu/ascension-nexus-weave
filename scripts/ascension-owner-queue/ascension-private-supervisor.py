@@ -19,6 +19,7 @@ root = sys.argv[1] if len(sys.argv) > 1 else '/data/ascension/state/live'
 runner = os.environ.get('ASCENSION_QUEUE_RUNNER', 'fly-ascension-core')
 health_file = Path('/data/ascension/transport/worker-health.json')
 stopping = False
+fatal_transport_exit = False
 workers = []
 
 def status(state, **details):
@@ -85,6 +86,7 @@ try:
     status('running', worker_pid=worker.pid, restarts=restarts)
     while not stopping:
         if transport.poll() is not None:
+            fatal_transport_exit = True
             print('ASCENSION_PRIVATE_TRANSPORT_EXITED exit_code=' + str(transport.returncode), flush=True)
             status('transport_failed', exit_code=transport.returncode)
             shutdown()
@@ -126,5 +128,5 @@ finally:
             child.kill()
             child.wait()
     status('stopped')
-if not stopping:
+if fatal_transport_exit:
     sys.exit(1)

@@ -15,7 +15,9 @@ export function V1DesignViewport({
 
   useEffect(() => { setScale(1); }, [imageUrl, blueprintUrl, modelUrl, mode]);
   useEffect(() => {
-    if (!modelUrl || !container.current) return;
+    // A delivered blueprint is the authority for Blueprint view; do not
+    // substitute wireframe geometry when the actual drawing is present.
+    if (!modelUrl || (mode === "blueprint" && blueprintUrl) || !container.current) return;
     const host = container.current;
     let cancelled = false;
     let frame = 0;
@@ -133,9 +135,9 @@ export function V1DesignViewport({
       setProblem("3D viewing is unavailable on this device.");
       return () => { cancelled = true; renderer?.dispose(); };
     }
-  }, [modelUrl, mode]);
+  }, [modelUrl, blueprintUrl, mode]);
 
-  if (!modelUrl) {
+  if (!modelUrl || (mode === "blueprint" && blueprintUrl)) {
     const displayedImage = mode === "blueprint" ? blueprintUrl : imageUrl;
     return <div className="v1-design-image-view">
       {displayedImage ? <>

@@ -236,3 +236,8 @@
 .v1-model-canvas canvas { display:block; }
 .v1-zoom-controls { display:flex; gap:.5rem; justify-content:center; padding:.3rem; }
 .v1-design-image-view p, .v1-design-model p { font-size:clamp(.65rem,1vw,.8rem); margin:.3rem; text-align:center; color:#d0b77d; }
+
+/* Keep the five approved V1 inspection views reachable from every selected view. */
+.v1-inspection-views { display:flex; gap:.35rem; flex-wrap:wrap; flex-shrink:0; }
+.v1-inspection-views button { cursor:pointer; border:1px solid rgba(220,177,91,.55); border-radius:.3rem; background:#111c29; color:#f2d9a0; padding:.22rem .55rem; font:inherit; font-size:clamp(.58rem,.85vw,.8rem); }
+.v1-inspection-views button[aria-current="page"] { border-color:#f2d9a0; background:#28374b; }

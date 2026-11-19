@@ -48,7 +48,7 @@ try:
             'output_contract': offer.get('output_contract', ''),
             'accepted_intent_tokens': offer.get('accepted_intent_tokens', []),
         }).lower()
-        if any(word in searchable for word in ('robot', 'drone', 'physical', 'hardware', 'blueprint', '3d_model')):
+        if any(word in searchable for word in ('robot', 'drone', 'physical', 'hardware', 'blueprint', '3d_model', 'construction', 'cad', 'mesh', 'mechanical', 'invention')):
             physical.append({'available': offer.get('available') is True})
     print('ASCENSION_PHYSICAL_DESIGN_CAPABILITY',
           json.dumps({'catalog_readable': True, 'advertised': bool(physical),

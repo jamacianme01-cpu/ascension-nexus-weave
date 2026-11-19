@@ -36,11 +36,14 @@ jobs:
           test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly authorization missing"; exit 1; }
           # Fly replaces machine IDs during deploys. Resolve the current
           # worker by the original, persistent ascension_state volume.
-          owner_worker_id="$(flyctl volumes list --app "$FLY_APP" --json |
-            jq -er '[.[] | select(.name == "ascension_state" and
-              .state == "created" and (.attached_machine_id // "") != "")] |
-              if length == 1 then .[0].attached_machine_id
-              else error("Original owner volume must have exactly one attached machine") end')"
+          owner_worker_id="$(flyctl machine list --app "$FLY_APP" --json |
+            jq -er '[.[] | select(
+              (.state == "started" or .state == "stopped") and
+              .config.metadata.fly_process_group == "worker" and
+              ([.config.mounts[]? | select(.path == "/data/ascension")] | length == 1)
+            )] |
+            if length == 1 then .[0].id
+            else error("Exactly one live owner worker must mount the existing /data/ascension volume") end')"
           flyctl machine status "$owner_worker_id" --app "$FLY_APP"
           flyctl volumes list --app "$FLY_APP"
           python3 -m py_compile scripts/ascension-owner-queue/*.py
@@ -101,11 +104,14 @@ jobs:
           # Fly's rolling deploy can report a stopped machine as healthy.
           # Explicitly start the EXISTING owner machine before probing it.
           # Re-resolve after deploy: Fly may replace the worker machine.
-          owner_worker_id="$(flyctl volumes list --app "$FLY_APP" --json |
-            jq -er '[.[] | select(.name == "ascension_state" and
-              .state == "created" and (.attached_machine_id // "") != "")] |
-              if length == 1 then .[0].attached_machine_id
-              else error("Original owner volume must have exactly one attached machine") end')"
+          owner_worker_id="$(flyctl machine list --app "$FLY_APP" --json |
+            jq -er '[.[] | select(
+              (.state == "started" or .state == "stopped") and
+              .config.metadata.fly_process_group == "worker" and
+              ([.config.mounts[]? | select(.path == "/data/ascension")] | length == 1)
+            )] |
+            if length == 1 then .[0].id
+            else error("Exactly one live owner worker must mount the existing /data/ascension volume") end')"
           machine_state="$(flyctl machine status "$owner_worker_id" --app "$FLY_APP" --json)"
           if ! printf '%s' "$machine_state" | jq -e '(.state // .State) == "started"' >/dev/null; then
             flyctl machine start "$owner_worker_id" --app "$FLY_APP"

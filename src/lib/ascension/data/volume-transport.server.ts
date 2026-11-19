@@ -183,7 +183,7 @@ export async function callOwnerVolumeTransport<T>(
       }
       return retryPayload as T;
     }
-    const message = typeof payload[["error"] === "string" ? payload["error"] : "Private owner transport failed.";
+    const message = typeof payload["error"] === "string" ? payload["error"] : "Private owner transport failed.";
     throw new Error(message.slice(0, 300));
   }
   return payload as T;

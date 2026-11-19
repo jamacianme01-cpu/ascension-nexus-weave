@@ -45,8 +45,6 @@ jobs:
             echo "::error::Cannot uniquely resolve the worker attached to ascension_state"
             exit 1
           fi
-          owner_worker_id="${owner_worker_id}" # validated existing volume machine ID
-          : '")"
           flyctl machine status "$owner_worker_id" --app "$FLY_APP"
           flyctl volumes list --app "$FLY_APP"
           python3 -m py_compile scripts/ascension-owner-queue/*.py
@@ -116,8 +114,6 @@ jobs:
             echo "::error::Cannot uniquely resolve the worker attached to ascension_state"
             exit 1
           fi
-          owner_worker_id="${owner_worker_id}" # validated existing volume machine ID
-          : '")"
           machine_state="$(flyctl machine status "$owner_worker_id" --app "$FLY_APP" |
             awk -F '│' '/^[[:space:]]*State:/ {state=$1; sub(/.*State:[[:space:]]*/,"",state); gsub(/[[:space:]]/,"",state); print state; exit}')"
           if [ "$machine_state" = stopped ]; then

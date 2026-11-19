@@ -33,3 +33,44 @@ for file in recent:
         report.append({'status': 'unreadable'})
 print('ASCENSION_PRIVATE_RECENT_QUEUE_STATES ' + json.dumps(report))
 
+
+# Identify whether the original engine advertises the already-requested
+# physical/robotic design capability, without logging private source or designs.
+try:
+    from ASCENSION_CORE import capabilities
+    offerings = capabilities.advertise_all()
+    physical = []
+    for offer in offerings if isinstance(offerings, list) else []:
+        if not isinstance(offer, dict):
+            continue
+        searchable = json.dumps({
+            'capability_id': offer.get('capability_id', ''),
+            'output_contract': offer.get('output_contract', ''),
+            'accepted_intent_tokens': offer.get('accepted_intent_tokens', []),
+        }).lower()
+        if any(word in searchable for word in ('robot', 'drone', 'physical', 'hardware', 'blueprint', '3d_model')):
+            physical.append({'available': offer.get('available') is True})
+    print('ASCENSION_PHYSICAL_DESIGN_CAPABILITY',
+          json.dumps({'catalog_readable': True, 'advertised': bool(physical),
+                      'available': any(item['available'] for item in physical)}))
+except Exception as exc:
+    print('ASCENSION_PHYSICAL_DESIGN_CAPABILITY',
+          json.dumps({'catalog_readable': False, 'diagnostic_type': type(exc).__name__}))
+
+# Only log status-code-shaped contract fields for the latest rejected objective.
+for file in recent[:2]:
+    try:
+        run = json.loads(file.read_text(encoding='utf-8')).get('run', {})
+        if run.get('status') != 'rejected':
+            continue
+        result = run.get('result') if isinstance(run.get('result'), dict) else {}
+        output = result.get('requested_output') if isinstance(result.get('requested_output'), dict) else {}
+        relevant = {}
+        for key in ('output_contract', 'requested_type', 'primary_artifact', 'truth_status'):
+            value = output.get(key)
+            if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,80}', value):
+                relevant[key] = value
+        print('ASCENSION_REJECTED_OUTPUT_CONTRACT', json.dumps(relevant))
+        break
+    except (OSError, TypeError, ValueError):
+        continue

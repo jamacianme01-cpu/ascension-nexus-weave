@@ -50,6 +50,8 @@ export function V1DesignViewport({
 
   useEffect(() => { setScale(1); }, [imageUrl, modelUrl]);
   useEffect(() => {
+    setDimensions(null);
+    setProblem("");
     if ((!modelUrl && !modelSpec) || !container.current) return;
     const host = container.current;
     let cancelled = false;
@@ -148,8 +150,15 @@ export function V1DesignViewport({
         }
       };
       if (modelUrl) {
-        new GLTFLoader().load(modelUrl, loaded => install(loaded.scene), undefined,
-          () => { if (!cancelled) setProblem("ASCENSION could not load the delivered 3D model."); });
+        new GLTFLoader().load(modelUrl, loaded => install(loaded.scene), undefined, () => {
+          if (cancelled) return;
+          if (modelSpec) {
+            install(geometryFromSpec(modelSpec));
+            setProblem("The delivered GLB is unavailable; showing only this pathway's conceptual geometry. Physical measurements are not verified.");
+          } else {
+            setProblem("ASCENSION could not load the delivered 3D model.");
+          }
+        });
       } else if (modelSpec) {
         install(geometryFromSpec(modelSpec));
       }
@@ -179,7 +188,7 @@ export function V1DesignViewport({
       };
     } catch {
       setProblem("3D viewing is unavailable on this device.");
-      return () => { cancelled = true; renderer?.dispose(); };
+      return () => { cancelled = true; renderer?.dispose(); renderer?.domElement.remove(); };
     }
   }, [modelUrl, modelSpec, mode]);
 

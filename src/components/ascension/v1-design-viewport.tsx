@@ -54,7 +54,7 @@ export function V1DesignViewport({
     const host = container.current;
     let cancelled = false;
     let frame = 0;
-    let renderer: THREE.WebGLRenderer;
+    let renderer!: THREE.WebGLRenderer;
     let controls: OrbitControls;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#081019");
@@ -168,7 +168,7 @@ export function V1DesignViewport({
         for (const material of replacements) material.dispose();
         renderer.dispose();
         renderer.domElement.remove();
-        if (!modelUrl && geometry) geometry.traverse(part => {
+        if (!modelUrl) scene.traverse(part => {
           if (part instanceof THREE.Mesh) {
             part.geometry.dispose();
             if (Array.isArray(part.material)) part.material.forEach(material => material.dispose());

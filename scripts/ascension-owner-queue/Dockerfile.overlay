@@ -2,6 +2,9 @@
 # Original ASCENSION_CORE and CLARITY source NEVER enters public GitHub.
 ARG ORIGINAL_OWNER_IMAGE
 FROM ${ORIGINAL_OWNER_IMAGE}
+# The original private engine image is Python-based. The V1 site requires Bun.
+# Bundle the already-used Bun runtime rather than relying on a missing binary.
+COPY --from=oven/bun:1.4.5 /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 COPY .output/ /app/.output/
 COPY ascension-volume-transport.py /app/ascension-volume-transport.py
@@ -12,6 +15,7 @@ RUN test -f /app/ASCENSION_CORE/cloud_queue_worker.py \
     && test -f /app/ASCENSION_CORE/live_publication.py \
     && test -f /app/clarity/core_runtime.py \
     && test -f /app/.output/server/index.mjs \
+    && test -x /usr/local/bin/bun \
     && /usr/bin/python3 -m py_compile /app/ascension-volume-transport.py /app/ascension-private-supervisor.py \
     && chmod 0755 /app/ascension-start.sh
 ENV PYTHONPATH=/app

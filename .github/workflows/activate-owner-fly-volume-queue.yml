@@ -83,6 +83,27 @@ jobs:
             "$RUNNER_TEMP/ascension-owner-overlay"
           docker push "$new_image"
           echo "new_image=$new_image" >> "$GITHUB_OUTPUT"
+      - name: Smoke-test existing V1 website executable before Fly replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${{ steps.overlay.outputs.new_image }}"
+          cid="$(docker run --rm -d -e NODE_ENV=production -e PORT=8080 \
+            -e HOST=0.0.0.0 -e NITRO_HOST=0.0.0.0 -e NITRO_PORT=8080 \
+            -p 127.0.0.1:18080:8080 "$image" app)"
+          trap 'docker logs "$cid" || true; docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          ready=0
+          for attempt in $(seq 1 16); do
+            if curl --fail --silent --show-error --max-time 3 \
+              http://127.0.0.1:18080/ -o /dev/null; then
+              ready=1
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' "$cid")" != "true" ]; then break; fi
+            sleep 2
+          done
+          test "$ready" -eq 1 || { echo "::error::ASCENSION V1 web process could not serve HTTP."; exit 1; }
+          echo 'ASCENSION_V1_WEB_PROCESS_BOOT_CONFIRMED'
       - name: Update only existing ASCENSION app and worker processes
         shell: bash
         run: |

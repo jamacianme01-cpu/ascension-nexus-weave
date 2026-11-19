@@ -36,6 +36,9 @@
 
 .designed-hit {
   position: absolute;
+  /* Keep the approved image hot spots behind the live pathway controls.
+     Otherwise invisible full-frame buttons swallow zoom, view and parts clicks. */
+  z-index: 1;
   margin: 0;
   padding: 0;
   border: 0;

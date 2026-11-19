@@ -24,7 +24,6 @@ jobs:
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       FLY_APP: ascension-nexus-weave
-      OWNER_WORKER_ID: 7813e23b336938
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -34,7 +33,10 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly authorization missing"; exit 1; }
-          flyctl machine status "$OWNER_WORKER_ID" --app "$FLY_APP"
+          # Rolling deployments replace Machine IDs. Resolve the worker by its
+          # Fly process-group metadata rather than a retired historical ID.
+          flyctl machines list --app "$FLY_APP" --json |
+            jq -e 'any(.[]; .config.metadata.fly_process_group == "worker")'
           flyctl volumes list --app "$FLY_APP"
           python3 -m py_compile scripts/ascension-owner-queue/*.py
           python3 -m unittest discover -s tests -p test_ascension_private_supervisor.py -v
@@ -92,17 +94,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Fly's rolling deploy can report a stopped machine as healthy.
-          # Explicitly start the EXISTING owner machine before probing it.
-          # flyctl machine status has no --json flag on the installed CLI.
-          # Read its standard status output, then start only if not running.
-          machine_state="$(flyctl machine status "$OWNER_WORKER_ID" --app "$FLY_APP")"
-          if ! printf '%s\n' "$machine_state" | grep -Eiq '(^|[[:space:]])State:[[:space:]]*started([[:space:]]|$)'; then
-            flyctl machine start "$OWNER_WORKER_ID" --app "$FLY_APP"
+          # Use the post-deploy worker Machine, not the pre-deploy ID.
+          # Refuse an ambiguous worker selection or a worker without a mounted volume.
+          workers="$(flyctl machines list --app "$FLY_APP" --json)"
+          worker_count="$(printf '%s' "$workers" | jq '[.[] | select(.config.metadata.fly_process_group == "worker" and any(.config.mounts[]?; .volume != null))] | length')"
+          if [ "$worker_count" -ne 1 ]; then
+            echo "::error::Expected one owner worker with persistent volume; found $worker_count."
+            exit 1
           fi
-          flyctl ssh console --app "$FLY_APP" --machine "$OWNER_WORKER_ID" \
+          worker_id="$(printf '%s' "$workers" | jq -r '.[] | select(.config.metadata.fly_process_group == "worker" and any(.config.mounts[]?; .volume != null)) | .id')"
+          machine_state="$(printf '%s' "$workers" | jq -r --arg id "$worker_id" '.[] | select(.id == $id) | .state')"
+          if [ "$machine_state" != "started" ]; then
+            flyctl machine start "$worker_id" --app "$FLY_APP"
+          fi
+          flyctl ssh console --app "$FLY_APP" --machine "$worker_id" \
             --command 'python3 /app/verify_state.py /data/ascension/state/live'
-          flyctl ssh console --app "$FLY_APP" --machine "$OWNER_WORKER_ID" \
+          flyctl ssh console --app "$FLY_APP" --machine "$worker_id" \
             --command 'python3 /app/probe-ascension-private.py'
           for attempt in $(seq 1 10); do
             response="$(curl --fail --show-error --silent --max-time 20 \

@@ -134,6 +134,9 @@ export function IndependentEngage() {
   const abort = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const welcomed = useRef(false);
+  // Continuation retains the existing governed run and its guest authorization.
+  const activeRun = useRef<{ requestId: string; guestToken: string } | null>(null);
+  const continuation = useRef<{ requestId: string; guestToken: string } | null>(null);
 
   useEffect(() => {
     categoryRef.current = category;
@@ -179,6 +182,7 @@ export function IndependentEngage() {
 
   function chooseCategory(next: "Business Planner" | "Build / Create" | "Guidance") {
     categoryRef.current = next;
+    continuation.current = null;
     setCategory(next);
     setObjective("");
     objectiveRef.current = "";
@@ -317,10 +321,21 @@ export function IndependentEngage() {
     try {
       // The real governed submission MUST NOT depend on knowledge retrieval.
       // Previously a failed lookup stopped ENGAGE before the runtime saw the objective.
-      const submitted = await submitGuestObjective({ data: { objective: text } });
+      // A selected design continues its actual recorded run, not an unrelated new objective.
+      const parent = continuation.current;
+      const submitted = await submitGuestObjective({ data: {
+        objective: text,
+        ...(parent ? {
+          parentRequestId: parent.requestId,
+          parentGuestToken: parent.guestToken,
+          followUp: "continue" as const,
+        } : {}),
+      } });
       if (generation.current !== token) return;
+      continuation.current = null;
       const requestId = submitted.request.id;
       const guestToken = submitted.guestToken;
+      activeRun.current = { requestId, guestToken };
       setGovernedStatus("ASCENSION governed queue: " + submitted.request.status);
 
       // Show existing Knowledgeverse evidence when available; its failure never
@@ -463,6 +478,24 @@ export function IndependentEngage() {
     setScreen("assembled");
   }
 
+  function explainPart(part: Part) {
+    offer([
+      part.name,
+      part.location ? "Where: " + part.location : "Its location is not yet described in the delivered result.",
+      part.purpose ? "Does: " + part.purpose : "Its function is not yet described in the delivered result.",
+    ].join(". "));
+  }
+
+  function buildOnResult() {
+    if (!result || !activeRun.current) return;
+    continuation.current = { ...activeRun.current };
+    objectiveRef.current = "";
+    setObjective("");
+    setError("");
+    offer("Tell me what you want to build on this design.");
+    if (!talking) listenForObjective(true);
+  }
+
   // Browser speech recognition must always dispatch against the current screen.
   guideCommandRef.current = spoken => {
     if (!result) return false;
@@ -573,6 +606,7 @@ export function IndependentEngage() {
     </section>
     {screen && result && <DesignedFlow screen={screen} readings={readings} selectedIndex={choice}
       talking={talking} listening={listening} onListen={() => listenForObjective()}
-      onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway} />}
+      onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway}
+      onExplainPart={explainPart} onBuildOnResult={buildOnResult} />}
   </div>;
 }

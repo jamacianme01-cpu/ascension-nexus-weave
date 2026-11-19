@@ -87,7 +87,9 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
     steps: path.steps, tradeoffs: path.tradeoffs,
     // Retain real delivered assets, not the same stock drone picture for all objectives.
     parts: path.model_spec?.parts.map(part => ({
-      name: part.name, purpose: "", location: "",
+      name: part.name,
+      purpose: part.purpose ?? "",
+      location: part.location ?? "",
     })) ?? [],
     imageUrl: path.generated_image_url ?? null,
     modelUrl: path.model_url ?? null,

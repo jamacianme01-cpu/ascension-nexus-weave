@@ -93,6 +93,35 @@ export function governedDelivery(
   const result = record(run.result);
   if (!Object.keys(result).length) return null;
 
+  // The original governed runtime may publish an authored pathway delivery
+  // directly with its verified run. Preserve the actual four authored results
+  // instead of replacing them with an artifact summary. A planning branch alone
+  // is NOT a delivered solution, and no BLEND is constructed by this projection.
+  const authoredCandidates = [
+    record(result["objective_delivery"]),
+    record(result["delivery"]),
+    record(result["response_payload"]),
+    result,
+  ];
+  for (const authored of authoredCandidates) {
+    const paths = authored["pathways"];
+    if (!Array.isArray(paths) || paths.length !== 3 || !record(authored["blend"])["blend_reason"]) continue;
+    const body = typeof authored["body"] === "string" && authored["body"].trim()
+      ? authored["body"].trim()
+      : typeof authored["answer"] === "string" ? authored["answer"].trim() : "";
+    if (!body) continue;
+    const candidate = {
+      kind: authored["kind"] ?? "answer",
+      title: authored["title"] ?? run.objective,
+      body,
+      pathways: paths,
+      blend: authored["blend"],
+      files: artifactFiles(authored),
+      limitations: Array.isArray(authored["limitations"]) ? authored["limitations"] : [],
+    };
+    return parseDelivery(candidate);
+  }
+
   const receipts = Array.isArray(result["execution_receipts"])
     ? result["execution_receipts"].flatMap((rawReceipt) => {
         const receipt = record(rawReceipt);

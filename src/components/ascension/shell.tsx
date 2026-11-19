@@ -8,6 +8,7 @@ const NAV = [
   { to: "/", label: "Ascension" },
   { to: "/knowledgeverse", label: "Knowledgeverse" },
   { to: "/console", label: "Inspect" },
+  { to: "/companion", label: "Companion" },
 ] as const;
 
 /** Console surfaces live behind the optional Inspect area. */

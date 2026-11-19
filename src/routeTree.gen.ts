@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as ArchitectureRouteImport } from './routes/architecture'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CompanionRouteImport } from './routes/companion'
 import { Route as ConsoleRouteImport } from './routes/console'
 import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as KnowledgeverseRouteImport } from './routes/knowledgeverse'
@@ -53,6 +54,11 @@ const ArchitectureRoute = ArchitectureRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompanionRoute = CompanionRouteImport.update({
+  id: '/companion',
+  path: '/companion',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConsoleRoute = ConsoleRouteImport.update({
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/architecture': typeof ArchitectureRoute
   '/auth': typeof AuthRoute
+  '/companion': typeof CompanionRoute
   '/console': typeof ConsoleRouteWithChildren
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/architecture': typeof ArchitectureRoute
   '/auth': typeof AuthRoute
+  '/companion': typeof CompanionRoute
   '/console': typeof ConsoleRouteWithChildren
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
@@ -237,6 +245,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/architecture': typeof ArchitectureRoute
   '/auth': typeof AuthRoute
+  '/companion': typeof CompanionRoute
   '/console': typeof ConsoleRouteWithChildren
   '/governance': typeof GovernanceRoute
   '/knowledgeverse': typeof KnowledgeverseRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/'
     | '/architecture'
     | '/auth'
+    | '/companion'
     | '/console'
     | '/governance'
     | '/knowledgeverse'
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
     | '/'
     | '/architecture'
     | '/auth'
+    | '/companion'
     | '/console'
     | '/governance'
     | '/knowledgeverse'
@@ -321,6 +332,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/architecture'
     | '/auth'
+    | '/companion'
     | '/console'
     | '/governance'
     | '/knowledgeverse'
@@ -350,6 +362,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ArchitectureRoute: typeof ArchitectureRoute
   AuthRoute: typeof AuthRoute
+  CompanionRoute: typeof CompanionRoute
   ConsoleRoute: typeof ConsoleRouteWithChildren
   GovernanceRoute: typeof GovernanceRoute
   KnowledgeverseRoute: typeof KnowledgeverseRoute
@@ -399,6 +412,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/companion': {
+      id: '/companion'
+      path: '/companion'
+      fullPath: '/companion'
+      preLoaderRoute: typeof CompanionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/console': {
@@ -587,6 +607,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ArchitectureRoute: ArchitectureRoute,
   AuthRoute: AuthRoute,
+  CompanionRoute: CompanionRoute,
   ConsoleRoute: ConsoleRouteWithChildren,
   GovernanceRoute: GovernanceRoute,
   KnowledgeverseRoute: KnowledgeverseRoute,

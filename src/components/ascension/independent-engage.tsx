@@ -122,6 +122,7 @@ export function IndependentEngage() {
   const engageRef = useRef<() => void>(() => {});
   const guideCommandRef = useRef<(spoken: string) => boolean>(() => false);
   const listeningRef = useRef(false);
+  const loadingRef = useRef(false);
   const speechAllowedRef = useRef(true);
   const recognition = useRef<{ stop: () => void } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -234,6 +235,12 @@ export function IndependentEngage() {
     categoryRef.current = next;
     continuation.current = null;
     activeRun.current = null;
+    generation.current += 1;
+    abort.current?.abort();
+    if (governedWatch.current) clearInterval(governedWatch.current);
+    governedWatch.current = null;
+    loadingRef.current = false;
+    setLoading(false);
     try { window.sessionStorage.removeItem(MEMORY_KEY); } catch { /* Restricted storage. */ }
     setResult(null);
     setScreen(null);
@@ -274,8 +281,8 @@ export function IndependentEngage() {
       setVoiceError("Choose a Book category before stating your objective.");
       return;
     }
-    // Do not overwrite an objective while ASCENSION is already processing it.
-    if (loading) return;
+    // Recognition callbacks can hold a stale React render. Use the live lock.
+    if (loadingRef.current) return;
     // No keyword or objective-domain gate: every valid objective is submitted
     // to the same governed ASCENSION execution pipeline without reinterpretation.
     objectiveRef.current = spoken.slice(0, 4000);
@@ -361,7 +368,8 @@ export function IndependentEngage() {
 
   async function engage() {
     const text = objectiveRef.current.trim();
-    if (!categoryRef.current || !text || loading) return;
+    if (!categoryRef.current || !text || loadingRef.current) return;
+    loadingRef.current = true;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -369,6 +377,7 @@ export function IndependentEngage() {
     if (governedWatch.current) clearInterval(governedWatch.current);
     governedWatch.current = null;
     setLoading(true);
+    recognition.current?.stop();
     setError("");
     // Keep the selected design available during BUILD ON RESULT.
     // Only replace it when the continued governed delivery succeeds.
@@ -502,6 +511,7 @@ export function IndependentEngage() {
           if (terminal && generation.current === token) {
             if (governedWatch.current) clearInterval(governedWatch.current);
             governedWatch.current = null;
+            loadingRef.current = false;
             setLoading(false);
           }
         }
@@ -513,6 +523,7 @@ export function IndependentEngage() {
       if (generation.current === token) {
         const message = cause instanceof Error ? cause.message : String(cause);
         setError("ENGAGE submission failed: " + message.slice(0, 350));
+        loadingRef.current = false;
         setLoading(false);
       }
     } finally {
@@ -528,6 +539,7 @@ export function IndependentEngage() {
     abort.current?.abort();
     if (governedWatch.current) clearInterval(governedWatch.current);
     governedWatch.current = null;
+    loadingRef.current = false;
     setLoading(false);
     offer("Stopped. The book can wait until you want to try again.");
   }

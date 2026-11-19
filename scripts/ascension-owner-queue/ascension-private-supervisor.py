@@ -9,6 +9,7 @@ import time
 root = sys.argv[1] if len(sys.argv) > 1 else '/data/ascension/state/live'
 workers = []
 stopping = False
+unexpected_child_exit = False
 
 def shutdown(signum=None, _frame=None):
     global stopping
@@ -34,6 +35,9 @@ try:
     while not stopping:
         failed = next((proc for proc in workers if proc.poll() is not None), None)
         if failed is not None:
+            # A child stopping is a worker failure, even when it returned code 0.
+            # The supervisor must exit nonzero so Fly can restart the machine.
+            unexpected_child_exit = True
             print('ASCENSION_PRIVATE_PROCESS_STOPPED exit_code=' + str(failed.returncode), flush=True)
             shutdown()
             break
@@ -46,5 +50,5 @@ finally:
         except subprocess.TimeoutExpired:
             child.kill()
             child.wait()
-if not stopping:
+if unexpected_child_exit:
     sys.exit(1)

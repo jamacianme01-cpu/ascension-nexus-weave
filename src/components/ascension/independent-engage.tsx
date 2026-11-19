@@ -136,7 +136,7 @@ export function IndependentEngage() {
   const welcomed = useRef(false);
   // Continuation retains the existing governed run and its guest authorization.
   const activeRun = useRef<{ requestId: string; guestToken: string } | null>(null);
-  const continuation = useRef<{ requestId: string; guestToken: string } | null>(null);
+  const continuation = useRef<{ requestId: string; guestToken: string; selected: Pathway; blend: boolean } | null>(null);
 
   useEffect(() => {
     categoryRef.current = category;
@@ -329,6 +329,15 @@ export function IndependentEngage() {
           parentRequestId: parent.requestId,
           parentGuestToken: parent.guestToken,
           followUp: "continue" as const,
+          evidence: [JSON.stringify({
+            source: "ASCENSION_SELECTED_RESULT",
+            pathway_id: parent.selected.id,
+            label: parent.selected.title,
+            summary: parent.selected.summary,
+            blend: parent.blend,
+            steps: parent.selected.steps,
+            parts: parent.selected.parts,
+          }).slice(0, 2000)],
         } : {}),
       } });
       if (generation.current !== token) return;
@@ -488,7 +497,9 @@ export function IndependentEngage() {
 
   function buildOnResult() {
     if (!result || !activeRun.current) return;
-    continuation.current = { ...activeRun.current };
+    const selected = choice === 3 ? result.blend : result.pathways[choice];
+    if (!selected) return;
+    continuation.current = { ...activeRun.current, selected, blend: choice === 3 };
     objectiveRef.current = "";
     setObjective("");
     setError("");

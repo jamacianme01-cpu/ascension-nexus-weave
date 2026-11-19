@@ -217,7 +217,8 @@ export function IndependentEngage() {
       if (closed) return;
       setMicrophone("ready");
       setMicrophonePrompt(false);
-      listenForObjective(true);
+      // Do not interrupt the Tree's welcome by starting recognition here.
+      // The welcome completion starts listening after the Book category is chosen.
     }).catch(() => {
       if (closed) return;
       setMicrophone("unavailable");
@@ -271,6 +272,8 @@ export function IndependentEngage() {
       setVoiceError("Choose a Book category before stating your objective.");
       return;
     }
+    // Do not overwrite an objective while ASCENSION is already processing it.
+    if (loading) return;
     // No keyword or objective-domain gate: every valid objective is submitted
     // to the same governed ASCENSION execution pipeline without reinterpretation.
     objectiveRef.current = spoken.slice(0, 4000);

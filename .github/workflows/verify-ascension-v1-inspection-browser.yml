@@ -1,0 +1,105 @@
+name: Verify ASCENSION V1 pathway inspection controls in browser
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/ascension/designed-flow.tsx'
+      - 'src/components/ascension/designed-flow.css'
+      - 'src/components/ascension/v1-design-viewport.tsx'
+      - '.github/workflows/verify-ascension-v1-inspection-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  v1-inspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Verify preserved V1 navigation, side-list details and continuation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > v1-inspection-ci.html <<'HTML'
+          <!doctype html><html><head><meta charset="utf-8"><title>ASCENSION V1 inspection test</title></head><body><div id="root"></div><script type="module" src="/v1-inspection-ci.tsx"></script></body></html>
+          HTML
+          cat > v1-inspection-ci.tsx <<'TSX'
+          import React, { useState } from "react";
+          import { createRoot } from "react-dom/client";
+          import { DesignedFlow, type DesignedScreen, type DesignedTarget } from "@/components/ascension/designed-flow";
+          const readings = [
+            {title: "Claude", line: "First pathway", summary: "Test delivery one", imageUrl: "/designed-flow/assembled.jpg", parts: [{name:"Coil",purpose:"Carries current",location:"Inside enclosure"},{name:"Switch",purpose:"Opens circuit",location:"At the entrance"}]},
+            {title: "Grok",line:"Second pathway",summary:"Test delivery two"},
+            {title: "OpenAI",line:"Third pathway",summary:"Test delivery three"},
+            {title: "BLEND",line:"Combined pathway",summary:"Test blend",blend:true}
+          ];
+          function App() {
+            const [screen, setScreen] = useState<DesignedScreen>("spiral");
+            const [selected, setSelected] = useState(0);
+            const [continued, setContinued] = useState(0);
+            const [spoken, setSpoken] = useState("");
+            return <>
+              <output id="continued">{continued}</output><output id="spoken">{spoken}</output>
+              <DesignedFlow screen={screen} readings={readings} selectedIndex={selected}
+                talking={true} listening={false} onListen={()=>{}} onToggleTalking={()=>{}}
+                onScreen={(next:DesignedTarget)=>setScreen(next === "book" ? "spiral" : next)}
+                onOpen={index=>{setSelected(index);setScreen("assembled")}}
+                onExplainPart={part=>setSpoken(part.name)}
+                onBuildOnResult={()=>setContinued(count=>count+1)}/>
+            </>;
+          }
+          createRoot(document.getElementById("root")!).render(<App />);
+          TSX
+          cat > v1-inspection-ci.vite.mjs <<'VITE'
+          import { defineConfig } from "vite";
+          import react from "@vitejs/plugin-react";
+          import path from "node:path";
+          export default defineConfig({envDir:false, plugins:[react()],resolve:{alias:{"@":path.resolve("src")}},server:{host:"127.0.0.1",port:4179,strictPort:true}});
+          VITE
+          cat > v1-inspection-ci.browser.mjs <<'JS'
+          import assert from "node:assert/strict";
+          import { chromium } from "playwright";
+          const browser = await chromium.launch();
+          try {
+            const page = await browser.newPage({viewport:{width:1280,height:800}});
+            await page.goto("http://127.0.0.1:4179/v1-inspection-ci.html");
+            for(const name of ["Claude","Grok","OpenAI","BLEND"]) {
+              await page.getByRole("button",{name,exact:true}).waitFor();
+            }
+            await page.getByRole("button",{name:"Claude",exact:true}).click();
+            await page.locator(".designed-live-panel").waitFor();
+            assert.equal(await page.locator(".v1-design-title h2").textContent(),"Claude");
+            for (const name of ["Blueprint","Dissect","Exploded","Imploded","Assembled"]) {
+              await page.locator(".v1-view-switch").getByRole("button",{name,exact:true}).click();
+              assert.equal(await page.locator(".designed-frame").getAttribute("data-screen"),name.toLowerCase());
+              assert.equal(await page.locator(".v1-view-switch").getByRole("button",{name,exact:true}).getAttribute("aria-pressed"),"true");
+            }
+            await page.locator(".designed-live-parts").getByRole("button",{name:"Coil"}).click();
+            assert.equal(await page.locator("#spoken").textContent(),"Coil");
+            const details = await page.locator(".v1-part-detail").first().innerText();
+            for (const expected of ["What:","Where:","Does:","Inside enclosure","Carries current"]) assert.ok(details.includes(expected),details);
+            await page.getByRole("button",{name:"BUILD ON RESULT"}).click();
+            assert.equal(await page.locator("#continued").textContent(),"1");
+            console.log("V1_BROWSER_INTERACTION_PASS: four authored-card slots; actual view navigation; component What Where Does; continuation");
+          } finally { await browser.close(); }
+          JS
+          npx vite --config v1-inspection-ci.vite.mjs > "$RUNNER_TEMP/v1-inspection-vite.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          ok=0
+          for attempt in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4179/v1-inspection-ci.html >/dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then cat "$RUNNER_TEMP/v1-inspection-vite.log"; exit 1; fi
+          node v1-inspection-ci.browser.mjs

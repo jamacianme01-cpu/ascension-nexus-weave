@@ -1,6 +1,7 @@
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import "./designed-flow.css";
 import { V1DesignViewport } from "./v1-design-viewport";
+import type { ObjectiveModelSpec } from "@/lib/ascension/result-model";
 
 /** Screens taken from the designed flow, unchanged. */
 export type DesignedScreen = "spiral" | "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
@@ -24,6 +25,7 @@ export type PathwayReading = {
   blend?: boolean;
   imageUrl?: string | null;
   modelUrl?: string | null;
+  modelSpec?: ObjectiveModelSpec | null;
   parts?: { name: string; purpose: string; location: string }[];
 };
 
@@ -158,6 +160,8 @@ export function DesignedFlow({
   onExplainPart: (part: { name: string; purpose: string; location: string }) => void;
   onBuildOnResult: () => void;
 }) {
+  const [openedPart, setOpenedPart] = useState<number | null>(null);
+  useEffect(() => { setOpenedPart(null); }, [selectedIndex]);
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -193,18 +197,34 @@ export function DesignedFlow({
         {screen !== "spiral" && chosen && (
           <section className="designed-live-panel" aria-label="Selected ASCENSION pathway">
             <div className="v1-design-title"><h2>{chosen.title}</h2><button type="button" onClick={onBuildOnResult}>BUILD ON RESULT</button></div>
+            <nav className="v1-view-switch" aria-label="Selected pathway inspection views">
+              {([
+                ["assembled", "Assembled"],
+                ["blueprint", "Blueprint"],
+                ["dissect", "Dissect"],
+                ["exploded", "Exploded"],
+                ["imploded", "Imploded"],
+              ] as const).map(([target, label]) => (
+                <button key={target} type="button" aria-pressed={screen === target}
+                  onClick={() => onScreen(target)}>{label}</button>
+              ))}
+            </nav>
             <div className="designed-live-content">
               <div className="designed-live-artwork">
-                <V1DesignViewport modelUrl={chosen.modelUrl ?? null} imageUrl={selectedPicture} mode={screen} />
+                <V1DesignViewport modelUrl={chosen.modelUrl ?? null} modelSpec={chosen.modelSpec ?? null} imageUrl={selectedPicture} mode={screen} />
                 <p className="designed-live-summary">{chosen.summary}</p>
               </div>
               <aside className="designed-live-parts" aria-label="Delivered components">
                 <h3>Components</h3>
                 {chosen.parts?.length
                   ? <ul>{chosen.parts.map((part, index) => <li key={`${part.name}-${index}`}>
-                    <button type="button" className="v1-part-name" onClick={() => onExplainPart(part)}>{part.name}</button>
-                    {part.purpose && <p><strong>Does:</strong> {part.purpose}</p>}
-                    {part.location && <p><strong>Where:</strong> {part.location}</p>}
+                    <button type="button" className="v1-part-name" aria-expanded={openedPart === index}
+                      onClick={() => { setOpenedPart(openedPart === index ? null : index); onExplainPart(part); }}>{part.name}</button>
+                    {openedPart === index && <div className="v1-part-detail">
+                      <p><strong>What:</strong> {part.name}</p>
+                      <p><strong>Where:</strong> {part.location || "Not specified in this pathway."}</p>
+                      <p><strong>Does:</strong> {part.purpose || "Not specified in this pathway."}</p>
+                    </div>}
                   </li>)}</ul>
                   : <p>No component descriptions were delivered for this pathway.</p>}
               </aside>

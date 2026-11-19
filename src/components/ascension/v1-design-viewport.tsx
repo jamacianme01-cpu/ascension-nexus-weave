@@ -2,12 +2,47 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import type { ObjectiveModelSpec } from "@/lib/ascension/result-model";
 
 export type DesignView = "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
 
+/** Construct inspectable geometry from THIS delivered pathway, not a stock image.
+ * Coordinates are normalized model units; this is not a measured engineering drawing.
+ */
+function geometryFromSpec(spec: ObjectiveModelSpec): THREE.Group {
+  const group = new THREE.Group();
+  const colors: Record<string, number> = {
+    gold: 0xd9ba65, gold_deep: 0x88632d, copper: 0xb87954,
+    blue: 0x529dcc, blue_deep: 0x244a74, ice: 0xc4e9f1,
+    cyan: 0x42c8d3, warm: 0xf2b88c, steel: 0x899ba9, dark: 0x2b3743,
+  };
+  for (const part of spec.parts) {
+    let shape: THREE.BufferGeometry;
+    switch (part.primitive) {
+      case "cylinder": shape = new THREE.CylinderGeometry(0.5, 0.5, 1, 24); break;
+      case "ring": shape = new THREE.TorusGeometry(0.7, 0.18, 12, 32); break;
+      case "sphere": shape = new THREE.SphereGeometry(0.55, 24, 16); break;
+      case "nozzle": shape = new THREE.CylinderGeometry(0.18, 0.48, 1, 24); break;
+      default: shape = new THREE.BoxGeometry(1, 1, 1);
+    }
+    const mesh = new THREE.Mesh(shape, new THREE.MeshStandardMaterial({
+      color: colors[part.material] ?? 0x899ba9, metalness: 0.38, roughness: 0.46,
+      side: THREE.DoubleSide,
+    }));
+    mesh.name = part.name;
+    mesh.position.set(...part.position);
+    mesh.rotation.set(...part.rotation);
+    mesh.scale.set(...part.scale);
+    group.add(mesh);
+  }
+  group.rotation.set(...spec.hero_rotation);
+  group.scale.setScalar(spec.hero_scale);
+  return group;
+}
+
 export function V1DesignViewport({
-  modelUrl, imageUrl, mode,
-}: { modelUrl: string | null; imageUrl: string | null; mode: DesignView }) {
+  modelUrl, modelSpec, imageUrl, mode,
+}: { modelUrl: string | null; modelSpec: ObjectiveModelSpec | null; imageUrl: string | null; mode: DesignView }) {
   const container = useRef<HTMLDivElement>(null);
   const [problem, setProblem] = useState("");
   const [dimensions, setDimensions] = useState<string | null>(null);
@@ -15,11 +50,13 @@ export function V1DesignViewport({
 
   useEffect(() => { setScale(1); }, [imageUrl, modelUrl]);
   useEffect(() => {
-    if (!modelUrl || !container.current) return;
+    setDimensions(null);
+    setProblem("");
+    if ((!modelUrl && !modelSpec) || !container.current) return;
     const host = container.current;
     let cancelled = false;
     let frame = 0;
-    let renderer: THREE.WebGLRenderer;
+    let renderer!: THREE.WebGLRenderer;
     let controls: OrbitControls;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#081019");
@@ -48,9 +85,9 @@ export function V1DesignViewport({
       const observer = new ResizeObserver(resize);
       observer.observe(host);
       resize();
-      new GLTFLoader().load(modelUrl, loaded => {
+      const install = (delivered: THREE.Group) => {
         if (cancelled) return;
-        geometry = loaded.scene;
+        geometry = delivered;
         scene.add(geometry);
         const box = new THREE.Box3().setFromObject(geometry);
         if (box.isEmpty()) { setProblem("The delivered model contains no visible geometry."); return; }
@@ -111,7 +148,20 @@ export function V1DesignViewport({
           };
           animateTogether();
         }
-      }, undefined, () => { if (!cancelled) setProblem("ASCENSION could not load the delivered 3D model."); });
+      };
+      if (modelUrl) {
+        new GLTFLoader().load(modelUrl, loaded => install(loaded.scene), undefined, () => {
+          if (cancelled) return;
+          if (modelSpec) {
+            install(geometryFromSpec(modelSpec));
+            setProblem("The delivered GLB is unavailable; showing only this pathway's conceptual geometry. Physical measurements are not verified.");
+          } else {
+            setProblem("ASCENSION could not load the delivered 3D model.");
+          }
+        });
+      } else if (modelSpec) {
+        install(geometryFromSpec(modelSpec));
+      }
       const render = () => {
         if (cancelled) return;
         controls.update();
@@ -127,15 +177,22 @@ export function V1DesignViewport({
         for (const material of replacements) material.dispose();
         renderer.dispose();
         renderer.domElement.remove();
+        if (!modelUrl) scene.traverse(part => {
+          if (part instanceof THREE.Mesh) {
+            part.geometry.dispose();
+            if (Array.isArray(part.material)) part.material.forEach(material => material.dispose());
+            else part.material.dispose();
+          }
+        });
         scene.clear();
       };
     } catch {
       setProblem("3D viewing is unavailable on this device.");
-      return () => { cancelled = true; renderer?.dispose(); };
+      return () => { cancelled = true; renderer?.dispose(); renderer?.domElement.remove(); };
     }
-  }, [modelUrl, mode]);
+  }, [modelUrl, modelSpec, mode]);
 
-  if (!modelUrl) {
+  if (!modelUrl && !modelSpec) {
     return <div className="v1-design-image-view">
       {imageUrl ? <>
         <div className="v1-design-zoom-frame">
@@ -154,7 +211,7 @@ export function V1DesignViewport({
 
   return <div className="v1-design-model">
     <div className="v1-model-canvas" ref={container} aria-label="Interactive selected 3D design; drag to rotate and scroll to zoom" />
-    {dimensions && <p className="v1-model-measurement">3D model extents: {dimensions} model units. Physical dimensions are not verified.</p>}
+    {dimensions && <p className="v1-model-measurement">3D geometry extents: {dimensions} model units. Physical dimensions are not verified.</p>}
     {problem && <p role="status">{problem}</p>}
   </div>;
 }

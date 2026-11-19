@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
 import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
-import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
+import type { ObjectiveDelivery, ObjectiveModelSpec } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
-type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; modelUrl: string | null; blend_reason?: string };
+type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; modelUrl: string | null; modelSpec: ObjectiveModelSpec | null; blend_reason?: string };
 type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
@@ -87,10 +87,14 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
     steps: path.steps, tradeoffs: path.tradeoffs,
     // Retain real delivered assets, not the same stock drone picture for all objectives.
     parts: path.model_spec?.parts.map(part => ({
-      name: part.name, purpose: "", location: "",
+      name: part.name,
+      // Describe only functions stated in this pathway's delivered steps.
+      purpose: path.steps.find(step => step.toLowerCase().includes(part.name.toLowerCase())) ?? "",
+      location: `Concept model coordinates: ${part.position.join(", ")} (normalized units)`,
     })) ?? [],
     imageUrl: path.generated_image_url ?? null,
     modelUrl: path.model_url ?? null,
+    modelSpec: path.model_spec ?? null,
   });
   const pathways = delivery.pathways.map(toPath);
   const blend = { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason };
@@ -113,7 +117,6 @@ export function IndependentEngage() {
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [microphone, setMicrophone] = useState<"checking" | "ready" | "unavailable">("checking");
-  const [textBackup, setTextBackup] = useState(false);
   const [microphonePrompt, setMicrophonePrompt] = useState(false);
   const objectiveRef = useRef("");
   const categoryRef = useRef<typeof category>(null);
@@ -123,6 +126,7 @@ export function IndependentEngage() {
   const speechAllowedRef = useRef(true);
   const recognition = useRef<{ stop: () => void } | null>(null);
   const [loading, setLoading] = useState(false);
+  const runInFlight = useRef(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [internalKnowledge, setInternalKnowledge] = useState("");
@@ -159,7 +163,7 @@ export function IndependentEngage() {
     const getMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
     if (!getMedia) {
       setMicrophone("unavailable");
-      setTextBackup(true);
+      setVoiceError("Microphone access is unavailable in this browser.");
       return;
     }
     // Request permission at entry. Some browsers require a user gesture;
@@ -174,7 +178,7 @@ export function IndependentEngage() {
     }).catch(() => {
       if (closed) return;
       setMicrophone("unavailable");
-      setTextBackup(true);
+      setVoiceError("Microphone access is required for the Tree's voice interface.");
       setMicrophonePrompt(false);
     });
     return () => { closed = true; };
@@ -193,6 +197,16 @@ export function IndependentEngage() {
     const spoken = text.trim();
     const normalized = spoken.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!spoken) return;
+    // BUILD ON RESULT is a continuation: the next speech is the new objective,
+    // not a command for the prior design. Preserve its selected parent run.
+    if (continuation.current && categoryRef.current &&
+        normalized !== "stop" && normalized !== "stop listening") {
+      objectiveRef.current = spoken.slice(0, 4000);
+      setObjective(objectiveRef.current);
+      recognition.current?.stop();
+      engageRef.current();
+      return;
+    }
     // Keep spoken pathway and viewing commands available after ENGAGE.
     if (guideCommandRef.current(normalized)) return;
     // A Book category is a navigation choice, not a domain filter for objectives.
@@ -240,8 +254,7 @@ export function IndependentEngage() {
     };
     const Recognition = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
     if (!Recognition) {
-      setVoiceError("Speech recognition is unavailable in this browser. Use the text backup.");
-      setTextBackup(true);
+      setVoiceError("Speech recognition is unavailable in this browser. Use a browser that supports spoken input.");
       return;
     }
     stopVoice();
@@ -260,7 +273,6 @@ export function IndependentEngage() {
       setVoiceError("Speech recognition: " + event.error);
       listeningRef.current = false;
       setListening(false);
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") setTextBackup(true);
     };
     listener.onend = () => {
       listeningRef.current = false;
@@ -268,22 +280,21 @@ export function IndependentEngage() {
       recognition.current = null;
     };
     try { listener.start(); listeningRef.current = true; setListening(true); }
-    catch { setVoiceError("Microphone could not start. Use text backup."); setTextBackup(true); setListening(false); }
+    catch { setVoiceError("Microphone could not start."); setListening(false); }
   }
 
   async function requestMicrophone() {
     const getMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
-    if (!getMedia) { setTextBackup(true); return; }
+    if (!getMedia) { setVoiceError("Microphone access is unavailable in this browser."); return; }
     try {
       const stream = await getMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       setMicrophone("ready");
       setVoiceError("");
-      setTextBackup(false);
       listenForObjective(true);
     } catch {
       setMicrophone("unavailable");
-      setTextBackup(true);
+      setVoiceError("Microphone access is required for the Tree's voice interface.");
     }
   }
 
@@ -304,7 +315,8 @@ export function IndependentEngage() {
 
   async function engage() {
     const text = objectiveRef.current.trim();
-    if (!categoryRef.current || !text || loading) return;
+    if (!categoryRef.current || !text || runInFlight.current) return;
+    runInFlight.current = true;
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -375,6 +387,7 @@ export function IndependentEngage() {
           const run = state.request;
           if (!run) {
             setError("ENGAGE: the governed queue did not return this objective's status.");
+            terminal = true;
             return;
           }
           failures = 0;
@@ -421,7 +434,13 @@ export function IndependentEngage() {
         } finally {
           polling = false;
           if (terminal && governedWatch.current) clearInterval(governedWatch.current);
-          if (terminal) governedWatch.current = null;
+          if (terminal) {
+            governedWatch.current = null;
+            if (generation.current === token) {
+              runInFlight.current = false;
+              setLoading(false);
+            }
+          }
         }
       };
       await poll();
@@ -433,7 +452,12 @@ export function IndependentEngage() {
         setError("ENGAGE submission failed: " + message.slice(0, 350));
       }
     } finally {
-      if (generation.current === token) setLoading(false);
+      // A queued or running objective retains the ENGAGE lock until its
+      // original governed result is delivered or stops with an error.
+      if (generation.current === token && !governedWatch.current) {
+        runInFlight.current = false;
+        setLoading(false);
+      }
     }
   }
 
@@ -441,6 +465,7 @@ export function IndependentEngage() {
 
   function stop() {
     generation.current += 1;
+    runInFlight.current = false;
     abort.current?.abort();
     if (governedWatch.current) clearInterval(governedWatch.current);
     governedWatch.current = null;
@@ -456,6 +481,7 @@ export function IndependentEngage() {
         summary: path.summary,
         imageUrl: path.imageUrl,
         modelUrl: path.modelUrl,
+        modelSpec: path.modelSpec,
         parts: path.parts,
       }))
     : [];
@@ -538,6 +564,11 @@ export function IndependentEngage() {
       show(screen === "spiral" ? "book" : "spiral"); return true;
     }
     const selected = choice === 3 ? result.blend : result.pathways[choice];
+    if (screen && screen !== "spiral" &&
+        /^(?:build on result|build on this result|build on this design|continue this design)$/.test(spoken)) {
+      buildOnResult();
+      return true;
+    }
     if (screen && screen !== "spiral" && selected) {
       if (/^(?:explain|explain this|what is this|what does this do|tell me about this|how does this work)$/.test(spoken)) {
         offer(openLine(selected, choice === 3)); return true;
@@ -581,14 +612,6 @@ export function IndependentEngage() {
               {objective || (listening ? "Listening…" : "Your spoken objective will appear here.")}
             </p>
             {voiceError && <p role="alert" className="text-sm text-red-200">{voiceError}</p>}
-            {textBackup && <label className="w-full text-sm text-amber-100">Text backup
-              <textarea rows={2} value={objective} maxLength={4000}
-                className="mt-1 block w-full rounded border border-amber-300/50 bg-black/90 p-2 text-white"
-                placeholder="Enter your objective" onChange={event => {
-                  setObjective(event.target.value);
-                  objectiveRef.current = event.target.value;
-                }} />
-            </label>}
           </div>
         )}
         {microphonePrompt && microphone === "checking" && <p className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded bg-black/85 p-3 text-sm text-white" role="status">Allow microphone access to control ASCENSION by voice.</p>}

@@ -1,0 +1,66 @@
+name: Recover and verify original ASCENSION Fly worker
+
+# Re-start only the EXISTING owner worker attached to the existing state
+# volume if Fly stopped it. Never deploy an image, merge, replace a worker,
+# reset a volume, or create a service as part of this verification.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'fly.owner-queue.toml'
+      - 'src/routes/api/health.ts'
+      - 'src/routes/api/public/ascension/answer-readiness.ts'
+      - '.github/workflows/activate-owner-fly-volume-queue.yml'
+      - '.github/workflows/deploy-ascension-fly.yml'
+      - '.github/workflows/verify-ascension-fly-owner-live.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe-existing-fly-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: ascension-nexus-weave
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Recover only the stopped original-volume worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly authorization is unavailable to this PR runner"; exit 1; }
+          flyctl status --app "$FLY_APP"
+          flyctl volumes list --app "$FLY_APP"
+          volume_table="$(flyctl volumes list --app "$FLY_APP")"
+          owner_worker_id="$(awk -F '│' '$2 ~ /created/ && $3 ~ /ascension_state/ {
+            machine=$8; gsub(/[[:space:]]/, "", machine); print machine
+          }' <<< "$volume_table")"
+          # Match exactly one valid Fly machine ID. Refuse to guess on ambiguous mounts.
+          if ! [[ "$owner_worker_id" =~ ^[a-f0-9]{14}$ ]]; then
+            echo "::error::Cannot uniquely resolve the worker attached to ascension_state"
+            exit 1
+          fi
+          machine_status="$(flyctl machine status "$owner_worker_id" --app "$FLY_APP")"
+          state="$(awk '/^State:/ {sub(/^State:[[:space:]]*/, ""); gsub(/[[:space:]]/, ""); print}' <<< "$machine_status")"
+          if [ "$state" = stopped ]; then
+            echo "Starting the original-volume worker, preserving its existing state and image."
+            flyctl machine start "$owner_worker_id" --app "$FLY_APP"
+          elif [ "$state" != started ]; then
+            echo "::error::Owner worker is neither stopped nor running: $state"
+            exit 1
+          fi
+          echo "Owner worker: $owner_worker_id"
+      - name: Prove live website reaches original owner queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 8 --retry-delay 5 --max-time 25 \
+            "https://$FLY_APP.fly.dev/api/public/ascension/answer-readiness" -o /tmp/owner-readiness.json
+          jq -e '.owner_queue_transport_connected == true and
+                 (.owner_publication_revision_at_worker_start | type == "number" and . >= 1)' \
+            /tmp/owner-readiness.json ||
+            { echo "::error::Fly website cannot reach the original governed owner queue"; exit 1; }
+          echo "Original ASCENSION Fly owner transport reachable. End-to-end inference requires a separate real objective test."

@@ -398,7 +398,8 @@ export function IndependentEngage() {
       continuation.current = null;
       const requestId = submitted.request.id;
       const guestToken = submitted.guestToken;
-      activeRun.current = { requestId, guestToken };
+      // Do not bind a previously selected design to a new run before that
+      // run has delivered a verified replacement.
       setGovernedStatus("ASCENSION governed queue: " + submitted.request.status);
 
       // Show existing Knowledgeverse evidence when available; its failure never
@@ -440,6 +441,7 @@ export function IndependentEngage() {
             const payload = delivered?.status === "completed" ? delivered.response_payload : null;
             const actual = payload && delivered?.source === "governed" ? fromGovernedDelivery(payload) : null;
             if (actual) {
+              activeRun.current = { requestId, guestToken };
               setResult(actual);
               setScreen("spiral");
               setGovernedStatus("ASCENSION delivered three pathways and BLEND.");

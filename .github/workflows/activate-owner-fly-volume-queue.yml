@@ -144,6 +144,25 @@ jobs:
           echo "::error::ENGAGE website has not confirmed private worker connectivity."
           exit 1
 
+      - name: Prove real Tree submission, four pathways and inspection views
+        shell: bash
+        timeout-minutes: 12
+        env:
+          ASCENSION_V1_WEBSITE: https://ascension-nexus-weave.fly.dev/
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ascension-live-browser"
+          npm install --no-save --prefix "$RUNNER_TEMP/ascension-live-browser" playwright@1.56.1
+          "$RUNNER_TEMP/ascension-live-browser/node_modules/.bin/playwright" install chromium
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/ascension-live-browser/node_modules/playwright/index.mjs" \
+            node tests/ascension-live-engage.mjs
+      - name: Save actual ASCENSION browser-test image
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ascension-v1-live-browser-evidence
+          path: ascension-v1-live-engage.png
+          if-no-files-found: ignore
       - name: Publish non-secret deployment status to ASCENSION commit
         if: always()
         shell: bash

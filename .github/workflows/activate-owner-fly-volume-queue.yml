@@ -36,10 +36,12 @@ jobs:
           test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly authorization missing"; exit 1; }
           # Fly replaces machine IDs during deploys. Resolve the current
           # worker by the original, persistent ascension_state volume.
-          owner_worker_id="$(flyctl volumes list --app "$FLY_APP" |
-            awk -F '│' 'index($3,"ascension_state") && index($2,"created") {
-              machine=$8; gsub(/[[:space:]]/,"",machine); print machine
-            }')"
+          volume_table="$(flyctl volumes list --app "$FLY_APP")"
+          owner_worker_id="$(python3 -c 'import sys
+rows = [line.split("│") for line in sys.stdin if "│" in line]
+matches = [r[7].strip() for r in rows if len(r) > 7 and r[2].strip() == "ascension_state" and r[1].strip() == "created"]
+if len(matches) != 1: raise SystemExit("Original state volume must be uniquely identifiable")
+print(matches[0])' <<< "$volume_table")"
           # Match exactly one valid Fly machine ID. Refuse to guess on ambiguous mounts.
           if ! [[ "$owner_worker_id" =~ ^[a-f0-9]{14}$ ]]; then
             echo "::error::Cannot uniquely resolve the worker attached to ascension_state"
@@ -105,10 +107,12 @@ jobs:
           # Fly's rolling deploy can report a stopped machine as healthy.
           # Explicitly start the EXISTING owner machine before probing it.
           # Re-resolve after deploy: Fly may replace the worker machine.
-          owner_worker_id="$(flyctl volumes list --app "$FLY_APP" |
-            awk -F '│' 'index($3,"ascension_state") && index($2,"created") {
-              machine=$8; gsub(/[[:space:]]/,"",machine); print machine
-            }')"
+          volume_table="$(flyctl volumes list --app "$FLY_APP")"
+          owner_worker_id="$(python3 -c 'import sys
+rows = [line.split("│") for line in sys.stdin if "│" in line]
+matches = [r[7].strip() for r in rows if len(r) > 7 and r[2].strip() == "ascension_state" and r[1].strip() == "created"]
+if len(matches) != 1: raise SystemExit("Original state volume must be uniquely identifiable")
+print(matches[0])' <<< "$volume_table")"
           # Match exactly one valid Fly machine ID. Refuse to guess on ambiguous mounts.
           if ! [[ "$owner_worker_id" =~ ^[a-f0-9]{14}$ ]]; then
             echo "::error::Cannot uniquely resolve the worker attached to ascension_state"

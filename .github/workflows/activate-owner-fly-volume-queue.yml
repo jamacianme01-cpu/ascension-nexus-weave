@@ -83,6 +83,13 @@ jobs:
             "$RUNNER_TEMP/ascension-owner-overlay"
           docker push "$new_image"
           echo "new_image=$new_image" >> "$GITHUB_OUTPUT"
+      - name: Verify authored Python queue can validate the Fly TLS chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint /usr/bin/python3 \
+            "${{ steps.overlay.outputs.new_image }}" -c \
+            'import ssl, urllib.request; u="https://ascension-nexus-weave.fly.dev/api/public/ascension/answer-readiness"; data=urllib.request.urlopen(u, timeout=25).read(); assert data.startswith(b"{"), "ASCENSION readiness was not JSON"; print("ASCENSION_OWNER_CLOUD_WORKER_TLS_VERIFIED CA_roots="+ssl.get_default_verify_paths().cafile)'
       - name: Smoke-test existing V1 website executable before Fly replacement
         shell: bash
         run: |

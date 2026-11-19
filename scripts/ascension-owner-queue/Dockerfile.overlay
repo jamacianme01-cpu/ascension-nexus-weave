@@ -5,6 +5,11 @@ FROM ${ORIGINAL_OWNER_IMAGE}
 # The original private engine image is Python-based. The V1 site requires Bun.
 # Bundle the already-used Bun runtime rather than relying on a missing binary.
 COPY --from=oven/bun:1.4.5 /usr/local/bin/bun /usr/local/bin/bun
+# Original private Python image was missing public CA roots: the authored queue
+# worker rejected Fly TLS with CERTIFICATE_VERIFY_FAILED and never claimed jobs.
+# Restore ordinary certificate validation without disabling TLS checks.
+COPY --from=oven/bun:1.4.5 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY .output/ /app/.output/
 COPY ascension-volume-transport.py /app/ascension-volume-transport.py
@@ -16,6 +21,7 @@ RUN test -f /app/ASCENSION_CORE/cloud_queue_worker.py \
     && test -f /app/clarity/core_runtime.py \
     && test -f /app/.output/server/index.mjs \
     && test -x /usr/local/bin/bun \
+    && test -s /etc/ssl/certs/ca-certificates.crt \
     && /usr/bin/python3 -m py_compile /app/ascension-volume-transport.py /app/ascension-private-supervisor.py \
     && chmod 0755 /app/ascension-start.sh
 ENV PYTHONPATH=/app

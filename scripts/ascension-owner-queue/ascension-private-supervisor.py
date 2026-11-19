@@ -81,6 +81,7 @@ try:
     worker = start_original_worker()
     workers.append(worker)
     restarts = 0
+    heartbeat_at = time.monotonic()
     status('running', worker_pid=worker.pid, restarts=restarts)
     while not stopping:
         if transport.poll() is not None:
@@ -88,6 +89,9 @@ try:
             status('transport_failed', exit_code=transport.returncode)
             shutdown()
             break
+        if worker.poll() is None and time.monotonic() - heartbeat_at >= 10:
+            status('running', worker_pid=worker.pid, restarts=restarts)
+            heartbeat_at = time.monotonic()
         if worker.poll() is not None:
             code = worker.returncode
             print('ASCENSION_ORIGINAL_CORE_WORKER_EXITED exit_code=' + str(code), flush=True)
@@ -110,6 +114,7 @@ try:
             worker = start_original_worker()
             workers.append(worker)
             status('running', worker_pid=worker.pid, restarts=restarts)
+            heartbeat_at = time.monotonic()
             print('ASCENSION_ORIGINAL_CORE_WORKER_RESTARTED count=' + str(restarts), flush=True)
         time.sleep(1)
 finally:

@@ -1,6 +1,7 @@
 import { useEffect, type CSSProperties } from "react";
 import "./designed-flow.css";
 import { V1DesignViewport } from "./v1-design-viewport";
+import type { ObjectiveModelSpec } from "@/lib/ascension/result-model";
 
 /** Screens taken from the designed flow, unchanged. */
 export type DesignedScreen = "spiral" | "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
@@ -24,6 +25,7 @@ export type PathwayReading = {
   blend?: boolean;
   imageUrl?: string | null;
   modelUrl?: string | null;
+  modelSpec?: ObjectiveModelSpec | null;
   parts?: { name: string; purpose: string; location: string }[];
 };
 
@@ -195,7 +197,7 @@ export function DesignedFlow({
             <div className="v1-design-title"><h2>{chosen.title}</h2><button type="button" onClick={onBuildOnResult}>BUILD ON RESULT</button></div>
             <div className="designed-live-content">
               <div className="designed-live-artwork">
-                <V1DesignViewport modelUrl={chosen.modelUrl ?? null} imageUrl={selectedPicture} mode={screen} />
+                <V1DesignViewport modelUrl={chosen.modelUrl ?? null} modelSpec={chosen.modelSpec ?? null} imageUrl={selectedPicture} mode={screen} />
                 <p className="designed-live-summary">{chosen.summary}</p>
               </div>
               <aside className="designed-live-parts" aria-label="Delivered components">

@@ -196,7 +196,7 @@ export function DesignedFlow({
             <div className="designed-live-content">
               <div className="designed-live-artwork">
                 <V1DesignViewport modelUrl={chosen.modelUrl ?? null} imageUrl={selectedPicture} mode={screen} />
-                <p className="designed-live-summary">{chosen.summary}</p>}
+                <p className="designed-live-summary">{chosen.summary}</p>
               </div>
               <aside className="designed-live-parts" aria-label="Delivered components">
                 <h3>Components</h3>

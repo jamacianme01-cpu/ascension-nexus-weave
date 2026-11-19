@@ -25,7 +25,6 @@ jobs:
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       FLY_APP: ascension-nexus-weave
-      OWNER_WORKER_ID: 7813e23b336938
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -35,7 +34,14 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly authorization missing"; exit 1; }
-          flyctl machine status "$OWNER_WORKER_ID" --app "$FLY_APP"
+          # Fly replaces machine IDs during deploys. Resolve the current
+          # worker by the original, persistent ascension_state volume.
+          owner_worker_id="$(flyctl volumes list --app "$FLY_APP" --json |
+            jq -er '[.[] | select(.name == "ascension_state" and
+              .state == "created" and (.attached_machine_id // "") != "")] |
+              if length == 1 then .[0].attached_machine_id
+              else error("Original owner volume must have exactly one attached machine") end')"
+          flyctl machine status "$owner_worker_id" --app "$FLY_APP"
           flyctl volumes list --app "$FLY_APP"
           python3 -m py_compile scripts/ascension-owner-queue/*.py
           sh -n scripts/ascension-owner-queue/ascension-start.sh
@@ -94,13 +100,19 @@ jobs:
           set -euo pipefail
           # Fly's rolling deploy can report a stopped machine as healthy.
           # Explicitly start the EXISTING owner machine before probing it.
-          machine_state="$(flyctl machine status "$OWNER_WORKER_ID" --app "$FLY_APP" --json)"
+          # Re-resolve after deploy: Fly may replace the worker machine.
+          owner_worker_id="$(flyctl volumes list --app "$FLY_APP" --json |
+            jq -er '[.[] | select(.name == "ascension_state" and
+              .state == "created" and (.attached_machine_id // "") != "")] |
+              if length == 1 then .[0].attached_machine_id
+              else error("Original owner volume must have exactly one attached machine") end')"
+          machine_state="$(flyctl machine status "$owner_worker_id" --app "$FLY_APP" --json)"
           if ! printf '%s' "$machine_state" | jq -e '(.state // .State) == "started"' >/dev/null; then
-            flyctl machine start "$OWNER_WORKER_ID" --app "$FLY_APP"
+            flyctl machine start "$owner_worker_id" --app "$FLY_APP"
           fi
-          flyctl ssh console --app "$FLY_APP" --machine "$OWNER_WORKER_ID" \
+          flyctl ssh console --app "$FLY_APP" --machine "$owner_worker_id" \
             --command 'python3 /app/verify_state.py /data/ascension/state/live'
-          flyctl ssh console --app "$FLY_APP" --machine "$OWNER_WORKER_ID" \
+          flyctl ssh console --app "$FLY_APP" --machine "$owner_worker_id" \
             --command 'python3 /app/probe-ascension-private.py'
           for attempt in $(seq 1 10); do
             response="$(curl --fail --show-error --silent --max-time 20 \

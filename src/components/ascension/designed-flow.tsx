@@ -193,6 +193,12 @@ export function DesignedFlow({
         {screen !== "spiral" && chosen && (
           <section className="designed-live-panel" aria-label="Selected ASCENSION pathway">
             <div className="v1-design-title"><h2>{chosen.title}</h2><button type="button" onClick={onBuildOnResult}>BUILD ON RESULT</button></div>
+            <nav aria-label="Design inspection views" className="v1-inspection-views">
+              {(["assembled", "blueprint", "dissect", "exploded", "imploded"] as const).map(view => (
+                <button key={view} type="button" aria-current={screen === view ? "page" : undefined}
+                  onClick={() => onScreen(view)}>{view === "assembled" ? "Assembled" : view === "blueprint" ? "Blueprint" : view === "dissect" ? "Dissect" : view === "exploded" ? "Exploded" : "Imploded"}</button>
+              ))}
+            </nav>
             <div className="designed-live-content">
               <div className="designed-live-artwork">
                 <V1DesignViewport modelUrl={chosen.modelUrl ?? null} imageUrl={selectedPicture} mode={screen} />

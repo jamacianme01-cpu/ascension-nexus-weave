@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import "./designed-flow.css";
 import { V1DesignViewport } from "./v1-design-viewport";
 import type { ObjectiveModelSpec } from "@/lib/ascension/result-model";
@@ -160,6 +160,8 @@ export function DesignedFlow({
   onExplainPart: (part: { name: string; purpose: string; location: string }) => void;
   onBuildOnResult: () => void;
 }) {
+  const [openedPart, setOpenedPart] = useState<number | null>(null);
+  useEffect(() => { setOpenedPart(null); }, [selectedIndex]);
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -216,9 +218,13 @@ export function DesignedFlow({
                 <h3>Components</h3>
                 {chosen.parts?.length
                   ? <ul>{chosen.parts.map((part, index) => <li key={`${part.name}-${index}`}>
-                    <button type="button" className="v1-part-name" onClick={() => onExplainPart(part)}>{part.name}</button>
-                    {part.purpose && <p><strong>Does:</strong> {part.purpose}</p>}
-                    {part.location && <p><strong>Where:</strong> {part.location}</p>}
+                    <button type="button" className="v1-part-name" aria-expanded={openedPart === index}
+                      onClick={() => { setOpenedPart(openedPart === index ? null : index); onExplainPart(part); }}>{part.name}</button>
+                    {openedPart === index && <div className="v1-part-detail">
+                      <p><strong>What:</strong> {part.name}</p>
+                      <p><strong>Where:</strong> {part.location || "Not specified in this pathway."}</p>
+                      <p><strong>Does:</strong> {part.purpose || "Not specified in this pathway."}</p>
+                    </div>}
                   </li>)}</ul>
                   : <p>No component descriptions were delivered for this pathway.</p>}
               </aside>

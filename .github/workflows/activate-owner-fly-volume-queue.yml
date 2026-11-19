@@ -93,8 +93,10 @@ jobs:
           set -euo pipefail
           # Fly's rolling deploy can report a stopped machine as healthy.
           # Explicitly start the EXISTING owner machine before probing it.
-          machine_state="$(flyctl machine status "$OWNER_WORKER_ID" --app "$FLY_APP" --json)"
-          if ! printf '%s' "$machine_state" | jq -e '(.state // .State) == "started"' >/dev/null; then
+          # flyctl machine status has no --json flag on the installed CLI.
+          # Read its standard status output, then start only if not running.
+          machine_state="$(flyctl machine status "$OWNER_WORKER_ID" --app "$FLY_APP")"
+          if ! printf '%s\n' "$machine_state" | grep -Eiq '(^|[[:space:]])State:[[:space:]]*started([[:space:]]|$)'; then
             flyctl machine start "$OWNER_WORKER_ID" --app "$FLY_APP"
           fi
           flyctl ssh console --app "$FLY_APP" --machine "$OWNER_WORKER_ID" \

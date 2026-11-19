@@ -100,6 +100,38 @@ jobs:
                       break
           print('ASCENSION_PRIVATE_CAPABILITY_SITES_FOUND', count, flush=True)
           PY
+      - name: Audit owner's original physical-design capability routing before any deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ steps.image.outputs.original_base }}"
+          docker run --rm -i --entrypoint /usr/bin/python3 "$base" - <<'PY'
+          import importlib.util
+          import json
+          from ASCENSION_CORE import capabilities
+          objective = "I want to make Worker drones for people with dementia."
+          contract = capabilities.requested_output_contract(objective, "")
+          selected = capabilities.select_capability(objective, [])
+          registry = capabilities.REGISTRY
+          offers = capabilities.advertise_all()
+          match = [item for item in offers if isinstance(item, dict) and
+                   (item.get("capability_id") == contract or
+                    item.get("output_contract") == contract)]
+          # No source, objectives from other users, credentials or engine outputs
+          # are sent to public CI logs.
+          print("ASCENSION_PHYSICAL_ROUTE_AUDIT " + json.dumps({
+              "requested_contract": str(contract)[:100],
+              "selected_capability": str(selected)[:100],
+              "registry_contains_contract": contract in registry,
+              "registry_contains_selected": selected in registry,
+              "contract_advertised": bool(match),
+              "contract_available": any(item.get("available") is True for item in match),
+              "construction_module_in_image":
+                  importlib.util.find_spec("clarity.autosync.construction_engine") is not None,
+          }, sort_keys=True), flush=True)
+          if isinstance(selected, str) and selected.startswith("unavailable:"):
+              raise SystemExit("ASCENSION_AUTHORED_PHYSICAL_EXECUTOR_MISSING: do not deploy an image claiming V1 success")
+          PY
       - name: Build and publish owner-only Fly image overlay
         id: overlay
         shell: bash

@@ -1,0 +1,48 @@
+name: Verify live ASCENSION Fly owner runtime
+
+# An observation-only PR gate: no deployment, state writes, merges, or
+# modifications to the owner's original private engine/volume.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'fly.owner-queue.toml'
+      - 'src/routes/api/health.ts'
+      - 'src/routes/api/public/ascension/answer-readiness.ts'
+      - '.github/workflows/activate-owner-fly-volume-queue.yml'
+      - '.github/workflows/deploy-ascension-fly.yml'
+      - '.github/workflows/verify-ascension-fly-owner-live.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe-existing-fly-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: ascension-nexus-weave
+      OWNER_WORKER_ID: 7813e23b336938
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Read existing Fly process and mounted worker state
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FLY_API_TOKEN" || { echo "::error::Original Fly authorization is unavailable to this PR runner"; exit 1; }
+          flyctl status --app "$FLY_APP"
+          flyctl machine status "$OWNER_WORKER_ID" --app "$FLY_APP"
+          flyctl volumes list --app "$FLY_APP"
+      - name: Prove live website reaches original owner queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 4 --max-time 25 \
+            "https://$FLY_APP.fly.dev/api/public/ascension/answer-readiness" -o /tmp/owner-readiness.json
+          jq -e '.owner_queue_transport_connected == true and
+                 (.owner_publication_revision_at_worker_start | type == "number" and . >= 1)' \
+            /tmp/owner-readiness.json ||
+            { echo "::error::Fly website cannot reach the original governed owner queue"; exit 1; }
+          echo "Original ASCENSION Fly owner transport reachable. End-to-end inference requires a separate real objective test."

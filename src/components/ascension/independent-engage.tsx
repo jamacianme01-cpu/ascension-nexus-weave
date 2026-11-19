@@ -196,6 +196,16 @@ export function IndependentEngage() {
     const spoken = text.trim();
     const normalized = spoken.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!spoken) return;
+    // BUILD ON RESULT is a continuation: the next speech is the new objective,
+    // not a command for the prior design. Preserve its selected parent run.
+    if (continuation.current && categoryRef.current &&
+        normalized !== "stop" && normalized !== "stop listening") {
+      objectiveRef.current = spoken.slice(0, 4000);
+      setObjective(objectiveRef.current);
+      recognition.current?.stop();
+      engageRef.current();
+      return;
+    }
     // Keep spoken pathway and viewing commands available after ENGAGE.
     if (guideCommandRef.current(normalized)) return;
     // A Book category is a navigation choice, not a domain filter for objectives.
@@ -542,6 +552,11 @@ export function IndependentEngage() {
       show(screen === "spiral" ? "book" : "spiral"); return true;
     }
     const selected = choice === 3 ? result.blend : result.pathways[choice];
+    if (screen && screen !== "spiral" &&
+        /^(?:build on result|build on this result|build on this design|continue this design)$/.test(spoken)) {
+      buildOnResult();
+      return true;
+    }
     if (screen && screen !== "spiral" && selected) {
       if (/^(?:explain|explain this|what is this|what does this do|tell me about this|how does this work)$/.test(spoken)) {
         offer(openLine(selected, choice === 3)); return true;

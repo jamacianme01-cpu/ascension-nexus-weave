@@ -8,7 +8,7 @@ primary_region = 'ams'
   HOST = '0.0.0.0'
   NITRO_HOST = '0.0.0.0'
   ASCENSION_LIVE_ROOT = '/data/ascension/state/live'
-  ASCENSION_QUEUE_URL = 'https://ascension-nexus-weave.fly.dev/api/public/ascension/execution-queue'
+  ASCENSION_QUEUE_URL = 'http://localhost:9091/api/public/ascension/execution-queue'
   ASCENSION_VOLUME_TRANSPORT_URL = 'http://worker.process.ascension-nexus-weave.internal:9091'
   ASCENSION_STATE_BOOTSTRAP = '0'
 

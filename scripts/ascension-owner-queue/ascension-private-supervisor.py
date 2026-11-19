@@ -29,7 +29,7 @@ try:
         '/usr/bin/python3', '-u', '-m', 'ASCENSION_CORE.cloud_queue_worker',
         '--root', root,
         '--queue-url', os.environ.get('ASCENSION_QUEUE_URL',
-            'https://ascension-nexus-weave.fly.dev/api/public/ascension/execution-queue'),
+            'http://localhost:9091/api/public/ascension/execution-queue'),
         '--runner', os.environ.get('ASCENSION_QUEUE_RUNNER', 'fly-ascension-core'),
     ]))
     while not stopping:

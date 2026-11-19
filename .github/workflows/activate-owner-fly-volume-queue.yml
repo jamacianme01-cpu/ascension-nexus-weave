@@ -40,6 +40,7 @@ jobs:
           flyctl volumes list --app "$FLY_APP"
           python3 -m py_compile scripts/ascension-owner-queue/*.py
           python3 -m unittest discover -s tests -p test_ascension_private_supervisor.py -v
+          python3 -m unittest discover -s tests -p test_ascension_volume_transport_alias.py -v
           sh -n scripts/ascension-owner-queue/ascension-start.sh
           echo "No external database or hosted AI provider configured or changed."
       - name: Build existing ASCENSION web source

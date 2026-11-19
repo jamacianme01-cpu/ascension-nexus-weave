@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Apply COMPLETE physical_design capability registration to a local ASCENSION core tree.
-# Refuses to run unless the full capabilities.py is present.
 set -euo pipefail
 ROOT="${1:-}"
 if [[ -z "$ROOT" ]]; then
@@ -8,19 +6,25 @@ if [[ -z "$ROOT" ]]; then
   exit 2
 fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SRC="$SCRIPT_DIR/ASCENSION_CORE/capabilities.py"
-if [[ ! -f "$SRC" ]]; then
-  echo "REFUSING: complete capabilities.py missing at $SRC" >&2
-  echo "Do not apply partial part1/part2/b64 fragments." >&2
+CORE="$SCRIPT_DIR/ASCENSION_CORE"
+if [[ -f "$CORE/capabilities.py" ]]; then
+  SRC="$CORE/capabilities.py"
+elif [[ -f "$CORE/capabilities.complete.part1.txt" && -f "$CORE/capabilities.complete.part2.txt" && -f "$CORE/capabilities.complete.part3.txt" ]]; then
+  SRC="$CORE/capabilities.py.assembled"
+  cat "$CORE/capabilities.complete.part1.txt" "$CORE/capabilities.complete.part2.txt" "$CORE/capabilities.complete.part3.txt" > "$SRC"
+elif [[ -f "$CORE/capabilities.py.b64" ]]; then
+  SRC="$CORE/capabilities.py.assembled"
+  base64 -d < "$CORE/capabilities.py.b64" > "$SRC" 2>/dev/null || base64 --decode "$CORE/capabilities.py.b64" > "$SRC"
+else
+  echo "REFUSING: complete capabilities.py missing" >&2
   exit 1
 fi
-# Require PhysicalDesignCapability marker so partial files cannot pass
 if ! grep -q 'class PhysicalDesignCapability' "$SRC"; then
-  echo "REFUSING: $SRC does not contain PhysicalDesignCapability" >&2
+  echo "REFUSING: assembled file missing PhysicalDesignCapability" >&2
   exit 1
 fi
 if ! grep -q 'PhysicalDesignCapability()' "$SRC"; then
-  echo "REFUSING: $SRC does not register PhysicalDesignCapability in REGISTRY" >&2
+  echo "REFUSING: assembled file missing REGISTRY registration" >&2
   exit 1
 fi
 if [[ -d "$ROOT/ASCENSION_CORE" ]]; then

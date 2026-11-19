@@ -161,6 +161,18 @@ jobs:
           ASCENSION_CHROME_BIN="$browser" \
           PLAYWRIGHT_MODULE="$RUNNER_TEMP/ascension-live-browser/node_modules/playwright/index.mjs" \
             node tests/ascension-live-engage.mjs
+      - name: Read Fly worker diagnostics after failed validation
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          machines="$(flyctl machines list --app "$FLY_APP" --json)"
+          worker_id="$(printf '%s' "$machines" | jq -r '[.[] | select(.config.metadata.fly_process_group == "worker") | .id][0] // empty')"
+          if [ -n "$worker_id" ]; then
+            flyctl machine status "$worker_id" --app "$FLY_APP"
+          fi
+          timeout 12s flyctl logs --app "$FLY_APP" --no-tail 2>&1 |
+            grep -E 'ASCENSION_|cloud_queue|Traceback|Exception|[Ee]rror|exit' | tail -n 80 || true
       - name: Save actual ASCENSION browser-test image
         if: always()
         uses: actions/upload-artifact@v4

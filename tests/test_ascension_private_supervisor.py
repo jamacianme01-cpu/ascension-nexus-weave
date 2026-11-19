@@ -29,9 +29,14 @@ class FakeChild:
     def kill(self):
         self.returncode = -9
 
+class FakeHealth:
+    status = 200
+    def __enter__(self): return self
+    def __exit__(self, *_): return False
+
 class SupervisorExitTests(unittest.TestCase):
     def execute(self, first_exit, graceful=False):
-        children = [FakeChild(first_exit), FakeChild(None)]
+        children = [FakeChild(None), FakeChild(first_exit)]
         signal_handlers = {}
 
         def capture_signal(signum, handler):
@@ -47,6 +52,7 @@ class SupervisorExitTests(unittest.TestCase):
              patch("subprocess.Popen", side_effect=children), \
              patch("signal.signal", side_effect=capture_signal), \
              patch("time.sleep", side_effect=fake_sleep), \
+             patch("urllib.request.urlopen", return_value=FakeHealth()), \
              contextlib.redirect_stdout(output):
             try:
                 runpy.run_path(str(SUPERVISOR), run_name="__main__")
@@ -57,13 +63,13 @@ class SupervisorExitTests(unittest.TestCase):
     def test_unexpected_clean_exit_is_a_worker_failure(self):
         code, children, output = self.execute(0)
         self.assertEqual(code, 1)
-        self.assertTrue(children[1].terminated)
+        self.assertTrue(children[0].terminated)
         self.assertIn("ASCENSION_PRIVATE_PROCESS_STOPPED exit_code=0", output)
 
     def test_unexpected_crash_is_a_worker_failure(self):
         code, children, output = self.execute(17)
         self.assertEqual(code, 1)
-        self.assertTrue(children[1].terminated)
+        self.assertTrue(children[0].terminated)
         self.assertIn("exit_code=17", output)
 
     def test_sigterm_is_clean_shutdown(self):

@@ -10,14 +10,22 @@ export const Route = createFileRoute("/api/public/ascension/answer-readiness")({
         const database = await databaseConnectivity();
         let ownerQueueConnected = false;
         let ownerPublicationRevision: number | null = null;
+        let originalWorkerRunning = false;
+        let originalWorkerState: string | null = null;
         if (ownerVolumeTransportEnabled()) {
           try {
             const snapshot = await callOwnerVolumeTransport<{
               status: string;
               original_publication_revision_at_start: number;
+              original_worker_running?: boolean;
+              original_worker_state?: string;
             }>("/health", "GET");
             ownerQueueConnected = snapshot.status === "LIVE_GOVERNED_TRANSPORT";
-            if (ownerQueueConnected) ownerPublicationRevision = snapshot.original_publication_revision_at_start;
+            if (ownerQueueConnected) {
+              ownerPublicationRevision = snapshot.original_publication_revision_at_start;
+              originalWorkerRunning = snapshot.original_worker_running === true;
+              originalWorkerState = snapshot.original_worker_state ?? null;
+            }
           } catch { /* A missing worker stays unavailable, never reported as healthy. */ }
         }
         return new Response(JSON.stringify({
@@ -28,6 +36,8 @@ export const Route = createFileRoute("/api/public/ascension/answer-readiness")({
           database_connected: database.connected,
           database_status: ownerVolumeTransportEnabled() ? "OWNER_VOLUME_TRANSPORT_SELECTED" : database.reason,
           owner_queue_transport_connected: ownerQueueConnected,
+          original_worker_running: originalWorkerRunning,
+          original_worker_state: originalWorkerState,
           owner_publication_revision_at_worker_start: ownerPublicationRevision,
           live_inference_tested: false,
           note: ownerQueueConnected

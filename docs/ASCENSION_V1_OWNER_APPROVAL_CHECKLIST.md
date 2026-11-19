@@ -4,8 +4,8 @@ This is my standard for how the app should start and work all together. Start at
 
 1. [x] Original Tree and Book together. **Approved:** I said I see the original Tree and Book all together.
 2. [ ] No typing. Talk to the Tree. The Tree is interactive and stays the spoken guide.
-3. [ ] After I speak the objective, exactly four pathways appear: ChatGPT, Grok, Claude, and BLEND.
-4. [ ] My engines take their answers and make their own answer.
+3. [ ] After I speak my objective, ASCENSION's own engines analyze it and generate exactly four pathways, including BLEND.
+4. [ ] ASCENSION's own engines create their own answers independently.
 5. [ ] The selected pathway opens its own design picture, and the Tree explains it by voice.
 6. [ ] Grab, rotate, and zoom the selected design.
 7. [ ] Blueprint with real dimensions and measurements.

@@ -5,6 +5,7 @@ import { TreeStudio } from "@/components/ascension/tree-studio";
 import "./living-tree-scene.css";
 import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
 import { governedPersisted, type ObjectiveDelivery } from "@/lib/ascension/result-model";
+import { awaitTreeWomanVoice } from "@/lib/ascension/tree-woman-voice";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; blueprintUrl: string | null; modelUrl: string | null; blend_reason?: string };
@@ -35,17 +36,32 @@ let activeUtterance: SpeechSynthesisUtterance | null = null;
 function signalSpeaking(active: boolean) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ascension-tree-speech", { detail: { speaking: active } }));
 }
-function say(text: string, onFinished?: () => void) {
+async function say(text: string, onFinished?: () => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
   const synth = window.speechSynthesis;
   try { synth.cancel(); } catch { return; }
+
+  // speechSynthesis.getVoices() is often EMPTY on the first call, especially
+  // in Windows Chrome. Waiting for voiceschanged avoids the male default.
+  const woman = await awaitTreeWomanVoice(synth);
+  if (sequence !== speechSequence) return;
+  if (!woman) {
+    signalSpeaking(false);
+    window.dispatchEvent(new CustomEvent("ascension-tree-voice-error", {
+      detail: { message: "A woman's voice is not available in this browser yet. ASCENSION will not use a male default. Install or enable an English woman voice, then choose HEAR TREE." },
+    }));
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent("ascension-tree-voice-selected", {
+    detail: { voice: woman.name },
+  }));
   const chunks: string[] = [];
   let chunk = "";
-  for (const word of text.trim().split(/\s+/)) {
+  for (const word of text.trim().split(/\\s+/)) {
     if (chunk && chunk.length + word.length + 1 > 220) {
-      chunks.push(chunk);
-      chunk = word;
+      chunks.push(chunk); chunk = word;
     } else {
       chunk += (chunk ? " " : "") + word;
     }
@@ -63,17 +79,28 @@ function say(text: string, onFinished?: () => void) {
     }
     const words = new SpeechSynthesisUtterance(chunks[index++]!);
     activeUtterance = words;
-    words.rate = 0.96;
-    words.pitch = 1.04;
-    // Select a natural-sounding woman voice when the browser provides one.
-    // Never promise a voice that the user's device has not installed.
-    const available = (synth.getVoices?.() ?? []).filter(v => v.lang.toLowerCase().startsWith("en"));
-    words.voice = available.find(v => /samantha|jenny|aria|zira|serena|victoria|susan|kate|ava|female/i.test(v.name)) ?? null;
+    words.voice = woman;
+    words.lang = woman.lang;
+    words.rate = /neural|natural|online/i.test(woman.name) ? 1.0 : 0.94;
+    words.pitch = 1.0;
     words.onstart = () => signalSpeaking(true);
     words.onboundary = () => window.dispatchEvent(new Event("ascension-tree-syllable"));
     words.onend = next;
-    words.onerror = next;
-    try { synth.speak(words); } catch { activeUtterance = null; }
+    words.onerror = () => {
+      if (sequence !== speechSequence) return;
+      activeUtterance = null;
+      signalSpeaking(false);
+      window.dispatchEvent(new CustomEvent("ascension-tree-voice-error", {
+        detail: { message: "The selected woman voice could not play. Choose HEAR TREE to try again." },
+      }));
+    };
+    try { synth.speak(words); } catch {
+      activeUtterance = null;
+      signalSpeaking(false);
+      window.dispatchEvent(new CustomEvent("ascension-tree-voice-error", {
+        detail: { message: "The selected woman voice could not play." },
+      }));
+    }
   };
   next();
 }
@@ -164,6 +191,7 @@ export function IndependentEngage() {
   const [zoomRequest, setZoomRequest] = useState(0);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [selectedVoice, setSelectedVoice] = useState("");
   const [microphone, setMicrophone] = useState<"checking" | "ready" | "unavailable">("checking");
   const [textBackup, setTextBackup] = useState(false);
   const [microphonePrompt, setMicrophonePrompt] = useState(false);
@@ -193,6 +221,23 @@ export function IndependentEngage() {
   const activeRun = useRef<{ requestId: string; guestToken: string } | null>(null);
   const continuation = useRef<{ requestId: string; guestToken: string; selected: Pathway; blend: boolean } | null>(null);
 
+  useEffect(() => {
+    const error = (event: Event) => setVoiceError(
+      (event as CustomEvent<{ message: string }>).detail.message,
+    );
+    const chosen = (event: Event) => {
+      setVoiceError("");
+      setSelectedVoice((event as CustomEvent<{ voice: string }>).detail.voice);
+    };
+    window.addEventListener("ascension-tree-voice-error", error);
+    window.addEventListener("ascension-tree-voice-selected", chosen);
+    // Warm the browser's asynchronous voice registry at mount.
+    window.speechSynthesis?.getVoices?.();
+    return () => {
+      window.removeEventListener("ascension-tree-voice-error", error);
+      window.removeEventListener("ascension-tree-voice-selected", chosen);
+    };
+  }, []);
   useEffect(() => {
     categoryRef.current = category;
   }, [category]);
@@ -776,6 +821,7 @@ export function IndependentEngage() {
             {internalKnowledge}
           </section>}
           {voiceError && <p className="living-tree-voice-error" role="alert">{voiceError}</p>}
+          {selectedVoice && <span className="sr-only" aria-live="polite">Tree voice: {selectedVoice}</span>}
           {microphonePrompt && microphone === "checking" && <p className="living-tree-voice-error" role="status">Allow microphone access to speak with the Tree.</p>}
           {microphone === "unavailable" && <button type="button" className="living-tree-enable-mic" onClick={() => void requestMicrophone()}>Enable microphone</button>}
           <button type="button" className="living-tree-mute" aria-pressed={!talking} onClick={toggleTalking}>

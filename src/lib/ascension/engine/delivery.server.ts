@@ -866,6 +866,20 @@ export async function resolveDelivery(args: {
     ...extra,
   });
 
+  // The ORIGINAL runtime's actual completed result is the authority.
+  // It takes priority over earlier external drafts and version-card metadata.
+  // An explicit owner-supplied objective-fit review is handled below; a
+  // website-side LLM may not silently hold back real published work.
+  if (run.status === "verified" && !args.review) {
+    const actualFiles = artifactStage?.status === "completed"
+      ? artifactFiles(artifactStage.response_payload) : [];
+    const original = governedDelivery(run, actualFiles);
+    if (original && original.kind !== "not_produced") {
+      return { ...base, status: "completed", response_payload: original,
+        note: null, source: "governed" };
+    }
+  }
+
   // Version production is independent of external answer providers.
   // When genuine generated output files arrive after a failed/old draft,
   // they take precedence. Four slots are required, but incomplete slots do

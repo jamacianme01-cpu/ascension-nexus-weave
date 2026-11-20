@@ -23,6 +23,8 @@ assert.match(book,/TreeStudio/);
 assert.match(book,/living-pathway-options/);
 assert.match(book,/ENTER PATHWAY/);
 assert.match(book,/showingPathways/);
+assert.match(book,/setScreen\("spiral"\)/);
+assert.match(book,/onBack=\{result\?\.pathways\.length === 3/);
 assert.match(book,/selected: active, blend: active.id === result.blend.id/);
 assert.match(book,/governedPersisted\(run\)/);
 assert.match(book,/continuation\.current/);

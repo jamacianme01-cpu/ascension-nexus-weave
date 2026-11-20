@@ -104,8 +104,7 @@ function cardLine(text: string): string {
 function guideFor(result: Result): string {
   const intro = result.introduction.replace(/\b(ChatGPT|OpenAI|Claude|Grok)\b/gi, "").replace(/\s+/g, " ").trim();
   if (intro.length > 40 && intro.length < 320) return intro;
-  const [first, second, third] = result.pathways;
-  return `Three readings came back: ${first?.title}, ${second?.title}, and ${third?.title}. The fourth is a blend, ${result.blend.title}. Any of them can be opened if a closer look would help.`;
+  return `The governed result is ready. I can show the design, explain its components, or help you change it.`;
 }
 
 function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {

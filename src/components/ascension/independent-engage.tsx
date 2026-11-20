@@ -730,6 +730,10 @@ export function IndependentEngage() {
       const index = number ?? named;
       if (index !== undefined && index >= 0 && index < 4) { openPathway(index); return true; }
     }
+    if (screen === "spiral") {
+      offer("Choose one of the four pathways first. Then I can show its parts and views.");
+      return true;
+    }
     if (/^(?:rotate|turn) (?:left|right)$/.test(spoken)) {
       if (!active.modelUrl) {
         offer("I need the actual 3D model before I can rotate this design in space.");

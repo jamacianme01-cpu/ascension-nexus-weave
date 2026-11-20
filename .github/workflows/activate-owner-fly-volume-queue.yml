@@ -218,10 +218,10 @@ jobs:
           test -n "$mount_volume" || { echo "::error::Original worker volume was not identified."; exit 1; }
           flyctl machine update "$worker_id" --app "$FLY_APP" --config fly.owner-queue.toml \
             --entrypoint "/app/ascension-start.sh" --command "worker" \
-            --image "${{ steps.overlay.outputs.new_image }}" --yes
+            --restart always --image "${{ steps.overlay.outputs.new_image }}" --yes
           refreshed="$(flyctl machines list --app "$FLY_APP" --json)"
           printf '%s' "$refreshed" | jq -e --arg id "$worker_id" --arg volume "$mount_volume" \
-            'any(.[]; .id == $id and .config.init.entrypoint == ["/app/ascension-start.sh"] and .config.init.cmd == ["worker"] and any(.config.mounts[]?; .volume == $volume))'
+            'any(.[]; .id == $id and .config.init.entrypoint == ["/app/ascension-start.sh"] and .config.init.cmd == ["worker"] and .config.restart.policy == "always" and any(.config.mounts[]?; .volume == $volume))'
           echo "ASCENSION_ORIGINAL_OWNER_WORKER_ENTRYPOINT_RESTORED_WITH_VOLUME"
       - name: Validate ORIGINAL governed publication and private transport
         shell: bash

@@ -160,6 +160,8 @@ export function IndependentEngage() {
   const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
   const [verifiedRevision, setVerifiedRevision] = useState<number | null>(null);
+  const [rotationRequest, setRotationRequest] = useState(0);
+  const [zoomRequest, setZoomRequest] = useState(0);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [microphone, setMicrophone] = useState<"checking" | "ready" | "unavailable">("checking");
@@ -694,6 +696,18 @@ export function IndependentEngage() {
   // Natural spoken changes continue the SAME verified run; never silently alter geometry.
   guideCommandRef.current = spoken => {
     if (!result) return false;
+    if (/^(?:rotate|turn) (?:left|right)$/.test(spoken)) {
+      if (!result.blend.modelUrl) {
+        offer("I need the actual 3D model before I can rotate this design in space.");
+      } else {
+        setRotationRequest(n => n + (spoken.endsWith("right") ? 1 : -1));
+      }
+      return true;
+    }
+    if (/^(?:zoom in|zoom out)$/.test(spoken)) {
+      setZoomRequest(n => n + (spoken.endsWith("in") ? 1 : -1));
+      return true;
+    }
     const view = spoken.replace(/^(?:show|open|view|go to)\\s+/, "");
     const views: Record<string, DesignedScreen> = {
       blueprint: "blueprint", dissect: "dissect", explode: "exploded",
@@ -753,6 +767,7 @@ export function IndependentEngage() {
               className="living-tree-submit">{loading ? "WORKING WITH YOUR INTENT…" : currentDesign ? "CONTINUE DESIGN" : "ENGAGE ASCENSION"}</button>
           </div>
           {currentDesign && <TreeStudio design={{ ...currentDesign, files: result?.files ?? [] }} view={currentView} loading={loading}
+            rotateRequest={rotationRequest} zoomRequest={zoomRequest}
             onView={next => show(next)} onExplainPart={explainPart} onContinue={buildOnResult}/>}
           {loading && <p className="living-tree-message" role="status">The original ASCENSION engines are processing your intent. <button onClick={stop} type="button">Stop</button></p>}
           {error && <p className="living-tree-message living-tree-error" role="alert">{error}</p>}

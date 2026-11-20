@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { type DesignedScreen, type DesignedTarget } from "@/components/ascension/designed-flow";
+import { type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
 import { LivingTree } from "@/components/ascension/living-tree";
 import { TreeStudio } from "@/components/ascension/tree-studio";
 import "./living-tree-scene.css";

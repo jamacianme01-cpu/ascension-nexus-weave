@@ -349,6 +349,20 @@ try {
     assert.equal(oneModel.pathways[0].generated_image_url, "https://owner.example.test/care-companion.png");
     assert.equal(oneModel.pathways[0].model_url, "https://owner.example.test/care-companion.glb");
   });
+  const actualLateFile = "<!doctype html><html><body><h1>Revenue app</h1><form id='lead-form'><input name='contact' required/><button>Save</button></form><script>document.querySelector('form').onsubmit=e=>{e.preventDefault();document.querySelector('h1').textContent='Saved';};</script></body></html>";
+  const lateOutput = deliveryEngine.governedDelivery({
+    objective: "make a quick money making app",
+    result: { objective_delivery: {
+      kind: "not_produced", title: "Unfinished earlier",
+      body: "The requested app has not been produced.",
+      files: [], limitations: [],
+    }},
+  }, [{name: "revenue.html", content: actualLateFile}]);
+  check("late genuine runtime artifact supersedes an earlier not-produced marker", () => {
+    assert.equal(lateOutput.kind, "artifact");
+    assert.deepEqual(lateOutput.files.map(f=>f.name), ["revenue.html"]);
+    assert.equal(lateOutput.files[0].content, actualLateFile);
+  });
   const ownerRun = {
     id: "12345678-90ab-4cde-8f12-123456789abc",
     objective: originalOneAnswer.objective,

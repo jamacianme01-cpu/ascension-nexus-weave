@@ -730,7 +730,7 @@ export function IndependentEngage() {
       const index = number ?? named;
       if (index !== undefined && index >= 0 && index < 4) { openPathway(index); return true; }
     }
-    if (screen === "spiral") {
+    if (screen === "spiral" && /^(?:blueprint|dissect|explod(?:e|ed)|implod(?:e|ed)|assembled|assembly|zoom|rotate|turn|explain|show (?:blueprint|dissect|exploded|imploded|assembled))\b/.test(spoken)) {
       offer("Choose one of the four pathways first. Then I can show its parts and views.");
       return true;
     }

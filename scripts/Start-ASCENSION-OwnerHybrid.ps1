@@ -82,8 +82,9 @@ try {
         }
       }
     } catch {
-      Start-Sleep -Seconds 1
+      # The original runtime or website may still be starting.
     }
+    Start-Sleep -Seconds 1
   }
   if (-not $connected) { throw 'The original ASCENSION local queue transport and website did not establish a verified connection.' }
   $worker = Start-Process -FilePath $python.Source -WorkingDirectory $OriginalRoot -NoNewWindow -PassThru -ArgumentList @(

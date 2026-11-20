@@ -342,6 +342,10 @@ export function IndependentEngage() {
     objectiveRef.current = spoken.slice(0, 4000);
     setObjective(objectiveRef.current);
     recognition.current?.stop();
+    // Subsequent conversation continues the SAME actual governed objective.
+    if (result && activeRun.current && !continuation.current) {
+      continuation.current = { ...activeRun.current, selected: result.blend, blend: true };
+    }
     // A spoken objective executes hands-free; the existing button remains
     // available when speech recognition or a microphone is unavailable.
     engageRef.current();
@@ -449,7 +453,8 @@ export function IndependentEngage() {
       // The real governed submission MUST NOT depend on knowledge retrieval.
       // Previously a failed lookup stopped ENGAGE before the runtime saw the objective.
       // A selected design continues its actual recorded run, not an unrelated new objective.
-      const parent = continuation.current;
+      const parent = continuation.current ??
+        (result && activeRun.current ? { ...activeRun.current, selected: result.blend, blend: true } : null);
       const submitted = await submitGuestObjective({ data: {
         objective: text,
         ...(parent ? {

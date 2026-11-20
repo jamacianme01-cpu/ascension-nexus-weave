@@ -132,9 +132,12 @@ function cardLine(text: string): string {
 }
 
 function guideFor(result: Result): string {
-  const intro = result.introduction.replace(/\b(ChatGPT|OpenAI|Claude|Grok)\b/gi, "").replace(/\s+/g, " ").trim();
-  if (intro.length > 40 && intro.length < 320) return intro;
-  return `The governed result is ready. I can show the design, explain its components, or help you change it.`;
+  // Speak actual ASCENSION-authored content without removing provider names,
+  // changing the owner's terminology, or substituting a canned announcement.
+  const original = result.introduction.trim();
+  if (!original) return "";
+  const paragraph = original.split(/\n\s*\n/)[0]!.trim();
+  return paragraph.length > 600 ? sentence(paragraph) : paragraph;
 }
 
 function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {

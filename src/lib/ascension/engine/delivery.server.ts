@@ -109,8 +109,12 @@ export function governedDelivery(
       : typeof authored["answer"] === "string" ? authored["answer"].trim() : "";
     if (!body) continue;
     const candidate = {
-      kind: authored["kind"] ?? "answer",
-      title: authored["title"] ?? run.objective,
+      // The original runtime may label a concept as "design" or "drawing".
+      // That is authored content, not a reason to reject its whole result.
+      kind: ["answer", "recommendation", "artifact", "not_produced"].includes(String(authored["kind"]))
+        ? authored["kind"] : "answer",
+      title: typeof authored["title"] === "string" && authored["title"].trim()
+        ? authored["title"] : run.objective.slice(0, 200),
       body,
       pathways: Array.isArray(paths) ? paths : [],
       blend: authored["blend"] ?? null,

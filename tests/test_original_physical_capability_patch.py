@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Offline fail-closed tests for the ORIGINAL private capability adapter."""
+import ast
+import importlib.util
+import re
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts/ascension-owner-queue/apply-original-physical-capability.py"
+PATCH = ROOT / "scripts/ascension-owner-queue/original-physical-capability.patch"
+
+spec = importlib.util.spec_from_file_location("original_capability_patch", SCRIPT)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def old_hunks():
+    lines = PATCH.read_text(encoding="utf-8").splitlines(keepends=True)
+    hunks = []
+    i = 2
+    while i < len(lines):
+        match = mod.HUNK.match(lines[i])
+        assert match, "Bad hunk header"
+        i += 1
+        old, new = [], []
+        while i < len(lines) and not lines[i].startswith("@@ "):
+            line = lines[i]
+            i += 1
+            if line.startswith(" ") or line.startswith("-"):
+                old.append(line[1:])
+            if line.startswith(" ") or line.startswith("+"):
+                new.append(line[1:])
+        assert len(old) == int(match.group(2))
+        assert len(new) == int(match.group(4))
+        hunks.append((old, new))
+    return hunks
+
+def synthetic_original():
+    first, second = old_hunks()
+    prefix = (
+        "from __future__ import annotations\n"
+        "from typing import Dict, List\n"
+        "import json\n"
+        "class CapabilityContract:\n"
+        "    def __init__(self, **kwargs): self.__dict__.update(kwargs)\n"
+        "class DigitalArtifactWriter:\n"
+        "    contract = type('C', (), {'capability_id':'digital_artifact_writer'})()\n"
+        "class DocumentBundleCapability:\n"
+        "    contract = type('C', (), {'capability_id':'document_bundle'})()\n"
+        "class CapabilityResult: pass\n"
+        "class Branch: pass\n"
+        "class MeaningElement: pass\n"
+        "DOCUMENT_OUTPUTS = {'answer', 'document_bundle'}\n"
+        "def requested_output_contract(destiny, requested_type):\n"
+        "    return 'physical_design' if 'drone' in destiny.lower() else 'answer'\n"
+        "def earlier_writer():\n"
+        "    return (\n"
+    )
+    before_select = (
+        "def select_capability(destiny: str, mes: List[MeaningElement], requested_type: str = '') -> str:\n"
+        '    """Select only capabilities whose output matches the requested contract."""\n'
+    )
+    source = prefix + "".join(first[0]) + before_select + "".join(second[0]) + (
+        '        return "document_bundle"\n'
+        '    return "digital_artifact_writer"\n'
+    )
+    ast.parse(source)
+    return source
+
+class OriginalEngineAdapterTests(unittest.TestCase):
+    def test_reviewed_diff_is_structurally_valid(self):
+        self.assertEqual(len(old_hunks()), 2)
+
+    def test_exact_original_receives_only_adapter_and_registry(self):
+        old = synthetic_original()
+        result = mod.patched(old, PATCH.read_text(encoding="utf-8"))
+        ast.parse(result)
+        self.assertIn("class PhysicalDesignCapability:", result)
+        self.assertIn("PhysicalDesignCapability.contract.capability_id: PhysicalDesignCapability()", result)
+        self.assertIn('return "unavailable:physical_design"', result)
+        self.assertEqual(result.count("class PhysicalDesignCapability:"), 1)
+        self.assertIn("class DigitalArtifactWriter:", result)
+        self.assertIn("class DocumentBundleCapability:", result)
+
+    def test_modified_original_source_is_rejected(self):
+        old = synthetic_original().replace("DocumentBundleCapability()", "MissingOwnerCapability()")
+        with self.assertRaises(ValueError):
+            mod.patched(old, PATCH.read_text(encoding="utf-8"))
+
+    def test_unrelated_diff_target_is_rejected(self):
+        old = synthetic_original()
+        diff = PATCH.read_text(encoding="utf-8").replace(
+            "--- a/ASCENSION_CORE/capabilities.py",
+            "--- a/ASCENSION_CORE/guardian.py",
+        )
+        with self.assertRaises(ValueError):
+            mod.patched(old, diff)
+
+if __name__ == "__main__":
+    unittest.main()

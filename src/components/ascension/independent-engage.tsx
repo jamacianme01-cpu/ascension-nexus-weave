@@ -346,7 +346,7 @@ export function IndependentEngage() {
     setObjective(objectiveRef.current);
     recognition.current?.stop();
     // Subsequent conversation continues the SAME actual governed objective.
-    if (result && activeRun.current && !continuation.current) {
+    if (result && activeRun.current && screen !== "spiral" && !continuation.current) {
       const selected = result.pathways[choice] ?? result.blend;
       continuation.current = { ...activeRun.current, selected, blend: selected.id === result.blend.id };
     }
@@ -459,7 +459,7 @@ export function IndependentEngage() {
       // A selected design continues its actual recorded run, not an unrelated new objective.
       const selected = result ? result.pathways[choice] ?? result.blend : null;
       const parent = continuation.current ??
-        (selected && result && activeRun.current
+        (selected && result && screen !== "spiral" && activeRun.current
           ? { ...activeRun.current, selected, blend: selected.id === result.blend.id }
           : null);
       const submitted = await submitGuestObjective({ data: {
@@ -800,8 +800,8 @@ export function IndependentEngage() {
               <textarea rows={2} maxLength={4000} value={objective} placeholder="Enter your intent"
                 onChange={event => { setObjective(event.target.value); objectiveRef.current = event.target.value; }}/>
             </label>}
-            <button type="button" disabled={loading || !objective.trim()} onClick={() => void engage()}
-              className="living-tree-submit">{loading ? "WORKING WITH YOUR INTENT…" : currentDesign ? "CONTINUE DESIGN" : "ENGAGE ASCENSION"}</button>
+            {!showingPathways && <button type="button" disabled={loading || !objective.trim()} onClick={() => void engage()}
+              className="living-tree-submit">{loading ? "WORKING WITH YOUR INTENT…" : currentDesign ? "CONTINUE DESIGN" : "ENGAGE ASCENSION"}</button>}
           </div>
           {showingPathways && result && <section className="living-pathways" aria-label="Four ASCENSION pathways">
             <h2>Choose a pathway</h2>

@@ -660,15 +660,14 @@ export function IndependentEngage() {
       return;
     }
     const selected = readings[choice];
-    if (next === "assembled" && selected) offer(openLine(
-      choice === 3 ? result!.blend : result!.pathways[choice]!,
-      choice === 3,
-    ));
+    if (next === "assembled" && selected && result) {
+      const pathway = result.pathways[choice] ?? result.blend;
+      offer(openLine(pathway, pathway.id === result.blend.id));
+    }
     else if (next === "blueprint") offer("The blueprint is this same reading, drawn out, if that view would help.");
     else if (next === "dissect") offer("This opens the same reading so the parts can be seen.");
     else if (next === "exploded") offer("The parts are set apart here, if seeing them separately would help.");
     else if (next === "imploded") offer("The parts can come back together from here.");
-    else if (next === "spiral") offer("Let's return to the design we're developing.");
     setScreen(next);
   }
 
@@ -746,7 +745,7 @@ export function IndependentEngage() {
       setZoomRequest(n => n + (spoken.endsWith("in") ? 1 : -1));
       return true;
     }
-    const view = spoken.replace(/^(?:show|open|view|go to)\\s+/, "");
+    const view = spoken.replace(/^(?:show|open|view|go to)\s+/, "");
     const views: Record<string, DesignedScreen> = {
       blueprint: "blueprint", dissect: "dissect", explode: "exploded",
       exploded: "exploded", implode: "imploded", imploded: "imploded",
@@ -761,7 +760,7 @@ export function IndependentEngage() {
       explainPart(part); return true;
     }
     // Existing governed continuation accepts a modification as an objective.
-    if (/^(?:add|remove|replace|change|modify|make|move|increase|decrease|extend|reduce)\\b/.test(spoken) && activeRun.current) {
+    if (/^(?:add|remove|replace|change|modify|make|move|increase|decrease|extend|reduce)\b/.test(spoken) && activeRun.current) {
       continuation.current = { ...activeRun.current, selected: active, blend: active.id === result.blend.id };
       objectiveRef.current = spoken.slice(0, 4000);
       setObjective(objectiveRef.current);

@@ -49,7 +49,7 @@ export function TreeStudio({
           onClick={() => onView(item)}>{item === "assembled" ? "Assembled" : item === "exploded" ? "Explode" : item === "imploded" ? "Implode" : item[0]!.toUpperCase()+item.slice(1)}</button>
       ))}
     </nav>
-    <div className="tree-studio-work">
+    <div className="tree-studio-work" data-has-parts={design.parts.length > 0}>
       <div className="tree-studio-viewport">
         {design.modelUrl || design.imageUrl || design.blueprintUrl
           ? <V1DesignViewport mode={view} modelUrl={design.modelUrl} imageUrl={design.imageUrl}
@@ -61,18 +61,18 @@ export function TreeStudio({
                 {design.files.map(file => <button key={file.name} type="button"
                   onClick={() => downloadOriginalArtifact(file)}>{file.name}</button>)}
               </div> : null}
-              <p className="tree-studio-no-geometry">No measured 3D model or blueprint has been delivered for this result.</p>
+
             </article>}
       </div>
-      <aside className="tree-studio-parts" aria-label="Invention components">
+      {design.parts.length > 0 && <aside className="tree-studio-parts" aria-label="Invention components">
         <button className="tree-studio-parts-toggle" type="button" aria-expanded={partsOpen}
           onClick={() => setPartsOpen(v => !v)}>Components {partsOpen ? "−" : "+"}</button>
-        {partsOpen && (design.parts.length ? <ul>{design.parts.map((part,index) => <li key={part.name+index}>
+        {partsOpen && <ul>{design.parts.map((part,index) => <li key={part.name+index}>
           <button type="button" onClick={() => onExplainPart(part)}>{part.name}</button>
           {part.purpose && <p><strong>Does:</strong> {part.purpose}</p>}
           {part.location && <p><strong>Where:</strong> {part.location}</p>}
-        </li>)}</ul> : <p>The governed engine has not supplied component specifications.</p>)}
-      </aside>
+        </li>)}</ul>}
+      </aside>}
     </div>
   </section>;
 }

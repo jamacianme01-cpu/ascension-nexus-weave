@@ -20,7 +20,8 @@ assert.equal(selectTreeWomanVoice([male, zira, jenny]), jenny);
 assert.equal(selectTreeWomanVoice([male]), null, "Never use male default.");
 assert.equal(selectTreeWomanVoice([voice("Google US English")]), null, "Unknown gender must not be assumed.");
 assert.equal(selectTreeWomanVoice([voice("Microsoft Zira Desktop", "de-DE")]), null);
-assert.equal(selectTreeWomanVoice([zira]), zira);
+assert.equal(selectTreeWomanVoice([zira]), null, "Robotic desktop voices are not an approved substitute.");
+assert.equal(selectTreeWomanVoice([voice("Samantha")]).name, "Samantha");
 
 const callbacks = new Set();
 let activeVoices = [];

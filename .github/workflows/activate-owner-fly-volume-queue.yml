@@ -2,9 +2,9 @@ name: Activate original ASCENSION Fly worker queue
 
 # Every website change must preserve the owner's original private engine image.
 # Do NOT publish a public-source image that removes authored ASCENSION_CORE.
+# Legacy Fly-only recovery workflow. It must never auto-run for the owner's
+# Oracle Cloud / own-computer architecture. This only retains historical recovery.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

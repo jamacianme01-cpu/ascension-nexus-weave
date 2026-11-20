@@ -129,8 +129,11 @@ export function governedDelivery(
     // be inspected even when it has no exported SVG or artificial BLEND.
     const hasRealDesignAsset = [...projected.pathways, ...(projected.blend ? [projected.blend] : [])]
       .some(pathway => Boolean(pathway.generated_image_url || pathway.model_url));
-    if (actual.produced || projected.kind === "not_produced" ||
-        (hasRealDesignAsset && scaffoldReason(projected.body, run.objective) === null))
+    // An earlier not_produced marker cannot suppress genuinely completed
+    // artifacts transported afterward by the original runtime.
+    if (projected.kind !== "not_produced" &&
+        (actual.produced ||
+         (hasRealDesignAsset && scaffoldReason(projected.body, run.objective) === null)))
       return projected;
   }
 

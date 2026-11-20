@@ -208,6 +208,11 @@ class IPv6Server(ThreadingHTTPServer):
     daemon_threads = True
 
 
+class IPv4Server(ThreadingHTTPServer):
+    address_family = socket.AF_INET
+    daemon_threads = True
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = 'ASCENSION-Private-Transport/1'
 
@@ -279,11 +284,18 @@ def main():
     parser.add_argument('--live-root', default=os.environ.get('ASCENSION_LIVE_ROOT', '/data/ascension/state/live'))
     parser.add_argument('--transport-root', default='/data/ascension/transport')
     parser.add_argument('--port', type=int, default=9091)
+    # Default keeps the existing private IPv6 worker unchanged.
+    # Owner-computer mode explicitly binds 127.0.0.1 (not the public network).
+    parser.add_argument('--host', default=os.environ.get('ASCENSION_TRANSPORT_HOST', '::'))
     args = parser.parse_args()
     if not os.environ.get('ASCENSION_PUBLISH_TOKEN', '').strip():
-        raise SystemExit('Original Fly ASCENSION_PUBLISH_TOKEN is required')
+        raise SystemExit('ASCENSION_PUBLISH_TOKEN is required')
+    if args.host not in ('::', '::1', '127.0.0.1', 'localhost'):
+        raise SystemExit('ASCENSION private transport may only bind localhost or the governed private IPv6 default')
     store = TransportStore(Path(args.live_root), Path(args.transport_root))
-    httpd = IPv6Server(('::', args.port), Handler)
+    server = IPv6Server if ':' in args.host else IPv4Server
+    bind_host = '127.0.0.1' if args.host == 'localhost' else args.host
+    httpd = server((bind_host, args.port), Handler)
     httpd.ascension_store = store
     print('ASCENSION_OWNER_TRANSPORT_READY root=/data/ascension revision_at_start=' + str(store.initial_revision), flush=True)
     httpd.serve_forever(poll_interval=.5)

@@ -1,7 +1,7 @@
 /**
  * ASCENSION local front-end development launcher.
  * Do not reconnect the owner's old computer or start external platform apps.
- * The production governed brain is deployed separately on Fly.
+ * The owner-governed runtime may run locally or on an owner-controlled host.
  */
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -17,6 +17,7 @@ const SAFE_SERVER_KEYS = [
   "OPENAI_API_KEY",
   "ASCENSION_OPENAI_MODEL",
   "ASCENSION_PUBLISH_TOKEN",
+  "ASCENSION_VOLUME_TRANSPORT_URL",
 ];
 
 export function loadServerEnvironment(env, values) {
@@ -30,7 +31,9 @@ export async function connectAnswerEngine(env) {
   if (env.ASCENSION_ENABLE_PAID_APIS === "true" &&
       env.ASCENSION_ALLOW_OPENAI_AI === "true" &&
       env.OPENAI_API_KEY?.trim()) return "owner-approved OpenAI";
-  return "ASCENSION governed runtime (cloud worker must be deployed separately)";
+  return env.ASCENSION_VOLUME_TRANSPORT_URL?.trim()
+    ? "ASCENSION governed runtime (configured private transport)"
+    : "ASCENSION governed runtime (transport not yet configured)";
 }
 
 async function main() {

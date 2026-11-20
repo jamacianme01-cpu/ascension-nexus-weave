@@ -801,7 +801,7 @@ export function IndependentEngage() {
         </section>}
         {bookOpen && <>
           <details className="living-tree-book-navigation">
-            <summary>BOOK</summary>
+            <summary><img src={BOOK} alt="" draggable={false} /><span>BOOK</span></summary>
             <div role="group" aria-label="Choose ASCENSION category">
               {(["Business Planner", "Build / Create", "Guidance"] as const).map(item =>
                 <button type="button" key={item} aria-pressed={category === item}

@@ -1,0 +1,54 @@
+/* Original Tree remains the backdrop and visible speaker, even during creation. */
+.tree-studio {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  top: 16%;
+  width: min(70rem, 82vw);
+  height: min(69svh, 47rem);
+  transform: translateX(-50%);
+  border: 1px solid rgb(232 192 114 / 66%);
+  border-radius: 1rem;
+  background: linear-gradient(160deg, rgb(8 22 18 / 88%), rgb(6 17 15 / 95%));
+  box-shadow: 0 0 40px rgb(11 30 23 / 60%);
+  backdrop-filter: blur(8px);
+  color: #f7ead2;
+  padding: .85rem;
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  overflow: hidden;
+}
+.tree-studio-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.tree-studio-heading h2 { font-size: clamp(.9rem, 1.45vw, 1.25rem); line-height: 1.2; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-studio-heading button, .tree-studio-views button, .tree-studio-parts button {
+  border: 1px solid rgb(205 161 87 / 70%);
+  border-radius: .4rem;
+  background: rgb(15 39 30 / 93%);
+  color: #f5dfb1;
+  padding: .35rem .7rem;
+  cursor: pointer;
+  font-size: clamp(.67rem, .9vw, .85rem);
+}
+.tree-studio-heading button:disabled { opacity: .5; cursor: wait; }
+.tree-studio-summary { color: #e4decf; font-size: clamp(.72rem, 1vw, .95rem); max-height: 4.1rem; overflow: auto; }
+.tree-studio-views { display: flex; flex-wrap: wrap; gap: .35rem; flex-shrink: 0; }
+.tree-studio-views button[aria-current="page"] { background: #375a46; border-color: #eaca8a; }
+.tree-studio-work { display: grid; grid-template-columns: minmax(0, 1fr) minmax(10rem, 23%); gap: .6rem; flex: 1; min-height: 0; }
+.tree-studio-viewport { min-height: 0; display: flex; overflow: hidden; background: #0a1820; border: 1px solid rgb(205 161 87 / 24%); }
+.tree-studio-parts { min-width: 0; overflow: auto; padding: .4rem; border: 1px solid rgb(205 161 87 / 35%); font-size: .78rem; }
+.tree-studio-parts-toggle { width: 100%; text-align: left; }
+.tree-studio-parts ul { padding: .25rem .3rem; list-style: none; }
+.tree-studio-parts li { border-bottom: 1px solid rgb(205 161 87 / 15%); padding: .5rem 0; }
+.tree-studio-parts li button { text-align: left; width: 100%; }
+.tree-studio-parts p { font-size: .75rem; color: #d6d2c6; padding-top: .2rem; }
+@media (max-width: 780px) {
+  .tree-studio { top: 28%; width: 96vw; height: 60svh; padding: .45rem; }
+  .tree-studio-work { grid-template-columns: minmax(0, 1fr) 32%; }
+  .tree-studio-parts { font-size: .7rem; }
+}
+@media (max-width: 470px) {
+  .tree-studio { top: 29%; height: 60svh; }
+  .tree-studio-heading { flex-wrap: wrap; }
+  .tree-studio-summary { max-height: 2.5rem; }
+}

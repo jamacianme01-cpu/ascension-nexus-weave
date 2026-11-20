@@ -5,7 +5,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "ASCENSION — What do you want to accomplish?" },
-      { name: "description", content: "ASCENSION Tree and Book: objective, three pathways, and a reasoned blend." },
+      { name: "description", content: "ASCENSION Tree of Knowledge and Book: one continuous voice-guided experience with the owner's original governed intelligence and invention inspection." },
       { property: "og:title", content: "ASCENSION" },
       { property: "og:type", content: "website" },
     ],

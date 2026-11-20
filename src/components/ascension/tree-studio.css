@@ -3,9 +3,9 @@
   position: absolute;
   z-index: 12;
   left: 50%;
-  top: 16%;
-  width: min(70rem, 82vw);
-  height: min(69svh, 47rem);
+  top: 37%;
+  width: min(70rem, 76vw);
+  height: min(44svh, 34rem);
   transform: translateX(-50%);
   border: 1px solid rgb(232 192 114 / 66%);
   border-radius: 1rem;
@@ -43,12 +43,12 @@
 .tree-studio-parts li button { text-align: left; width: 100%; }
 .tree-studio-parts p { font-size: .75rem; color: #d6d2c6; padding-top: .2rem; }
 @media (max-width: 780px) {
-  .tree-studio { top: 28%; width: 96vw; height: 60svh; padding: .45rem; }
+  .tree-studio { top: 37%; width: 96vw; height: 43svh; padding: .45rem; }
   .tree-studio-work { grid-template-columns: minmax(0, 1fr) 32%; }
   .tree-studio-parts { font-size: .7rem; }
 }
 @media (max-width: 470px) {
-  .tree-studio { top: 29%; height: 60svh; }
+  .tree-studio { top: 37%; height: 43svh; }
   .tree-studio-heading { flex-wrap: wrap; }
   .tree-studio-summary { max-height: 2.5rem; }
 }

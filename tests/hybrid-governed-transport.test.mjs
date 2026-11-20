@@ -17,6 +17,7 @@ const originalFetch = globalThis.fetch;
 const originalEnv = {
   ASCENSION_VOLUME_TRANSPORT_URL: process.env.ASCENSION_VOLUME_TRANSPORT_URL,
   ASCENSION_PUBLISH_TOKEN: process.env.ASCENSION_PUBLISH_TOKEN,
+  FLY_APP_NAME: process.env.FLY_APP_NAME,
 };
 const calls = [];
 try {
@@ -41,10 +42,27 @@ try {
   assert.equal(remote.status, "LIVE_GOVERNED_TRANSPORT");
   assert.deepEqual(calls.map(c => c.url), ["https://owner-private-tunnel.example/health"]);
 
+  // Existing private 6PN bridge is accepted only on its exact original
+  // website host, with its fixed internal process host and port.
+  calls.length = 0;
+  process.env.FLY_APP_NAME = "ascension-nexus-weave";
+  process.env.ASCENSION_VOLUME_TRANSPORT_URL = "http://worker.process.ascension-nexus-weave.internal:9091";
+  const bridge = await callOwnerVolumeTransport("/health", "GET");
+  assert.equal(bridge.status, "LIVE_GOVERNED_TRANSPORT");
+  assert.deepEqual(calls.map(c => c.url), ["http://worker.process.ascension-nexus-weave.internal:9091/health"]);
+  assert.equal(calls[0].token, "offline-test-only");
+
+  // Never permit that private host outside the original process.
+  calls.length = 0;
+  delete process.env.FLY_APP_NAME;
+  await assert.rejects(callOwnerVolumeTransport("/health", "GET"));
+  assert.equal(calls.length, 0);
+
   for (const forbidden of [
     "http://owner-private-tunnel.example:9091",
     "http://192.168.1.10:9091",
-    "http://worker.process.ascension-nexus-weave.internal:9091",
+    "http://worker.process.ascension-nexus-weave.internal:9092",
+    "http://other.internal:9091",
     "https://ascension-nexus-weave.fly.dev",
     "https://username:password@owner-private-tunnel.example",
     "ftp://owner-private-tunnel.example",
@@ -61,7 +79,7 @@ try {
     /Invalid private ASCENSION transport path/);
   assert.equal(calls.length, 0);
 
-  console.log("PASS: owner Oracle/local transport; authenticated; no Fly calls; remote TLS enforced.");
+  console.log("PASS: owner Oracle/local TLS, original private 6PN bridge, host-bound credentials, no public plaintext.");
 } finally {
   globalThis.fetch = originalFetch;
   for (const [key, value] of Object.entries(originalEnv)) {

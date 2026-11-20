@@ -55,7 +55,7 @@ async function say(text: string, onFinished?: () => void) {
   }
   const chunks: string[] = [];
   let chunk = "";
-  for (const word of text.trim().split(/\\s+/)) {
+  for (const word of text.trim().split(/\s+/)) {
     if (chunk && chunk.length + word.length + 1 > 220) {
       chunks.push(chunk); chunk = word;
     } else {
@@ -184,8 +184,7 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
 }
 function openLine(path: Pathway, blend: boolean): string {
   const detail = sentence(blend ? path.blend_reason || path.summary : path.summary);
-  if (blend) return `${path.title}. ${detail}`;
-  return `${path.title}. ${detail} The other views are there if a closer look would help.`;
+  return `${path.title}. ${detail}`;
 }
 
 /** Hosted Tree entry. Engines analyze the answer; the fourth pathway is the blend. */
@@ -707,7 +706,7 @@ export function IndependentEngage() {
       setZoomRequest(n => n + (spoken.endsWith("in") ? 1 : -1));
       return true;
     }
-    const view = spoken.replace(/^(?:show|open|view|go to)\\s+/, "");
+    const view = spoken.replace(/^(?:show|open|view|go to)\s+/, "");
     const views: Record<string, DesignedScreen> = {
       blueprint: "blueprint", dissect: "dissect", explode: "exploded",
       exploded: "exploded", implode: "imploded", imploded: "imploded",
@@ -723,7 +722,7 @@ export function IndependentEngage() {
       explainPart(part); return true;
     }
     // Existing governed continuation accepts a modification as an objective.
-    if (/^(?:add|remove|replace|change|modify|make|move|increase|decrease|extend|reduce)\\b/.test(spoken) && activeRun.current) {
+    if (/^(?:add|remove|replace|change|modify|make|move|increase|decrease|extend|reduce)\b/.test(spoken) && activeRun.current) {
       continuation.current = { ...activeRun.current, selected: active, blend: originalBlendWasDelivered(result) };
       objectiveRef.current = spoken.slice(0, 4000);
       setObjective(objectiveRef.current);

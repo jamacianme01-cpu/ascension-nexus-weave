@@ -789,15 +789,22 @@ export function IndependentEngage() {
     <section aria-label="ASCENSION Tree of Knowledge" className="ascension-command">
       <div className="ascension-stage living-tree-stage">
         <LivingTree state={treeState} verifiedRevision={verifiedRevision} />
-        {!bookOpen && <section className="living-book-entry" aria-label="Open ASCENSION Book">
-          <img src={BOOK} alt="Original ASCENSION closed Book" draggable={false}/>
-          <div className="living-book-choices" role="group" aria-label="Choose a Book category">
-            {(["Business Planner", "Build / Create", "Guidance"] as const).map(item =>
-              <button type="button" key={item} onClick={() => chooseCategory(item)}>{item}</button>
-            )}
-          </div>
+        {!bookOpen && <section className="living-book-entry" aria-label="ASCENSION Book entrance">
+          <img src={BOOK} alt="The original ASCENSION Knowledgeverse Book" draggable={false}/>
+          <button className="living-book-open" type="button"
+            onClick={() => chooseCategory("Build / Create")}
+            aria-label="Open the Book and meet the Tree of Knowledge">OPEN THE BOOK</button>
         </section>}
         {bookOpen && <>
+          <details className="living-tree-book-navigation">
+            <summary>BOOK</summary>
+            <div role="group" aria-label="Choose ASCENSION category">
+              {(["Business Planner", "Build / Create", "Guidance"] as const).map(item =>
+                <button type="button" key={item} aria-pressed={category === item}
+                  onClick={() => chooseCategory(item)}>{item}</button>
+              )}
+            </div>
+          </details>
           <div className="living-tree-conversation">
             <button type="button" onClick={() => listenForObjective()} disabled={loading}
               aria-pressed={listening} className="living-tree-microphone">

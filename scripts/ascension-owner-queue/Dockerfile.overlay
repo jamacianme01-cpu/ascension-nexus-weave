@@ -16,6 +16,11 @@ COPY ascension-volume-transport.py /app/ascension-volume-transport.py
 COPY ascension-private-supervisor.py /app/ascension-private-supervisor.py
 COPY probe-ascension-private.py /app/probe-ascension-private.py
 COPY ascension-start.sh /app/ascension-start.sh
+COPY original-physical-capability.patch /app/original-physical-capability.patch
+COPY apply-original-physical-capability.py /app/apply-original-physical-capability.py
+# Apply exclusively to the ORIGINAL private engine image, never a public replacement.
+# Abort build on any source mismatch; no Fly volume or governed state is written.
+RUN /usr/bin/python3 /app/apply-original-physical-capability.py /app
 RUN test -f /app/ASCENSION_CORE/cloud_queue_worker.py \
     && test -f /app/ASCENSION_CORE/live_publication.py \
     && test -f /app/clarity/core_runtime.py \

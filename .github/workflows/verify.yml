@@ -25,6 +25,8 @@ jobs:
       - run: npm run test:interface
       - run: node tests/tree-voice.test.mjs
       - run: npm run build
+      - name: Verify original authored construction capability patch (offline, no Fly changes)
+        run: python3 -m unittest discover -s tests -p test_original_physical_capability_patch.py -v
       - name: TypeScript checks with file annotations
         shell: bash
         run: |

@@ -6,12 +6,43 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 export type DesignView = "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
 
 export function V1DesignViewport({
-  modelUrl, imageUrl, blueprintUrl, mode,
-}: { modelUrl: string | null; imageUrl: string | null; blueprintUrl: string | null; mode: DesignView }) {
+  modelUrl, imageUrl, blueprintUrl, mode, rotateRequest = 0, zoomRequest = 0,
+}: { modelUrl: string | null; imageUrl: string | null; blueprintUrl: string | null; mode: DesignView;
+  rotateRequest?: number; zoomRequest?: number }) {
   const container = useRef<HTMLDivElement>(null);
   const [problem, setProblem] = useState("");
   const [dimensions, setDimensions] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
+  const orbit = useRef<{ camera: THREE.PerspectiveCamera; controls: OrbitControls } | null>(null);
+  const prevRotate = useRef(rotateRequest);
+  const prevZoom = useRef(zoomRequest);
+
+  useEffect(() => {
+    const difference = rotateRequest - prevRotate.current;
+    prevRotate.current = rotateRequest;
+    if (!difference || !orbit.current) return;
+    const { camera, controls } = orbit.current;
+    const offset = camera.position.clone().sub(controls.target);
+    offset.applyAxisAngle(new THREE.Vector3(0,1,0), -difference * Math.PI / 12);
+    camera.position.copy(controls.target).add(offset);
+    controls.update();
+  }, [rotateRequest]);
+
+  useEffect(() => {
+    const difference = zoomRequest - prevZoom.current;
+    prevZoom.current = zoomRequest;
+    if (!difference) return;
+    if (orbit.current) {
+      const { camera, controls } = orbit.current;
+      const offset = camera.position.clone().sub(controls.target);
+      const factor = Math.pow(0.84, difference);
+      const distance = Math.max(0.01, Math.min(10000, offset.length() * factor));
+      camera.position.copy(controls.target).add(offset.normalize().multiplyScalar(distance));
+      controls.update();
+    } else {
+      setScale(value => Math.min(5, Math.max(1, value + 0.25 * difference)));
+    }
+  }, [zoomRequest]);
 
   useEffect(() => { setScale(1); }, [imageUrl, blueprintUrl, modelUrl, mode]);
   useEffect(() => {
@@ -38,6 +69,7 @@ export function V1DesignViewport({
       renderer.localClippingEnabled = true;
       host.appendChild(renderer.domElement);
       controls = new OrbitControls(camera, renderer.domElement);
+      orbit.current = {camera, controls};
       controls.enableDamping = true;
       controls.enablePan = true;
       const resize = () => {
@@ -126,6 +158,7 @@ export function V1DesignViewport({
         window.cancelAnimationFrame(frame);
         observer.disconnect();
         controls.dispose();
+        orbit.current = null;
         for (const material of replacements) material.dispose();
         renderer.dispose();
         renderer.domElement.remove();

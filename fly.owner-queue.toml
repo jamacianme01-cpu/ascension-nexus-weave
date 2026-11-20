@@ -16,6 +16,12 @@ primary_region = 'ams'
   app = '/app/.output/server/index.mjs'
   worker = 'worker'
 
+# Keep the existing owner-only, volume-mounted worker alive across clean exits.
+# The website does not have a Fly Machines credential to start a stopped worker.
+[[restart]]
+  policy = 'always'
+  processes = ['worker']
+
 [experimental]
   entrypoint = ['/app/ascension-start.sh']
 

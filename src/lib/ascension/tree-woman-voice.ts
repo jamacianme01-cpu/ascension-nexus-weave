@@ -11,7 +11,12 @@ const MALE_NAMES = /(?:^|[^a-z])(?:david|mark|guy|ryan|brian|daniel|george|james
 export function selectTreeWomanVoice<T extends TreeVoiceCandidate>(voices: readonly T[]): T | null {
   const english = voices.filter(voice => /^en(?:-|_)/i.test(voice.lang) || voice.lang.toLowerCase() === "en");
   const women = english.filter(voice => WOMAN_NAMES.test(voice.name) && !MALE_NAMES.test(voice.name));
-  if (!women.length) return null;
+  // An old robotic desktop woman voice is not the natural woman voice the
+  // owner approved. There is no robotic or male substitute at any point.
+  const natural = women.filter(voice =>
+    /neural|natural|premium|enhanced|online|samantha|ava/i.test(voice.name) &&
+    !/desktop|compact|legacy|standard/i.test(voice.name));
+  if (!natural.length) return null;
 
   const rating = (voice: T): number => {
     const name = voice.name.toLowerCase();
@@ -24,7 +29,7 @@ export function selectTreeWomanVoice<T extends TreeVoiceCandidate>(voices: reado
     if (/desktop|compact/.test(name)) score -= 10;
     return score;
   };
-  return women.slice().sort((a, b) => rating(b) - rating(a))[0] ?? null;
+  return natural.slice().sort((a, b) => rating(b) - rating(a))[0] ?? null;
 }
 
 /** Browser speech voices frequently load AFTER page mount / first getVoices(). */

@@ -13,6 +13,30 @@ const FLY_API = "https://api.machines.dev/v1";
 const APP_NAME = "ascension-nexus-weave";
 const WORKER_PROCESS = "worker";
 
+/**
+ * Owner's hybrid deployment may place the existing governed runtime on the
+ * local computer instead of a Fly Machine. A local/private endpoint must never
+ * require Fly credentials or create/start a Fly worker.
+ *
+ * Do not send the publish token over plaintext to a remote host. Oracle may
+ * reach the owner's PC only through a separately secured HTTPS connection.
+ */
+function endpointRequiresFlyWake(endpoint: string): boolean {
+  const url = new URL(endpoint);
+  if (url.username || url.password) {
+    throw new Error("ASCENSION transport URL must not contain credentials.");
+  }
+  const hostname = url.hostname.toLowerCase();
+  const fly = hostname === "worker.process.ascension-nexus-weave.internal";
+  const loopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  if (!fly && !(url.protocol === "https:" || (loopback && url.protocol === "http:"))) {
+    throw new Error(
+      "ASCENSION hybrid transport must use HTTPS, or HTTP bound to loopback on this computer.",
+    );
+  }
+  return fly;
+}
+
 export function ownerVolumeTransportEnabled(): boolean {
   return Boolean(process.env["ASCENSION_VOLUME_TRANSPORT_URL"]?.trim());
 }
@@ -172,13 +196,14 @@ export async function callOwnerVolumeTransport<T>(
   const endpoint = process.env["ASCENSION_VOLUME_TRANSPORT_URL"]?.trim();
   const secret = process.env["ASCENSION_PUBLISH_TOKEN"]?.trim();
   if (!endpoint || !secret) {
-    throw new Error("Owner's private ASCENSION queue transport is not configured on Fly.");
+    throw new Error("Owner's private ASCENSION queue transport is not configured.");
   }
   if (!path.startsWith("/") || path.startsWith("//")) {
     throw new Error("Invalid private ASCENSION transport path.");
   }
 
-  const wake = await ensureWorkerAwake();
+  const usingFly = endpointRequiresFlyWake(endpoint);
+  const wake = usingFly ? await ensureWorkerAwake() : "running";
   if (wake === "no_token") {
     // Do not invent credentials. If the worker is already running, transport
     // may still succeed below; only fail hard when the connect also fails.
@@ -197,7 +222,7 @@ export async function callOwnerVolumeTransport<T>(
     response = await transportFetch(url, method, secret, body);
   } catch (err) {
     if (!isTransientNetworkError(err)) throw err;
-    const retryWake = await ensureWorkerAwake();
+    const retryWake = usingFly ? await ensureWorkerAwake() : "running";
     if (retryWake === "no_token") {
       throw new Error(
         "ASCENSION worker is not reachable and no ASCENSION_FLY_MACHINE_TOKEN (or FLY_API_TOKEN) is available on the app to start the existing worker machine.",
@@ -209,7 +234,9 @@ export async function callOwnerVolumeTransport<T>(
     } catch (err2) {
       if (isTransientNetworkError(err2)) {
         throw new Error(
-          "ASCENSION worker did not become reachable after start attempt (ENOTFOUND/ECONNREFUSED). Original worker/volume must stay; do not replace the private image.",
+          usingFly
+            ? "ASCENSION worker did not become reachable after start attempt (ENOTFOUND/ECONNREFUSED). Original worker/volume must stay; do not replace the private image."
+            : "ASCENSION local/hybrid governed transport is unreachable. Start the existing local transport and verify the private connection.",
         );
       }
       throw err2;
@@ -226,7 +253,7 @@ export async function callOwnerVolumeTransport<T>(
 
   if (!response.ok) {
     if (response.status === 502 || response.status === 503 || response.status === 504) {
-      await ensureWorkerAwake();
+      if (usingFly) await ensureWorkerAwake();
       await new Promise((r) => setTimeout(r, 2500));
       const retry = await transportFetch(url, method, secret, body);
       const retryText = await retry.text();

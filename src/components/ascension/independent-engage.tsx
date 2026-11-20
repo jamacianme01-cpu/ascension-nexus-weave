@@ -186,6 +186,7 @@ export function IndependentEngage() {
   const [objective, setObjective] = useState("");
   const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
+  const [intentRevealed, setIntentRevealed] = useState(false);
   const [verifiedRevision, setVerifiedRevision] = useState<number | null>(null);
   const [rotationRequest, setRotationRequest] = useState(0);
   const [zoomRequest, setZoomRequest] = useState(0);
@@ -265,6 +266,7 @@ export function IndependentEngage() {
       }
       activeRun.current = saved.run;
       setBookOpen(true);
+      setIntentRevealed(true);
       if (typeof saved.verifiedRevision === "number" && Number.isInteger(saved.verifiedRevision) && saved.verifiedRevision > 0) {
         setVerifiedRevision(saved.verifiedRevision);
       }
@@ -344,6 +346,7 @@ export function IndependentEngage() {
     setLoading(false);
     try { window.sessionStorage.removeItem(MEMORY_KEY); } catch { /* Restricted storage. */ }
     setResult(null);
+    setIntentRevealed(false);
     setVerifiedRevision(null);
     setScreen(null);
     setChoice(0);
@@ -478,6 +481,7 @@ export function IndependentEngage() {
     const text = objectiveRef.current.trim();
     if (!text || loadingRef.current) return;
     loadingRef.current = true;
+    setIntentRevealed(true);
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -779,7 +783,7 @@ export function IndependentEngage() {
     return false;
   };
 
-  const treeState = result && !loading ? "revealed" : loading ? "creating" : listening ? "listening" : "welcome";
+  const treeState = intentRevealed ? (loading ? "creating" : "revealed") : listening ? "listening" : "welcome";
   const currentDesign = result?.blend ?? null;
   const currentView = screen && ["assembled", "blueprint", "dissect", "exploded", "imploded"].includes(screen)
     ? screen as "assembled" | "blueprint" | "dissect" | "exploded" | "imploded"

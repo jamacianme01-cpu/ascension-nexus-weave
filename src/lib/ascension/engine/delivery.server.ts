@@ -1,9 +1,9 @@
 import type { Json } from "@/lib/ascension/data/types";
 import { ASCENSION_GUIDE_INSTRUCTIONS } from "./guide-personality.server";
-import { buildGuideFallbackDelivery } from "./guide-fallback.server";
 import { callOpenAIResponse, type OpenAIWebSource } from "./openai.server";
 import {
   assessResult,
+  scaffoldReason,
   hasEnvisionPreparation,
   notProducedMessage,
   parseDelivery,
@@ -93,10 +93,9 @@ export function governedDelivery(
   const result = record(run.result);
   if (!Object.keys(result).length) return null;
 
-  // The original governed runtime may publish an authored pathway delivery
-  // directly with its verified run. Preserve the actual four authored results
-  // instead of replacing them with an artifact summary. A planning branch alone
-  // is NOT a delivered solution, and no BLEND is constructed by this projection.
+  // Deliver the owner's actual authored result, whether it is a single
+  // result or several real pathways. Neither 3 slots nor BLEND is mandatory.
+  // A planning record by itself is still not a finished invention.
   const authoredCandidates = [
     record(result["objective_delivery"]),
     record(result["delivery"]),
@@ -105,7 +104,6 @@ export function governedDelivery(
   ];
   for (const authored of authoredCandidates) {
     const paths = authored["pathways"];
-    if (!Array.isArray(paths) || paths.length !== 3 || !record(authored["blend"])["blend_reason"]) continue;
     const body = typeof authored["body"] === "string" && authored["body"].trim()
       ? authored["body"].trim()
       : typeof authored["answer"] === "string" ? authored["answer"].trim() : "";
@@ -114,12 +112,22 @@ export function governedDelivery(
       kind: authored["kind"] ?? "answer",
       title: authored["title"] ?? run.objective,
       body,
-      pathways: paths,
-      blend: authored["blend"],
+      pathways: Array.isArray(paths) ? paths : [],
+      blend: authored["blend"] ?? null,
       files: artifactFiles(authored),
       limitations: Array.isArray(authored["limitations"]) ? authored["limitations"] : [],
     };
-    return parseDelivery(candidate);
+    const projected = parseDelivery(candidate);
+    const actual = assessResult(run.objective, projected.body, projected.files,
+      [...projected.pathways, ...(projected.blend ? [projected.blend] : [])]
+        .flatMap(pathway => pathway.visual_svg ? [pathway.visual_svg] : []));
+    // Display only real original output. A delivered image or 3D asset can
+    // be inspected even when it has no exported SVG or artificial BLEND.
+    const hasRealDesignAsset = [...projected.pathways, ...(projected.blend ? [projected.blend] : [])]
+      .some(pathway => Boolean(pathway.generated_image_url || pathway.model_url));
+    if (actual.produced || projected.kind === "not_produced" ||
+        (hasRealDesignAsset && scaffoldReason(projected.body, run.objective) === null))
+      return projected;
   }
 
   const receipts = Array.isArray(result["execution_receipts"])
@@ -464,20 +472,8 @@ export async function externalProductDraft(
       temperature: 0.25,
     });
   } catch (cause) {
-    const detail = cause instanceof Error ? cause.message : String(cause);
-    const fallback = buildGuideFallbackDelivery(run.objective);
-    return {
-      ...fallback,
-      ...(openaiSources.length ? { web_sources: openaiSources } : {}),
-      body: openaiAnswer
-        ? `${fallback.body}\n\nOpenAI first answer (unverified external research):\n${openaiAnswer.slice(0, 7500)}`
-        : fallback.body,
-      limitations: [
-        ...fallback.limitations,
-        ...(openaiAnswer ? ["ASCENSION's independent pathway assessment was unavailable; the external OpenAI research was not verified by ASCENSION."] : []),
-        `Answer provider recovery note: ${detail.slice(0, 240)}`,
-      ],
-    };
+    // Never fabricate a guide result when the real answer provider fails.
+    throw cause;
   }
   const { formatInternalConnection } = await import("./knowledge.server");
   const internalConnection = generated.knowledge
@@ -847,10 +843,9 @@ export async function resolveDelivery(args: {
   const now = args.now ?? Date.now();
   const generate = args.generate ?? externalProductDraft;
   const review = args.review ?? reviewObjectiveFit;
-  const hasOpenAI = process.env["ASCENSION_ENABLE_PAID_APIS"] === "true" &&
-    process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
-    Boolean(process.env["OPENAI_API_KEY"]?.trim());
-  const canReview = hasOpenAI || Boolean(args.review);
+  // A website-side external model never silently reviews or overrides the
+  // owner's original governed result. Explicit test-only review is separate.
+  const canReview = Boolean(args.review);
   let rejectedFit: ObjectiveFitReview | undefined;
   const base = {
     created_at: run.completed_at ?? run.updated_at ?? run.created_at,
@@ -874,7 +869,7 @@ export async function resolveDelivery(args: {
   const variantData = record(args.versionsStage?.status === "completed"
     ? args.versionsStage?.response_payload : null);
   const versionRecords = Array.isArray(variantData["versions"]) ? variantData["versions"] : [];
-  if (run.status === "verified" && versionRecords.length === 4) {
+  if (run.status === "verified" && versionRecords.length > 0) {
     const created = versionRecords.map(record).filter((v) => v["status"] === "created" &&
       Array.isArray(v["files"]) && v["files"].length > 0);
     if (created.length) {
@@ -892,7 +887,7 @@ export async function resolveDelivery(args: {
         versions: versionRecords,
         limitations: [
           ...baseDelivery.limitations,
-          `${created.length} of 4 distinct output versions contain real generated files. The remaining slots are unavailable until their capability succeeds.`,
+          `${created.length} of ${versionRecords.length} recorded output versions contain actual generated files.`,
           "Output files and syntax checks do not independently verify requested features, physical behavior, or deployment.",
         ],
       });
@@ -901,7 +896,7 @@ export async function resolveDelivery(args: {
         engine_label: "ASCENSION_OUTPUT_VERSIONS",
         status: "completed",
         response_payload: combined,
-        note: created.length === 4 ? null : `Created ${created.length} of 4 output versions; remaining versions not yet created.`,
+        note: created.length === versionRecords.length ? null : `Created ${created.length} of ${versionRecords.length} recorded output versions.`,
         source: "governed",
       };
     }
@@ -910,7 +905,8 @@ export async function resolveDelivery(args: {
   // A delivered version is a saved result. Reopening it, model completion,
   // and later runtime transport must not rewrite its answer or drawings.
   // New answers and user-selected blends submit a linked, separate request.
-  if (draft?.status === "completed" && !retry) {
+  if (draft?.status === "completed" && !retry &&
+      (Boolean(args.generate) || draft.source_key === `local:${run.id}`) && run.status !== "verified") {
     try {
       const saved = parseDelivery(draft.response_payload);
       const assessment = assessResult(run.objective, saved.body, saved.files,
@@ -956,11 +952,8 @@ export async function resolveDelivery(args: {
       }
     }
   }
-  // A plain-text runtime receipt does not fulfill a request to create a
-  // multi-path design. Continue into synthesis without falsifying governance.
-  if (governed && governed.kind !== "not_produced" &&
-      !(requestedKind(run.objective) === "design" &&
-        needsSpiralExpansionRepair(run.objective, run.evidence, [], governed))) {
+  // Never suppress a genuine core result for lacking three pathways/BLEND.
+  if (governed && governed.kind !== "not_produced") {
     return {
       ...base,
       status: "completed",
@@ -993,57 +986,22 @@ export async function resolveDelivery(args: {
     );
   }
   const failed = (message: string): ResolvedDelivery => {
-    // Older runs recorded before the resilient guide was deployed can retain
-    // a provider timeout as a sticky failed draft. Show an honest draft
-    // immediately rather than leaving ENGAGE with no readable result.
-    if (/\b429\b|HTTP (?:502|503|504)|temporarily overloaded|operation was aborted|\btimeout\b|timed out/i.test(message)) {
-      const fallback = buildGuideFallbackDelivery(run.objective);
-      return {
-        ...draftBase, status: "completed", response_payload: fallback,
-        error: null, source: "external_draft",
-        note: "External research unavailable; displaying an unverified guide draft.",
-      };
+    if (!TERMINAL_STATUSES.has(run.status)) {
+      // An unrelated draft failure does not terminate the real core.
+      return pending("Original ASCENSION execution is still running.");
     }
-    // When external synthesis fails, show only pathways actually recorded by
-    // the governed runtime. This does not invent a design or verification.
-    const planning = record(record(run.result)["objective_planning"]);
-    const branches = Array.isArray(planning["branches"]) ? planning["branches"].map(record) : [];
-    const recordedPaths = branches.slice(0, 8).flatMap((branch, index) => {
-      const label = String(branch["pathway"] ?? branch["name"] ?? branch["approach"] ?? branch["branch_id"] ?? branch["id"] ?? "").trim();
-      if (!label) return [];
-      const steps = Array.isArray(branch["steps"]) ? branch["steps"].filter((value): value is string => typeof value === "string") : [];
-      const risks = Array.isArray(branch["risks"]) ? branch["risks"].filter((value): value is string => typeof value === "string") : [];
-      return [{
-        id: String(branch["branch_id"] ?? branch["id"] ?? `recorded-${index + 1}`),
-        label: label.slice(0, 160),
-        summary: String(branch["summary"] ?? branch["description"] ?? branch["rationale"] ?? label).slice(0, 5000),
-        steps: steps.slice(0, 12),
-        tradeoffs: risks.slice(0, 12),
-        spiral_form: null, visual_svg: null, model_spec: null,
-        generated_image_url: null, generated_blueprint_url: null,
-        generated_environment_url: null, model_url: null,
-        outcome_score: null, outcome_reason: null,
-      }];
-    });
-    const recorded = run.status === "verified" && recordedPaths.length
-      ? parseDelivery({
-          kind: "answer", title: run.objective.slice(0, 200) || "ASCENSION pathways",
-          body: "Recorded pathways from ASCENSION's governed runtime. External synthesis is unavailable. These records do not establish that a physical build was completed.",
-          pathways: recordedPaths, blend: null, files: [],
-          limitations: ["External answer synthesis unavailable; showing recorded runtime planning only."],
-        })
-      : null;
-    const available = governed?.kind !== "not_produced" ? governed : (recorded ?? governed);
+    // Keep the actual verified files if present; never manufacture a guide
+    // result or reclassify planning branches as a completed invention.
     return {
-      ...draftBase, status: "completed", response_payload: available,
-      error: available && available.kind !== "not_produced" ? null : `The external result engine failed: ${message}`,
-      note: available && available.kind !== "not_produced" ? `External synthesis unavailable: ${message}` : null,
-      source: "governed",
+      ...draftBase, status: "completed",
+      response_payload: governed && governed.kind !== "not_produced" ? governed : null,
+      error: governed && governed.kind !== "not_produced" ? null : message,
+      note: null, source: governed ? "governed" : null,
     };
   };
   // The website does NOT implicitly spend credits on hosted AI. The owner must
   // explicitly opt in; otherwise allow the ASCENSION local worker to deliver.
-  if (!args.generate && !hasOpenAI) {
+  if (!args.generate) {
     if (!TERMINAL_STATUSES.has(run.status))
       return pending("Awaiting a connected ASCENSION answer provider or governed runtime. No paid AI credits will be used.", {
         engine_label: "ASCENSION_LOCAL_RESULT_PENDING",
@@ -1061,7 +1019,7 @@ export async function resolveDelivery(args: {
           limitations: [],
         }),
       error:
-        draft?.error ?? "The runtime finished without a usable result. Configure a cloud answer provider; no paid hosted AI was called.",
+        draft?.error ?? "The original ASCENSION runtime has not delivered the requested result.",
       note: null,
       source: "governed",
     };
@@ -1090,21 +1048,7 @@ export async function resolveDelivery(args: {
     };
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
-    // When a configured external provider times out, keep ENGAGE readable.
-    // This is an explicitly UNVERIFIED guide draft, never a governed result.
-    if (hasOpenAI && /timed? ?out|timeout|aborted|overloaded|HTTP (?:429|502|503|504)|no completed answer|inference failed/i.test(message)) {
-      const fallback = buildGuideFallbackDelivery(run.objective);
-      const recovered = {
-        ...fallback,
-        limitations: [...fallback.limitations, `Research/synthesis recovery note: ${message.slice(0, 200)}`],
-      };
-      try {
-        await store.complete(sourceKey, recovered);
-        return { ...draftBase, created_at: new Date(now).toISOString(),
-          status: "completed", response_payload: recovered,
-          note: "Unverified guide draft; external provider could not finish.", source: "external_draft" };
-      } catch { /* Continue to the existing failure recorder. */ }
-    }
+    // No provider-failure substitution and no manufactured answer.
     await store.fail(sourceKey, obsoleteDrawingFailure ? `Drawing handoff repair: ${message}` : message).catch(() => undefined);
     return failed(message);
   }

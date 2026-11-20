@@ -108,7 +108,20 @@ function guideFor(result: Result): string {
 }
 
 function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
-  if (delivery.pathways.length !== 3 || !delivery.blend) return null;
+  if (delivery.kind === "not_produced" || !delivery.body.trim()) return null;
+  // A truthful single core result is a valid creation/conversation.
+  // Do not reject it for missing legacy model pathways or invent geometry.
+  if (!delivery.blend || delivery.pathways.length !== 3) {
+    const output: Pathway & { blend_reason: string } = {
+      id: "governed-single-output",
+      title: delivery.title,
+      summary: delivery.body,
+      steps: [], tradeoffs: delivery.limitations, parts: [],
+      imageUrl: null, blueprintUrl: null, modelUrl: null,
+      blend_reason: "",
+    };
+    return { introduction: delivery.body, pathways: [], blend: output };
+  }
   const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
     id: path.id, title: path.label, summary: path.summary,
     steps: path.steps, tradeoffs: path.tradeoffs,

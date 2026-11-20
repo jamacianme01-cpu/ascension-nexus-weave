@@ -8,7 +8,12 @@ import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; blueprintUrl: string | null; modelUrl: string | null; blend_reason?: string };
-type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
+type Result = {
+  introduction: string;
+  pathways: Pathway[];
+  blend: Pathway & { blend_reason: string };
+  files?: { name: string; content: string }[];
+};
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
@@ -62,7 +67,7 @@ function say(text: string, onFinished?: () => void) {
     words.pitch = 1.04;
     // Select a natural-sounding woman voice when the browser provides one.
     // Never promise a voice that the user's device has not installed.
-    const available = synth.getVoices().filter(v => v.lang.toLowerCase().startsWith("en"));
+    const available = (synth.getVoices?.() ?? []).filter(v => v.lang.toLowerCase().startsWith("en"));
     words.voice = available.find(v => /samantha|jenny|aria|zira|serena|victoria|susan|kate|ava|female/i.test(v.name)) ?? null;
     words.onstart = () => signalSpeaking(true);
     words.onboundary = () => window.dispatchEvent(new Event("ascension-tree-syllable"));
@@ -120,7 +125,7 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
       imageUrl: null, blueprintUrl: null, modelUrl: null,
       blend_reason: "",
     };
-    return { introduction: delivery.body, pathways: [], blend: output };
+    return { introduction: delivery.body, pathways: [], blend: output, files: delivery.files };
   }
   const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
     id: path.id, title: path.label, summary: path.summary,
@@ -140,7 +145,7 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
   if (new Set(pathways.map(path => path.id)).size !== 3 ||
       pathways.some(path => !path.title.trim() || !path.summary.trim()) ||
       !blend.title.trim() || !blend.summary.trim()) return null;
-  return { introduction: delivery.body, pathways, blend };
+  return { introduction: delivery.body, pathways, blend, files: delivery.files };
 }
 
 function openLine(path: Pathway, blend: boolean): string {
@@ -205,7 +210,7 @@ export function IndependentEngage() {
       if (!saved || !Number.isFinite(saved.savedAt) ||
           Date.now() - saved.savedAt > 24 * 60 * 60 * 1000 ||
           !["Business Planner", "Build / Create", "Guidance"].includes(saved.category || "") ||
-          !saved.result || saved.result.pathways?.length !== 3 || !saved.result.blend ||
+          !saved.result || !Array.isArray(saved.result.pathways) || !saved.result.blend ||
           !/^[a-f0-9-]{36}$/i.test(saved.run?.requestId || "") ||
           !/^[a-f0-9-]{36}$/i.test(saved.run?.guestToken || "")) {
         window.sessionStorage.removeItem(MEMORY_KEY);
@@ -734,7 +739,7 @@ export function IndependentEngage() {
             <button type="button" disabled={loading || !objective.trim()} onClick={() => void engage()}
               className="living-tree-submit">{loading ? "WORKING WITH YOUR INTENT…" : currentDesign ? "CONTINUE DESIGN" : "ENGAGE ASCENSION"}</button>
           </div>
-          {currentDesign && <TreeStudio design={currentDesign} view={currentView} loading={loading}
+          {currentDesign && <TreeStudio design={{ ...currentDesign, files: result?.files ?? [] }} view={currentView} loading={loading}
             onView={next => show(next)} onExplainPart={explainPart} onContinue={buildOnResult}/>}
           {loading && <p className="living-tree-message" role="status">The original ASCENSION engines are processing your intent. <button onClick={stop} type="button">Stop</button></p>}
           {error && <p className="living-tree-message living-tree-error" role="alert">{error}</p>}

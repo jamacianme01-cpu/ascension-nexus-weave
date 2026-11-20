@@ -21,7 +21,7 @@ export function TreeStudio({
   onView: (view: DesignView) => void;
   onExplainPart: (part: TreeDesign["parts"][number]) => void;
   onContinue: () => void;
-  onBack?: () => void;
+  onBack?: (() => void) | undefined;
   loading?: boolean;
   rotateRequest?: number;
   zoomRequest?: number;

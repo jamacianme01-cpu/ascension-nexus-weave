@@ -117,6 +117,11 @@ function nextWelcome(): string {
     const n = Number(window.localStorage.getItem(key) || "-1");
     const next = Number.isInteger(n) && n >= -1 ? (n + 1) % WELCOMES.length : 0;
     window.localStorage.setItem(key, String(next));
+    if (next === 0) {
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+      return greeting + ". It's good to see you. What would you like to work on today?";
+    }
     return WELCOMES[next]!;
   } catch { return WELCOMES[0]!; }
 }

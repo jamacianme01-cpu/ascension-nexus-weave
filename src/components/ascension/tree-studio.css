@@ -35,6 +35,7 @@
 .tree-studio-views { display: flex; flex-wrap: wrap; gap: .35rem; flex-shrink: 0; }
 .tree-studio-views button[aria-current="page"] { background: #375a46; border-color: #eaca8a; }
 .tree-studio-work { display: grid; grid-template-columns: minmax(0, 1fr) minmax(10rem, 23%); gap: .6rem; flex: 1; min-height: 0; }
+.tree-studio-work[data-has-parts="false"] { grid-template-columns: minmax(0, 1fr); }
 .tree-studio-viewport { min-height: 0; display: flex; overflow: hidden; background: #0a1820; border: 1px solid rgb(205 161 87 / 24%); }
 .tree-studio-parts { min-width: 0; overflow: auto; padding: .4rem; border: 1px solid rgb(205 161 87 / 35%); font-size: .78rem; }
 .tree-studio-parts-toggle { width: 100%; text-align: left; }

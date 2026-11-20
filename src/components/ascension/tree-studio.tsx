@@ -14,7 +14,7 @@ export type TreeDesign = {
 export const TREE_DESIGN_VIEWS: DesignView[] = ["assembled", "blueprint", "dissect", "exploded", "imploded"];
 
 export function TreeStudio({
-  design, view, onView, onExplainPart, onContinue, loading = false,
+  design, view, onView, onExplainPart, onContinue, rotateRequest = 0, zoomRequest = 0, loading = false,
 }: {
   design: TreeDesign;
   view: DesignView;
@@ -22,6 +22,8 @@ export function TreeStudio({
   onExplainPart: (part: TreeDesign["parts"][number]) => void;
   onContinue: () => void;
   loading?: boolean;
+  rotateRequest?: number;
+  zoomRequest?: number;
 }) {
   const [partsOpen, setPartsOpen] = useState(true);
   function downloadOriginalArtifact(file: {name: string; content: string}) {
@@ -50,7 +52,8 @@ export function TreeStudio({
     <div className="tree-studio-work">
       <div className="tree-studio-viewport">
         {design.modelUrl || design.imageUrl || design.blueprintUrl
-          ? <V1DesignViewport mode={view} modelUrl={design.modelUrl} imageUrl={design.imageUrl} blueprintUrl={design.blueprintUrl}/>
+          ? <V1DesignViewport mode={view} modelUrl={design.modelUrl} imageUrl={design.imageUrl}
+            blueprintUrl={design.blueprintUrl} rotateRequest={rotateRequest} zoomRequest={zoomRequest}/>
           : <article className="tree-studio-readable" aria-label="Actual governed result">
               <p>{design.summary}</p>
               {design.files?.length ? <div className="tree-studio-files">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import "./living-tree.css";
 
 type State = "welcome" | "listening" | "creating" | "revealed";
@@ -47,10 +47,17 @@ export function LivingTree({ state, verifiedRevision = null }: Props) {
       draggable={false} onError={() => missingImage("portrait")} />
     <img className="living-tree-reveal" src={TREE_REVEAL} alt=""
       draggable={false} onError={() => missingImage("reveal")} />
+    {/* The mouth is a feather-small crop of the SAME photograph, not a new
+        face or animated cartoon. Word boundaries drive subtle movement.
+        Full phoneme-accurate lip sync requires a separate approved face rig. */}
+    <img className="living-tree-mouth living-tree-close-mouth" src={TREE_PORTRAIT} alt=""
+      draggable={false} aria-hidden="true" />
+    <img className="living-tree-mouth living-tree-open-mouth" src={TREE_REVEAL} alt=""
+      draggable={false} aria-hidden="true" />
     <span className="living-tree-breath" aria-hidden="true" />
     <span className="living-tree-gold" aria-hidden="true" data-verified={hasVerifiedWork} />
     <div className="living-tree-expression" data-speaking={speaking} aria-hidden="true"
-      style={{ "--voice-pulse": voicePulse % 2 } as React.CSSProperties} />
+      style={{ "--voice-pulse": voicePulse % 2 } as CSSProperties} />
     {missing.length > 0 && <p className="living-tree-image-missing" role="status">
       Approved Tree portrait/reveal artwork is not installed. Use the original approved images; do not replace the character.
     </p>}

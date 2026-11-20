@@ -9,6 +9,7 @@ export type TreeDesign = {
   blueprintUrl: string | null;
   modelUrl: string | null;
   parts: { name: string; location: string; purpose: string }[];
+  files?: { name: string; content: string }[];
 };
 export const TREE_DESIGN_VIEWS: DesignView[] = ["assembled", "blueprint", "dissect", "exploded", "imploded"];
 
@@ -23,6 +24,16 @@ export function TreeStudio({
   loading?: boolean;
 }) {
   const [partsOpen, setPartsOpen] = useState(true);
+  function downloadOriginalArtifact(file: {name: string; content: string}) {
+    // User-initiated download of actual governed source bytes, never generated
+    // by the front end and never rendered as executable HTML.
+    const uri = URL.createObjectURL(new Blob([file.content], {type:"text/plain;charset=utf-8"}));
+    const anchor = document.createElement("a");
+    anchor.href = uri;
+    anchor.download = file.name;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(uri), 1000);
+  }
 
   return <section className="tree-studio" aria-label="Live ASCENSION creation and inspection">
     <header className="tree-studio-heading">
@@ -38,7 +49,17 @@ export function TreeStudio({
     </nav>
     <div className="tree-studio-work">
       <div className="tree-studio-viewport">
-        <V1DesignViewport mode={view} modelUrl={design.modelUrl} imageUrl={design.imageUrl} blueprintUrl={design.blueprintUrl}/>
+        {design.modelUrl || design.imageUrl || design.blueprintUrl
+          ? <V1DesignViewport mode={view} modelUrl={design.modelUrl} imageUrl={design.imageUrl} blueprintUrl={design.blueprintUrl}/>
+          : <article className="tree-studio-readable" aria-label="Actual governed result">
+              <p>{design.summary}</p>
+              {design.files?.length ? <div className="tree-studio-files">
+                <h3>Original delivered files</h3>
+                {design.files.map(file => <button key={file.name} type="button"
+                  onClick={() => downloadOriginalArtifact(file)}>{file.name}</button>)}
+              </div> : null}
+              <p className="tree-studio-no-geometry">No measured 3D model or blueprint has been delivered for this result.</p>
+            </article>}
       </div>
       <aside className="tree-studio-parts" aria-label="Invention components">
         <button className="tree-studio-parts-toggle" type="button" aria-expanded={partsOpen}

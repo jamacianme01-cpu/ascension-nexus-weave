@@ -20,6 +20,10 @@ assert.match(book,/nextWelcome/);
 assert.match(book,/samantha\|jenny\|aria\|zira\|serena/);
 assert.match(book,/chooseCategory\(item\)/);
 assert.match(book,/TreeStudio/);
+assert.match(book,/living-pathway-options/);
+assert.match(book,/ENTER PATHWAY/);
+assert.match(book,/showingPathways/);
+assert.match(book,/selected: active, blend: active.id === result.blend.id/);
 assert.match(book,/governedPersisted\(run\)/);
 assert.match(book,/continuation\.current/);
 assert.doesNotMatch(book,/<DesignedFlow\s/);
@@ -44,4 +48,4 @@ for (const [path, digest] of photos) {
     throw Error("Required owner-approved photograph missing: " + path);
   }
 }
-console.log("PASS: one living photoreal Tree; Book; woman's voice preference; real single governed result; preserved original images.");
+console.log("PASS: approved photoreal Tree and Book; verified four-pathway selection or truthful single result; selection-aware continuation; original artwork.");

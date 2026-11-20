@@ -778,11 +778,15 @@ export function IndependentEngage() {
     <section aria-label="ASCENSION Tree of Knowledge" className="ascension-command">
       <div className="ascension-stage living-tree-stage">
         <LivingTree state={treeState} verifiedRevision={verifiedRevision} />
-        {!bookOpen && <section className="living-book-entry" aria-label="ASCENSION Book entrance">
-          <img src={BOOK} alt="The original ASCENSION Knowledgeverse Book" draggable={false}/>
-          <button className="living-book-open" type="button"
-            onClick={() => chooseCategory("Build / Create")}
-            aria-label="Open the Book and meet the Tree of Knowledge">OPEN THE BOOK</button>
+        {!bookOpen && <section className="living-book-entry" aria-label="ASCENSION Book and Tree opening">
+          <div className="living-book-art">
+            <img src={BOOK} alt="The original ASCENSION Knowledgeverse Book" draggable={false}/>
+          </div>
+          <div className="living-book-choices" role="group" aria-label="Choose a Book category">
+            {(["Business Planner", "Build / Create", "Guidance"] as const).map(item =>
+              <button type="button" key={item} onClick={() => chooseCategory(item)}>{item}</button>
+            )}
+          </div>
         </section>}
         {bookOpen && <>
           <details className="living-tree-book-navigation">

@@ -34,7 +34,7 @@ assert.match(studio,/BLUEPRINT|blueprint/);
 assert.match(studio,/dissect/);
 assert.match(studio,/exploded/);
 assert.match(studio,/imploded/);
-assert.match(studio,/No measured 3D model or blueprint/);
+assert.doesNotMatch(studio,/No measured 3D model or blueprint/);
 assert.match(guest,/const complete = Boolean\(delivered/);
 assert.doesNotMatch(guest,/delivered\?\.pathways.length === 3/);
 

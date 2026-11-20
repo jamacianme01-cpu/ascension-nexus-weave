@@ -1,0 +1,110 @@
+/* Owner-approved realistic Tree of Knowledge, one woman in two states.
+   No cartoon, mascot, new scenery, fake generated 3D model, or imposed panels. */
+.living-tree {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: #132219;
+  pointer-events: none;
+}
+.living-tree-portrait, .living-tree-reveal {
+  position: absolute;
+  inset: 0;
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center center;
+  user-select: none;
+  transition: opacity 1.25s ease, transform 2.15s cubic-bezier(.19,.75,.25,1);
+  will-change: transform, opacity;
+}
+.living-tree-portrait {
+  opacity: 1;
+  transform: scale(1.045);
+  animation: tree-gentle-presence 10s ease-in-out infinite alternate;
+}
+.living-tree-reveal { opacity: 0; transform: scale(1.3) translateY(4%); }
+.living-tree[data-tree-state="creating"] .living-tree-portrait,
+.living-tree[data-tree-state="revealed"] .living-tree-portrait {
+  opacity: 0;
+  animation: none;
+  transform: scale(1.13) translateY(-3%);
+}
+.living-tree[data-tree-state="creating"] .living-tree-reveal,
+.living-tree[data-tree-state="revealed"] .living-tree-reveal {
+  opacity: 1;
+  transform: scale(1);
+}
+.living-tree-breath {
+  position: absolute;
+  left: 35%;
+  top: 40%;
+  height: 27%;
+  width: 30%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 202 111 / 10%), transparent 70%);
+  mix-blend-mode: screen;
+  animation: tree-living-breath 5.7s ease-in-out infinite;
+}
+.living-tree-gold {
+  position: absolute;
+  left: 49%;
+  top: 68%;
+  width: 2.2%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgb(245 194 84 / 35%), transparent 75%);
+  filter: blur(3px);
+  opacity: .15;
+  transition: opacity 2s ease;
+}
+.living-tree-gold[data-verified="true"] { opacity: .6; animation: tree-living-breath 7s ease-in-out infinite; }
+.living-tree[data-tree-speaking="true"] .living-tree-portrait,
+.living-tree[data-tree-speaking="true"] .living-tree-reveal {
+  animation: tree-speaking-presence 1.7s ease-in-out infinite alternate;
+}
+.living-tree-expression {
+  position: absolute;
+  left: 43%;
+  top: 51%;
+  width: 14%;
+  height: 11%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgb(231 183 106 / 3%), transparent 80%);
+  opacity: 0;
+}
+.living-tree-expression[data-speaking="true"] {
+  opacity: 1;
+  transform: translateY(calc(var(--voice-pulse, 0) * .18rem));
+  transition: transform .12s ease;
+}
+.living-tree-image-missing {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(31rem, 90%);
+  color: #fff2d0;
+  background: rgb(15 22 15 / 95%);
+  border: 1px solid #aa8050;
+  padding: .8rem;
+  border-radius: .6rem;
+  font-size: .8rem;
+}
+@keyframes tree-gentle-presence {
+  0% { transform: scale(1.045) translateY(0); }
+  100% { transform: scale(1.065) translateY(-.45%); }
+}
+@keyframes tree-living-breath {
+  0%, 100% { opacity: .32; transform: scale(.94); }
+  50% { opacity: .6; transform: scale(1.08); }
+}
+@keyframes tree-speaking-presence {
+  0%, 100% { transform: scale(1.012) translateY(0); }
+  50% { transform: scale(1.016) translateY(-.4%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .living-tree *, .living-tree::before, .living-tree::after { animation: none !important; transition: none !important; }
+}

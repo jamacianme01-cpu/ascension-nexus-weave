@@ -113,3 +113,110 @@
 @media (prefers-reduced-motion: reduce) {
   .living-tree-world * { scroll-behavior: auto !important; }
 }
+
+/* Prevent the previous stylesheet's old absolute alert from covering her face. */
+.living-tree-world .living-tree-stage > .living-tree-message.living-tree-error[role="alert"] {
+  top: auto;
+  bottom: clamp(6rem, 12svh, 8rem);
+  left: 50%;
+  width: min(38rem, 88vw);
+  transform: translateX(-50%);
+  padding: .6rem .9rem;
+  border-radius: .65rem;
+  background: rgba(33, 10, 9, .92);
+  color: #fbd8ca;
+  font-size: .8rem;
+  line-height: 1.35;
+  z-index: 35;
+}
+@media (max-width: 660px) {
+  .living-tree-world .living-book-entry > img { transform: scale(1.34); }
+  .living-tree-world .living-tree-stage > .living-tree-message.living-tree-error[role="alert"] {
+    bottom: 9rem;
+  }
+}
+
+/* Her original Book stays present in the same Tree world. */
+.living-tree-world .living-tree-book-navigation summary {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  list-style: none;
+}
+.living-tree-world .living-tree-book-navigation summary::-webkit-details-marker { display: none; }
+.living-tree-world .living-tree-book-navigation summary img {
+  display: block;
+  width: 3.35rem;
+  height: 2.1rem;
+  object-fit: cover;
+  object-position: center 55%;
+  border: 1px solid rgba(230, 180, 101, .5);
+  border-radius: .3rem;
+}
+
+/* The owner's approved initial scene is Tree AND Book together. No
+   invented OPEN BOOK step, no replacement painting and no cover takeover. */
+.living-tree-world .living-book-entry {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  background: transparent;
+  align-items: flex-start;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.living-tree-world .living-book-entry::after { content: none; }
+.living-tree-world .living-book-art {
+  position: absolute;
+  left: clamp(-2rem, -1vw, 0rem);
+  bottom: 7svh;
+  width: min(39vw, 40rem);
+  height: min(39svh, 27rem);
+  mask-image: radial-gradient(ellipse 75% 80% at 50% 55%, black 48%, transparent 100%);
+  opacity: .95;
+}
+.living-tree-world .living-book-art img {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 54%;
+  transform: none;
+}
+.living-tree-world .living-book-choices {
+  position: absolute;
+  z-index: 32;
+  bottom: 2.2svh;
+  left: clamp(.65rem, 2.3vw, 2.6rem);
+  width: min(46vw, 42rem);
+  margin: 0;
+  padding: .5rem;
+  justify-content: flex-start;
+  pointer-events: auto;
+  background: rgba(8, 25, 20, .82);
+}
+.living-tree-world .living-book-choices button {
+  padding: .55rem .75rem;
+  min-height: 2.5rem;
+  font-size: clamp(.68rem, 1vw, .9rem);
+}
+@media (max-width: 720px) {
+  .living-tree-world .living-book-art {
+    width: 88vw;
+    height: 30svh;
+    left: -8vw;
+    bottom: 17svh;
+    opacity: .83;
+  }
+  .living-tree-world .living-book-choices {
+    left: 3vw;
+    bottom: 2svh;
+    width: 94vw;
+    justify-content: center;
+  }
+  .living-tree-world .living-book-choices button {
+    min-height: 2.7rem;
+    flex: 1 1 7rem;
+  }
+}

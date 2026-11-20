@@ -19,12 +19,26 @@ function validatedOwnerEndpoint(endpoint: string): URL {
   const loopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
   const remoteTls = url.protocol === "https:";
   const localPlaintext = url.protocol === "http:" && loopback;
-  if (!remoteTls && !localPlaintext) {
-    throw new Error("ASCENSION hybrid transport must use HTTPS, or HTTP on local loopback.");
+
+  // COMPATIBILITY ONLY for the owner's EXISTING, already-hosted public page.
+  // The exact worker hostname is on Fly's private WireGuard 6PN, NOT public
+  // HTTP. No Fly machine provisioning, startup APIs, or paid AI introduced.
+  // This exception is disabled on Oracle, on personal computers, and on
+  // unrecognized hosts. The owner’s long-term Oracle/local path stays HTTPS.
+  const existingPrivateWorker =
+    url.protocol === "http:" &&
+    hostname === "worker.process.ascension-nexus-weave.internal" &&
+    url.port === "9091" &&
+    url.pathname === "/" &&
+    process.env["FLY_APP_NAME"] === "ascension-nexus-weave";
+  if (!remoteTls && !localPlaintext && !existingPrivateWorker) {
+    throw new Error(
+      "ASCENSION private transport requires HTTPS, local loopback, or the existing authenticated private worker on its original host.",
+    );
   }
-  if (hostname === "worker.process.ascension-nexus-weave.internal" ||
-      hostname.endsWith(".fly.dev") || hostname.endsWith(".fly.io")) {
-    throw new Error("ASCENSION owner hybrid cannot connect to the retired Fly endpoint.");
+  if (hostname.endsWith(".fly.dev") || hostname.endsWith(".fly.io") ||
+      (hostname.endsWith(".internal") && !existingPrivateWorker)) {
+    throw new Error("ASCENSION transport refused an unapproved endpoint.");
   }
   return url;
 }
@@ -61,6 +75,7 @@ async function transportFetch(
     },
     ...(method === "POST" ? { body: JSON.stringify(body ?? {}) } : {}),
     signal: AbortSignal.timeout(25000),
+    redirect: "error",
     cache: "no-store",
   });
 }

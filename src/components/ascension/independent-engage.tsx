@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
+import { type DesignedScreen, type DesignedTarget } from "@/components/ascension/designed-flow";
 import { LivingTree } from "@/components/ascension/living-tree";
 import { TreeStudio } from "@/components/ascension/tree-studio";
 import "./living-tree-scene.css";
 import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
 import { governedPersisted, type ObjectiveDelivery } from "@/lib/ascension/result-model";
+import { awaitTreeWomanVoice } from "@/lib/ascension/tree-woman-voice";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; blueprintUrl: string | null; modelUrl: string | null; blend_reason?: string };
@@ -35,17 +36,28 @@ let activeUtterance: SpeechSynthesisUtterance | null = null;
 function signalSpeaking(active: boolean) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ascension-tree-speech", { detail: { speaking: active } }));
 }
-function say(text: string, onFinished?: () => void) {
+async function say(text: string, onFinished?: () => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
   const synth = window.speechSynthesis;
   try { synth.cancel(); } catch { return; }
+
+  // speechSynthesis.getVoices() is often EMPTY on the first call, especially
+  // in Windows Chrome. Waiting for voiceschanged avoids the male default.
+  const woman = await awaitTreeWomanVoice(synth);
+  if (sequence !== speechSequence) return;
+  if (!woman) {
+    // No male/unknown substitute, and no technical fault announcement from
+    // the Tree. The interaction can still continue by speaking or typing.
+    signalSpeaking(false);
+    onFinished?.();
+    return;
+  }
   const chunks: string[] = [];
   let chunk = "";
   for (const word of text.trim().split(/\s+/)) {
     if (chunk && chunk.length + word.length + 1 > 220) {
-      chunks.push(chunk);
-      chunk = word;
+      chunks.push(chunk); chunk = word;
     } else {
       chunk += (chunk ? " " : "") + word;
     }
@@ -63,17 +75,25 @@ function say(text: string, onFinished?: () => void) {
     }
     const words = new SpeechSynthesisUtterance(chunks[index++]!);
     activeUtterance = words;
-    words.rate = 0.96;
-    words.pitch = 1.04;
-    // Select a natural-sounding woman voice when the browser provides one.
-    // Never promise a voice that the user's device has not installed.
-    const available = (synth.getVoices?.() ?? []).filter(v => v.lang.toLowerCase().startsWith("en"));
-    words.voice = available.find(v => /samantha|jenny|aria|zira|serena|victoria|susan|kate|ava|female/i.test(v.name)) ?? null;
+    words.voice = woman;
+    words.lang = woman.lang;
+    words.rate = /neural|natural|online/i.test(woman.name) ? 1.0 : 0.94;
+    words.pitch = 1.0;
     words.onstart = () => signalSpeaking(true);
     words.onboundary = () => window.dispatchEvent(new Event("ascension-tree-syllable"));
     words.onend = next;
-    words.onerror = next;
-    try { synth.speak(words); } catch { activeUtterance = null; }
+    words.onerror = () => {
+      if (sequence !== speechSequence) return;
+      activeUtterance = null;
+      signalSpeaking(false);
+      onFinished?.();
+    };
+    try { synth.speak(words); } catch {
+      if (sequence !== speechSequence) return;
+      activeUtterance = null;
+      signalSpeaking(false);
+      onFinished?.();
+    }
   };
   next();
 }
@@ -90,6 +110,11 @@ function nextWelcome(): string {
     const n = Number(window.localStorage.getItem(key) || "-1");
     const next = Number.isInteger(n) && n >= -1 ? (n + 1) % WELCOMES.length : 0;
     window.localStorage.setItem(key, String(next));
+    if (next === 0) {
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+      return greeting + ". It's good to see you. What would you like to work on today?";
+    }
     return WELCOMES[next]!;
   } catch { return WELCOMES[0]!; }
 }
@@ -101,36 +126,31 @@ function sentence(text: string): string {
   return line.length > 140 ? line.slice(0, 137).trim() + "…" : line;
 }
 
-function cardLine(text: string): string {
-  const phrase = text.replace(/\s+/g, " ").trim().split(/[.!?]/)[0]?.trim() ?? "";
-  return phrase.length <= 28 ? phrase : "";
+function guideFor(result: Result): string {
+  // Speak actual ASCENSION-authored content without removing provider names,
+  // changing the owner's terminology, or substituting a canned announcement.
+  const original = result.introduction.trim();
+  if (!original) return "";
+  const paragraph = original.split(/\n\s*\n/)[0]!.trim();
+  return paragraph.length > 600 ? sentence(paragraph) : paragraph;
 }
 
-function guideFor(result: Result): string {
-  const intro = result.introduction.replace(/\b(ChatGPT|OpenAI|Claude|Grok)\b/gi, "").replace(/\s+/g, " ").trim();
-  if (intro.length > 40 && intro.length < 320) return intro;
-  return `The governed result is ready. I can show the design, explain its components, or help you change it.`;
+function originalBlendWasDelivered(result: Result): boolean {
+  return result.pathways.length > 1 && Boolean(result.blend.blend_reason);
 }
 
 function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
   if (delivery.kind === "not_produced" || !delivery.body.trim()) return null;
-  // A truthful single core result is a valid creation/conversation.
-  // Do not reject it for missing legacy model pathways or invent geometry.
-  if (!delivery.blend || delivery.pathways.length !== 3) {
-    const output: Pathway & { blend_reason: string } = {
-      id: "governed-single-output",
-      title: delivery.title,
-      summary: delivery.body,
-      steps: [], tradeoffs: delivery.limitations, parts: [],
-      imageUrl: null, blueprintUrl: null, modelUrl: null,
-      blend_reason: "",
-    };
-    return { introduction: delivery.body, pathways: [], blend: output, files: delivery.files };
-  }
+
+  // The owner's ORIGINAL runtime chooses the result. One real model must
+  // retain its own image, GLB, dimensions and parts; do not throw them out
+  // when there is no artificial three-pathway + BLEND envelope.
   const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
-    id: path.id, title: path.label, summary: path.summary,
-    steps: path.steps, tradeoffs: path.tradeoffs,
-    // Retain real delivered assets, not the same stock drone picture for all objectives.
+    id: path.id,
+    title: path.label,
+    summary: path.summary,
+    steps: path.steps,
+    tradeoffs: path.tradeoffs,
     parts: path.model_spec?.parts.map(part => ({
       name: part.name,
       purpose: part.purpose ?? "",
@@ -140,18 +160,31 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
     blueprintUrl: path.generated_blueprint_url ?? null,
     modelUrl: path.model_url ?? null,
   });
-  const pathways = delivery.pathways.map(toPath);
-  const blend = { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason };
-  if (new Set(pathways.map(path => path.id)).size !== 3 ||
-      pathways.some(path => !path.title.trim() || !path.summary.trim()) ||
-      !blend.title.trim() || !blend.summary.trim()) return null;
-  return { introduction: delivery.body, pathways, blend, files: delivery.files };
-}
 
+  const actualPaths = delivery.pathways.map(toPath);
+  const chosen = delivery.blend
+    ? { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason }
+    : actualPaths[0]
+      ? { ...actualPaths[0], blend_reason: "" }
+      : {
+          id: "governed-single-output",
+          title: delivery.title,
+          summary: delivery.body,
+          steps: [], tradeoffs: delivery.limitations, parts: [],
+          imageUrl: null, blueprintUrl: null, modelUrl: null,
+          blend_reason: "",
+        };
+
+  return {
+    introduction: delivery.body,
+    pathways: actualPaths,
+    blend: chosen,
+    files: delivery.files,
+  };
+}
 function openLine(path: Pathway, blend: boolean): string {
   const detail = sentence(blend ? path.blend_reason || path.summary : path.summary);
-  if (blend) return `${path.title}. ${detail}`;
-  return `${path.title}. ${detail} The other views are there if a closer look would help.`;
+  return `${path.title}. ${detail}`;
 }
 
 /** Hosted Tree entry. Engines analyze the answer; the fourth pathway is the blend. */
@@ -159,6 +192,7 @@ export function IndependentEngage() {
   const [objective, setObjective] = useState("");
   const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
+  const [intentRevealed, setIntentRevealed] = useState(false);
   const [verifiedRevision, setVerifiedRevision] = useState<number | null>(null);
   const [rotationRequest, setRotationRequest] = useState(0);
   const [zoomRequest, setZoomRequest] = useState(0);
@@ -194,6 +228,11 @@ export function IndependentEngage() {
   const continuation = useRef<{ requestId: string; guestToken: string; selected: Pathway; blend: boolean } | null>(null);
 
   useEffect(() => {
+    // Preload the native voice registry; speech chooses only a known
+    // woman voice after voiceschanged. No technical status is spoken by Tree.
+    window.speechSynthesis?.getVoices?.();
+  }, []);
+  useEffect(() => {
     categoryRef.current = category;
   }, [category]);
   // Restore the same authorized guest run and actual delivered pathways after
@@ -220,6 +259,7 @@ export function IndependentEngage() {
       }
       activeRun.current = saved.run;
       setBookOpen(true);
+      setIntentRevealed(true);
       if (typeof saved.verifiedRevision === "number" && Number.isInteger(saved.verifiedRevision) && saved.verifiedRevision > 0) {
         setVerifiedRevision(saved.verifiedRevision);
       }
@@ -230,7 +270,7 @@ export function IndependentEngage() {
       objectiveRef.current = saved.objective;
       setObjective(saved.objective);
       setResult(saved.result);
-      setChoice(Number.isInteger(saved.choice) && saved.choice >= 0 && saved.choice < 4 ? saved.choice : 0);
+      setChoice(0);
       setScreen(saved.screen && ["assembled", "blueprint", "dissect", "exploded", "imploded"].includes(saved.screen) ? saved.screen : "assembled");
     } catch {
       window.sessionStorage.removeItem(MEMORY_KEY);
@@ -299,6 +339,7 @@ export function IndependentEngage() {
     setLoading(false);
     try { window.sessionStorage.removeItem(MEMORY_KEY); } catch { /* Restricted storage. */ }
     setResult(null);
+    setIntentRevealed(false);
     setVerifiedRevision(null);
     setScreen(null);
     setChoice(0);
@@ -346,7 +387,7 @@ export function IndependentEngage() {
     recognition.current?.stop();
     // Subsequent conversation continues the SAME actual governed objective.
     if (result && activeRun.current && !continuation.current) {
-      continuation.current = { ...activeRun.current, selected: result.blend, blend: true };
+      continuation.current = { ...activeRun.current, selected: result.blend, blend: originalBlendWasDelivered(result) };
     }
     // A spoken objective executes hands-free; the existing button remains
     // available when speech recognition or a microphone is unavailable.
@@ -433,6 +474,7 @@ export function IndependentEngage() {
     const text = objectiveRef.current.trim();
     if (!text || loadingRef.current) return;
     loadingRef.current = true;
+    setIntentRevealed(true);
     const token = ++generation.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -456,7 +498,7 @@ export function IndependentEngage() {
       // Previously a failed lookup stopped ENGAGE before the runtime saw the objective.
       // A selected design continues its actual recorded run, not an unrelated new objective.
       const parent = continuation.current ??
-        (result && activeRun.current ? { ...activeRun.current, selected: result.blend, blend: true } : null);
+        (result && activeRun.current ? { ...activeRun.current, selected: result.blend, blend: originalBlendWasDelivered(result) } : null);
       const submitted = await submitGuestObjective({ data: {
         objective: text,
         ...(parent ? {
@@ -525,19 +567,13 @@ export function IndependentEngage() {
               activeRun.current = { requestId, guestToken };
               setResult(actual);
               if (parent) {
-                // BUILD ON RESULT remains in the design inspection experience.
-                // Match the continuing pathway by its recorded ID when possible;
-                // otherwise retain the original pathway position, including BLEND.
-                const updated = [...actual.pathways, actual.blend];
-                const originalIndex = parent.blend ? 3 : result?.pathways.findIndex(p => p.id === parent.selected.id) ?? 0;
-                const matchedIndex = updated.findIndex(p => p.id === parent.selected.id);
-                const nextIndex = matchedIndex >= 0 ? matchedIndex : Math.max(0, Math.min(3, originalIndex));
-                setChoice(nextIndex);
-                 setScreen(previous => previous && previous !== "spiral" ? previous : "assembled");
-                const selected = updated[nextIndex]!;
-                offer("The continued design is ready. " + openLine(selected, nextIndex === 3));
+                // One evolving original result. No fabricated fourth slot or
+                // out-of-bounds pathway index when the core returns one model.
+                setChoice(0);
+                setScreen(previous => previous && previous !== "spiral" ? previous : "assembled");
+                offer(openLine(actual.blend, originalBlendWasDelivered(actual)));
               } else {
-                setChoice(3);
+                setChoice(0);
                 setScreen("assembled");
                 offer(guideFor(actual));
               }
@@ -553,8 +589,8 @@ export function IndependentEngage() {
             }
             if (delivered?.status === "completed") {
               const reason = delivered.source === "external_draft"
-                ? "Only an external draft was returned, not the required governed pathways."
-                : delivered.error || "The governed result contains no complete set of three pathways and BLEND.";
+                ? "Only an external draft was returned, not the original governed result."
+                : delivered.error || "The original governed runtime has not delivered a complete result.";
               setError("ENGAGE delivery incomplete: " + reason.slice(0, 350));
               terminal = true;
               return;
@@ -618,66 +654,28 @@ export function IndependentEngage() {
     offer("Stopped. The book can wait until you want to try again.");
   }
 
-  const readings: PathwayReading[] = result
-    ? [...result.pathways, result.blend].map((path, index) => ({
-        title: path.title,
-        line: cardLine(path.summary),
-        blend: index === 3,
-        summary: path.summary,
-        imageUrl: path.imageUrl,
-        blueprintUrl: path.blueprintUrl,
-        modelUrl: path.modelUrl,
-        parts: path.parts,
-      }))
-    : [];
-
   function show(next: DesignedTarget) {
     if (next === "book") {
       setScreen(null);
-      offer("The book is here whenever another reading would help.");
       return;
     }
-    const selected = readings[choice];
-    if (next === "assembled" && selected) offer(openLine(
-      choice === 3 ? result!.blend : result!.pathways[choice]!,
-      choice === 3,
-    ));
-    else if (next === "blueprint") offer("The blueprint is this same reading, drawn out, if that view would help.");
-    else if (next === "dissect") offer("This opens the same reading so the parts can be seen.");
-    else if (next === "exploded") offer("The parts are set apart here, if seeing them separately would help.");
-    else if (next === "imploded") offer("The parts can come back together from here.");
-    else if (next === "spiral") offer("Let's return to the design we're developing.");
     setScreen(next);
-  }
-
-  function openPathway(index: number) {
-    const path = index === 3 ? result?.blend : result?.pathways[index];
-    if (!path) return;
-    setChoice(index);
-    setScreen("assembled");
-    // Introduce the selected picture and its actual delivered components,
-    // without inventing a physical location, function, or measurement.
-    const picture = path.imageUrl || path.modelUrl
-      ? "This is the selected design."
-      : "A design picture has not been delivered for this pathway.";
-    const componentReading = path.parts.length
-      ? "The delivered components are: " + path.parts.map(part => {
-          const details = [
-            part.name,
-            part.location ? "where it belongs: " + part.location : "",
-            part.purpose ? "what it does: " + part.purpose : "",
-          ].filter(Boolean);
-          return details.join(", ");
-        }).join("; ") + "."
-      : "Component details have not been delivered yet.";
-    offer([openLine(path, index === 3), picture, componentReading].join(" "));
+    if (!result) return;
+    const actual = result.blend;
+    if (next === "assembled") offer(openLine(actual, originalBlendWasDelivered(result)));
+    // Inspection controls work on the same genuine model. The Tree never
+    // describes parts, dimensions or pictures that were not actually delivered.
+    else if (next === "blueprint" && actual.blueprintUrl)
+      offer(actual.title + ". Here is the blueprint for this design.");
+    else if (["dissect", "exploded", "imploded"].includes(next) && actual.modelUrl)
+      offer(actual.title + ". We can inspect the parts of this model.");
   }
 
   function explainPart(part: Part) {
     offer([
       part.name,
-      part.location ? "Where: " + part.location : "Its location is not yet described in the delivered result.",
-      part.purpose ? "Does: " + part.purpose : "Its function is not yet described in the delivered result.",
+      ...(part.location ? ["Where: " + part.location] : []),
+      ...(part.purpose ? ["Does: " + part.purpose] : []),
     ].join(". "));
   }
 
@@ -685,7 +683,7 @@ export function IndependentEngage() {
     if (!result || !activeRun.current) return;
     const selected = result.blend;
     if (!selected) return;
-    continuation.current = { ...activeRun.current, selected, blend: true };
+    continuation.current = { ...activeRun.current, selected, blend: originalBlendWasDelivered(result) };
     objectiveRef.current = "";
     setObjective("");
     setError("");
@@ -708,7 +706,7 @@ export function IndependentEngage() {
       setZoomRequest(n => n + (spoken.endsWith("in") ? 1 : -1));
       return true;
     }
-    const view = spoken.replace(/^(?:show|open|view|go to)\\s+/, "");
+    const view = spoken.replace(/^(?:show|open|view|go to)\s+/, "");
     const views: Record<string, DesignedScreen> = {
       blueprint: "blueprint", dissect: "dissect", explode: "exploded",
       exploded: "exploded", implode: "imploded", imploded: "imploded",
@@ -724,8 +722,8 @@ export function IndependentEngage() {
       explainPart(part); return true;
     }
     // Existing governed continuation accepts a modification as an objective.
-    if (/^(?:add|remove|replace|change|modify|make|move|increase|decrease|extend|reduce)\\b/.test(spoken) && activeRun.current) {
-      continuation.current = { ...activeRun.current, selected: active, blend: true };
+    if (/^(?:add|remove|replace|change|modify|make|move|increase|decrease|extend|reduce)\b/.test(spoken) && activeRun.current) {
+      continuation.current = { ...activeRun.current, selected: active, blend: originalBlendWasDelivered(result) };
       objectiveRef.current = spoken.slice(0, 4000);
       setObjective(objectiveRef.current);
       engageRef.current();
@@ -734,7 +732,7 @@ export function IndependentEngage() {
     return false;
   };
 
-  const treeState = result && !loading ? "revealed" : loading ? "creating" : listening ? "listening" : "welcome";
+  const treeState = intentRevealed ? (loading ? "creating" : "revealed") : listening ? "listening" : "welcome";
   const currentDesign = result?.blend ?? null;
   const currentView = screen && ["assembled", "blueprint", "dissect", "exploded", "imploded"].includes(screen)
     ? screen as "assembled" | "blueprint" | "dissect" | "exploded" | "imploded"
@@ -744,8 +742,10 @@ export function IndependentEngage() {
     <section aria-label="ASCENSION Tree of Knowledge" className="ascension-command">
       <div className="ascension-stage living-tree-stage">
         <LivingTree state={treeState} verifiedRevision={verifiedRevision} />
-        {!bookOpen && <section className="living-book-entry" aria-label="Open ASCENSION Book">
-          <img src={BOOK} alt="Original ASCENSION closed Book" draggable={false}/>
+        {!bookOpen && <section className="living-book-entry" aria-label="ASCENSION Book and Tree opening">
+          <div className="living-book-art">
+            <img src={BOOK} alt="The original ASCENSION Knowledgeverse Book" draggable={false}/>
+          </div>
           <div className="living-book-choices" role="group" aria-label="Choose a Book category">
             {(["Business Planner", "Build / Create", "Guidance"] as const).map(item =>
               <button type="button" key={item} onClick={() => chooseCategory(item)}>{item}</button>
@@ -753,6 +753,15 @@ export function IndependentEngage() {
           </div>
         </section>}
         {bookOpen && <>
+          <details className="living-tree-book-navigation">
+            <summary><img src={BOOK} alt="" draggable={false} /><span>BOOK</span></summary>
+            <div role="group" aria-label="Choose ASCENSION category">
+              {(["Business Planner", "Build / Create", "Guidance"] as const).map(item =>
+                <button type="button" key={item} aria-pressed={category === item}
+                  onClick={() => chooseCategory(item)}>{item}</button>
+              )}
+            </div>
+          </details>
           <div className="living-tree-conversation">
             <button type="button" onClick={() => listenForObjective()} disabled={loading}
               aria-pressed={listening} className="living-tree-microphone">
@@ -775,8 +784,7 @@ export function IndependentEngage() {
           {internalKnowledge && <section className="living-tree-knowledge" aria-label="Original Knowledgeverse retrieval">
             {internalKnowledge}
           </section>}
-          {voiceError && <p className="living-tree-voice-error" role="alert">{voiceError}</p>}
-          {microphonePrompt && microphone === "checking" && <p className="living-tree-voice-error" role="status">Allow microphone access to speak with the Tree.</p>}
+
           {microphone === "unavailable" && <button type="button" className="living-tree-enable-mic" onClick={() => void requestMicrophone()}>Enable microphone</button>}
           <button type="button" className="living-tree-mute" aria-pressed={!talking} onClick={toggleTalking}>
             {talking ? "MUTE TREE" : "HEAR TREE"}

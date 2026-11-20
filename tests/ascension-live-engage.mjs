@@ -15,7 +15,7 @@ const page=await context.newPage();
 try {
   await page.goto(website,{waitUntil:"domcontentloaded",timeout:60000});
   await page.getByRole("group",{name:"Choose a Book category"}).waitFor({timeout:20000});
-  await page.getByRole("button",{name:"Build / Create",exact:true}).click();
+  await page.getByRole("group",{name:"Choose a Book category"}).getByRole("button",{name:"Build / Create",exact:true}).click();
   const portrait=page.locator(".living-tree-portrait");
   const reveal=page.locator(".living-tree-reveal");
   await portrait.waitFor({timeout:10000});

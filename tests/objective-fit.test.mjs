@@ -171,9 +171,10 @@ try {
     draft: legacy, artifactStage: { status: "completed", response_payload: { files: [{ name: "later.md", content: wrong.body }] } },
     retry: false, store, review: async () => { throw new Error("Must keep the delivered version"); },
     generate: async () => { throw new Error("Must not replace a saved result"); } });
-  assert.equal(frozen.response_payload.title, correct.title);
-  assert.equal(frozen.response_payload.pathways[0].model_url, "https://example.invalid/approved.glb");
-  pass("later runtime transport cannot replace an already delivered answer or approved model");
+  assert.equal(frozen.source, "governed");
+  assert.equal(frozen.response_payload.body, wrong.body);
+  assert.equal(frozen.response_payload.pathways.length, 0);
+  pass("actual verified runtime output replaces an earlier unverified external draft; no old model is smuggled in");
 
   const wrongRun = { ...request, status: "verified", result: { requested_output: { primary_artifact: "result.md" } } };
   generated = 0;

@@ -17,18 +17,34 @@ assert.match(tree,/verifiedRevision/);
 assert.match(pictureCSS,/prefers-reduced-motion/);
 assert.match(pictureCSS,/tree-photo-mouth/);
 assert.match(book,/nextWelcome/);
-assert.match(book,/samantha\|jenny\|aria\|zira\|serena/);
+assert.match(book,/await awaitTreeWomanVoice\(synth\)/);
+assert.match(book,/words.voice = woman/);
+assert.doesNotMatch(book,/words.voice\s*=\s*available\.find\([\s\S]*\?\? null/);
+assert.match(book,/ASCENSION Book and Tree opening/);
+assert.match(book,/living-tree-book-navigation/);
+assert.match(book,/living-book-choices/);
+assert.doesNotMatch(book,/OPEN THE BOOK/);
 assert.match(book,/chooseCategory\(item\)/);
 assert.match(book,/TreeStudio/);
 assert.match(book,/governedPersisted\(run\)/);
 assert.match(book,/continuation\.current/);
+assert.match(book,/blend: originalBlendWasDelivered\(result\)/);
+assert.doesNotMatch(book,/setChoice\(3\)/);
+assert.doesNotMatch(book,/const readings: PathwayReading/);
+// Regression: literal double slashes broke spoken commands and even
+// sentence chunking. The actual source must contain valid regex escapes.
+assert.ok(book.includes(String.raw`text.trim().split(/\s+/)`));
+assert.ok(book.includes(String.raw`go to)\s+/`));
+assert.ok(book.includes(String.raw`extend|reduce)\b/`));
+assert.ok(!book.includes(String.raw`go to)\\s+/`));
+assert.ok(!book.includes(String.raw`extend|reduce)\\b/`));
 assert.doesNotMatch(book,/<DesignedFlow\s/);
 assert.match(studio,/V1DesignViewport/);
 assert.match(studio,/BLUEPRINT|blueprint/);
 assert.match(studio,/dissect/);
 assert.match(studio,/exploded/);
 assert.match(studio,/imploded/);
-assert.match(studio,/No measured 3D model or blueprint/);
+assert.doesNotMatch(studio,/No measured 3D model or blueprint/);
 assert.match(guest,/const complete = Boolean\(delivered/);
 assert.doesNotMatch(guest,/delivered\?\.pathways.length === 3/);
 

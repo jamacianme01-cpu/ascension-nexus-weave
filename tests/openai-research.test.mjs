@@ -60,16 +60,12 @@ try {
     assert.deepEqual(delivery.web_sources, [{ title: "Cited", url: "https://example.org/cited" }]);
     assert.equal(delivery.objective_fit, undefined);
   });
-  const { buildGuideFallbackDelivery } = await server.ssrLoadModule(
-    "/src/lib/ascension/engine/guide-fallback.server.ts",
-  );
-  const failedApp = buildGuideFallbackDelivery("make a music app");
-  check("provider outage never produces fictitious application paths or code", () => {
-    assert.equal(failedApp.kind, "not_produced");
-    assert.equal(failedApp.pathways.length, 0);
-    assert.equal(failedApp.blend, null);
-    assert.equal(failedApp.files.length, 0);
-    assert.match(failedApp.body, /has not been created/);
+  // The owner prohibited canned fallback designs, including the old
+  // synthetic drone paths on a 429/503. Only original runtime output counts.
+  const { readFileSync } = await import("node:fs");
+  const deliverySource = readFileSync("src/lib/ascension/engine/delivery.server.ts","utf8");
+  check("engine delivery has no canned guide fallback invocation", () => {
+    assert.doesNotMatch(deliverySource, /buildGuideFallbackDelivery/);
   });
   const { callApprovedAnswer, approvedAnswerModel } = await server.ssrLoadModule(
     "/src/lib/ascension/engine/approved-answer.server.ts",
@@ -138,17 +134,14 @@ try {
         fail: async () => { throw new Error("should not fail this historical row"); },
       },
     });
-    check("a recorded legacy external failure does not invent engine execution", () => {
-      assert.equal(oldFailed.error, null);
-      assert.equal(oldFailed.response_payload?.pathways.length, 3);
-      assert.ok(oldFailed.response_payload?.blend);
+    check("historical external failure never substitutes imaginary engine output", () => {
+      assert.equal(oldFailed.status, "running");
+      assert.equal(oldFailed.response_payload, null);
     });
-    check("ENGAGE returns a readable three-pathway unverified guide rather than timeout", () => {
-      assert.equal(recovered.status, "completed");
-      assert.equal(recovered.response_payload?.pathways.length, 3);
-      assert.ok(recovered.response_payload?.blend);
-      assert.equal(saved, recovered.response_payload);
-      assert.ok(recovered.response_payload?.limitations.some(x => x.includes("Unverified")));
+    check("failed external drafting leaves the actual ASCENSION runtime running", () => {
+      assert.equal(recovered.status, "running");
+      assert.equal(recovered.response_payload, null);
+      assert.equal(saved, null);
     });
   } finally {
     globalThis.fetch = originalFetch;

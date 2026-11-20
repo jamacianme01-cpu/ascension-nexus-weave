@@ -1,0 +1,148 @@
+--- a/ASCENSION_CORE/capabilities.py
++++ b/ASCENSION_CORE/capabilities.py
+@@ -148,9 +148,133 @@
+         )
+ 
+ 
++
++
++class PhysicalDesignCapability:
++    """Adapter for the existing UniversalConstructionEngine.
++
++    Does not invent a new engine. Registers the authored construction engine
++    under a formal capability contract so select_capability can return it for
++    physical_design contracts instead of unavailable:physical_design.
++    """
++
++    contract = CapabilityContract(
++        capability_id="physical_design",
++        name="Universal Construction (Physical Design)",
++        description=(
++            "Routes physical/hardware design objectives through the existing "
++            "UniversalConstructionEngine (design specification, layers, twin lattice, evidence). "
++            "Does not claim physical manufacture when only design/simulation artifacts are produced."
++        ),
++        accepted_intent_tokens=[
++            "build", "create", "construct", "design", "make", "produce",
++            "drone", "drones", "robot", "robots", "machine", "machines",
++            "device", "hardware", "prototype", "vehicle", "motor", "engine",
++        ],
++        output_contract="physical_design",
++        constraints=[
++            "design and simulation artifacts only unless fabrication backends are present",
++            "no false manufacture claims",
++            "evidence required",
++        ],
++        required_authority="CLARITY:orchestrator",
++        evidence_produced="construction job evidence, design specification, layer and provenance records",
++        verification_method="ConstructionJob verification_evidence + file receipts",
++        risk_class="medium",
++        available=True,
++    )
++
++    def write(self, branch: Branch, mes: List[MeaningElement]) -> CapabilityResult:
++        import os
++        from pathlib import Path as _Path
++
++        # Import the existing engine only; do not redefine it.
++        try:
++            from clarity.autosync.construction_engine import UniversalConstructionEngine
++        except Exception as exc:  # pragma: no cover - import environment dependent
++            raise RuntimeError(
++                "UniversalConstructionEngine is not importable in this runtime: " + str(exc)
++            ) from exc
++
++        root = os.environ.get("ASCENSION_REPOSITORY_ROOT") or os.environ.get("ASCENSION_WORKSPACE_ROOT") or "."
++        engine = UniversalConstructionEngine(repository_root=root)
++        me_texts = [getattr(m, "text", str(m)) for m in mes]
++        objective = getattr(branch, "approach", None) or getattr(branch, "branch_id", "physical_design")
++        expected = getattr(branch, "expected", None)
++        if expected is not None and getattr(expected, "artifact_name", None):
++            objective = str(expected.artifact_name)
++
++        job = engine.create_job(
++            objective=str(objective),
++            meaning_elements=me_texts,
++            artifact_type="physical_design",
++            source_materials=[],
++            constraints={},
++        )
++        job = engine.run_job(job)
++
++        files: Dict[str, str] = {}
++        files["construction_job.json"] = json.dumps({
++            "job_id": job.job_id,
++            "objective": job.objective,
++            "artifact_type": job.artifact_type,
++            "build_state": job.build_state,
++            "design_specification": job.design_specification,
++            "construction_layers": job.construction_layers,
++            "final_artifact_paths": job.final_artifact_paths,
++            "verification_evidence": job.verification_evidence,
++            "provenance": job.provenance,
++            "history": job.history,
++            "defects": job.defects,
++            "tool_events": job.tool_events,
++        }, indent=2, sort_keys=True, default=str)
++
++        spec = job.design_specification or {}
++        lines = [
++            f"# Physical Design: {job.objective}",
++            "",
++            f"_Job: {job.job_id}_",
++            f"_Build state: {job.build_state}_",
++            f"_Capability: {self.contract.capability_id}_",
++            "",
++            "## Design specification",
++            json.dumps(spec, indent=2, sort_keys=True, default=str),
++            "",
++            "## Meaning elements",
++        ]
++        for text in me_texts:
++            lines.append(f"- {text}")
++        lines.append("")
++        lines.append("## Evidence")
++        lines.append(json.dumps(job.verification_evidence, indent=2, sort_keys=True, default=str))
++        lines.append("")
++        lines.append(
++            "Note: This capability produces design/simulation artifacts through "
++            "UniversalConstructionEngine. It does not assert physical manufacture "
++            "unless fabrication backends and verification evidence establish that."
++        )
++        files["physical_design.md"] = "\n".join(lines) + "\n"
++
++        for artifact_path in job.final_artifact_paths[:20]:
++            try:
++                p = _Path(artifact_path)
++                if p.is_file() and p.stat().st_size < 200_000:
++                    name = "artifact_" + p.name
++                    files[name] = p.read_text(encoding="utf-8", errors="replace")
++            except Exception:
++                continue
++
++        return CapabilityResult(
++            capability=self.contract.capability_id,
++            files=files,
++            primary_artifact="physical_design.md",
++        )
++
++
+ REGISTRY: Dict[str, object] = {
+     DigitalArtifactWriter.contract.capability_id: DigitalArtifactWriter(),
+     DocumentBundleCapability.contract.capability_id: DocumentBundleCapability(),
++    PhysicalDesignCapability.contract.capability_id: PhysicalDesignCapability(),
+ }
+ 
+ 
+@@ -207,6 +331,11 @@
+ def select_capability(destiny: str, mes: List[MeaningElement], requested_type: str = "") -> str:
+     """Select only capabilities whose output matches the requested contract."""
+     contract = requested_output_contract(destiny, requested_type)
++    if contract == "physical_design":
++        cap = REGISTRY.get("physical_design")
++        if cap is not None and getattr(getattr(cap, "contract", None), "available", False):
++            return "physical_design"
++        return "unavailable:physical_design"
+     if contract not in DOCUMENT_OUTPUTS:
+         return "unavailable:" + contract
+     if contract == "document_bundle":

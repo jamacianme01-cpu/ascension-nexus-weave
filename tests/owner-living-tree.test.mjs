@@ -28,6 +28,16 @@ assert.match(book,/chooseCategory\(item\)/);
 assert.match(book,/TreeStudio/);
 assert.match(book,/governedPersisted\(run\)/);
 assert.match(book,/continuation\.current/);
+assert.match(book,/blend: originalBlendWasDelivered\(result\)/);
+assert.doesNotMatch(book,/setChoice\(3\)/);
+assert.doesNotMatch(book,/const readings: PathwayReading/);
+// Regression: literal double slashes broke spoken commands and even
+// sentence chunking. The actual source must contain valid regex escapes.
+assert.ok(book.includes(String.raw`text.trim().split(/\s+/)`));
+assert.ok(book.includes(String.raw`go to)\s+/`));
+assert.ok(book.includes(String.raw`extend|reduce)\b/`));
+assert.ok(!book.includes(String.raw`go to)\\s+/`));
+assert.ok(!book.includes(String.raw`extend|reduce)\\b/`));
 assert.doesNotMatch(book,/<DesignedFlow\s/);
 assert.match(studio,/V1DesignViewport/);
 assert.match(studio,/BLUEPRINT|blueprint/);

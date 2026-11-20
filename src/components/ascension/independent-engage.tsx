@@ -139,23 +139,16 @@ function guideFor(result: Result): string {
 
 function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
   if (delivery.kind === "not_produced" || !delivery.body.trim()) return null;
-  // A truthful single core result is a valid creation/conversation.
-  // Do not reject it for missing legacy model pathways or invent geometry.
-  if (!delivery.blend || delivery.pathways.length !== 3) {
-    const output: Pathway & { blend_reason: string } = {
-      id: "governed-single-output",
-      title: delivery.title,
-      summary: delivery.body,
-      steps: [], tradeoffs: delivery.limitations, parts: [],
-      imageUrl: null, blueprintUrl: null, modelUrl: null,
-      blend_reason: "",
-    };
-    return { introduction: delivery.body, pathways: [], blend: output, files: delivery.files };
-  }
+
+  // The owner's ORIGINAL runtime chooses the result. One real model must
+  // retain its own image, GLB, dimensions and parts; do not throw them out
+  // when there is no artificial three-pathway + BLEND envelope.
   const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
-    id: path.id, title: path.label, summary: path.summary,
-    steps: path.steps, tradeoffs: path.tradeoffs,
-    // Retain real delivered assets, not the same stock drone picture for all objectives.
+    id: path.id,
+    title: path.label,
+    summary: path.summary,
+    steps: path.steps,
+    tradeoffs: path.tradeoffs,
     parts: path.model_spec?.parts.map(part => ({
       name: part.name,
       purpose: part.purpose ?? "",
@@ -165,14 +158,28 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
     blueprintUrl: path.generated_blueprint_url ?? null,
     modelUrl: path.model_url ?? null,
   });
-  const pathways = delivery.pathways.map(toPath);
-  const blend = { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason };
-  if (new Set(pathways.map(path => path.id)).size !== 3 ||
-      pathways.some(path => !path.title.trim() || !path.summary.trim()) ||
-      !blend.title.trim() || !blend.summary.trim()) return null;
-  return { introduction: delivery.body, pathways, blend, files: delivery.files };
-}
 
+  const actualPaths = delivery.pathways.map(toPath);
+  const chosen = delivery.blend
+    ? { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason }
+    : actualPaths[0]
+      ? { ...actualPaths[0], blend_reason: "" }
+      : {
+          id: "governed-single-output",
+          title: delivery.title,
+          summary: delivery.body,
+          steps: [], tradeoffs: delivery.limitations, parts: [],
+          imageUrl: null, blueprintUrl: null, modelUrl: null,
+          blend_reason: "",
+        };
+
+  return {
+    introduction: delivery.body,
+    pathways: actualPaths,
+    blend: chosen,
+    files: delivery.files,
+  };
+}
 function openLine(path: Pathway, blend: boolean): string {
   const detail = sentence(blend ? path.blend_reason || path.summary : path.summary);
   if (blend) return `${path.title}. ${detail}`;

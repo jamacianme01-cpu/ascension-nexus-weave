@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-HUNK = re.compile(r'^@@ -(\\d+)(?:,(\\d+))? \\+(\\d+)(?:,(\\d+))? @@')
+HUNK = re.compile(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
 
 def patched(source: str, diff: str) -> str:
     lines = source.splitlines(keepends=True)

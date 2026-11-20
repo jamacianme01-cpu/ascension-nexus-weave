@@ -4,7 +4,7 @@ import { LivingTree } from "@/components/ascension/living-tree";
 import { TreeStudio } from "@/components/ascension/tree-studio";
 import "./living-tree-scene.css";
 import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
-import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
+import { governedPersisted, type ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; blueprintUrl: string | null; modelUrl: string | null; blend_reason?: string };
@@ -205,7 +205,7 @@ export function IndependentEngage() {
       const saved = JSON.parse(raw) as {
         savedAt: number; category: typeof category; objective: string;
         result: Result; run: { requestId: string; guestToken: string };
-        screen: DesignedScreen | null; choice: number;
+        screen: DesignedScreen | null; choice: number; verifiedRevision?: number | null;
       };
       if (!saved || !Number.isFinite(saved.savedAt) ||
           Date.now() - saved.savedAt > 24 * 60 * 60 * 1000 ||
@@ -218,6 +218,9 @@ export function IndependentEngage() {
       }
       activeRun.current = saved.run;
       setBookOpen(true);
+      if (typeof saved.verifiedRevision === "number" && Number.isInteger(saved.verifiedRevision) && saved.verifiedRevision > 0) {
+        setVerifiedRevision(saved.verifiedRevision);
+      }
       // Restoring an existing pathway is not a fresh entry welcome.
       welcomed.current = true;
       categoryRef.current = saved.category;
@@ -236,10 +239,10 @@ export function IndependentEngage() {
     try {
       window.sessionStorage.setItem(MEMORY_KEY, JSON.stringify({
         savedAt: Date.now(), category, objective, result, run: activeRun.current,
-        screen, choice,
+        screen, choice, verifiedRevision,
       }));
     } catch { /* Browser storage may be restricted. */ }
-  }, [category, objective, result, screen, choice]);
+  }, [category, objective, result, screen, choice, verifiedRevision]);
   useEffect(() => { objectiveRef.current = objective; }, [objective]);
   useEffect(() => {
     if (!category || welcomed.current) return;
@@ -254,6 +257,8 @@ export function IndependentEngage() {
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); recognition.current?.stop(); if (governedWatch.current) clearInterval(governedWatch.current); stopVoice(); }, []);
 
   useEffect(() => {
+    // Do not request microphone permission on the closed Book.
+    if (!bookOpen) return;
     let closed = false;
     const getMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
     if (!getMedia) {
@@ -278,7 +283,7 @@ export function IndependentEngage() {
       setMicrophonePrompt(false);
     });
     return () => { closed = true; };
-  }, []);
+  }, [bookOpen]);
 
   function chooseCategory(next: "Business Planner" | "Build / Create" | "Guidance") {
     categoryRef.current = next;
@@ -529,7 +534,10 @@ export function IndependentEngage() {
                 setScreen("assembled");
                 offer(guideFor(actual));
               }
-              if (typeof run.runtime_revision === "number" && Number.isInteger(run.runtime_revision) && run.runtime_revision > 0) {
+              // Her visible knowledge growth is tied to the original persisted
+              // Δ receipt, never to an unverified response or user engagement.
+              if (governedPersisted(run) && typeof run.runtime_revision === "number" &&
+                  Number.isInteger(run.runtime_revision) && run.runtime_revision > 0) {
                 setVerifiedRevision(run.runtime_revision);
               }
               setGovernedStatus("ASCENSION delivered a governed result.");

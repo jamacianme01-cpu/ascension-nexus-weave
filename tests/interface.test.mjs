@@ -329,6 +329,26 @@ try {
     assert.equal(originalDelivery.blend, null);
     assert.equal(originalDelivery.body, originalOneAnswer.result.objective_delivery.body);
   });
+  const oneModel = deliveryEngine.governedDelivery({
+    objective: "Design a care drone for people with dementia",
+    result: { objective_delivery: {
+      kind: "design", title: "Care companion drone",
+      body: "A dementia-care companion drone is designed to assist with orientation and provide connected memory support, with components intended for the owner's original sensing and guidance architecture.",
+      pathways: [{
+        id: "one", label: "Owner's original companion", summary: "Actual connected companion design",
+        steps: ["Preserve original sensing and assistance functions."], tradeoffs: [],
+        generated_image_url: "https://owner.example.test/care-companion.png",
+        model_url: "https://owner.example.test/care-companion.glb",
+      }],
+      blend: null, files: [], limitations: [],
+    }},
+  }, []);
+  check("one original design keeps its actual image, GLB and pathway without a fabricated BLEND", () => {
+    assert.equal(oneModel.pathways.length, 1);
+    assert.equal(oneModel.blend, null);
+    assert.equal(oneModel.pathways[0].generated_image_url, "https://owner.example.test/care-companion.png");
+    assert.equal(oneModel.pathways[0].model_url, "https://owner.example.test/care-companion.glb");
+  });
   const ownerRun = {
     id: "12345678-90ab-4cde-8f12-123456789abc",
     objective: originalOneAnswer.objective,

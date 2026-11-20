@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { DesignedFlow, type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
+import { type DesignedScreen, type DesignedTarget, type PathwayReading } from "@/components/ascension/designed-flow";
+import { LivingTree } from "@/components/ascension/living-tree";
+import { TreeStudio } from "@/components/ascension/tree-studio";
+import "./living-tree-scene.css";
 import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
-import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
+import { governedPersisted, type ObjectiveDelivery } from "@/lib/ascension/result-model";
 
 type Part = { name: string; purpose: string; location: string };
 type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; blueprintUrl: string | null; modelUrl: string | null; blend_reason?: string };
-type Result = { introduction: string; pathways: Pathway[]; blend: Pathway & { blend_reason: string } };
+type Result = {
+  introduction: string;
+  pathways: Pathway[];
+  blend: Pathway & { blend_reason: string };
+  files?: { name: string; content: string }[];
+};
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
@@ -14,10 +22,19 @@ type SpeechRecognitionLike = {
   start: () => void; stop: () => void;
 };
 
-const SCENE = "/approved-scene/ascension-tree-behind-book-hq.jpg";
+const BOOK = "/approved-scene/01-closed-book.jpg";
+const WELCOMES = [
+  "Hello, it's good to see you. What would you like to work on today?",
+  "Welcome back. What are we creating or exploring today?",
+  "Hello there. The book is open, and I'm here to help you think things through.",
+  "Good to have you here. Tell me what's on your mind.",
+];
 
 let speechSequence = 0;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
+function signalSpeaking(active: boolean) {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ascension-tree-speech", { detail: { speaking: active } }));
+}
 function say(text: string, onFinished?: () => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const sequence = ++speechSequence;
@@ -39,14 +56,21 @@ function say(text: string, onFinished?: () => void) {
     if (sequence !== speechSequence || index >= chunks.length) {
       if (sequence === speechSequence) {
         activeUtterance = null;
+        signalSpeaking(false);
         onFinished?.();
       }
       return;
     }
     const words = new SpeechSynthesisUtterance(chunks[index++]!);
     activeUtterance = words;
-    words.rate = 0.93;
-    words.pitch = 0.98;
+    words.rate = 0.96;
+    words.pitch = 1.04;
+    // Select a natural-sounding woman voice when the browser provides one.
+    // Never promise a voice that the user's device has not installed.
+    const available = (synth.getVoices?.() ?? []).filter(v => v.lang.toLowerCase().startsWith("en"));
+    words.voice = available.find(v => /samantha|jenny|aria|zira|serena|victoria|susan|kate|ava|female/i.test(v.name)) ?? null;
+    words.onstart = () => signalSpeaking(true);
+    words.onboundary = () => window.dispatchEvent(new Event("ascension-tree-syllable"));
     words.onend = next;
     words.onerror = next;
     try { synth.speak(words); } catch { activeUtterance = null; }
@@ -56,10 +80,19 @@ function say(text: string, onFinished?: () => void) {
 function stopVoice() {
   speechSequence += 1;
   activeUtterance = null;
+  signalSpeaking(false);
   try { window.speechSynthesis?.cancel(); } catch { /* Browser may lack speech playback. */ }
 }
 
-const WELCOME = "Welcome. I can stay with you as a guide.";
+function nextWelcome(): string {
+  try {
+    const key = "ascension-tree-welcome-rotation-v1";
+    const n = Number(window.localStorage.getItem(key) || "-1");
+    const next = Number.isInteger(n) && n >= -1 ? (n + 1) % WELCOMES.length : 0;
+    window.localStorage.setItem(key, String(next));
+    return WELCOMES[next]!;
+  } catch { return WELCOMES[0]!; }
+}
 
 function sentence(text: string): string {
   const cleaned = text.replace(/\s+/g, " ").trim();
@@ -76,12 +109,24 @@ function cardLine(text: string): string {
 function guideFor(result: Result): string {
   const intro = result.introduction.replace(/\b(ChatGPT|OpenAI|Claude|Grok)\b/gi, "").replace(/\s+/g, " ").trim();
   if (intro.length > 40 && intro.length < 320) return intro;
-  const [first, second, third] = result.pathways;
-  return `Three readings came back: ${first?.title}, ${second?.title}, and ${third?.title}. The fourth is a blend, ${result.blend.title}. Any of them can be opened if a closer look would help.`;
+  return `The governed result is ready. I can show the design, explain its components, or help you change it.`;
 }
 
 function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
-  if (delivery.pathways.length !== 3 || !delivery.blend) return null;
+  if (delivery.kind === "not_produced" || !delivery.body.trim()) return null;
+  // A truthful single core result is a valid creation/conversation.
+  // Do not reject it for missing legacy model pathways or invent geometry.
+  if (!delivery.blend || delivery.pathways.length !== 3) {
+    const output: Pathway & { blend_reason: string } = {
+      id: "governed-single-output",
+      title: delivery.title,
+      summary: delivery.body,
+      steps: [], tradeoffs: delivery.limitations, parts: [],
+      imageUrl: null, blueprintUrl: null, modelUrl: null,
+      blend_reason: "",
+    };
+    return { introduction: delivery.body, pathways: [], blend: output, files: delivery.files };
+  }
   const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
     id: path.id, title: path.label, summary: path.summary,
     steps: path.steps, tradeoffs: path.tradeoffs,
@@ -100,26 +145,30 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
   if (new Set(pathways.map(path => path.id)).size !== 3 ||
       pathways.some(path => !path.title.trim() || !path.summary.trim()) ||
       !blend.title.trim() || !blend.summary.trim()) return null;
-  return { introduction: delivery.body, pathways, blend };
+  return { introduction: delivery.body, pathways, blend, files: delivery.files };
 }
 
 function openLine(path: Pathway, blend: boolean): string {
   const detail = sentence(blend ? path.blend_reason || path.summary : path.summary);
-  if (blend) return `This fourth one is the blend. ${path.title}. ${detail}`;
+  if (blend) return `${path.title}. ${detail}`;
   return `${path.title}. ${detail} The other views are there if a closer look would help.`;
 }
 
 /** Hosted Tree entry. Engines analyze the answer; the fourth pathway is the blend. */
 export function IndependentEngage() {
   const [objective, setObjective] = useState("");
-  const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>("Build / Create");
+  const [category, setCategory] = useState<"Business Planner" | "Build / Create" | "Guidance" | null>(null);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [verifiedRevision, setVerifiedRevision] = useState<number | null>(null);
+  const [rotationRequest, setRotationRequest] = useState(0);
+  const [zoomRequest, setZoomRequest] = useState(0);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [microphone, setMicrophone] = useState<"checking" | "ready" | "unavailable">("checking");
   const [textBackup, setTextBackup] = useState(false);
   const [microphonePrompt, setMicrophonePrompt] = useState(false);
   const objectiveRef = useRef("");
-  const categoryRef = useRef<typeof category>("Build / Create");
+  const categoryRef = useRef<typeof category>(null);
   const engageRef = useRef<() => void>(() => {});
   const guideCommandRef = useRef<(spoken: string) => boolean>(() => false);
   const listeningRef = useRef(false);
@@ -158,18 +207,22 @@ export function IndependentEngage() {
       const saved = JSON.parse(raw) as {
         savedAt: number; category: typeof category; objective: string;
         result: Result; run: { requestId: string; guestToken: string };
-        screen: DesignedScreen | null; choice: number;
+        screen: DesignedScreen | null; choice: number; verifiedRevision?: number | null;
       };
       if (!saved || !Number.isFinite(saved.savedAt) ||
           Date.now() - saved.savedAt > 24 * 60 * 60 * 1000 ||
           !["Business Planner", "Build / Create", "Guidance"].includes(saved.category || "") ||
-          !saved.result || saved.result.pathways?.length !== 3 || !saved.result.blend ||
+          !saved.result || !Array.isArray(saved.result.pathways) || !saved.result.blend ||
           !/^[a-f0-9-]{36}$/i.test(saved.run?.requestId || "") ||
           !/^[a-f0-9-]{36}$/i.test(saved.run?.guestToken || "")) {
         window.sessionStorage.removeItem(MEMORY_KEY);
         return;
       }
       activeRun.current = saved.run;
+      setBookOpen(true);
+      if (typeof saved.verifiedRevision === "number" && Number.isInteger(saved.verifiedRevision) && saved.verifiedRevision > 0) {
+        setVerifiedRevision(saved.verifiedRevision);
+      }
       // Restoring an existing pathway is not a fresh entry welcome.
       welcomed.current = true;
       categoryRef.current = saved.category;
@@ -178,7 +231,7 @@ export function IndependentEngage() {
       setObjective(saved.objective);
       setResult(saved.result);
       setChoice(Number.isInteger(saved.choice) && saved.choice >= 0 && saved.choice < 4 ? saved.choice : 0);
-      setScreen(saved.screen && ["spiral", "assembled", "blueprint", "dissect", "exploded", "imploded"].includes(saved.screen) ? saved.screen : "spiral");
+      setScreen(saved.screen && ["assembled", "blueprint", "dissect", "exploded", "imploded"].includes(saved.screen) ? saved.screen : "assembled");
     } catch {
       window.sessionStorage.removeItem(MEMORY_KEY);
     }
@@ -188,17 +241,17 @@ export function IndependentEngage() {
     try {
       window.sessionStorage.setItem(MEMORY_KEY, JSON.stringify({
         savedAt: Date.now(), category, objective, result, run: activeRun.current,
-        screen, choice,
+        screen, choice, verifiedRevision,
       }));
     } catch { /* Browser storage may be restricted. */ }
-  }, [category, objective, result, screen, choice]);
+  }, [category, objective, result, screen, choice, verifiedRevision]);
   useEffect(() => { objectiveRef.current = objective; }, [objective]);
   useEffect(() => {
     if (!category || welcomed.current) return;
     welcomed.current = true;
     if (talking) {
       recognition.current?.stop();
-      say(WELCOME + " Speak your objective when you are ready.", () => {
+      say(nextWelcome(), () => {
         if (categoryRef.current) listenForObjective(true);
       });
     }
@@ -206,6 +259,8 @@ export function IndependentEngage() {
   useEffect(() => () => { generation.current += 1; abort.current?.abort(); recognition.current?.stop(); if (governedWatch.current) clearInterval(governedWatch.current); stopVoice(); }, []);
 
   useEffect(() => {
+    // Do not request microphone permission on the closed Book.
+    if (!bookOpen) return;
     let closed = false;
     const getMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
     if (!getMedia) {
@@ -230,7 +285,7 @@ export function IndependentEngage() {
       setMicrophonePrompt(false);
     });
     return () => { closed = true; };
-  }, []);
+  }, [bookOpen]);
 
   function chooseCategory(next: "Business Planner" | "Build / Create" | "Guidance") {
     categoryRef.current = next;
@@ -244,9 +299,11 @@ export function IndependentEngage() {
     setLoading(false);
     try { window.sessionStorage.removeItem(MEMORY_KEY); } catch { /* Restricted storage. */ }
     setResult(null);
+    setVerifiedRevision(null);
     setScreen(null);
     setChoice(0);
     setCategory(next);
+    setBookOpen(true);
     setObjective("");
     objectiveRef.current = "";
     setError("");
@@ -278,7 +335,8 @@ export function IndependentEngage() {
       recognition.current?.stop();
       return;
     }
-    // The Tree accepts objectives immediately; a category click is not a gate.
+    // The Book opens the Tree. No objective executes before that choice.
+    if (!categoryRef.current) return;
     // Recognition callbacks can hold a stale React render. Use the live lock.
     if (loadingRef.current) return;
     // No keyword or objective-domain gate: every valid objective is submitted
@@ -286,6 +344,10 @@ export function IndependentEngage() {
     objectiveRef.current = spoken.slice(0, 4000);
     setObjective(objectiveRef.current);
     recognition.current?.stop();
+    // Subsequent conversation continues the SAME actual governed objective.
+    if (result && activeRun.current && !continuation.current) {
+      continuation.current = { ...activeRun.current, selected: result.blend, blend: true };
+    }
     // A spoken objective executes hands-free; the existing button remains
     // available when speech recognition or a microphone is unavailable.
     engageRef.current();
@@ -393,7 +455,8 @@ export function IndependentEngage() {
       // The real governed submission MUST NOT depend on knowledge retrieval.
       // Previously a failed lookup stopped ENGAGE before the runtime saw the objective.
       // A selected design continues its actual recorded run, not an unrelated new objective.
-      const parent = continuation.current;
+      const parent = continuation.current ??
+        (result && activeRun.current ? { ...activeRun.current, selected: result.blend, blend: true } : null);
       const submitted = await submitGuestObjective({ data: {
         objective: text,
         ...(parent ? {
@@ -470,15 +533,21 @@ export function IndependentEngage() {
                 const matchedIndex = updated.findIndex(p => p.id === parent.selected.id);
                 const nextIndex = matchedIndex >= 0 ? matchedIndex : Math.max(0, Math.min(3, originalIndex));
                 setChoice(nextIndex);
-                setScreen(previous => previous && previous !== "spiral" ? previous : "assembled");
+                 setScreen(previous => previous && previous !== "spiral" ? previous : "assembled");
                 const selected = updated[nextIndex]!;
                 offer("The continued design is ready. " + openLine(selected, nextIndex === 3));
               } else {
-                setChoice(0);
-                setScreen("spiral");
+                setChoice(3);
+                setScreen("assembled");
                 offer(guideFor(actual));
               }
-              setGovernedStatus("ASCENSION delivered three pathways and BLEND.");
+              // Her visible knowledge growth is tied to the original persisted
+              // Δ receipt, never to an unverified response or user engagement.
+              if (governedPersisted(run) && typeof run.runtime_revision === "number" &&
+                  Number.isInteger(run.runtime_revision) && run.runtime_revision > 0) {
+                setVerifiedRevision(run.runtime_revision);
+              }
+              setGovernedStatus("ASCENSION delivered a governed result.");
               terminal = true;
               return;
             }
@@ -577,7 +646,7 @@ export function IndependentEngage() {
     else if (next === "dissect") offer("This opens the same reading so the parts can be seen.");
     else if (next === "exploded") offer("The parts are set apart here, if seeing them separately would help.");
     else if (next === "imploded") offer("The parts can come back together from here.");
-    else if (next === "spiral") offer("The four readings are still here. The fourth is the blend, if you want to compare them.");
+    else if (next === "spiral") offer("Let's return to the design we're developing.");
     setScreen(next);
   }
 
@@ -614,9 +683,9 @@ export function IndependentEngage() {
 
   function buildOnResult() {
     if (!result || !activeRun.current) return;
-    const selected = choice === 3 ? result.blend : result.pathways[choice];
+    const selected = result.blend;
     if (!selected) return;
-    continuation.current = { ...activeRun.current, selected, blend: choice === 3 };
+    continuation.current = { ...activeRun.current, selected, blend: true };
     objectiveRef.current = "";
     setObjective("");
     setError("");
@@ -624,104 +693,96 @@ export function IndependentEngage() {
     if (!talking) listenForObjective(true);
   }
 
-  // Browser speech recognition must always dispatch against the current screen.
+  // Natural spoken changes continue the SAME verified run; never silently alter geometry.
   guideCommandRef.current = spoken => {
     if (!result) return false;
-    const choices: Record<string, number> = {
-      blend: 3, "the blend": 3,
-      "pathway one": 0, "pathway two": 1, "pathway three": 2, "pathway four": 3,
-    };
-    const selection = spoken.replace(/^(?:open|enter|choose|select|show)\s+/, "");
-    const index = choices[selection] ??
-      [...result.pathways, result.blend].findIndex(path =>
-        path.title.toLowerCase() === selection ||
-        path.title.toLowerCase().includes(selection) && selection.length > 3);
-    if (index >= 0 && index < 4) {
-      openPathway(index); return true;
+    if (/^(?:rotate|turn) (?:left|right)$/.test(spoken)) {
+      if (!result.blend.modelUrl) {
+        offer("I need the actual 3D model before I can rotate this design in space.");
+      } else {
+        setRotationRequest(n => n + (spoken.endsWith("right") ? 1 : -1));
+      }
+      return true;
     }
-    if (/^(?:show )?(?:pathways|four pathways|all pathways)$/.test(spoken)) {
-      show("spiral"); return true;
+    if (/^(?:zoom in|zoom out)$/.test(spoken)) {
+      setZoomRequest(n => n + (spoken.endsWith("in") ? 1 : -1));
+      return true;
     }
-    const view = spoken.replace(/^(?:show|open|view|go to)\s+/, "");
-    const views: Record<string, DesignedTarget> = {
+    const view = spoken.replace(/^(?:show|open|view|go to)\\s+/, "");
+    const views: Record<string, DesignedScreen> = {
       blueprint: "blueprint", dissect: "dissect", explode: "exploded",
       exploded: "exploded", implode: "imploded", imploded: "imploded",
       assembled: "assembled", assembly: "assembled",
     };
-    if (screen && screen !== "spiral" && views[view]) {
-      show(views[view]); return true;
+    if (views[view]) { show(views[view]); return true; }
+    const active = result.blend;
+    if (/^(?:explain|explain this|what is this|what does this do|tell me about this|how does this work)$/.test(spoken)) {
+      offer(openLine(active, true)); return true;
     }
-    if (spoken === "back" && screen) {
-      show(screen === "spiral" ? "book" : "spiral"); return true;
+    const part = active.parts.find(item => spoken.includes(item.name.toLowerCase()));
+    if (part && /^(?:explain|what|where|describe|tell)/.test(spoken)) {
+      explainPart(part); return true;
     }
-    const selected = choice === 3 ? result.blend : result.pathways[choice];
-    if (screen && screen !== "spiral" && selected) {
-      if (/^(?:explain|explain this|what is this|what does this do|tell me about this|how does this work)$/.test(spoken)) {
-        offer(openLine(selected, choice === 3)); return true;
-      }
-      if (/^(?:what are the steps|tell me the steps|how do i build it)$/.test(spoken)) {
-        offer(selected.steps.length ? selected.steps.join(". ") : "No construction steps were delivered for this pathway."); return true;
-      }
-      const part = selected.parts.find(item => spoken.includes(item.name.toLowerCase()));
-      if (part && /^(?:explain|what|where|describe|tell)/.test(spoken)) {
-        offer([part.name, part.purpose, part.location].filter(Boolean).join(". ") ||
-          "ASCENSION has not delivered a component description."); return true;
-      }
+    // Existing governed continuation accepts a modification as an objective.
+    if (/^(?:add|remove|replace|change|modify|make|move|increase|decrease|extend|reduce)\\b/.test(spoken) && activeRun.current) {
+      continuation.current = { ...activeRun.current, selected: active, blend: true };
+      objectiveRef.current = spoken.slice(0, 4000);
+      setObjective(objectiveRef.current);
+      engageRef.current();
+      return true;
     }
     return false;
   };
 
-  return <div className="ascension-world relative isolate mx-auto w-full max-w-none">
-    <section aria-label="Engage ASCENSION" className="ascension-command" hidden={screen !== null}>
-      <div className="ascension-stage">
-        <div className="ascension-scene-hero" aria-hidden="true">
-          <img className="ascension-tree-scene" src={SCENE} alt="" draggable={false} />
-        </div>
-        <div className="absolute bottom-[22%] left-1/2 z-20 flex w-[min(90%,38rem)] -translate-x-1/2 flex-col items-center gap-3 text-center">
-            <button type="button" onClick={() => listenForObjective()} disabled={loading}
-              className="min-h-12 rounded-full border border-amber-400/70 bg-black/85 px-5 text-amber-100">
-              {listening ? "STOP LISTENING" : "SPEAK OBJECTIVE"}
-            </button>
-            <p role="status" aria-live="polite" className="max-h-24 overflow-auto rounded-lg bg-black/85 px-3 py-2 text-sm text-white">
-              {objective || (listening ? "Listening…" : "Your spoken objective will appear here.")}
-            </p>
-            {voiceError && <p role="alert" className="text-sm text-red-200">{voiceError}</p>}
-            {textBackup && <label className="w-full text-sm text-amber-100">Text backup
-              <textarea rows={2} value={objective} maxLength={4000}
-                className="mt-1 block w-full rounded border border-amber-300/50 bg-black/90 p-2 text-white"
-                placeholder="Enter your objective" onChange={event => {
-                  setObjective(event.target.value);
-                  objectiveRef.current = event.target.value;
-                }} />
-            </label>}
+  const treeState = result && !loading ? "revealed" : loading ? "creating" : listening ? "listening" : "welcome";
+  const currentDesign = result?.blend ?? null;
+  const currentView = screen && ["assembled", "blueprint", "dissect", "exploded", "imploded"].includes(screen)
+    ? screen as "assembled" | "blueprint" | "dissect" | "exploded" | "imploded"
+    : "assembled";
+
+  return <div className="ascension-world living-tree-world relative isolate mx-auto w-full max-w-none">
+    <section aria-label="ASCENSION Tree of Knowledge" className="ascension-command">
+      <div className="ascension-stage living-tree-stage">
+        <LivingTree state={treeState} verifiedRevision={verifiedRevision} />
+        {!bookOpen && <section className="living-book-entry" aria-label="Open ASCENSION Book">
+          <img src={BOOK} alt="Original ASCENSION closed Book" draggable={false}/>
+          <div className="living-book-choices" role="group" aria-label="Choose a Book category">
+            {(["Business Planner", "Build / Create", "Guidance"] as const).map(item =>
+              <button type="button" key={item} onClick={() => chooseCategory(item)}>{item}</button>
+            )}
           </div>
-        {microphonePrompt && microphone === "checking" && <p className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded bg-black/85 p-3 text-sm text-white" role="status">Allow microphone access to control ASCENSION by voice.</p>}
-        {microphone === "unavailable" && <button type="button" onClick={() => void requestMicrophone()}
-          className="absolute right-4 top-4 z-30 rounded border border-amber-400 bg-black/90 p-3 text-amber-100">Enable microphone</button>}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" disabled={loading || !objective.trim()} onClick={() => void engage()}
-            className="ascension-engage min-h-12 rounded-full border border-gold/55 bg-gold/10 px-7 text-sm font-medium tracking-wide text-gold">
-            {loading ? "ENGAGING ASCENSION…" : "ENGAGE ASCENSION"}
-          </button>
-        </div>
-        {loading && <p className="ascension-tree-status" role="status">
-          Reading this with you.
-          <button type="button" onClick={stop}>Stop</button>
-        </p>}
-        {error && <p className="ascension-tree-status" role="status">{error}</p>}
-        {governedStatus && <p className="ascension-tree-status" role="status">{governedStatus}</p>}
-        {internalKnowledge && <section className="ascension-tree-status" aria-label="ASCENSION existing knowledge">
-          <p className="whitespace-pre-wrap">{internalKnowledge}</p>
-          <p>New pathways are not verified or available until the governed ASCENSION runtime processes the objective.</p>
         </section>}
-        <button type="button" onClick={toggleTalking} aria-pressed={!talking} className="ascension-tree-hear">
-          {talking ? "MUTE TREE" : "HEAR TREE"}
-        </button>
+        {bookOpen && <>
+          <div className="living-tree-conversation">
+            <button type="button" onClick={() => listenForObjective()} disabled={loading}
+              aria-pressed={listening} className="living-tree-microphone">
+              {listening ? "STOP LISTENING" : "SPEAK TO TREE"}
+            </button>
+            {objective && <p className="living-tree-words" role="status">{objective}</p>}
+            {textBackup && <label className="living-tree-text-backup">Your words
+              <textarea rows={2} maxLength={4000} value={objective} placeholder="Enter your intent"
+                onChange={event => { setObjective(event.target.value); objectiveRef.current = event.target.value; }}/>
+            </label>}
+            <button type="button" disabled={loading || !objective.trim()} onClick={() => void engage()}
+              className="living-tree-submit">{loading ? "WORKING WITH YOUR INTENT…" : currentDesign ? "CONTINUE DESIGN" : "ENGAGE ASCENSION"}</button>
+          </div>
+          {currentDesign && <TreeStudio design={{ ...currentDesign, files: result?.files ?? [] }} view={currentView} loading={loading}
+            rotateRequest={rotationRequest} zoomRequest={zoomRequest}
+            onView={next => show(next)} onExplainPart={explainPart} onContinue={buildOnResult}/>}
+          {loading && <p className="living-tree-message" role="status">The original ASCENSION engines are processing your intent. <button onClick={stop} type="button">Stop</button></p>}
+          {error && <p className="living-tree-message living-tree-error" role="alert">{error}</p>}
+          {governedStatus && <p className="living-tree-governed" role="status">{governedStatus}</p>}
+          {internalKnowledge && <section className="living-tree-knowledge" aria-label="Original Knowledgeverse retrieval">
+            {internalKnowledge}
+          </section>}
+          {voiceError && <p className="living-tree-voice-error" role="alert">{voiceError}</p>}
+          {microphonePrompt && microphone === "checking" && <p className="living-tree-voice-error" role="status">Allow microphone access to speak with the Tree.</p>}
+          {microphone === "unavailable" && <button type="button" className="living-tree-enable-mic" onClick={() => void requestMicrophone()}>Enable microphone</button>}
+          <button type="button" className="living-tree-mute" aria-pressed={!talking} onClick={toggleTalking}>
+            {talking ? "MUTE TREE" : "HEAR TREE"}
+          </button>
+        </>}
       </div>
     </section>
-    {screen && result && <DesignedFlow screen={screen} readings={readings} selectedIndex={choice}
-      talking={talking} listening={listening} onListen={() => listenForObjective()}
-      onToggleTalking={toggleTalking} onScreen={show} onOpen={openPathway}
-      onExplainPart={explainPart} onBuildOnResult={buildOnResult} />}
   </div>;
 }

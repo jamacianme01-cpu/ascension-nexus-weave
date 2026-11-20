@@ -182,11 +182,14 @@ async function projectGuestDelivery(
     // Neither the transport nor the website invents a Claude/Grok/OpenAI answer.
     const engine = await import("./engine/delivery.server");
     const delivered = engine.governedDelivery(run, snapshot.artifacts || []);
-    const complete = delivered?.kind !== "not_produced" &&
-      delivered?.pathways.length === 3 && Boolean(delivered?.blend);
+    // The owner now wants ONE evolving design/conversation, not four model
+    // slots. Accept only the result the original runtime actually produced.
+    // governedDelivery already applies assessResult and returns not_produced for
+    // Knowledge Forms, receipts and unfinished placeholders.
+    const complete = Boolean(delivered && delivered.kind !== "not_produced" && delivered.body.trim());
     return {...base,status:"completed",response_payload: delivered,
-      error: complete ? null : "The governed objective finished, but three complete pathways and BLEND have not been produced.",
-      note:complete?null:"Only original runtime output was returned; no provider output was fabricated.",
+      error: complete ? null : "The governed objective finished without producing the requested result.",
+      note:complete?null:"Only original runtime output was returned; no result was fabricated.",
       source:"governed"};
   }
   const bundle = await rpc<GuestBundle>("ascension_guest_bundle", {

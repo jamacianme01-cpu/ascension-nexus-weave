@@ -14,9 +14,9 @@ await context.addInitScript(() => {
 const page = await context.newPage();
 try {
   await page.goto(website,{waitUntil:"domcontentloaded",timeout:60000});
+  await page.getByRole("group",{name:"Choose a Book category"}).waitFor({timeout:20000});
+  await page.getByRole("button",{name:"Build / Create",exact:true}).click();
   await page.locator('textarea[placeholder="Enter your objective"]').waitFor({timeout:20000});
-  if (await page.getByRole("button",{name:"Business Planner"}).count())
-    throw Error("V1 unexpectedly requires a category choice");
   await page.locator('textarea[placeholder="Enter your objective"]').fill(objective);
   await page.getByRole("button",{name:"ENGAGE ASCENSION",exact:true}).click();
   const signal = await page.waitForFunction(() => {

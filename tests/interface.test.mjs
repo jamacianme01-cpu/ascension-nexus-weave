@@ -312,6 +312,57 @@ try {
     );
   });
   const deliveryEngine = await server.ssrLoadModule("/src/lib/ascension/engine/delivery.server.ts");
+  const originalOneAnswer = {
+    objective: "How can the Tree guide the user?",
+    result: { objective_delivery: {
+      kind: "answer",
+      title: "Living Tree",
+      body: "The Tree speaks to the user naturally while preserving the original objective, then remains visible as the owner works on the same evolving design. Its guidance is grounded in recorded runtime output.",
+      files: [], limitations: [], pathways: [],
+    }},
+  };
+  const originalDelivery = deliveryEngine.governedDelivery(originalOneAnswer, []);
+  check("owner-authored single output survives intact without BLEND or artificial pathways", () => {
+    assert.equal(originalDelivery.kind, "answer");
+    assert.equal(originalDelivery.title, "Living Tree");
+    assert.equal(originalDelivery.pathways.length, 0);
+    assert.equal(originalDelivery.blend, null);
+    assert.equal(originalDelivery.body, originalOneAnswer.result.objective_delivery.body);
+  });
+  const ownerRun = {
+    id: "12345678-90ab-4cde-8f12-123456789abc",
+    objective: originalOneAnswer.objective,
+    status: "verified",
+    result: originalOneAnswer.result,
+    created_at: "2026-11-20T10:00:00Z",
+    completed_at: "2026-11-20T10:01:00Z",
+  };
+  const noSubstitute = {
+    claim: async () => {throw Error("Never start an external draft for actual core result");},
+    complete: async () => {throw Error("No external draft should complete");},
+    fail: async () => {throw Error("No external draft should fail");},
+  };
+  const exactOwner = await deliveryEngine.resolveDelivery({
+    run: ownerRun, artifactStage: null, draft: null,
+    store: noSubstitute, retry: false,
+  });
+  check("real core answer takes precedence and is not rejected for missing three results", () => {
+    assert.equal(exactOwner.status, "completed");
+    assert.equal(exactOwner.source, "governed");
+    assert.equal(exactOwner.response_payload.body, originalOneAnswer.result.objective_delivery.body);
+  });
+  const failedExternal = await deliveryEngine.resolveDelivery({
+    run: { ...ownerRun, result: {}, status: "failed" },
+    artifactStage: null, draft: null, retry: false,
+    store: { claim: async () => true, complete: async () => {
+      throw Error("Must not cache canned recovery");
+    }, fail: async () => {} },
+    generate: async () => { throw Error("HTTP 429 unavailable"); },
+  });
+  check("provider failure never fabricates canned drones or substitute answers", () => {
+    assert.equal(failedExternal.response_payload, null);
+    assert.match(failedExternal.error, /HTTP 429 unavailable/);
+  });
   const spiralPaths = [
     { id: "one", label: "Coils", summary: "Coil induction" },
     { id: "two", label: "Rotor", summary: "Rotating field" },

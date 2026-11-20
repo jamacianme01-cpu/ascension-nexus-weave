@@ -1,54 +1,53 @@
 #!/usr/bin/env node
-/** Live ASCENSION V1 acceptance: genuine Tree submission and four selectable pathways. */
+/** Owner-approved one-page Tree acceptance; genuine governed result required. */
 import { pathToFileURL } from "node:url";
 if (!process.env.PLAYWRIGHT_MODULE) throw Error("Missing Playwright location");
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
-const website = process.env.ASCENSION_V1_WEBSITE || "https://ascension-nexus-weave.fly.dev/";
-const objective = "I want to make Worker drones for people with dementia.";
+const website = process.env.ASCENSION_V1_WEBSITE || "http://127.0.0.1:4174/";
+const objective = "I want to make worker drones for people with dementia.";
 const browser = await chromium.launch({headless:true,executablePath:process.env.ASCENSION_CHROME_BIN,args:["--no-sandbox"]});
 const context = await browser.newContext({viewport:{width:1280,height:800}});
 await context.addInitScript(() => {
-  // Test the supported text alternative on a device with no microphone.
+  // No microphone required for the accessible text alternative.
   Object.defineProperty(navigator,"mediaDevices",{configurable:true,value:undefined});
 });
-const page = await context.newPage();
+const page=await context.newPage();
 try {
   await page.goto(website,{waitUntil:"domcontentloaded",timeout:60000});
-  await page.locator('textarea[placeholder="Enter your objective"]').waitFor({timeout:20000});
-  if (await page.getByRole("button",{name:"Business Planner"}).count())
-    throw Error("V1 unexpectedly requires a category choice");
-  await page.locator('textarea[placeholder="Enter your objective"]').fill(objective);
+  await page.getByRole("group",{name:"Choose a Book category"}).waitFor({timeout:20000});
+  await page.getByRole("button",{name:"Build / Create",exact:true}).click();
+  const portrait=page.locator(".living-tree-portrait");
+  const reveal=page.locator(".living-tree-reveal");
+  await portrait.waitFor({timeout:10000});
+  const photos=await Promise.all([portrait,reveal].map(img => img.evaluate(node =>
+    ({loaded:node.complete&&node.naturalWidth>0,source:new URL(node.src).pathname}))));
+  if (!photos.every(p=>p.loaded)) throw Error("Owner-approved green Tree artwork missing");
+  if (photos[0].source===photos[1].source) throw Error("Tree intent and reveal photos are not two actual states");
+
+  await page.getByPlaceholder("Enter your intent").fill(objective);
   await page.getByRole("button",{name:"ENGAGE ASCENSION",exact:true}).click();
-  const signal = await page.waitForFunction(() => {
-    const count=document.querySelectorAll('.designed-frame[data-screen="spiral"] .designed-reading').length;
-    if (count===4) return {ok:true,count};
-    const message=[...document.querySelectorAll(".ascension-tree-status")]
-      .map(el=>el.textContent||"").join(" ");
-    if (/submission failed|execution failed|execution rejected|delivery incomplete|runtime connection:/i.test(message))
-      return {ok:false,message:message.slice(0,700)};
+  await page.locator(".living-tree[data-tree-state='creating']").waitFor({timeout:20000});
+  const outcome=await page.waitForFunction(() => {
+    if (document.querySelector(".tree-studio")) return {ok:true};
+    const error=document.querySelector(".living-tree-error");
+    if (error) return {ok:false,message:error.textContent};
     return false;
   },null,{timeout:180000});
-  const result=await signal.jsonValue();
-  if (!result?.ok) throw Error("Actual Tree submission failed: "+(result?.message||"unknown"));
-  // A rendered result must enter each one of the owner's existing inspection views.
-  for(let index=0;index<4;index++){
-    await page.locator('.designed-frame[data-screen="spiral"] .designed-hit').nth(index+2).click();
-    await page.locator('.designed-frame[data-screen="assembled"] .designed-live-panel').waitFor({timeout:12000});
-    const views=page.getByRole("navigation",{name:"Design inspection views"});
-    for(const v of ["Blueprint","Dissect","Exploded","Imploded"]){
-      await views.getByRole("button",{name:v,exact:true}).click();
-      await page.locator('.designed-frame[data-screen="'+v.toLowerCase()+'"]').waitFor({timeout:12000});
-    }
-    await page.locator('.designed-margin[aria-label="Back"]').click();
-    await page.locator('.designed-frame[data-screen="spiral"]').waitFor({timeout:12000});
+  const result=await outcome.jsonValue();
+  if (!result?.ok) throw Error("Original ASCENSION did not produce a result: "+String(result?.message||"unknown"));
+  await page.locator(".living-tree[data-tree-state='revealed']").waitFor();
+  if(await page.locator(".designed-screen").count()) throw Error("Four-page pathway overlay replaced the Tree");
+  const inspection=page.getByRole("navigation",{name:"Inspect the same invention"});
+  for(const name of ["Blueprint","Dissect","Explode","Implode"]){
+    await inspection.getByRole("button",{name,exact:true}).click();
+    if(!await page.locator(".tree-studio").count()) throw Error("Tree vanished during "+name);
   }
-  console.log("ASCENSION_REAL_TREE_OBJECTIVE_FOUR_PATHWAYS_AND_INSPECTION_VIEWS_VERIFIED");
-} catch(err){
-  const status=await page.locator(".ascension-tree-status").allTextContents().catch(()=>[]);
-  console.error("ASCENSION_LIVE_ENGAGE_FAILURE",err instanceof Error?err.message:String(err),
-    "displayed_status=",status.join(" | ").slice(0,1000));
-  throw err;
+  console.log("ASCENSION_OWNER_LIVING_TREE_ONE_PAGE_GOVERNED_RESULT_VERIFIED");
+} catch(e) {
+  const errors=await page.locator(".living-tree-error").allTextContents().catch(()=>[]);
+  console.error("ASCENSION_LIVING_TREE_ACCEPTANCE_FAILED",e instanceof Error?e.message:String(e),errors.join(" | "));
+  throw e;
 } finally {
-  try{await page.screenshot({path:"ascension-v1-live-engage.png",fullPage:true});}catch{}
+  try {await page.screenshot({path:"ascension-owner-living-tree-acceptance.png",fullPage:true});}catch{}
   await browser.close();
 }

@@ -113,3 +113,65 @@
 @media (prefers-reduced-motion: reduce) {
   .living-tree-world * { scroll-behavior: auto !important; }
 }
+
+/* Four owner-defined pathways appear only after a real governed delivery.
+   No invention picture is exposed before ENTER PATHWAY. */
+.living-tree-world .living-pathways {
+  position: absolute;
+  z-index: 16;
+  left: 50%;
+  bottom: clamp(6.8rem, 16svh, 10rem);
+  transform: translateX(-50%);
+  width: min(66rem, 94vw);
+  color: #ffeed0;
+  pointer-events: auto;
+}
+.living-pathways h2 {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: clamp(.92rem, 1.7vw, 1.45rem);
+  text-align: center;
+  text-shadow: 0 2px 12px #0b1d13;
+  margin-bottom: .7rem;
+}
+.living-pathway-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .7rem;
+}
+.living-pathway-option {
+  display: flex;
+  min-height: clamp(8.6rem, 20svh, 12rem);
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  border: 1px solid rgb(216 186 127 / 67%);
+  border-radius: 1.1rem;
+  padding: .9rem .7rem;
+  color: #fff0d1;
+  background: linear-gradient(155deg, rgb(17 49 37 / 91%), rgb(8 30 25 / 86%));
+  box-shadow: 0 10px 28px rgb(3 13 9 / 42%);
+  cursor: pointer;
+  transition: transform .23s ease, border-color .23s ease;
+}
+.living-pathway-option:hover, .living-pathway-option:focus-visible {
+  transform: translateY(-4px);
+  border-color: #f9d69a;
+  outline-offset: 3px;
+}
+.living-pathway-name { font-family: "Cinzel", Georgia, serif; font-size: clamp(.77rem, 1.14vw, 1.03rem); text-align: center; }
+.living-pathway-description { font-size: clamp(.68rem, .9vw, .86rem); line-height: 1.4; max-height: 4.3em; overflow: hidden; text-align: center; color: #e8ddc6; }
+.living-pathway-action { font-size: .66rem; font-weight: 650; letter-spacing: .1em; color: #edc887; }
+@media (max-width: 680px) {
+  .living-pathway-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
+  .living-tree-world .living-pathways { bottom: 7.8rem; }
+  .living-pathway-option { min-height: 6.8rem; padding: .5rem; gap: .25rem; }
+  .living-pathway-description { max-height: 2.7em; }
+}
+@media (max-height: 620px) and (min-width: 681px) {
+  .living-tree-world .living-pathways { bottom: 6rem; }
+  .living-pathway-option { min-height: 6.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .living-pathway-option { transition: none; }
+}

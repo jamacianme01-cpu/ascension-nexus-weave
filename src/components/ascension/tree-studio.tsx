@@ -14,13 +14,14 @@ export type TreeDesign = {
 export const TREE_DESIGN_VIEWS: DesignView[] = ["assembled", "blueprint", "dissect", "exploded", "imploded"];
 
 export function TreeStudio({
-  design, view, onView, onExplainPart, onContinue, rotateRequest = 0, zoomRequest = 0, loading = false,
+  design, view, onView, onExplainPart, onContinue, onBack, rotateRequest = 0, zoomRequest = 0, loading = false,
 }: {
   design: TreeDesign;
   view: DesignView;
   onView: (view: DesignView) => void;
   onExplainPart: (part: TreeDesign["parts"][number]) => void;
   onContinue: () => void;
+  onBack?: (() => void) | undefined;
   loading?: boolean;
   rotateRequest?: number;
   zoomRequest?: number;
@@ -40,7 +41,10 @@ export function TreeStudio({
   return <section className="tree-studio" aria-label="Live ASCENSION creation and inspection">
     <header className="tree-studio-heading">
       <h2>{design.title}</h2>
-      <button type="button" onClick={onContinue} disabled={loading}>BUILD ON RESULT</button>
+      <div className="tree-studio-actions">
+        {onBack && <button type="button" onClick={onBack} disabled={loading}>FOUR PATHWAYS</button>}
+        <button type="button" onClick={onContinue} disabled={loading}>BUILD ON RESULT</button>
+      </div>
     </header>
     <div className="tree-studio-summary">{design.summary}</div>
     <nav className="tree-studio-views" aria-label="Inspect the same invention">

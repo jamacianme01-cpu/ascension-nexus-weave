@@ -101,6 +101,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const inspecting = INSPECT_PREFIXES.some(
     (prefix) => location.pathname === prefix || location.pathname.startsWith(prefix + "/"),
   );
+  const inOriginalTreeWorld = location.pathname === "/";
 
   useEffect(() => {
     if (!glossaryOpen) return;
@@ -111,6 +112,12 @@ export function Shell({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [glossaryOpen]);
+
+  if (inOriginalTreeWorld) {
+    // The owner's one-page Book and living Tree replace the app chrome here.
+    // No console header, developer navigation, demo banners, or footer intrude.
+    return <main className="m-0 min-h-svh w-full overflow-hidden p-0">{children}</main>;
+  }
 
   return (
     <div className="void-field relative min-h-screen">

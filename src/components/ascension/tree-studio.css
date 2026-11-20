@@ -68,3 +68,9 @@
 .tree-studio-files h3 { font-weight: 600; }
 .tree-studio-files button { display: inline-flex; padding: .5rem .75rem; margin: .4rem; border: 1px solid #ae9258; border-radius: .5rem; color: #f5e4c4; }
 .tree-studio-no-geometry { color: #dccaa8; font-size: .8rem; }
+
+/* The pathway switch is optional; it is not another screen or navigation route. */
+.tree-studio-actions { display: flex; flex-wrap: wrap; gap: .35rem; justify-content: flex-end; }
+@media (max-width: 470px) {
+  .tree-studio-actions button { padding: .25rem .35rem; font-size: .62rem; }
+}

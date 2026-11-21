@@ -1,0 +1,83 @@
+/* Voice-first ASCENSION: Library Card -> Groundskeeper + Tree + Intent Crystal.
+   Deliberately do not fall back to unapproved characters or scenery. */
+.ascension-living-world {
+  position:relative; isolation:isolate; width:100vw; height:100svh;
+  min-height:440px; overflow:hidden;
+  background:radial-gradient(ellipse at 65% 25%,#14234c 0%,#060e21 53%,#02040d 100%);
+  color:#fbeac7;
+}
+.ascension-library-book { position:absolute; inset:0; z-index:50; display:grid; place-items:end center; overflow:hidden; }
+.ascension-library-book img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.ascension-library-book button {
+  position:relative; z-index:1; margin-bottom:6vh; padding:.9rem 1.5rem;
+  color:#f6d89b; background:rgb(3 12 27 / 82%); cursor:pointer;
+  border:1px solid #ceae69; border-radius:999px; letter-spacing:.09em;
+}
+.ascension-knowledge-tree { position:absolute; inset:0; z-index:0; overflow:hidden; }
+.ascension-knowledge-tree img {
+  width:100%; height:100%; object-fit:cover; object-position:center;
+}
+.ascension-groundskeeper {
+  position:absolute; z-index:7; left:0; top:0; width:43vw; height:100%;
+  overflow:hidden; pointer-events:none;
+  filter:drop-shadow(0 0 1.2rem rgb(224 175 84 / 20%));
+  animation:ascension-breathe 8s ease-in-out infinite alternate;
+}
+.ascension-groundskeeper img {
+  height:100%; width:100%; object-fit:cover; object-position:35% center;
+  mask-image:linear-gradient(90deg,#000 0%,#000 65%,transparent 100%);
+}
+.ascension-groundskeeper[data-speaking="true"] {
+  filter:drop-shadow(0 0 1.8rem rgb(244 197 107 / 56%));
+}
+.ascension-artwork-pending {
+  position:absolute; z-index:18; width:min(34rem,80vw); left:50%; top:20%;
+  transform:translateX(-50%); color:#f6dfb1; font-size:.9rem;
+  text-align:center; padding:1rem; background:rgb(2 8 21 / 82%);
+  border:1px solid rgb(235 191 102 / 30%);
+}
+.ascension-voice-anchor {
+  position:absolute; z-index:22; bottom:1.1rem; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:1rem; max-width:95vw;
+}
+.ascension-voice-anchor > button,.ascension-voice-toggle {
+  border:1px solid #d6af6b; border-radius:999px;
+  background:rgb(5 15 36 / 85%); color:#f8d99a;
+  cursor:pointer; padding:.7rem;
+  display:grid; place-items:center; min-width:3rem; min-height:3rem;
+  box-shadow:0 0 1.4rem rgb(76 153 229 / 18%);
+}
+.ascension-voice-anchor > button[aria-pressed="true"] {
+  box-shadow:0 0 1.5rem rgb(51 172 255 / 70%);
+}
+.ascension-voice-anchor form {
+  display:flex; align-items:center; gap:.4rem; padding:.5rem;
+  background:rgb(2 9 26 / 92%); border-radius:.75rem;
+  border:1px solid rgb(211 170 104 / 40%);
+}
+.ascension-voice-anchor form label { font-size:.75rem; }
+.ascension-voice-anchor textarea {
+  resize:vertical; min-height:2.5rem; max-height:8rem; width:min(24rem,45vw);
+  padding:.4rem; border-radius:.4rem; background:#081327; color:white;
+}
+.ascension-voice-anchor form button { border:1px solid #d6af6b; border-radius:.4rem; padding:.4rem; }
+.ascension-voice-toggle { position:absolute; top:1rem; right:1rem; z-index:22; font-size:.7rem; }
+.ascension-crystal-error {
+  position:absolute; z-index:36; left:50%; transform:translateX(-50%);
+  bottom:5rem; max-width:min(80vw,42rem); max-height:20vh; overflow:auto;
+  text-align:center; color:#ffe2c7; font-size:.8rem;
+  background:rgb(45 12 13 / 91%); border:1px solid #b86b62;
+  border-radius:.6rem; padding:.65rem;
+}
+@keyframes ascension-breathe {
+  from { transform:translateY(0) scale(1); }
+  to { transform:translateY(-.4rem) scale(1.012); }
+}
+@media(max-width:720px) {
+  .ascension-groundskeeper { width:56vw; }
+  .ascension-voice-anchor form { max-width:75vw; }
+  .ascension-voice-anchor textarea { width:45vw; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .ascension-groundskeeper { animation:none; }
+}

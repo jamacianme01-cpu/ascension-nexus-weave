@@ -1,0 +1,68 @@
+/* A crystal is a persisted intent; only actual delivered assets become 3D reality.
+   Neither the Tree nor its groundskeeper is replaced by decorative artwork. */
+.ascension-crystals { position:absolute; inset:0; z-index:9; pointer-events:none; }
+.ascension-tree-intents { position:absolute; inset:0; pointer-events:none; }
+.ascension-tree-crystal {
+  position:absolute; left:var(--intent-x); top:var(--intent-y);
+  width:clamp(.55rem, 1.4vw, 1.1rem); height:clamp(.9rem, 2.3vw, 1.9rem);
+  padding:0; border:0; background:transparent; pointer-events:auto; cursor:pointer;
+  filter:drop-shadow(0 0 .4rem #3d9eff);
+  animation:intent-crystal-breathe 6s ease-in-out var(--intent-delay) infinite alternate;
+}
+.ascension-tree-crystal:focus-visible { outline:2px solid #f9d797; outline-offset:5px; }
+.ascension-crystal-facet, .ascension-held-crystal-shell {
+  display:block; width:100%; height:100%;
+  clip-path:polygon(50% 0%, 96% 29%, 75% 78%, 50% 100%, 25% 78%, 4% 29%);
+  background:linear-gradient(125deg, #d9efff 0%, #4ba7fa 22%, #092c72 48%, #ebc878 65%, #f8e9b7 78%, #2263ae 100%);
+  box-shadow: inset 0 0 1rem #ffe5a1;
+}
+.ascension-tree-crystal[data-verified="true"] .ascension-crystal-facet { background:linear-gradient(135deg,#fff3bc,#37aaff,#f6cc7d,#fff5da); }
+.ascension-tree-crystal[data-active="true"] { filter:drop-shadow(0 0 .7rem #fff2b2); }
+.ascension-held-crystal {
+  position:absolute; z-index:10; left:27%; top:56%;
+  height:clamp(4.8rem, 12vh, 10rem); width:clamp(3.2rem, 8vw, 7rem);
+  transform:translate(-50%, -50%);
+  filter:drop-shadow(0 0 2rem rgb(72 172 255 / 70%));
+}
+.ascension-held-crystal[data-phase="descending"] {
+  animation:crystal-from-knowledge 2.6s cubic-bezier(.15,.63,.2,1) both;
+}
+.ascension-held-crystal[data-phase="revealed"] {
+  animation:crystal-in-hand 6s ease-in-out infinite alternate;
+}
+.ascension-held-crystal-shell { filter:drop-shadow(0 0 .7rem #9de1ff); opacity:.9; }
+.ascension-held-crystal-heart {
+  position:absolute; left:43%; top:28%; width:17%; height:40%;
+  background:#fff4d6; filter:blur(7px); border-radius:50%;
+}
+.ascension-crystal-reality {
+  position:absolute; left:51%; top:45%; width:min(53vw, 65rem);
+  height:min(45vh, 34rem); z-index:11;
+  border:1px solid rgb(255 222 144 / 38%);
+  border-radius:1.1rem;
+  overflow:hidden; background:rgb(0 13 40 / 70%);
+  box-shadow:0 0 3rem rgb(25 111 208 / 33%);
+  pointer-events:auto;
+}
+.ascension-crystal-reality .v1-design-image-view,
+.ascension-crystal-reality .v1-design-model { width:100%; height:100%; }
+@keyframes crystal-from-knowledge {
+  from { left:72%; top:15%; opacity:.25; transform:translate(-50%,-50%) scale(.22); }
+  70% { opacity:1; }
+  to { left:27%; top:56%; opacity:1; transform:translate(-50%,-50%) scale(1); }
+}
+@keyframes crystal-in-hand {
+  from { transform:translate(-50%,-50%) translateY(0); }
+  to { transform:translate(-50%,-50%) translateY(-.45rem); }
+}
+@keyframes intent-crystal-breathe {
+  from { opacity:.68; transform:scale(.9); }
+  to { opacity:1; transform:scale(1.13); }
+}
+@media(max-width:700px) {
+  .ascension-held-crystal { left:24%; top:52%; }
+  .ascension-crystal-reality { top:38%; left:38%; width:59vw; height:35vh; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .ascension-tree-crystal,.ascension-held-crystal { animation:none!important; }
+}

@@ -151,7 +151,7 @@ export const getGuestObjectiveStatus = createServerFn({ method: "GET" })
     return { request: row ?? null };
   });
 
-async function projectGuestDelivery(
+export async function projectGuestDelivery(
   requestId: string,
   guestToken: string,
   retry: boolean,

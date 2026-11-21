@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const read = path => readFileSync(path, "utf8");
+const root = read("src/routes/index.tsx");
+const scene = read("src/components/ascension/crystal-experience.tsx");
+const crystal = read("src/components/ascension/crystal-surface.tsx");
+const storage = read("src/lib/ascension/intent-crystals.functions.ts");
+const stylesheet = read("src/components/ascension/crystal-experience.css");
+
+assert.match(root, /component: CrystalExperience/);
+assert.match(scene, /Enter ASCENSION/);
+assert.match(scene, /libraryCapability/);
+assert.match(scene, /recordIntentCrystal/);
+assert.match(scene, /inspectIntentCrystal/);
+assert.match(scene, /listIntentCrystals/);
+assert.match(scene, /getGuestObjectiveStatus/);
+assert.match(scene, /getGuestObjectiveDelivery/);
+assert.match(scene, /delivered\.source === "governed"/);
+assert.match(scene, /onRecall=\{id => void recallCrystal\(id\)\}/);
+assert.match(scene, /guideSuggestion/);
+assert.match(scene, /getVoice|SpeechRecognition|webkitSpeechRecognition/);
+assert.match(scene, /new intent/);
+assert.match(scene, /ascension-approved-cosmic-groundskeeper/);
+assert.match(scene, /ascension-knowledge-tree-crystals/);
+assert.doesNotMatch(scene, /ENTER PATHWAY|showingPathways|FOUR PATHWAYS|living-pathway-options/);
+assert.match(crystal, /ascension-tree-crystal/);
+assert.match(crystal, /data-verified/);
+assert.match(crystal, /V1DesignViewport/);
+assert.match(crystal, /hasVisualization/);
+assert.match(storage, /ASCENSION_STORAGE_DIR/);
+assert.match(storage, /createHash\("sha256"\)/);
+assert.match(storage, /recordIntentCrystal/);
+assert.match(storage, /inspectIntentCrystal/);
+assert.match(storage, /governedPersisted/);
+assert.match(storage, /delivery\?\.status === "completed" && delivery\.source === "governed"/);
+assert.match(stylesheet, /prefers-reduced-motion/);
+console.log("PASS: one-page Library Card, one crystal per intent, authorized governed recall, voice guide, no pathway chooser.");

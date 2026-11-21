@@ -1,7 +1,7 @@
 /**
  * Each crystal is one continuing intent. The record is stored in the owner's
  * configured persistent storage, never in an in-memory substitute.
- * The client has an unguessable Library Card capability, not guest run tokens.
+ * The Library Card capability controls retrieval of its own intent records.
  * Real evolution still requires the governed engine to record new work.
  */
 import { createServerFn } from "@tanstack/react-start";
@@ -146,6 +146,7 @@ export const inspectIntentCrystal = createServerFn({ method: "GET" })
     return {
       crystal: summary(item),
       status: run.status,
+      continuation: { requestId: item.requestId, guestToken: item.guestToken },
       // Only governed completed delivery is presented as an answer.
       delivery: delivery?.status === "completed" && delivery.source === "governed"
         ? delivery.response_payload : null,

@@ -34,7 +34,7 @@ export function CrystalSurface({
           title={crystal.intent}
           aria-label={`Recall intent: ${crystal.intent}`}
           style={{
-            "--intent-x": `${12 + ((index * 37) % 80)}%`,
+            "--intent-x": `${49 + ((index * 37) % 42)}%`,
             "--intent-y": `${8 + ((index * 23) % 43)}%`,
             "--intent-delay": `${(index % 7) * -0.47}s`,
           } as CSSProperties}

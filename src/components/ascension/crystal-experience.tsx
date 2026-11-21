@@ -169,6 +169,7 @@ export function CrystalExperience() {
         libraryKey: libraryCapability(), crystalId: id,
       } });
       if (epoch !== requestEpoch.current) return;
+      if (!state.continuation) throw new Error("This crystal has no recoverable governed run authorization.");
       chosen.current = { id, intent: state.crystal.intent, run: state.continuation };
       setSelectedId(id);
       setRevision(state.crystal.verifiedRevision);

@@ -26,9 +26,9 @@ export class ApprovedAnswerError extends Error {
 }
 
 function enabled(): boolean {
-  return process.env["ASCENSION_ENABLE_PAID_APIS"] === "true" &&
-    process.env["ASCENSION_ALLOW_OPENAI_AI"] === "true" &&
-    Boolean(process.env["OPENAI_API_KEY"]?.trim());
+  // External AI is not part of ASCENSION architecture (V1 recovery 2026-11-19).
+  // Governed runtime only.
+  return false;
 }
 
 export function approvedAnswerModel(): string {

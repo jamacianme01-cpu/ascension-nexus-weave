@@ -1,0 +1,121 @@
+"""Execution capability registry with formal semantic contracts.
+
+Each capability advertises:
+    capability_id, name, accepted intents (ME tokens), input contract,
+    output contract, constraints, required authority, evidence produced,
+    verification method, risk class, availability.
+
+CLARITY selects capabilities by meaning + constraints, not by if-chains.
+"""
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from typing import Dict, List
+
+from .schemas import Branch, MeaningElement, slugify
+
+
+@dataclass
+class CapabilityContract:
+    capability_id: str
+    name: str
+    description: str
+    accepted_intent_tokens: List[str]      # ME tokens this capability serves
+    output_contract: str
+    constraints: List[str]
+    required_authority: str = "CLARITY:orchestrator"
+    evidence_produced: str = "file receipts with sha256"
+    verification_method: str = "per-file sha256 + required sections"
+    risk_class: str = "low"
+    available: bool = True
+
+    def advertise(self) -> Dict:
+        return {k: getattr(self, k) for k in (
+            "capability_id", "name", "description", "accepted_intent_tokens",
+            "output_contract", "constraints", "required_authority",
+            "evidence_produced", "verification_method", "risk_class", "available")}
+
+    def serves(self, destiny: str) -> bool:
+        lower = destiny.lower()
+        return any(token in lower for token in self.accepted_intent_tokens)
+
+
+@dataclass
+class CapabilityResult:
+    capability: str
+    files: Dict[str, str]
+    primary_artifact: str
+
+
+class DigitalArtifactWriter:
+    contract = CapabilityContract(
+        capability_id="digital_artifact_writer",
+        name="Digital Artifact Writer",
+        description="Composes a single knowledge-form artifact from Destiny MEs.",
+        accepted_intent_tokens=["build", "create", "compose", "form", "construct"],
+        output_contract="one markdown knowledge-form artifact",
+        constraints=["project-relative paths", "no protected locations"],
+        required_authority="CLARITY:orchestrator",
+        evidence_produced="file receipt with sha256 + size",
+        verification_method="sha256 match + required sections present + min size",
+        risk_class="low",
+    )
+
+    def write(self, branch: Branch, mes: List[MeaningElement]) -> CapabilityResult:
+        artifact_name = branch.expected.artifact_name
+        lines: List[str] = []
+        lines.append(f"# Knowledge Form: {slugify(branch.approach, 40).replace('_', ' ')}")
+        lines.append("")
+        lines.append(f"_Executed branch: {branch.branch_id}_")
+        lines.append("")
+        for element in mes:
+            lines.append(f"## ME [{element.category}] {element.me_id}")
+            lines.append(f"- text: {element.text}")
+            lines.append("")
+        lines.append("## Required Sections")
+        for section in branch.expected.required_sections:
+            lines.append(f"- {section}: composed from destiny meaning elements")
+        lines.append("")
+        content = "\n".join(lines)
+        while len(content.encode("utf-8")) < branch.expected.min_bytes:
+            content += "\n_appendix: destiny meaning element digest_\n"
+        return CapabilityResult(
+            capability=self.contract.capability_id,
+            files={artifact_name: content},
+            primary_artifact=artifact_name,
+        )
+
+
+class DocumentBundleCapability:
+    contract = CapabilityContract(
+        capability_id="document_bundle",
+        name="Document Bundle",
+        description="Produces a governed specification bundle (spec, manifest, summary).",
+        accepted_intent_tokens=["document", "report", "bundle", "specification",
+                                "portfolio", "charter", "manual", "library", "registry"],
+        output_contract="bundle folder: spec.md + manifest.json + summary.txt",
+        constraints=["project-relative paths", "deterministic manifest"],
+        required_authority="CLARITY:orchestrator",
+        evidence_produced="per-file sha256 receipts",
+        verification_method="all bundle files present with receipted hashes",
+        risk_class="low",
+    )
+
+    def write(self, branch: Branch, mes: List[MeaningElement]) -> CapabilityResult:
+        base = slugify(branch.expected.artifact_name.replace(".md", ""), 32)
+        folder = f"{base}_bundle"
+
+        spec_lines: List[str] = []
+        spec_lines.append(f"# Specification Bundle: {base.replace('-', ' ')}")
+        spec_lines.append("")
+        spec_lines.append(f"_Governed branch: {branch.branch_id}_")
+        spec_lines.append("")
+        for element in mes:
+            spec_lines.append(f"## ME [{element.category}] {element.me_id}")
+            spec_lines.append(f"- {element.text}")
+            spec_lines.append("")
+        for section in branch.expected.required_sections:
+            spec_lines.append(f"## Section: {section}")
+            spec_lines.append("- composed from destiny meaning elem

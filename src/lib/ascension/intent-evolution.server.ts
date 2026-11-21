@@ -11,7 +11,7 @@
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { callOwnerVolumeTransport, ownerVolumeTransportEnabled } from "./data/volume-transport.server";
 import { ascensionDb } from "./data/client.server";
 import { projectGuestDelivery, type GuestSubmission } from "./guest.functions";
@@ -140,7 +140,16 @@ export async function advanceIntentCrystalsOnce(now = Date.now()): Promise<Evolu
       // Another process cannot simultaneously queue the same crystal.
       handle = await fs.open(lock, "wx", 0o600);
     } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code === "EEXIST") { report.skipped++; continue; }
+      if ((cause as NodeJS.ErrnoException).code === "EEXIST") {
+        // A crash must not permanently orphan a crystal. Reclaim stale
+        // scheduler locks on a later cycle, never while an active job runs.
+        try {
+          const stat = await fs.stat(lock);
+          if (now - stat.mtimeMs > 2 * 60 * 60 * 1000) await fs.unlink(lock);
+        } catch { /* Another process may have just released it. */ }
+        report.skipped++;
+        continue;
+      }
       report.failures++; continue;
     }
     try {

@@ -254,6 +254,13 @@ async function main() {
     } finally { running = false; }
   };
   await execute();
+  // The owner explicitly pairs through the Python companion. If that parent
+  // is killed unexpectedly, never leave an orphan holding the passphrase.
+  const pairedCompanionPid = process.ppid;
+  setInterval(() => {
+    try { process.kill(pairedCompanionPid, 0); }
+    catch { process.exit(0); }
+  }, 10000);
   setInterval(() => { void execute(); }, INTERVAL_MS);
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

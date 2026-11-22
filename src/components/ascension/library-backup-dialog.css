@@ -1,0 +1,41 @@
+/* Appears only after owner asks to back up or restore the Library Card.
+   No new persistent menus, panels, scenes, or changed approved artwork. */
+.ascension-backup-shade {
+  position: fixed; inset: 0; z-index: 80;
+  display: grid; place-items: center;
+  padding: 1rem; background: rgb(1 4 12 / 83%);
+}
+.ascension-backup-dialog {
+  width: min(100%, 31rem); max-height: min(90svh, 700px);
+  overflow-y: auto; border-radius: 0.8rem;
+  padding: clamp(1rem, 3vw, 1.6rem);
+  border: 1px solid rgb(219 177 102 / 66%);
+  background: #081326; color: #f7e9c9;
+  box-shadow: 0 0 3rem rgb(0 0 0 / 60%);
+}
+.ascension-backup-dialog h2 {
+  font-size: 1.16rem; font-weight: 650; margin: 0 0 0.6rem;
+}
+.ascension-backup-dialog p {
+  font-size: 0.88rem; line-height: 1.5; margin: 0.6rem 0;
+}
+.ascension-backup-dialog form { display: grid; gap: 0.9rem; }
+.ascension-backup-dialog label { display: grid; gap: 0.35rem; font-size: 0.9rem; }
+.ascension-backup-dialog input {
+  background: #101f36; color: #fff3dc;
+  border: 1px solid #927447; border-radius: 0.4rem;
+  min-width: 0; width: 100%; padding: 0.58rem;
+}
+.ascension-backup-dialog .ascension-backup-caution {
+  color: #e3c99e; font-size: 0.8rem;
+}
+.ascension-backup-dialog [role="alert"] { color: #ffc6c1; }
+.ascension-backup-dialog [role="status"] { color: #cbe7da; }
+.ascension-backup-actions { display: flex; gap: 0.6rem; justify-content: flex-end; flex-wrap: wrap; }
+.ascension-backup-actions button {
+  padding: 0.65rem 0.9rem; border-radius: 0.4rem;
+  border: 1px solid #ae905e; color: #f8e6c1;
+  background: #1b2a42; cursor: pointer;
+}
+.ascension-backup-actions button:last-child { background: #304254; }
+.ascension-backup-actions button:disabled { opacity: 0.6; cursor: not-allowed; }

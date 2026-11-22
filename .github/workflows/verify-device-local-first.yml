@@ -19,6 +19,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install
+      - name: Test unattended encrypted desktop folder convergence
+        run: node --test tests/device-background-sync.test.mjs
       - name: Install disposable browser test tools
         run: |
           npm install --no-save playwright

@@ -93,7 +93,9 @@ async function findJoinable(share) {
       const meta=await jsonFile(join(dir,"session.json"));
       if (meta.format !== SESSION_FORMAT || meta.id !== id ||
           !UUID_RE.test(meta.hostDeviceId) ||
+          !UUID_RE.test(meta.hostCrystalId) ||
           typeof meta.createdAt !== "string" ||
+          !Number.isFinite(Date.parse(meta.createdAt)) ||
           Date.now()-Date.parse(meta.createdAt) > MAX_WAIT ||
           Date.parse(meta.createdAt)-Date.now() > 30_000 ||
           await exists(join(dir,"host-report.json")) ||
@@ -131,7 +133,7 @@ function report(role, info) {
     checks:["shared-directory-visibility","two-owner-originals-preserved",
       "encrypted-ciphertext-only","peer-archive-convergence",
       "replay-idempotency","no-false-verification"],
-    ownerPersonalDevicesTested:true,
+    evidenceScope:"Native filesystem convergence between the processes running this test; physical device identity must be confirmed by the owner.",
     note:"This test does not exercise the browser's OS permission dialog or continuous background daemon.",
   },null,2)+"\n";
 }

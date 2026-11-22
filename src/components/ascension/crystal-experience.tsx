@@ -5,6 +5,7 @@ import { LibrarySyncDialog } from "./library-sync-dialog";
 import {
   startOwnerFolderSync, type DeviceSyncFolder, type FolderSyncSession,
 } from "@/lib/ascension/device-folder-sync";
+import { startDesktopBackgroundSync, stopDesktopBackgroundSync } from "@/lib/ascension/device-background-sync";
 import type { DesignView } from "./v1-design-viewport";
 import { listDeviceCrystals, readDeviceCrystal, type DeviceCrystal } from "@/lib/ascension/device-knowledgeverse";
 import {
@@ -301,6 +302,20 @@ export function CrystalExperience() {
     }
   }
 
+  async function stopLibrarySync() {
+    syncSession.current?.stop();
+    syncSession.current = null;
+    setSyncActive(false);
+    try {
+      await stopDesktopBackgroundSync();
+      speak("Your Library Card has stopped exchanging encrypted files.");
+    } catch {
+      setIssue("Browser folder sync stopped. The desktop companion could not confirm whether background sync stopped.");
+      speak("Browser exchange stopped. Desktop background exchange could not be confirmed stopped.");
+      throw new Error("Desktop background exchange stop could not be confirmed.");
+    }
+  }
+
   processVoice.current = words => {
     const input = words.trim();
     const lower = input.toLowerCase().replace(/[.,!?]/g, "").trim();
@@ -313,10 +328,7 @@ export function CrystalExperience() {
       return;
     }
     if (/^(?:stop syncing|stop synchronization|disconnect library|stop library sync)$/.test(lower)) {
-      syncSession.current?.stop();
-      syncSession.current = null;
-      setSyncActive(false);
-      speak("Your Library Card has stopped exchanging encrypted files.");
+      void stopLibrarySync().catch(() => {});
       return;
     }
     if (/^(?:back ?up|export|save) (?:my |the )?(?:library card|knowledgeverse|crystals|library)$/.test(lower)) {
@@ -502,7 +514,7 @@ export function CrystalExperience() {
       onClose={() => setArchiveMode(null)}/>}
     {syncDialog && <LibrarySyncDialog
       active={syncActive}
-      onStart={async (folder: DeviceSyncFolder, passphrase: string) => {
+      onStart={async (folder: DeviceSyncFolder, passphrase: string, desktopPath?: string) => {
         syncSession.current?.stop();
         const session = startOwnerFolderSync(folder, passphrase, state => {
           if (state.state === "error")
@@ -517,6 +529,14 @@ export function CrystalExperience() {
           const result = await session.syncNow();
           setSyncActive(true);
           await refreshCrystals();
+          if (desktopPath) {
+            try {
+              await startDesktopBackgroundSync(folder, passphrase, desktopPath);
+              return { ...result, backgroundActive: true };
+            } catch (cause) {
+              return { ...result, backgroundError: cause instanceof Error ? cause.message : "Desktop background pairing was unavailable." };
+            }
+          }
           return result;
         } catch (error) {
           session.stop();
@@ -525,11 +545,7 @@ export function CrystalExperience() {
           throw error;
         }
       }}
-      onStop={() => {
-        syncSession.current?.stop();
-        syncSession.current = null;
-        setSyncActive(false);
-      }}
+      onStop={stopLibrarySync}
       onClose={() => setSyncDialog(false)}/>}
     {issue && <p role="alert" className="ascension-crystal-error">{issue}</p>}
   </main>;

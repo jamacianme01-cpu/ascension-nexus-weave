@@ -323,17 +323,20 @@ export function CrystalExperience() {
       speak("I'm here. What would you like to create or explore?");
       return;
     }
-    const recall = lower.match(/^(?:recall|bring back|retrieve|open my|show my)\s+(.+)$/);
+    const recall = lower.match(/^(?:recall|bring back|retrieve|open my|show my|recall my)\s+(.+)$/);
     if (recall) {
       const phrase = recall[1]!.replace(/\b(?:intent|crystal|design)\b/g, "").trim();
-      const match = crystalsRef.current.find(item => item.intent.toLowerCase().includes(phrase));
+      const match = phrase && crystalsRef.current.find(item => item.intent.toLowerCase().includes(phrase));
       if (match) { void recallCrystal(match.id); return; }
+      speak("I haven't found that intent on this Library Card. Please say the intent's name.");
+      return;
+    }
+    if (/^(?:what has grown|what changed|what is new with this intent)$/.test(lower)) {
+      if (chosen.current) void recallCrystal(chosen.current.id);
+      else speak("Tell me which intent crystal you would like me to retrieve.");
+      return;
     }
     if (answerRef.current) {
-      if (/^(?:what has grown|what changed|what is new with this intent)$/.test(lower)) {
-        if (chosen.current) { void recallCrystal(chosen.current.id); }
-        return;
-      }
       if (/^(?:rotate|turn) (?:left|right)$/.test(lower)) {
         if (!answerRef.current.design?.modelUrl) speak("I need the delivered three-dimensional model to rotate it accurately.");
         else setRotation(value => value + (lower.endsWith("right") ? 1 : -1));

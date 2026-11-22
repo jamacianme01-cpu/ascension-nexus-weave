@@ -55,9 +55,9 @@ function transactionComplete(tx: IDBTransaction): Promise<void> {
     tx.onabort = () => reject(tx.error ?? new Error("Device storage transaction was interrupted."));
   });
 }
-async function database() {
+async function database(): Promise<IDBDatabase> {
   ensureDeviceFeatures();
-  opened ??= new Promise((resolve, reject) => {
+  opened ??= new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = () => {
       const db = request.result;

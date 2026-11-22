@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import {
+  measuredPartOffsets, positionPartAtWorldOffset,
+} from "@/lib/ascension/v1-model-transform.mjs";
+import "./v1-design-viewport.css";
 
 export type DesignView = "assembled" | "blueprint" | "dissect" | "exploded" | "imploded";
 
@@ -46,12 +50,17 @@ export function V1DesignViewport({
 
   useEffect(() => { setScale(1); }, [imageUrl, blueprintUrl, modelUrl, mode]);
   useEffect(() => {
+    // Clear measurements from any prior selected model BEFORE this model loads.
+    // Last model's bounds must never appear as the current invention's data.
+    setDimensions(null);
+    setProblem("");
     // A delivered blueprint is the authority for Blueprint view; do not
     // substitute wireframe geometry when the actual drawing is present.
     if (!modelUrl || (mode === "blueprint" && blueprintUrl) || !container.current) return;
     const host = container.current;
     let cancelled = false;
     let frame = 0;
+    let implosionFrame = 0;
     let renderer: THREE.WebGLRenderer;
     let controls: OrbitControls;
     const scene = new THREE.Scene();
@@ -87,10 +96,17 @@ export function V1DesignViewport({
         geometry = loaded.scene;
         scene.add(geometry);
         const box = new THREE.Box3().setFromObject(geometry);
-        if (box.isEmpty()) { setProblem("The delivered model contains no visible geometry."); return; }
+        if (box.isEmpty()) {
+          setProblem("The delivered model contains no visible geometry.");
+          return;
+        }
         const extent = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         const size = Math.max(extent.x, extent.y, extent.z, 0.01);
+        if (!Number.isFinite(size)) {
+          setProblem("The delivered model has invalid 3D bounds.");
+          return;
+        }
         setDimensions([extent.x, extent.y, extent.z].map(n => n.toFixed(3)).join(" × "));
         camera.position.set(center.x + size * 1.8, center.y + size * 0.9, center.z + size * 1.8);
         camera.near = Math.max(0.001, size / 1000);
@@ -99,22 +115,36 @@ export function V1DesignViewport({
         controls.target.copy(center);
         controls.update();
         const materialCopies: THREE.Material[] = [];
-        const originals: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[]; pos: THREE.Vector3 }[] = [];
+        const originals: {
+          mesh: THREE.Mesh;
+          material: THREE.Material | THREE.Material[];
+          pos: THREE.Vector3;
+        }[] = [];
         geometry.traverse(part => {
           if (!(part instanceof THREE.Mesh)) return;
-          const mesh = part;
-          originals.push({ mesh, material: mesh.material, pos: mesh.position.clone() });
+          originals.push({
+            mesh: part,
+            material: part.material,
+            pos: part.position.clone(),
+          });
         });
+        if (!originals.length) {
+          setProblem("The delivered model contains no inspectable mesh components.");
+          return;
+        }
         if ((mode === "exploded" || mode === "imploded") && originals.length < 2) {
           setProblem("The delivered model has fewer than two separable mesh components.");
         } else setProblem("");
+        // Inspect only existing, loaded mesh components. World-space offsets
+        // must be converted to local coordinates for transformed GLB groups.
+        const partOffsets = measuredPartOffsets(
+          originals.map(part => part.mesh), center, size,
+        );
         const clip = new THREE.Plane(new THREE.Vector3(1, 0, 0), -center.x);
-        for (const { mesh, material, pos } of originals) {
+        for (let i = 0; i < originals.length; i++) {
+          const { mesh, material, pos } = originals[i]!;
           if (mode === "exploded" && originals.length > 1) {
-            const partCenter = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
-            const away = partCenter.sub(center);
-            if (away.lengthSq() < 0.0001) away.set(originals.indexOf(originals.find(a => a.mesh === mesh)!) % 2 ? 1 : -1, 0.2, 0);
-            mesh.position.copy(pos).add(away.normalize().multiplyScalar(size * 0.25));
+            positionPartAtWorldOffset(mesh, pos, partOffsets[i]!);
           }
           if (mode === "blueprint" || mode === "dissect") {
             const convert = (original: THREE.Material): THREE.Material => {
@@ -123,7 +153,10 @@ export function V1DesignViewport({
                 const draft = copy as THREE.MeshStandardMaterial;
                 draft.wireframe = true;
                 draft.color?.set("#bcdff5");
-              } else copy.clippingPlanes = [clip];
+              } else {
+                copy.clippingPlanes = [clip];
+                copy.side = THREE.DoubleSide; // Keep true 3D cut surfaces visible.
+              }
               materialCopies.push(copy);
               return copy;
             };
@@ -131,17 +164,18 @@ export function V1DesignViewport({
           }
         }
         replacements.push(...materialCopies);
-        if (mode === "imploded" && originals.length > 1) {
+        if (mode === "imploded" && originals.length > 1 &&
+            !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
           const start = performance.now();
           const animateTogether = () => {
             if (cancelled) return;
             const k = Math.min(1, (performance.now() - start) / 1100);
             originals.forEach(({ mesh, pos }, i) => {
-              const p = new THREE.Vector3((i % 3) - 1, Math.floor(i / 3) % 3 - 1, (i % 2) - 0.5)
-                .normalize().multiplyScalar(size * 0.3 * (1 - k));
-              mesh.position.copy(pos).add(p);
+              positionPartAtWorldOffset(
+                mesh, pos, partOffsets[i]!.clone().multiplyScalar(1 - k),
+              );
             });
-            if (k < 1) window.requestAnimationFrame(animateTogether);
+            if (k < 1) implosionFrame = window.requestAnimationFrame(animateTogether);
           };
           animateTogether();
         }
@@ -156,6 +190,7 @@ export function V1DesignViewport({
       return () => {
         cancelled = true;
         window.cancelAnimationFrame(frame);
+        window.cancelAnimationFrame(implosionFrame);
         observer.disconnect();
         controls.dispose();
         orbit.current = null;
@@ -171,7 +206,11 @@ export function V1DesignViewport({
   }, [modelUrl, blueprintUrl, mode]);
 
   if (!modelUrl || (mode === "blueprint" && blueprintUrl)) {
-    const displayedImage = mode === "blueprint" ? blueprintUrl : imageUrl;
+    // An ordinary concept picture is never a 3D Dissect/Explode/Implode.
+    // Refuse a misleading flat illustration when the real GLB is missing.
+    const requires3D = mode === "dissect" || mode === "exploded" || mode === "imploded";
+    const displayedImage = !modelUrl && requires3D
+      ? null : mode === "blueprint" ? blueprintUrl : imageUrl;
     return <div className="v1-design-image-view">
       {displayedImage ? <>
         <div className="v1-design-zoom-frame">
@@ -183,8 +222,14 @@ export function V1DesignViewport({
           <button type="button" aria-label="Zoom in" onClick={() => setScale(n => Math.min(5, n + 0.25))}>+</button>
           <button type="button" onClick={() => setScale(1)}>Reset</button>
         </div>
-        {mode !== "assembled" && !(mode === "blueprint" && blueprintUrl) && <p role="status">This view needs the matching 3D model or measured drawing. The original design picture is preserved.</p>}
-      </> : <p role="status">{mode === "blueprint" ? "No blueprint drawing with verified dimensions has been delivered." : "The selected pathway has not delivered its design picture or 3D model."}</p>}
+        {mode !== "assembled" && !(mode === "blueprint" && blueprintUrl) && <p role="status">A true 3D model or actual measured drawing is required for this inspection. The original picture is preserved.</p>}
+      </> : <p role="status">
+        {requires3D
+          ? "A delivered 3D model is required for " + mode + ". A flat image is not a 3D inspection."
+          : mode === "blueprint"
+            ? "No actual blueprint drawing or 3D wireframe has been delivered."
+            : "The selected pathway has not delivered its design picture or 3D model."}
+      </p>}
     </div>;
   }
 

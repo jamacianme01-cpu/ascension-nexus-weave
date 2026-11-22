@@ -37,7 +37,7 @@ export async function startDesktopBackgroundSync(
     await writer.write(new Blob([token], {type: "text/plain"}));
     await writer.close();
   } catch (cause) {
-    await writer.abort?.().catch(() => {});
+    if (writer.abort) { try { await writer.abort(); } catch { /* Keep original error. */ } }
     throw cause;
   }
   try {
@@ -48,7 +48,7 @@ export async function startDesktopBackgroundSync(
     if (!result.active) throw new Error("The local desktop sync worker did not activate.");
   } finally {
     // The marker is only a same-directory ownership proof, not a credential.
-    await folder.removeEntry?.(marker).catch(() => {});
+    if (folder.removeEntry) { try { await folder.removeEntry(marker); } catch { /* Marker expires with folder cleanup. */ } }
   }
 }
 export async function stopDesktopBackgroundSync(): Promise<void> {

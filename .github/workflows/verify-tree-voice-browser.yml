@@ -116,3 +116,4 @@ jobs:
           if [ "$ready" != 1 ]; then cat "$RUNNER_TEMP/tree-voice-vite.log"; exit 1; fi
           node tree-voice-ci.browser.mjs
           node tests/active-tree-inspection.browser.mjs
+          node tests/v1-real-3d-inspection.browser.mjs

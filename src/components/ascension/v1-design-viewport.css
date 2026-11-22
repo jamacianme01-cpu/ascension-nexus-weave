@@ -1,0 +1,59 @@
+/* Inspection area only: does not move or modify approved Tree/Book artwork. */
+.v1-design-model, .v1-design-image-view {
+  position:relative;
+  width:100%; height:100%;
+  min-width:0; min-height:0;
+  display:flex; flex-direction:column;
+  overflow:hidden;
+  background:rgb(2 11 24 / 70%);
+}
+.v1-model-canvas {
+  flex:1 1 0;
+  min-width:0; min-height:0;
+  width:100%; height:100%;
+  overflow:hidden;
+  touch-action:none;
+}
+.v1-model-canvas canvas { display:block; max-width:none; }
+.v1-design-zoom-frame {
+  position:relative;
+  flex:1 1 0;
+  min-height:0;
+  width:100%;
+  overflow:hidden;
+  display:grid;
+  place-items:center;
+}
+.v1-design-zoom-frame img {
+  display:block;
+  max-width:none;
+  user-select:none;
+  transform-origin:center;
+}
+.v1-zoom-controls {
+  display:flex; flex-wrap:wrap; gap:.35rem;
+  align-items:center; justify-content:center;
+  padding:.35rem;
+  flex-shrink:0;
+  background:rgb(2 12 26 / 85%);
+}
+.v1-zoom-controls button {
+  padding:.24rem .6rem; border-radius:.35rem;
+  border:1px solid rgb(225 188 118 / 65%);
+  color:#f4e5c9; background:rgb(9 24 37 / 90%);
+  cursor:pointer;
+}
+.v1-zoom-controls button:focus-visible { outline:2px solid #ffe2a6; outline-offset:2px; }
+.v1-design-model .v1-model-measurement,
+.v1-design-model [role="status"],
+.v1-design-image-view [role="status"] {
+  padding:.3rem .6rem; margin:0;
+  font-size:clamp(.65rem,.8vw,.82rem);
+  color:#f3e3c6;
+  background:rgb(3 13 28 / 92%);
+  flex-shrink:0;
+}
+.v1-design-model .v1-model-measurement {
+  position:absolute; bottom:0; left:0; right:0;
+  pointer-events:none;
+}

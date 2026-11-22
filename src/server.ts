@@ -44,8 +44,37 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+
+/**
+ * Explicitly opt-in autonomous intent growth. The process only runs against
+ * mounted persistent ASCENSION storage and the original governed runtime.
+ * No hosting/provider activation is performed here.
+ */
+let crystalEvolutionLoop: ReturnType<typeof setInterval> | null = null;
+function startCrystalEvolutionLoop() {
+  if (crystalEvolutionLoop || process.env["ASCENSION_ENABLE_CRYSTAL_EVOLUTION"] !== "true") return;
+  const run = async () => {
+    try {
+      const { advanceIntentCrystalsOnce } = await import("./lib/ascension/intent-evolution.server");
+      const report = await advanceIntentCrystalsOnce();
+      if (report.queued || report.failures) {
+        console.info("ASCENSION intent evolution cycle", {
+          scanned: report.scanned, queued: report.queued, failures: report.failures,
+        });
+      }
+    } catch (cause) {
+      console.error("ASCENSION intent evolution cycle failed", cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+  crystalEvolutionLoop = setInterval(() => { void run(); }, 30 * 60 * 1000);
+  crystalEvolutionLoop.unref?.();
+  const initial = setTimeout(() => { void run(); }, 30000);
+  initial.unref?.();
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    startCrystalEvolutionLoop();
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

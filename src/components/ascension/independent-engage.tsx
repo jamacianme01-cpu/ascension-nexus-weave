@@ -5,15 +5,14 @@ import { TreeStudio } from "@/components/ascension/tree-studio";
 import "./living-tree-scene.css";
 import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
 import { governedPersisted, type ObjectiveDelivery } from "@/lib/ascension/result-model";
+import {
+  singleDeliveredResult, waitingOnDeliveredModels, reconcileDeliveredVisuals,
+  type VisibleGovernedResult, type VisiblePathway,
+} from "@/lib/ascension/governed-visual-continuity.mjs";
 
 type Part = { name: string; purpose: string; location: string };
-type Pathway = { id: string; title: string; summary: string; steps: string[]; tradeoffs: string[]; parts: Part[]; imageUrl: string | null; blueprintUrl: string | null; modelUrl: string | null; blend_reason?: string };
-type Result = {
-  introduction: string;
-  pathways: Pathway[];
-  blend: Pathway & { blend_reason: string };
-  files?: { name: string; content: string }[];
-};
+type Pathway = VisiblePathway;
+type Result = VisibleGovernedResult;
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
@@ -117,15 +116,9 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
   // A truthful single core result is a valid creation/conversation.
   // Do not reject it for missing legacy model pathways or invent geometry.
   if (!delivery.blend || delivery.pathways.length !== 3) {
-    const output: Pathway & { blend_reason: string } = {
-      id: "governed-single-output",
-      title: delivery.title,
-      summary: delivery.body,
-      steps: [], tradeoffs: delivery.limitations, parts: [],
-      imageUrl: null, blueprintUrl: null, modelUrl: null,
-      blend_reason: "",
-    };
-    return { introduction: delivery.body, pathways: [], blend: output, files: delivery.files };
+    // A valid single-output result can itself carry a REAL image, blueprint
+    // or 3D model. Preserve those assets instead of replacing them with null.
+    return singleDeliveredResult(delivery);
   }
   const toPath = (path: ObjectiveDelivery["pathways"][number]): Pathway => ({
     id: path.id, title: path.label, summary: path.summary,
@@ -139,6 +132,7 @@ function fromGovernedDelivery(delivery: ObjectiveDelivery): Result | null {
     imageUrl: path.generated_image_url ?? null,
     blueprintUrl: path.generated_blueprint_url ?? null,
     modelUrl: path.model_url ?? null,
+    modelStatus: path.model_status ?? null,
   });
   const pathways = delivery.pathways.map(toPath);
   const blend = { ...toPath(delivery.blend), blend_reason: delivery.blend.blend_reason };
@@ -246,6 +240,41 @@ export function IndependentEngage() {
       }));
     } catch { /* Browser storage may be restricted. */ }
   }, [category, objective, result, screen, choice, verifiedRevision]);
+  // Real GLBs can finish *after* the governed text response. While this
+  // existing authorized design is visible, ask the existing delivery endpoint
+  // for its recorded model job status and fill only missing genuine assets.
+  // The owner never sees another person's media or a fabricated replacement.
+  useEffect(() => {
+    if (!result || loading || !waitingOnDeliveredModels(result)) return;
+    const run = activeRun.current;
+    if (!run) return;
+    const atGeneration = generation.current;
+    let closed = false;
+    let fetching = false;
+    const refresh = async () => {
+      if (closed || fetching || generation.current !== atGeneration ||
+          activeRun.current?.requestId !== run.requestId ||
+          activeRun.current?.guestToken !== run.guestToken) return;
+      fetching = true;
+      try {
+        const state = await getGuestObjectiveDelivery({data:run});
+        if (closed || generation.current !== atGeneration ||
+            activeRun.current?.requestId !== run.requestId ||
+            activeRun.current?.guestToken !== run.guestToken) return;
+        const payload = state?.status === "completed" && state.source === "governed"
+          ? state.response_payload : null;
+        const later = payload ? fromGovernedDelivery(payload) : null;
+        if (later) setResult(previous => reconcileDeliveredVisuals(previous, later));
+      } catch {
+        // A temporary model or network failure must not erase the original
+        // governed design or make its promised model appear completed.
+      } finally { fetching = false; }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 6000);
+    return () => { closed = true; window.clearInterval(timer); };
+  }, [result, loading]);
+
   useEffect(() => { objectiveRef.current = objective; }, [objective]);
   useEffect(() => {
     if (!category || welcomed.current) return;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CrystalSurface, type CrystalDesign } from "./crystal-surface";
+import { CrystalSurface, type CrystalDesign, type RevealedPart } from "./crystal-surface";
 import { LibraryBackupDialog } from "./library-backup-dialog";
 import { LibrarySyncDialog } from "./library-sync-dialog";
 import {
@@ -389,6 +389,14 @@ export function CrystalExperience() {
     setGovernedWorking(false);
   }
 
+  function explainRevealedPart(part: RevealedPart) {
+    // What, where and does come only from the selected engine's recorded
+    // component; no geometry or engineering dimensions are inferred.
+    speak("What: " + part.name +
+      ". Where: " + (part.location || "The delivered result does not specify a location.") +
+      ". Does: " + (part.purpose || "The delivered result does not specify a function."));
+  }
+
   function revealGovernedChoice(index: number) {
     const selected = governedChoices.current[index];
     if (!selected || !chosen.current ||
@@ -646,9 +654,7 @@ export function CrystalExperience() {
         part => lower.includes(part.name.toLowerCase()),
       );
       if (chosenPart && /^(?:explain|describe|tell|what|where)/.test(lower)) {
-        speak(chosenPart.name + ". Where: " +
-          (chosenPart.location || "The delivered engine result did not specify a location.") +
-          ". Does: " + (chosenPart.purpose || "The delivered result did not specify a function."));
+        explainRevealedPart(chosenPart);
         return;
       }
       if (/^(?:rotate|turn) (?:left|right)$/.test(lower)) {
@@ -824,7 +830,9 @@ export function CrystalExperience() {
       </p>}
       <CrystalSurface working={working} design={answer?.design ?? null}
         view={view} rotateRequest={rotation} zoomRequest={zoom}
-        crystals={crystals} selectedId={selectedId} onRecall={id => void recallCrystal(id)}/>
+        crystals={crystals} selectedId={selectedId} onRecall={id => void recallCrystal(id)}
+        parts={governedChoices.current[governedIndex.current ?? -1]?.parts ?? []}
+        onExplainPart={explainRevealedPart}/>
       <div className="ascension-voice-anchor">
         <button type="button" aria-label={listening ? "Stop microphone" : "Speak with groundskeeper"}
           aria-pressed={listening} onClick={() => {

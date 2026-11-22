@@ -345,6 +345,136 @@ export function CrystalExperience() {
     }
   }
 
+  function stopGovernedPolling() {
+    governedEpoch.current += 1;
+    if (governedTimer.current) clearInterval(governedTimer.current);
+    governedTimer.current = null;
+    governedPending.current = false;
+    setGovernedWorking(false);
+  }
+
+  function revealGovernedChoice(index: number) {
+    const selected = governedChoices.current[index];
+    if (!selected || !chosen.current ||
+        governedAuth.current?.crystalId !== chosen.current.id) return;
+    governedIndex.current = index;
+    setView("assembled");
+    setAnswer(governedChoiceAnswer(selected));
+    const components = selected.parts.length
+      ? "Its delivered components include " + selected.parts.map(p => p.name).join(", ") + "."
+      : "The engine has not supplied a component specification for this result.";
+    speak(selected.title + ". " + selected.body + " " + components);
+  }
+
+  async function runGovernedIntent(change: string | null = null) {
+    const selected = chosen.current;
+    if (!selected || workingRef.current || governedPending.current) {
+      if (!selected) speak("First speak or recall the intent you want ASCENSION's engines to develop.");
+      return;
+    }
+    const previous = governedAuth.current?.crystalId === selected.id
+      ? governedAuth.current : null;
+    // A change to a governed result always remains linked to its original
+    // authorized request; the first submission is explicitly owner-invoked.
+    if (change && !previous) {
+      speak("First run this intent through ASCENSION's governed engines.");
+      return;
+    }
+    const epoch = ++governedEpoch.current;
+    governedPending.current = true;
+    setGovernedWorking(true);
+    setIssue("");
+    recognition.current?.stop();
+    if (!change) {
+      governedChoices.current = [];
+      governedIndex.current = null;
+    }
+    try {
+      const original = await readDeviceCrystal(selected.id);
+      if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+      const authorized = await submitGuestObjective({ data: {
+        objective: change || original.intent,
+        ...(previous ? {
+          parentRequestId: previous.requestId,
+          parentGuestToken: previous.guestToken,
+          followUp: "continue" as const,
+          evidence: [JSON.stringify({
+            source: "ASCENSION_SELECTED_RESULT",
+            pathway_id: governedChoices.current[governedIndex.current ?? 0]?.id ?? "",
+          })],
+        } : {}),
+      } });
+      if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+      const credentials = {
+        crystalId: selected.id,
+        requestId: authorized.request.id,
+        guestToken: authorized.guestToken,
+      };
+      governedAuth.current = credentials;
+      let polling = false;
+      let failures = 0;
+      let finished = false;
+      const poll = async () => {
+        if (finished || polling || epoch !== governedEpoch.current ||
+            chosen.current?.id !== selected.id) return;
+        polling = true;
+        try {
+          const state = await getGuestObjectiveStatus({
+            data: { requestId: credentials.requestId, guestToken: credentials.guestToken },
+          });
+          if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+          const run = state.request;
+          if (!run) throw new Error("The authorized ASCENSION run could not be retrieved.");
+          if (run.status === "failed" || run.status === "rejected") {
+            throw new Error(run.error || "The governed engine rejected this intent.");
+          }
+          if (run.status !== "verified") { failures = 0; return; }
+          const delivery = await getGuestObjectiveDelivery({
+            data: { requestId: credentials.requestId, guestToken: credentials.guestToken },
+          });
+          if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+          if (delivery?.status !== "completed") { failures = 0; return; }
+          if (delivery.source !== "governed" || !delivery.response_payload ||
+              delivery.response_payload.kind === "not_produced") {
+            throw new Error(delivery.error || "The governed runtime did not deliver a real result.");
+          }
+          const choices = deliveredCrystalChoices(delivery.response_payload);
+          if (!choices.length) throw new Error("No actual engine result was delivered.");
+          governedChoices.current = choices;
+          finished = true;
+          stopGovernedPolling();
+          // The server's verified run is NOT automatically copied into the
+          // device's verified-growth field; no physical proof is invented.
+          if (choices.length === 4) {
+            setAnswer(null);
+            speak("ASCENSION's governed engine delivered four recorded pathways: " +
+              choices.map(p => p.title).join(", ") +
+              ". Tell me which pathway to enter.");
+          } else {
+            revealGovernedChoice(0);
+          }
+        } catch (error) {
+          failures++;
+          if (failures >= 3) {
+            finished = true;
+            stopGovernedPolling();
+            setIssue("Governed engine: " + (error instanceof Error ? error.message : String(error)).slice(0, 300));
+            speak("The governed engine did not deliver a usable result. Your original intent is still saved privately.");
+          }
+        } finally { polling = false; }
+      };
+      await poll();
+      if (!finished && epoch === governedEpoch.current) {
+        governedTimer.current = setInterval(() => { void poll(); }, 3500);
+      }
+    } catch (error) {
+      if (epoch !== governedEpoch.current) return;
+      stopGovernedPolling();
+      setIssue("Governed engine: " + (error instanceof Error ? error.message : String(error)).slice(0, 300));
+      speak("The governed runtime is unavailable. Your original intent remains on your device.");
+    }
+  }
+
   async function stopLibrarySync() {
     syncSession.current?.stop();
     syncSession.current = null;

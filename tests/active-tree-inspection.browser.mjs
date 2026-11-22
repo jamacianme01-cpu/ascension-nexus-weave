@@ -25,12 +25,13 @@ try {
   assert.ok(viewport && aside && viewport.x + viewport.width <= aside.x + 3,
     "Owner-approved component labels must be BESIDE—not on top of—the image");
   await labels.getByRole("button",{name:"Shared memory dock"}).click();
-  await page.getByText("Unifies the two recorded drone memories").waitFor();
+  await labels.getByText("Unifies the two recorded drone memories").waitFor();
   assert.deepEqual(await labels.locator("dt").allTextContents(),["What","Where","Does"]);
-  assert.equal(await page.locator("#speech-fixture").textContent(),
-    "What: Shared memory dock. Where: Inside recorded dock housing. Does: Unifies the two recorded drone memories");
+  const expectedSpoken = "What: Shared memory dock. Where: Inside recorded dock housing. Does: Unifies the two recorded drone memories";
+  await page.waitForFunction(expected =>
+    document.querySelector("#speech-fixture")?.textContent === expected, expectedSpoken);
   await labels.getByRole("button",{name:"Guidance drone"}).click();
-  await page.getByText("Gives guidance using the real recorded pathway").waitFor();
+  await labels.getByText("Gives guidance using the real recorded pathway").waitFor();
   assert.equal(await labels.getByRole("button",{name:"Guidance drone"}).getAttribute("aria-pressed"),"true");
   await page.getByRole("button",{name:"Switch to Dissect"}).click();
   await page.getByText(/This view needs the matching 3D model/).waitFor();

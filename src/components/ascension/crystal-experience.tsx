@@ -366,11 +366,26 @@ export function CrystalExperience() {
   // on unrestricted background execution.
   useEffect(() => {
     if (!entered) return;
+    let active = true;
     const refresh = window.setInterval(() => {
-      void syncDevice().catch(() => { /* Local records remain available. */ });
+      void (async () => {
+        const saved = await syncDevice();
+        if (!active || !selectedId || workingRef.current) return;
+        const crystal = saved.find(item => item.id === selectedId);
+        const latest = crystal?.drafts.at(-1);
+        if (!latest || latest.jobId === lastPresentedJob.current || !crystal) return;
+        lastPresentedJob.current = latest.jobId;
+        const newAnswer = deviceDraftAnswer(crystal);
+        setAnswer(newAnswer);
+        if (newAnswer) {
+          speak("Your device recorded a new development for this intent. " +
+            "It is an unverified local draft. " + newAnswer.body + " " +
+            guideSuggestion(newAnswer));
+        }
+      })().catch(() => { /* Local records remain available. */ });
     }, 30000);
-    return () => window.clearInterval(refresh);
-  }, [entered]);
+    return () => { active = false; window.clearInterval(refresh); };
+  }, [entered, selectedId]);
 
   useEffect(() => () => {
     requestEpoch.current++;

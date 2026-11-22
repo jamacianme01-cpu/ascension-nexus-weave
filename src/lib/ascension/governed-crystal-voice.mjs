@@ -11,7 +11,7 @@ export function deliveredCrystalChoices(delivery) {
   const actual = realFour
     ? [...delivery.pathways, delivery.blend]
     : delivery.blend ? [delivery.blend]
-      : delivery.pathways?.length === 1 ? [delivery.pathways[0]] : [];
+      : delivery.pathways?.length ? [...delivery.pathways] : [];
   if (!actual.length) return [{
     id: "governed-single-output",
     title: delivery.title,
@@ -59,6 +59,7 @@ export function choiceForVoiceCommand(words, choices) {
   const position = positions[phrase];
   if (position !== undefined) return position < choices.length ? position : -1;
   if (phrase === "blend") {
+    if (choices.length === 4) return 3; // Only a recorded 3 + blend delivery earns this slot.
     const found = choices.findIndex(c => /\bblend\b/i.test(c.title));
     return found < 0 ? -1 : found;
   }

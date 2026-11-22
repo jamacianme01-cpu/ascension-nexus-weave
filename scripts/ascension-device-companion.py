@@ -299,9 +299,15 @@ def generate_local(job: dict) -> tuple[str, str]:
 
 
 def work_forever(storage: LocalKnowledgeverse, stop: threading.Event):
+    # Background scheduling is bounded to two continuations every 30 minutes,
+    # not two every 10 seconds or every time a model finishes a job.
+    last_growth_scan = 0.0
     while not stop.is_set():
         try:
-            storage.maybe_queue_growth()
+            now = time.monotonic()
+            if now - last_growth_scan >= 1800:
+                storage.maybe_queue_growth()
+                last_growth_scan = now
             job = storage.claim()
             if job:
                 try:

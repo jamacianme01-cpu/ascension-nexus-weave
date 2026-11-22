@@ -258,8 +258,12 @@ export function CrystalExperience() {
     const epoch = ++requestEpoch.current;
     setIssue("");
     try {
-      await syncDevice();
-      const crystal = await readDeviceCrystal(id);
+      // Recalling an already recorded governed result only decrypts the
+      // saved original. It must not queue fresh local AI inference.
+      const saved = await readDeviceCrystal(id);
+      const crystal = saved.governedResults?.length
+        ? saved
+        : (await syncDevice(), await readDeviceCrystal(id));
       if (epoch !== requestEpoch.current) return;
       chosen.current = { id: crystal.id, intent: crystal.intent };
       if (governedAuth.current?.crystalId !== id) {

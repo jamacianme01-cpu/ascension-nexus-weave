@@ -14,12 +14,13 @@ export function LibrarySyncDialog({
   active, onStart, onStop, onClose,
 }: {
   active: boolean;
-  onStart: (folder: DeviceSyncFolder, passphrase: string) => Promise<SyncSummary>;
-  onStop: () => void;
+  onStart: (folder: DeviceSyncFolder, passphrase: string, desktopPath?: string) => Promise<SyncSummary & { backgroundActive?: boolean; backgroundError?: string }>;
+  onStop: () => Promise<void>;
   onClose: () => void;
 }) {
   const [folder, setFolder] = useState<DeviceSyncFolder | null>(null);
   const [passphrase, setPassphrase] = useState("");
+  const [desktopPath, setDesktopPath] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -58,13 +59,16 @@ export function LibrarySyncDialog({
     setError("");
     setStatus("");
     try {
-      const result = await onStart(folder, passphrase);
+      const result = await onStart(folder, passphrase, desktopPath.trim() || undefined);
       setPassphrase("");
       setStatus(
-        "Encrypted folder sync is active while this page is open. " +
+        (result.backgroundActive
+          ? "Desktop background exchange is active while the local companion runs. "
+          : "Encrypted folder sync is active while this page is open. ") +
         result.peersRead + " peer archives processed; " +
         result.importedCrystals + " new crystals and " +
-        result.mergedDrafts + " missing developments restored."
+        result.mergedDrafts + " missing developments restored." +
+        (result.backgroundError ? " Desktop background pairing failed: " + result.backgroundError : "")
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Encrypted folder sync could not start.");
@@ -93,11 +97,20 @@ export function LibrarySyncDialog({
             value={passphrase} onChange={event => setPassphrase(event.target.value)}
             disabled={running || active}/>
         </label>
+        <label>
+          Desktop companion (optional): absolute path to the same chosen folder
+          <input type="text" autoComplete="off" maxLength={1024}
+            placeholder="Full local path to your private shared folder"
+            value={desktopPath} onChange={event => setDesktopPath(event.target.value)}
+            disabled={running || active}/>
+        </label>
         <p className="ascension-backup-caution">
-          Use the same passphrase on your other device. It is never saved or
-          sent to a server. Automatic folder exchange runs only while ASCENSION
-          is open on a supported browser and the folder remains accessible.
-          Do not speak your passphrase aloud.
+          Use the same passphrase on your other device. It is sent only to your
+          locally running desktop companion when a desktop folder path is provided,
+          held in memory, and never saved to a server or file. The companion can
+          exchange encrypted developments after the browser closes while that
+          computer remains on and the companion runs. Otherwise, synchronization
+          works only while this browser is open. Do not speak your passphrase aloud.
         </p>
         {error && <p role="alert">{error}</p>}
         {status && <p role="status">{status}</p>}
@@ -105,7 +118,8 @@ export function LibrarySyncDialog({
           <button type="button" disabled={running} onClick={onClose}>Close</button>
           {active
             ? <button type="button" disabled={running} onClick={() => {
-              onStop(); setStatus("This device's encrypted folder sync has stopped.");
+              void onStop().then(() => setStatus("This device's encrypted folder sync has stopped."))
+                .catch(cause => setError(cause instanceof Error ? cause.message : "Could not stop the desktop background exchange."));
             }}>Stop folder sync</button>
             : <button type="submit" disabled={running || !folder}>
               {running ? "Synchronizing…" : "Start private folder sync"}

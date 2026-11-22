@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CrystalSurface, type CrystalDesign } from "./crystal-surface";
 import type { DesignView } from "./v1-design-viewport";
-import {
-  createDeviceCrystal, listDeviceCrystals, readDeviceCrystal, deviceSummary,
-  type DeviceCrystal,
-} from "@/lib/ascension/device-knowledgeverse";
+import { listDeviceCrystals, readDeviceCrystal, type DeviceCrystal } from "@/lib/ascension/device-knowledgeverse";
 import {
   continueDeviceIntent, startDeviceIntent, synchronizeDeviceCompanion,
 } from "@/lib/ascension/device-companion";
@@ -24,6 +21,7 @@ const VERIFIED_SEEN_KEY = "ascension-library-card-last-viewed-verified-v1";
 
 type Recognition = {
   lang: string; continuous: boolean; interimResults: boolean;
+  processLocally?: boolean;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
@@ -93,7 +91,7 @@ export function CrystalExperience() {
   const [draft, setDraft] = useState("");
   const [issue, setIssue] = useState("");
   const [sceneAvailable, setSceneAvailable] = useState(true);
-  const [revision, setRevision] = useState<number | null>(null);
+
   const [speaking, setSpeaking] = useState(false);
   const enteredRef = useRef(false);
   const workingRef = useRef(false);
@@ -116,15 +114,25 @@ export function CrystalExperience() {
 
   function speak(words: string, thenListen = true) {
     const serial = ++speechSerial.current;
-    if (mutedRef.current || !("speechSynthesis" in window)) return;
+    if (mutedRef.current) return;
+    if (!("speechSynthesis" in window)) { setBackup(true); return; }
     recognition.current?.stop();
     const synthesis = window.speechSynthesis;
     synthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(words.slice(0, 1600));
     utterance.rate = 0.96;
     utterance.pitch = 1.01;
-    const voices = synthesis.getVoices().filter(voice => voice.lang.toLowerCase().startsWith("en"));
-    utterance.voice = voices.find(voice => /samantha|jenny|aria|zira|serena|ava|female/i.test(voice.name)) ?? null;
+    // Only device-installed voices, never a browser's cloud TTS provider.
+    const voices = synthesis.getVoices().filter(voice =>
+      voice.lang.toLowerCase().startsWith("en") && voice.localService === true);
+    const localVoice = voices.find(voice => /samantha|jenny|aria|zira|serena|ava|female/i.test(voice.name))
+      ?? voices[0];
+    if (!localVoice) {
+      setBackup(true);
+      setIssue("No installed on-device English voice is available; typed intent remains local.");
+      return;
+    }
+    utterance.voice = localVoice;
     utterance.onstart = () => { if (speechSerial.current === serial) setSpeaking(true); };
     utterance.onend = () => {
       if (speechSerial.current !== serial) return;
@@ -150,6 +158,12 @@ export function CrystalExperience() {
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
     const mic = new Ctor();
+    if (!("processLocally" in mic)) {
+      setBackup(true);
+      if (!automatic) setIssue("This browser does not support on-device speech recognition; typed intent stays private on your device.");
+      return;
+    }
+    mic.processLocally = true;
     recognition.current = mic;
     mic.lang = "en-US";
     mic.continuous = false;
@@ -197,7 +211,7 @@ export function CrystalExperience() {
       if (epoch !== requestEpoch.current) return;
       chosen.current = { id: crystal.id, intent: crystal.intent };
       setSelectedId(id);
-      setRevision(null); // Local model drafts are never governed verified revisions.
+      // On-device drafts are not governed revisions.
       setView("assembled");
       const last = crystal.drafts.at(-1);
       const next = deviceDraftAnswer(crystal);
@@ -408,7 +422,6 @@ export function CrystalExperience() {
           if (!muted) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
         }}>{muted ? "◖×" : "◖))"}</button>
       {working && <span className="sr-only" role="status">The governed engine is working on your intent.</span>}
-      {revision && <span className="sr-only">Verified runtime revision {revision} is attached to the active intent.</span>}
       {answer && <span className="sr-only" role="status">{answer.body}</span>}
     </>}
     {issue && <p role="alert" className="ascension-crystal-error">{issue}</p>}

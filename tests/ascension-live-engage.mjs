@@ -56,6 +56,10 @@ try {
     .click();
   const approved = page.locator(".ascension-approved-scene img");
   await approved.waitFor({ timeout: 20000 });
+  await page.waitForFunction(() => {
+    const img = document.querySelector(".ascension-approved-scene img");
+    return img && img.complete && img.naturalWidth > 0;
+  }, null, { timeout: 20000 });
   const art = await approved.evaluate(img => ({
     loaded: img.complete && img.naturalWidth > 0,
     source: new URL(img.src).pathname,
@@ -64,6 +68,9 @@ try {
   if (!art.loaded || art.source !== "/approved-scene/ascension-exact-approved-scene.png" ||
       art.fit !== "contain")
     throw Error("The original approved Tree/Groundskeeper/Book composition is missing or altered");
+  const guideSaidWelcome = await page.evaluate(() =>
+    window.__ascensionSpoken.some(words => /^Welcome to ASCENSION\./.test(words)));
+  if (!guideSaidWelcome) throw Error("The groundskeeper did not speak her opening welcome");
   await page.getByRole("button", { name: "Speak with groundskeeper" }).click();
   await page.getByPlaceholder("Speak or type your intent").waitFor({ timeout: 15000 });
   await command(objective);
@@ -115,9 +122,35 @@ try {
   if (!await page.locator(".ascension-approved-scene img").count())
     throw Error("The groundskeeper vanished after entering the result");
   const realMedia = await page.locator(".ascension-crystal-reality").count();
-  const model = await page.locator(".ascension-crystal-reality canvas").count();
-  console.log("ASCENSION_LIVE_GOVERNED_OWNER_V1_VERIFIED media_present=" +
-    Boolean(realMedia) + " model_canvas_present=" + Boolean(model));
+  if (!realMedia) throw Error("The governed result did not deliver any actual design media; full V1 cannot pass");
+  // The completed V1 specifically requires a REAL returned 3D model for
+  // Dissect / Explode / Implode. A picture or wireframe placeholder must fail.
+  for (const [instruction, mode] of [
+    ["show me inside", "dissect"],
+    ["take it apart", "exploded"],
+    ["put it together", "imploded"],
+  ]) {
+    await command(instruction);
+    await page.locator(".v1-model-canvas canvas").waitFor({ timeout: 30000 });
+    await page.locator(".v1-model-measurement").waitFor({ timeout: 30000 });
+    if (await page.locator(".v1-design-model [role='status']").count())
+      throw Error("Real " + mode + " inspection reported a model error");
+  }
+  // Owner-approved labels must be outside the picture, and reference actual
+  // component What / Where / Does rather than invented geometry names.
+  const componentPanel = page.getByRole("complementary", {
+    name: "Component labels for the selected pathway",
+  });
+  await componentPanel.waitFor({ timeout: 10000 });
+  const firstPart = componentPanel.getByRole("button").first();
+  await firstPart.click();
+  for (const field of ["What", "Where", "Does"]) {
+    await componentPanel.locator("dt", { hasText: field }).waitFor();
+  }
+  await command("show the blueprint");
+  const blueprint = page.getByAltText("Delivered pathway blueprint");
+  await blueprint.waitFor({ timeout: 15000 });
+  console.log("ASCENSION_LIVE_GOVERNED_OWNER_V1_VERIFIED genuine_model_views_and_blueprint=true");
 } catch (error) {
   const details = await page.locator(".ascension-crystal-error").allTextContents().catch(() => []);
   console.error("ASCENSION_LIVE_GOVERNED_OWNER_V1_FAILED",

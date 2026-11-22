@@ -139,12 +139,25 @@ class LocalKnowledgeverse:
                 """, (card_id, crystal_id)).fetchone()
             if pending:
                 return {"jobId": pending["id"], "status": "queued"}
+            # A manual continuation MUST have the exact original owner intent,
+            # not only a context-free phrase such as "continue this intent".
+            latest = self.db.execute("""
+                SELECT result FROM jobs WHERE card_id=? AND crystal_id=?
+                AND status='completed' ORDER BY created_at DESC LIMIT 1
+            """, (card_id, crystal_id)).fetchone()
+            contextual = (
+                "Original owner intent (preserve its meaning): " + intent.strip()
+                + "\nOwner follow-up instruction: " + instruction.strip()
+                + ("\nPrevious unverified local draft (context, not proof): "
+                   + latest["result"][:1500]
+                   if latest and isinstance(latest["result"], str) else "")
+            )[:4000]
             job_id = str(uuid.uuid4())
             now = utc_now()
             self.db.execute("""
                 INSERT INTO jobs(id,card_id,crystal_id,instruction,status,created_at)
                 VALUES(?,?,?,?,'queued',?)
-                """, (job_id, card_id, crystal_id, instruction.strip(), now))
+                """, (job_id, card_id, crystal_id, contextual, now))
             self.db.execute("""
                 UPDATE crystals SET last_queued_at=?, updated_at=?
                 WHERE card_id=? AND id=?

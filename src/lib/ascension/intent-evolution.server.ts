@@ -11,24 +11,14 @@
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { appendVerifiedSnapshot, crystalStorageFolder, readCrystalLedger, saveCrystalLedger,
+  withCrystalLedgerLock, type IntentCrystalRecord } from "./intent-crystal-ledger.server";
 import { callOwnerVolumeTransport, ownerVolumeTransportEnabled } from "./data/volume-transport.server";
 import { ascensionDb } from "./data/client.server";
 import { projectGuestDelivery, type GuestSubmission } from "./guest.functions";
 import { governedPersisted } from "./result-model";
 import type { ObjectiveRun } from "./objectives.functions";
 
-type EvolutionCrystal = {
-  id: string;
-  intent: string;
-  requestId: string;
-  guestToken: string;
-  createdAt: string;
-  updatedAt: string;
-  verifiedRevision: number | null;
-  verifiedAt: string | null;
-  lastAutoQueuedAt?: string;
-};
 export type EvolutionCycleReport = {
   scanned: number;
   queued: number;
@@ -38,22 +28,31 @@ export type EvolutionCycleReport = {
 };
 const MINIMUM_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const MAX_QUEUE_PER_CYCLE = 2;
-function storageFolder(): string | null {
-  const root = process.env["ASCENSION_STORAGE_DIR"]?.trim();
-  return root && path.isAbsolute(root) ? path.join(root, "intent-crystals") : null;
+/**
+ * The owner approved independent growth. On the next configured owner-run
+ * server process this is active automatically, unless explicitly disabled.
+ * No external infrastructure or paid model is selected by this setting.
+ */
+export function crystalEvolutionEnabled(): boolean {
+  if (process.env["ASCENSION_ENABLE_CRYSTAL_EVOLUTION"] === "false") return false;
+  const root = process.env["ASCENSION_STORAGE_DIR"]?.trim() ?? "";
+  const hasRuntime = Boolean(
+    (process.env["ASCENSION_VOLUME_TRANSPORT_URL"]?.trim() &&
+      process.env["ASCENSION_PUBLISH_TOKEN"]?.trim()) ||
+    process.env["ASCENSION_DATABASE_URL"]?.trim() ||
+    process.env["DATABASE_URL"]?.trim()
+  );
+  return path.isAbsolute(root) && hasRuntime;
 }
-function evolutionEnabled(): boolean {
-  return process.env["ASCENSION_ENABLE_CRYSTAL_EVOLUTION"] === "true" &&
-    Boolean(storageFolder());
+function validRecord(value: unknown): value is IntentCrystalRecord {
+  const record = value as Partial<IntentCrystalRecord> | null;
+  return !!record && typeof record.intent === "string" &&
+    typeof record.id === "string" && /^[a-f0-9-]{36}$/i.test(record.id) &&
+    typeof record.requestId === "string" && /^[a-f0-9-]{36}$/i.test(record.requestId) &&
+    typeof record.guestToken === "string" && /^[a-f0-9-]{36}$/i.test(record.guestToken);
 }
-function validRecord(value: unknown): value is EvolutionCrystal {
-  const x = value as Partial<EvolutionCrystal> | null;
-  return !!x && typeof x.intent === "string" && typeof x.id === "string" &&
-    /^[a-f0-9-]{36}$/i.test(x.id) &&
-    typeof x.requestId === "string" && /^[a-f0-9-]{36}$/i.test(x.requestId) &&
-    typeof x.guestToken === "string" && /^[a-f0-9-]{36}$/i.test(x.guestToken);
-}
-async function governedStatus(item: EvolutionCrystal): Promise<ObjectiveRun | null> {
+
+async function governedStatus(item: IntentCrystalRecord): Promise<ObjectiveRun | null> {
   if (ownerVolumeTransportEnabled()) {
     const response = await callOwnerVolumeTransport<{request: ObjectiveRun | null}>(
       "/guest/status", "POST", { requestId: item.requestId, guestToken: item.guestToken });
@@ -64,7 +63,7 @@ async function governedStatus(item: EvolutionCrystal): Promise<ObjectiveRun | nu
   if (response.error) throw new Error(response.error.message);
   return (response.data ?? null) as ObjectiveRun | null;
 }
-async function queueContinuation(item: EvolutionCrystal): Promise<GuestSubmission> {
+async function queueContinuation(item: IntentCrystalRecord): Promise<GuestSubmission> {
   const original = item.intent.slice(0, 2000);
   const objective = [
     "Continue developing the existing owner intent without changing its approved design.",
@@ -101,16 +100,7 @@ async function queueContinuation(item: EvolutionCrystal): Promise<GuestSubmissio
   if (!row?.request?.id || !row.guest_token) throw new Error("No governed continuation was queued.");
   return { request: row.request as GuestSubmission["request"], guestToken: row.guest_token };
 }
-async function updateLedger(filename: string, records: EvolutionCrystal[]) {
-  const pending = filename + "." + randomUUID() + ".tmp";
-  try {
-    await fs.writeFile(pending, JSON.stringify(records), {encoding:"utf8",mode:0o600,flag:"wx"});
-    await fs.rename(pending, filename);
-  } finally {
-    await fs.unlink(pending).catch(() => {});
-  }
-}
-function nextEligible(record: EvolutionCrystal, run: ObjectiveRun, now: number) {
+function nextEligible(record: IntentCrystalRecord, run: ObjectiveRun, now: number) {
   if (run.status !== "verified" || !governedPersisted(run)) return false;
   const completed = Date.parse(run.completed_at || run.updated_at || "");
   if (!Number.isFinite(completed) || now - completed < MINIMUM_INTERVAL_MS) return false;
@@ -119,10 +109,10 @@ function nextEligible(record: EvolutionCrystal, run: ObjectiveRun, now: number) 
 }
 export async function advanceIntentCrystalsOnce(now = Date.now()): Promise<EvolutionCycleReport> {
   const report: EvolutionCycleReport = {
-    scanned: 0, queued: 0, skipped: 0, failures: 0, enabled: evolutionEnabled(),
+    scanned: 0, queued: 0, skipped: 0, failures: 0, enabled: crystalEvolutionEnabled(),
   };
   if (!report.enabled) return report;
-  const folder = storageFolder()!;
+  const folder = crystalStorageFolder();
   let entries: string[];
   try { entries = await fs.readdir(folder); }
   catch (cause) {
@@ -133,61 +123,59 @@ export async function advanceIntentCrystalsOnce(now = Date.now()): Promise<Evolu
     if (report.queued >= MAX_QUEUE_PER_CYCLE) break;
     if (!/^[a-f0-9]{64}\.json$/.test(entry)) continue;
     const filename = path.join(folder, entry);
-    const lock = filename + ".evolve.lock";
-    let handle: Awaited<ReturnType<typeof fs.open>> | null = null;
     try {
-      // Claim before reading, submitting, or replacing the ledger.
-      // Another process cannot simultaneously queue the same crystal.
-      handle = await fs.open(lock, "wx", 0o600);
-    } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code === "EEXIST") {
-        // A crash must not permanently orphan a crystal. Reclaim stale
-        // scheduler locks on a later cycle, never while an active job runs.
-        try {
-          const stat = await fs.stat(lock);
-          if (now - stat.mtimeMs > 2 * 60 * 60 * 1000) await fs.unlink(lock);
-        } catch { /* Another process may have just released it. */ }
-        report.skipped++;
-        continue;
-      }
-      report.failures++; continue;
-    }
-    try {
-      const records = JSON.parse(await fs.readFile(filename, "utf8")) as unknown;
-      if (!Array.isArray(records)) { report.failures++; continue; }
-      for (const item of records) {
-        if (report.queued >= MAX_QUEUE_PER_CYCLE) break;
-        if (!validRecord(item)) { report.skipped++; continue; }
-        report.scanned++;
-        try {
-          const run = await governedStatus(item);
-          if (!run || !nextEligible(item, run, now)) { report.skipped++; continue; }
-          // No autonomous continuation from a draft or an incomplete delivery.
-          const delivery = await projectGuestDelivery(item.requestId, item.guestToken, false);
-          if (delivery?.status !== "completed" || delivery.source !== "governed" ||
-              !delivery.response_payload) { report.skipped++; continue; }
-          const submitted = await queueContinuation(item);
-          if (!submitted?.request?.id || !submitted.guestToken) throw new Error("Queue did not acknowledge intent.");
-          item.requestId = submitted.request.id;
-          item.guestToken = submitted.guestToken;
-          item.lastAutoQueuedAt = new Date(now).toISOString();
-          item.updatedAt = item.lastAutoQueuedAt;
-          if (typeof run.runtime_revision === "number" && run.runtime_revision > 0) {
-            item.verifiedRevision = run.runtime_revision;
-            item.verifiedAt = run.completed_at || new Date(now).toISOString();
+      const handled = await withCrystalLedgerLock(filename, async records => {
+        let queued = 0;
+        let skipped = 0;
+        let scanned = 0;
+        let failures = 0;
+        for (const item of records) {
+          if (report.queued + queued >= MAX_QUEUE_PER_CYCLE) break;
+          if (!validRecord(item)) { skipped++; continue; }
+          scanned++;
+          try {
+            const run = await governedStatus(item);
+            if (!run || !nextEligible(item, run, now)) { skipped++; continue; }
+            // Do not continue an unverified answer or an external draft.
+            const delivery = await projectGuestDelivery(item.requestId, item.guestToken, false);
+            if (delivery?.status !== "completed" || delivery.source !== "governed" ||
+                !delivery.response_payload || delivery.response_payload.kind === "not_produced" ||
+                !delivery.response_payload.body.trim()) { skipped++; continue; }
+
+            // The known-good answer remains available while its next result is
+            // pending; no animation is used as proof of new discoveries.
+            if (typeof run.runtime_revision !== "number" ||
+                !Number.isInteger(run.runtime_revision) || run.runtime_revision <= 0) {
+              skipped++; continue;
+            }
+            const prior = {
+              requestId: item.requestId,
+              guestToken: item.guestToken,
+              revision: run.runtime_revision,
+              completedAt: run.completed_at || run.updated_at || new Date(now).toISOString(),
+            };
+            const submitted = await queueContinuation(item);
+            if (!submitted?.request?.id || !submitted.guestToken)
+              throw new Error("The governed runtime did not accept a continuation.");
+            appendVerifiedSnapshot(item, prior);
+            item.requestId = submitted.request.id;
+            item.guestToken = submitted.guestToken;
+            item.lastAutoQueuedAt = new Date(now).toISOString();
+            item.updatedAt = item.lastAutoQueuedAt;
+            await saveCrystalLedger(filename, records);
+            queued++;
+          } catch {
+            failures++;
           }
-          // Only successful governed queue submissions become ledger entries.
-          await updateLedger(filename, records);
-          report.queued++;
-        } catch {
-          report.failures++;
         }
-      }
+        return { queued, skipped, scanned, failures };
+      });
+      report.queued += handled.queued;
+      report.skipped += handled.skipped;
+      report.scanned += handled.scanned;
+      report.failures += handled.failures;
     } catch {
       report.failures++;
-    } finally {
-      await handle?.close();
-      await fs.unlink(lock).catch(() => {});
     }
   }
   return report;

@@ -66,6 +66,18 @@ class DeviceCompanionTests(unittest.TestCase):
         self.assertIn("DO NOT claim verification", follow["instruction"])
         self.assertTrue(follow["id"] != first["id"])
 
+    def test_owner_manual_follow_up_preserves_original_intent(self):
+        self._submit()
+        first = self.ledger.claim()
+        self.ledger.complete(first["id"], "installed-model", "Earlier draft with component notes")
+        second = self._submit("continue this intent")
+        self.assertNotEqual(first["id"], second["jobId"])
+        follow = self.ledger.claim()
+        self.assertIn("Original owner intent (preserve its meaning):", follow["instruction"])
+        self.assertIn("Build my original user-owned engine", follow["instruction"])
+        self.assertIn("Owner follow-up instruction: continue this intent", follow["instruction"])
+        self.assertIn("Earlier draft with component notes", follow["instruction"])
+
     def test_background_growth_requires_completed_real_draft(self):
         self._submit()
         with self.ledger.lock, self.ledger.db:

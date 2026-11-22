@@ -48,6 +48,7 @@ export type DeviceSyncFile = {
 export type DeviceSyncFolder = {
   entries(): AsyncIterable<[string, { kind: string }]>;
   getFileHandle(name: string, options?: { create?: boolean }): Promise<DeviceSyncFile>;
+  removeEntry?(name: string): Promise<void>;
 };
 export type FolderSyncSession = {
   syncNow(): Promise<SyncSummary>;

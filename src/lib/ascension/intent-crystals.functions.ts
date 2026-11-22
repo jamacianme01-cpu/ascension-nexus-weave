@@ -106,7 +106,7 @@ export const recordIntentCrystal = createServerFn({ method: "POST" })
 
       // Preserve any verified answer already shown to the visitor before a
       // manual continuation makes its latest run pending.
-      if (previous && !previous.lastVerified) {
+      if (previous && previous.lastVerified?.requestId !== previous.requestId) {
         const prior = await runFor(previous.requestId, previous.guestToken);
         const last = prior ? snapshotFor(prior, previous.requestId, previous.guestToken) : null;
         if (last && await verifiedDelivery(last.requestId, last.guestToken))

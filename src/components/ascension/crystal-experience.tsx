@@ -710,7 +710,7 @@ export function CrystalExperience() {
     const refresh = window.setInterval(() => {
       void (async () => {
         const saved = await syncDevice();
-        if (!active || !selectedId || workingRef.current) return;
+        if (!active || !selectedId || workingRef.current || governedPending.current) return;
         if (governedAuth.current?.crystalId === selectedId &&
             governedChoices.current.length) return;
         const crystal = saved.find(item => item.id === selectedId);

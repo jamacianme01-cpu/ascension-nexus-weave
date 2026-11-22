@@ -28,9 +28,36 @@ type RemoteCrystal = {
 };
 type LibraryState = { crystals: RemoteCrystal[] };
 
-async function companionRequest<T>(route: "/v1/library" | "/v1/submit", body: object): Promise<T> {
+export type CompanionFinishedJob = {
+  id: string;
+  instruction: string;
+  status: "completed" | "blocked";
+  model: string | null;
+  result: string | null;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+};
+export type CompanionHistorySnapshot = {
+  format: "ascension-companion-finished-history";
+  version: 1;
+  crystals: Array<{
+    id: string; intent: string; createdAt: string; updatedAt: string;
+    jobs: CompanionFinishedJob[];
+  }>;
+};
+export type CompanionRestoreReport = {
+  importedCrystals: number;
+  importedJobs: number;
+  skippedJobs: number;
+};
+async function companionRequest<T>(
+  route: "/v1/library" | "/v1/submit" | "/v1/snapshot" | "/v1/restore-finished",
+  body: object,
+  timeoutMs = 1700,
+): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 1700);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(ENDPOINT + route, {
       method: "POST",
@@ -47,6 +74,20 @@ async function companionRequest<T>(route: "/v1/library" | "/v1/submit", body: ob
     clearTimeout(timer);
   }
 }
+/** Copy completed and blocked local history only. No pending job can be resurrected. */
+export async function readDeviceCompanionSnapshot(): Promise<CompanionHistorySnapshot> {
+  return companionRequest<CompanionHistorySnapshot>("/v1/snapshot", {
+    libraryKey: deviceCardId(),
+  }, 15000);
+}
+export async function restoreDeviceCompanionSnapshot(
+  snapshot: CompanionHistorySnapshot,
+): Promise<CompanionRestoreReport> {
+  return companionRequest<CompanionRestoreReport>("/v1/restore-finished", {
+    libraryKey: deviceCardId(), snapshot,
+  }, 15000);
+}
+
 export type LocalJobSubmission = { jobId: string; status: "queued" };
 export async function submitDeviceComputation(crystal: DeviceCrystal, instruction: string) {
   const response = await companionRequest<LocalJobSubmission>("/v1/submit", {

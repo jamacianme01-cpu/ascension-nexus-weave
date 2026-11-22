@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  createEncryptedLibraryBackup,
+  createEncryptedLibraryBackupWithStatus,
   restoreEncryptedLibraryBackup,
   encryptedLibraryBackupFilename,
 } from "@/lib/ascension/device-backup";
@@ -53,7 +53,8 @@ export function LibraryBackupDialog({
     try {
       if (mode === "export") {
         await beforeExport();
-        const encrypted = await createEncryptedLibraryBackup(passphrase);
+        const { file: encrypted, companionIncluded } =
+          await createEncryptedLibraryBackupWithStatus(passphrase);
         const url = URL.createObjectURL(encrypted);
         try {
           const a = document.createElement("a");
@@ -62,7 +63,9 @@ export function LibraryBackupDialog({
           document.body.appendChild(a);
           a.click();
           a.remove();
-          setResult("Encrypted archive prepared. Save your downloaded file and passphrase somewhere you control. They are both required to restore your Library Card.");
+          setResult(companionIncluded
+            ? "Encrypted Library Card prepared with your browser crystals and the local companion's finished job history. Pending jobs are not restored as running work. Save this file and passphrase."
+            : "Encrypted Library Card prepared with your browser records. Your desktop companion was unavailable, so unsynchronized SQLite-only developments are NOT included. Save this file and passphrase.");
         } finally {
           window.setTimeout(() => URL.revokeObjectURL(url), 30000);
         }
@@ -72,7 +75,11 @@ export function LibraryBackupDialog({
         setResult(
           restored.imported + " intent crystals restored. " +
           restored.skipped + " already saved originals left unchanged. " +
-          "Only your current device can read the newly encrypted local records."
+          (restored.companionIncluded
+            ? restored.companionRestored
+              ? " Finished history also restored to your running local companion."
+              : " Finished history is preserved in your encrypted browser records. Start the desktop companion and restore this archive again to restore its SQLite history."
+            : " This was a browser-only archive.")
         );
       }
       // Do not retain a password in input state after the action completes.

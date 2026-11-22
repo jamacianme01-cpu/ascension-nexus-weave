@@ -145,6 +145,102 @@ try {
     await other.close();
   }
 
+
+  // A finished desktop-companion result that was NEVER synchronized into
+  // IndexedDB must still travel in the encrypted Library Card backup.
+  const unsyncedJob = "88888888-8888-4888-8888-888888888888";
+  const unsyncedText = "Offline-created owner knowledge preserved from the companion SQLite history.";
+  const companionSnapshot = {
+    format: "ascension-companion-finished-history", version: 1,
+    crystals: [{
+      id: saved.id, intent,
+      createdAt: saved.createdAt, updatedAt: saved.updatedAt,
+      jobs: [{
+        id: unsyncedJob, instruction: "Original owner intent: " + intent,
+        status: "completed", model: "installed-local-model",
+        result: unsyncedText, error: null,
+        created_at: new Date().toISOString(), finished_at: new Date().toISOString(),
+      }],
+    }],
+  };
+  let exposedPassphrase = false;
+  await page.route("http://127.0.0.1:8788/v1/snapshot", async route => {
+    const req = route.request();
+    if (req.method() === "POST") {
+      const body = req.postDataJSON();
+      if ("passphrase" in body || "password" in body) exposedPassphrase = true;
+    }
+    const headers = {
+      "Access-Control-Allow-Origin": "http://127.0.0.1:4182",
+      "Access-Control-Allow-Private-Network": "true",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods": "POST,OPTIONS",
+      "Content-Type": "application/json",
+    };
+    await route.fulfill({
+      status: req.method() === "OPTIONS" ? 204 : 200,
+      headers,
+      body: req.method() === "OPTIONS" ? "" : JSON.stringify(companionSnapshot),
+    });
+  });
+  const completeArchive = await page.evaluate(async password =>
+    (await window.deviceTestAPI.createEncryptedLibraryBackup(password)).text(), passphrase);
+  assert.equal(exposedPassphrase, false, "Passphrase must never reach local companion HTTP.");
+  assert.ok(!completeArchive.includes(unsyncedText), "Unsynced companion history must be encrypted.");
+  assert.ok(!completeArchive.includes(intent));
+
+  const fresh = await browser.newContext();
+  try {
+    const recoveredPage = await fresh.newPage();
+    await recoveredPage.goto("http://127.0.0.1:4182/tests/fixtures/device-local-first.html");
+    await recoveredPage.waitForFunction(() => Boolean(window.deviceTestAPI));
+    const recovery = await recoveredPage.evaluate(async payload =>
+      window.deviceTestAPI.restoreEncryptedLibraryBackup(payload.archive, payload.password),
+      { archive: completeArchive, password: passphrase });
+    assert.equal(recovery.companionIncluded, true);
+    assert.equal(recovery.companionRestored, false,
+      "Browser backup must succeed even if desktop companion is off on the receiving device.");
+    assert.equal(recovery.imported, 1);
+    const restoredCrystal = await recoveredPage.evaluate(id =>
+      window.deviceTestAPI.readDeviceCrystal(id), saved.id);
+    assert.equal(restoredCrystal.drafts.length, 2);
+    assert.ok(restoredCrystal.drafts.some(item => item.jobId === unsyncedJob &&
+      item.content === unsyncedText));
+    assert.equal(restoredCrystal.verifiedGrowthCount, 0);
+
+    // Same owner crystal already present: restore only the newly missing draft.
+    const archiveNoCompanion = archive;
+    const baseFirst = await browser.newContext();
+    try {
+      const mergePage = await baseFirst.newPage();
+      await mergePage.goto("http://127.0.0.1:4182/tests/fixtures/device-local-first.html");
+      await mergePage.waitForFunction(() => Boolean(window.deviceTestAPI));
+      await mergePage.evaluate(async payload =>
+        window.deviceTestAPI.restoreEncryptedLibraryBackup(payload.archive, payload.password),
+        { archive: archiveNoCompanion, password: passphrase });
+      const merged = await mergePage.evaluate(async payload =>
+        window.deviceTestAPI.restoreEncryptedLibraryBackup(payload.archive, payload.password),
+        { archive: completeArchive, password: passphrase });
+      assert.equal(merged.imported, 0);
+      assert.equal(merged.mergedDrafts, 1);
+      const both = await mergePage.evaluate(id => window.deviceTestAPI.readDeviceCrystal(id), saved.id);
+      assert.equal(both.drafts.length, 2);
+      assert.ok(both.drafts.some(x => x.jobId === jobId));
+      assert.ok(both.drafts.some(x => x.jobId === unsyncedJob));
+      const repeat = await mergePage.evaluate(async payload =>
+        window.deviceTestAPI.restoreEncryptedLibraryBackup(payload.archive, payload.password),
+        { archive: completeArchive, password: passphrase });
+      assert.equal(repeat.imported, 0);
+      assert.equal(repeat.skipped, 1);
+      assert.equal((await mergePage.evaluate(id =>
+        window.deviceTestAPI.readDeviceCrystal(id), saved.id)).drafts.length, 2);
+    } finally {
+      await baseFirst.close();
+    }
+  } finally {
+    await fresh.close();
+  }
+
   await context.close();
   console.log("PASS: encrypted on-device intent survives browser reload, remains unexportable, duplicate drafts do not fake growth.");
 } finally {

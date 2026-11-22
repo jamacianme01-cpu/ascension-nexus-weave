@@ -34,6 +34,8 @@ INTERVAL = 12 * 60 * 60
 MAX_QUEUED_AUTOMATIC = 2
 MAX_JSON = 65536
 MAX_DRAFT = 50000
+MAX_SNAPSHOT_BYTES = 20 * 1024 * 1024
+MAX_SNAPSHOT_JOBS = 4096
 
 
 def utc_now() -> str:
@@ -179,6 +181,141 @@ class LocalKnowledgeverse:
             "id": item["id"], "intent": item["intent"], "createdAt": item["created_at"],
             "updatedAt": item["updated_at"], "jobs": grouped.get(item["id"], [])[-64:],
         } for item in crystals]}
+
+    def snapshot(self, payload: dict) -> dict:
+        """All finished local jobs on this Library Card; no keys or pending jobs."""
+        card = valid_card(payload.get("libraryKey"))
+        with self.lock:
+            crystals = [dict(row) for row in self.db.execute("""
+                SELECT id, intent, created_at, updated_at FROM crystals
+                WHERE card_id=? ORDER BY created_at
+            """, (card,))]
+            finished = [dict(row) for row in self.db.execute("""
+                SELECT id, crystal_id, instruction, status, model, result, error,
+                       created_at, finished_at
+                FROM jobs WHERE card_id=? AND status IN ('completed','blocked')
+                ORDER BY created_at
+            """, (card,))]
+        if len(finished) > MAX_SNAPSHOT_JOBS:
+            raise ValueError("Companion history exceeds the secure archive job limit")
+        by_crystal = {}
+        for job in finished:
+            by_crystal.setdefault(job.pop("crystal_id"), []).append(job)
+        result = {
+            "format": "ascension-companion-finished-history",
+            "version": 1,
+            "crystals": [{
+                "id": entry["id"], "intent": entry["intent"],
+                "createdAt": entry["created_at"], "updatedAt": entry["updated_at"],
+                "jobs": by_crystal.get(entry["id"], []),
+            } for entry in crystals],
+        }
+        if len(json.dumps(result, separators=(",", ":")).encode("utf-8")) > MAX_SNAPSHOT_BYTES:
+            raise ValueError("Companion history is too large for one encrypted archive")
+        return result
+
+    def restore_snapshot(self, payload: dict) -> dict:
+        """Add missing finished jobs only; never overwrite originals or resume jobs."""
+        card = valid_card(payload.get("libraryKey"))
+        snapshot = payload.get("snapshot")
+        if (not isinstance(snapshot, dict) or
+            snapshot.get("format") != "ascension-companion-finished-history" or
+            snapshot.get("version") != 1):
+            raise ValueError("Invalid companion backup structure")
+        data = snapshot.get("crystals")
+        if not isinstance(data, list) or len(data) > 128:
+            raise ValueError("Invalid companion backup crystal count")
+        if len(json.dumps(snapshot, separators=(",", ":")).encode("utf-8")) > MAX_SNAPSHOT_BYTES:
+            raise ValueError("Companion backup exceeds allowed size")
+        prepared = []
+        seen_crystals = set()
+        seen_jobs = set()
+        job_count = 0
+        for record in data:
+            if not isinstance(record, dict):
+                raise ValueError("Invalid companion backup crystal")
+            crystal_id = valid_uuid(record.get("id"))
+            intent = record.get("intent")
+            if crystal_id in seen_crystals or not isinstance(intent, str) or not 1 <= len(intent.strip()) <= 4000:
+                raise ValueError("Duplicate or invalid original intent")
+            seen_crystals.add(crystal_id)
+            created = record.get("createdAt")
+            updated = record.get("updatedAt")
+            if not isinstance(created, str) or not timestamp(created) or not isinstance(updated, str) or not timestamp(updated):
+                raise ValueError("Invalid original timestamp")
+            jobs = record.get("jobs")
+            if not isinstance(jobs, list):
+                raise ValueError("Invalid companion job history")
+            accepted = []
+            for job in jobs:
+                if not isinstance(job, dict):
+                    raise ValueError("Invalid companion job")
+                job_id = valid_uuid(job.get("id"))
+                status = job.get("status")
+                instruction = job.get("instruction")
+                model = job.get("model")
+                result = job.get("result")
+                error = job.get("error")
+                created_at = job.get("created_at")
+                finished_at = job.get("finished_at")
+                if (job_id in seen_jobs or status not in ("completed", "blocked") or
+                    not isinstance(instruction, str) or not 1 <= len(instruction) <= 4000 or
+                    not isinstance(created_at, str) or not timestamp(created_at) or
+                    not isinstance(finished_at, str) or not timestamp(finished_at) or
+                    error is not None and (not isinstance(error, str) or len(error) > 400)):
+                    raise ValueError("Malformed or duplicate archived job")
+                if status == "completed" and (
+                    not isinstance(model, str) or not 1 <= len(model) <= 300 or
+                    not isinstance(result, str) or not 1 <= len(result) <= MAX_DRAFT
+                ):
+                    raise ValueError("An archived local draft is incomplete")
+                if status == "blocked" and (
+                    model is not None and not isinstance(model, str) or
+                    result is not None and not isinstance(result, str)
+                ):
+                    raise ValueError("Invalid blocked job")
+                seen_jobs.add(job_id)
+                job_count += 1
+                if job_count > MAX_SNAPSHOT_JOBS:
+                    raise ValueError("Too many companion jobs to import")
+                accepted.append((job_id, crystal_id, instruction, status, model, result,
+                                 error, created_at, finished_at))
+            prepared.append((crystal_id, intent, created, updated, accepted))
+        inserted_crystals = 0
+        inserted_jobs = 0
+        with self.lock, self.db:
+            own = {row["id"]: row["intent"] for row in self.db.execute(
+                "SELECT id,intent FROM crystals WHERE card_id=?", (card,))}
+            if len(own) + sum(1 for entry in prepared if entry[0] not in own) > 128:
+                raise ValueError("The import would exceed the Library Card crystal limit")
+            # Check every conflict BEFORE any write, so a failed restore cannot
+            # overwrite or partially replace the owner's local discoveries.
+            for crystal_id, intent, _, _, jobs in prepared:
+                if crystal_id in own and own[crystal_id] != intent:
+                    raise ValueError("Archived intent conflicts with current owner original")
+                for job in jobs:
+                    match = self.db.execute("SELECT card_id,crystal_id FROM jobs WHERE id=?",
+                                            (job[0],)).fetchone()
+                    if match and (match["card_id"] != card or match["crystal_id"] != crystal_id):
+                        raise ValueError("Archived job identifier conflicts with existing owner data")
+            for crystal_id, intent, created, updated, jobs in prepared:
+                if crystal_id not in own:
+                    # A restored old job cannot automatically start a new run.
+                    self.db.execute("""
+                        INSERT INTO crystals(id,card_id,intent,created_at,updated_at,last_queued_at)
+                        VALUES(?,?,?,?,?,?)
+                    """, (crystal_id, card, intent, created, updated, utc_now()))
+                    inserted_crystals += 1
+                for job in jobs:
+                    cursor = self.db.execute("""
+                        INSERT OR IGNORE INTO jobs
+                        (id,card_id,crystal_id,instruction,status,model,result,error,created_at,finished_at)
+                        VALUES(?,?,?,?,?,?,?,?,?,?)
+                    """, (job[0], card, *job[1:]))
+                    inserted_jobs += cursor.rowcount
+        return {"importedCrystals": inserted_crystals,
+                "importedJobs": inserted_jobs,
+                "skippedJobs": job_count - inserted_jobs}
 
     def maybe_queue_growth(self) -> int:
         if os.environ.get("ASCENSION_DEVICE_AUTOGROW", "true").lower() == "false":
@@ -374,7 +511,9 @@ class DeviceHandler(BaseHTTPRequestHandler):
         if not self._allowed():
             return self._reply(403, {"error": "origin_not_allowed"})
         try:
-            if int(self.headers.get("Content-Length", "0")) > MAX_JSON:
+            request_limit = (MAX_SNAPSHOT_BYTES + 4096
+                             if self.path == "/v1/restore-finished" else MAX_JSON)
+            if int(self.headers.get("Content-Length", "0")) > request_limit:
                 return self._reply(413, {"error": "request_too_large"})
             size = int(self.headers.get("Content-Length", "0"))
             if size < 2:
@@ -386,6 +525,10 @@ class DeviceHandler(BaseHTTPRequestHandler):
                 payload = self.server.library.library(data)
             elif self.path == "/v1/submit":
                 payload = self.server.library.submit(data)
+            elif self.path == "/v1/snapshot":
+                payload = self.server.library.snapshot(data)
+            elif self.path == "/v1/restore-finished":
+                payload = self.server.library.restore_snapshot(data)
             else:
                 return self._reply(404, {"error": "not_found"})
             return self._reply(200, payload)

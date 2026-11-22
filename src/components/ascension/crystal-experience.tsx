@@ -12,6 +12,14 @@ import {
   continueDeviceIntent, startDeviceIntent, synchronizeDeviceCompanion,
 } from "@/lib/ascension/device-companion";
 import {
+  submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery,
+} from "@/lib/ascension/guest.functions";
+import { governedPersisted, type ObjectiveDelivery } from "@/lib/ascension/result-model";
+import {
+  choiceForVoiceCommand, deliveredCrystalChoices, governedVoiceCommand,
+  type CrystalGovernedChoice,
+} from "@/lib/ascension/governed-crystal-voice.mjs";
+import {
   isContinuationPrompt, isDesignEditInstruction, isCancelContinuation,
 } from "@/lib/ascension/voice-intent-flow.mjs";
 import {
@@ -53,6 +61,14 @@ function deviceDraftAnswer(crystal: DeviceCrystal): StoredAnswer | null {
   };
 }
 
+function governedChoiceAnswer(choice: CrystalGovernedChoice): StoredAnswer {
+  return {
+    title: choice.title, body: choice.body,
+    limitations: choice.limitations,
+    design: choice.design,
+    parts: choice.parts.map(part => part.name),
+  };
+}
 function guideSuggestion(answer: StoredAnswer): string {
   if (answer.parts.length >= 2) return "Would you like to examine how " +
     answer.parts[0] + " and " + answer.parts[1] + " work together?";
@@ -94,6 +110,7 @@ export function CrystalExperience() {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(0);
   const [working, setWorking] = useState(false);
+  const [governedWorking, setGovernedWorking] = useState(false);
   const [listening, setListening] = useState(false);
   const [muted, setMuted] = useState(false);
   const [backup, setBackup] = useState(false);
@@ -113,6 +130,14 @@ export function CrystalExperience() {
   const requestEpoch = useRef(0);
   const chosen = useRef<IntentRecord | null>(null);
   const continuing = useRef(false);
+  // The owner explicitly chooses whether an original leaves this device for
+  // the existing governed runtime. Guest tokens remain in this tab's memory.
+  const governedPending = useRef(false);
+  const governedChoices = useRef<CrystalGovernedChoice[]>([]);
+  const governedIndex = useRef<number | null>(null);
+  const governedAuth = useRef<{ crystalId: string; requestId: string; guestToken: string } | null>(null);
+  const governedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const governedEpoch = useRef(0);
   const crystalsRef = useRef<DeviceCrystal[]>([]);
   const answerRef = useRef<StoredAnswer | null>(null);
   const mutedRef = useRef(false);
@@ -225,7 +250,7 @@ export function CrystalExperience() {
   }
 
   async function recallCrystal(id: string) {
-    if (workingRef.current) return;
+    if (workingRef.current || governedPending.current) return;
     const epoch = ++requestEpoch.current;
     setIssue("");
     try {
@@ -233,6 +258,11 @@ export function CrystalExperience() {
       const crystal = await readDeviceCrystal(id);
       if (epoch !== requestEpoch.current) return;
       chosen.current = { id: crystal.id, intent: crystal.intent };
+      if (governedAuth.current?.crystalId !== id) {
+        governedAuth.current = null;
+        governedChoices.current = [];
+        governedIndex.current = null;
+      }
       setSelectedId(id);
       // On-device drafts are not governed revisions.
       setView("assembled");
@@ -261,6 +291,13 @@ export function CrystalExperience() {
     if (!statement || workingRef.current) return;
     const parent = continuing.current ? chosen.current : null;
     continuing.current = false;
+    if (parent && governedAuth.current?.crystalId === parent.id &&
+        governedChoices.current.length) {
+      // The owner already authorized this crystal's governed run. Continue
+      // THAT exact run using its guest token, not a new local crystal.
+      void runGovernedIntent(statement);
+      return;
+    }
     const epoch = ++requestEpoch.current;
     workingRef.current = true;
     setWorking(true);
@@ -287,6 +324,9 @@ export function CrystalExperience() {
       } else {
         const result = await startDeviceIntent(statement);
         chosen.current = { id: result.crystal.id, intent: result.crystal.intent };
+        governedAuth.current = null;
+        governedChoices.current = [];
+        governedIndex.current = null;
         setSelectedId(result.crystal.id);
         message = result.submitted
           ? "Your intent is now a crystal saved on your device. Your local model is queued to develop it."

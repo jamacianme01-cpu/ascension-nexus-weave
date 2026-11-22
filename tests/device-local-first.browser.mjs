@@ -70,6 +70,81 @@ try {
     "A local AI draft is not governed verified knowledge.");
   assert.equal(recovered.verifiedRevision, null);
   assert.equal(recovered.developing, false);
+
+  // Owner-exported archive is portable between fresh browser profiles, but
+  // never contains plaintext inventions or exports a device CryptoKey.
+  const passphrase = "correct-horse-battery-local-library";
+  const archive = await page.evaluate(async pass =>
+    (await window.deviceTestAPI.createEncryptedLibraryBackup(pass)).text(), passphrase);
+  assert.ok(!archive.includes(intent), "Encrypted archive must not expose invention text.");
+  assert.ok(!archive.includes("Test-generated draft"), "Drafts must remain encrypted.");
+  const header = JSON.parse(archive);
+  assert.equal(header.format, "ascension-library-card-encrypted");
+  assert.equal(header.iterations, 310000);
+  assert.equal(header.kdf, "PBKDF2-SHA-256");
+  assert.equal(header.cipher, "AES-256-GCM");
+  assert.ok(!("crystals" in header), "Unencrypted header must not contain crystal data.");
+
+  const originalCard = await page.evaluate(() =>
+    localStorage.getItem("ascension-library-card-capability-v1"));
+
+  // Failed decryption and ciphertext tampering MUST NOT change user storage.
+  const failed = await page.evaluate(async text => {
+    try {
+      await window.deviceTestAPI.restoreEncryptedLibraryBackup(text, "incorrect-passphrase-1234");
+      return "unexpected success";
+    } catch (error) {
+      return error.message;
+    }
+  }, archive);
+  assert.match(failed, /Incorrect passphrase or damaged archive/);
+  assert.equal((await page.evaluate(() => window.deviceTestAPI.listDeviceCrystals())).length, 1);
+
+  const forged = { ...header, data: (header.data[0] === "A" ? "B" : "A") + header.data.slice(1) };
+  const tamperResult = await page.evaluate(async payload => {
+    try {
+      await window.deviceTestAPI.restoreEncryptedLibraryBackup(payload.text, payload.password);
+      return "unexpected success";
+    } catch (error) {
+      return error.message;
+    }
+  }, { text: JSON.stringify(forged), password: passphrase });
+  assert.match(tamperResult, /Incorrect passphrase or damaged archive/);
+
+  const other = await browser.newContext();
+  try {
+    const second = await other.newPage();
+    await second.goto("http://127.0.0.1:4182/tests/fixtures/device-local-first.html");
+    await second.waitForFunction(() => Boolean(window.deviceTestAPI));
+    const imported = await second.evaluate(async payload =>
+      window.deviceTestAPI.restoreEncryptedLibraryBackup(payload.archive, payload.password),
+      { archive, password: passphrase });
+    assert.deepEqual(imported, { imported: 1, skipped: 0, totalInArchive: 1 });
+
+    const newCard = await second.evaluate(() =>
+      localStorage.getItem("ascension-library-card-capability-v1"));
+    assert.notEqual(newCard, originalCard, "Original device access capability must not be transferred.");
+
+    const restored = await second.evaluate(id => window.deviceTestAPI.readDeviceCrystal(id), saved.id);
+    assert.equal(restored.intent, intent);
+    assert.equal(restored.drafts.length, 1);
+    assert.equal(restored.drafts[0].jobId, jobId);
+    assert.equal(restored.verifiedRevision, null);
+    assert.equal(restored.verifiedGrowthCount, 0, "Imported draft is never verified proof.");
+    assert.equal(restored.queuedJobId, null, "Old device jobs must not restart as active jobs.");
+
+    const repeated = await second.evaluate(async payload =>
+      window.deviceTestAPI.restoreEncryptedLibraryBackup(payload.archive, payload.password),
+      { archive, password: passphrase });
+    assert.deepEqual(repeated, { imported: 0, skipped: 1, totalInArchive: 1 },
+      "An existing original must never be overwritten by an old backup.");
+
+    const afterRepeat = await second.evaluate(() => window.deviceTestAPI.listDeviceCrystals());
+    assert.equal(afterRepeat.length, 1);
+  } finally {
+    await other.close();
+  }
+
   await context.close();
   console.log("PASS: encrypted on-device intent survives browser reload, remains unexportable, duplicate drafts do not fake growth.");
 } finally {

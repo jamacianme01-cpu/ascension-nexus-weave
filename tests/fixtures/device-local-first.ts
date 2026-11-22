@@ -1,7 +1,8 @@
 import {
   createDeviceCrystal, listDeviceCrystals, readDeviceCrystal,
-  markDeviceJob, appendDeviceDraft,
+  markDeviceJob, appendDeviceDraft, importDeviceCrystals,
 } from "../../src/lib/ascension/device-knowledgeverse";
+import { createEncryptedLibraryBackup, restoreEncryptedLibraryBackup } from "../../src/lib/ascension/device-backup";
 
 Object.assign(window, {
   deviceTestAPI: {
@@ -10,5 +11,8 @@ Object.assign(window, {
     readDeviceCrystal,
     markDeviceJob,
     appendDeviceDraft,
+    createEncryptedLibraryBackup,
+    restoreEncryptedLibraryBackup,
+    importDeviceCrystals,
   },
 });

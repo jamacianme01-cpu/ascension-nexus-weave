@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CrystalSurface, type CrystalDesign } from "./crystal-surface";
+import { LibraryBackupDialog } from "./library-backup-dialog";
 import type { DesignView } from "./v1-design-viewport";
 import { listDeviceCrystals, readDeviceCrystal, type DeviceCrystal } from "@/lib/ascension/device-knowledgeverse";
 import {
@@ -90,6 +91,7 @@ export function CrystalExperience() {
   const [backup, setBackup] = useState(false);
   const [draft, setDraft] = useState("");
   const [issue, setIssue] = useState("");
+  const [archiveMode, setArchiveMode] = useState<"export" | "import" | null>(null);
   const [sceneAvailable, setSceneAvailable] = useState(true);
 
   const [speaking, setSpeaking] = useState(false);
@@ -297,6 +299,18 @@ export function CrystalExperience() {
     const lower = input.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!enteredRef.current) { void enter(); return; }
     if (workingRef.current) return;
+    if (/^(?:back ?up|export|save) (?:my |the )?(?:library card|knowledgeverse|crystals|library)$/.test(lower)) {
+      setIssue("");
+      setArchiveMode("export");
+      speak("I can make an encrypted backup of your Library Card. Type a private passphrase in the form. Do not speak it aloud.", false);
+      return;
+    }
+    if (/^(?:restore|import|recover) (?:my |the )?(?:library card|knowledgeverse|crystals|library)$/.test(lower)) {
+      setIssue("");
+      setArchiveMode("import");
+      speak("Choose your encrypted Library Card file and type its passphrase privately. Your existing crystals will stay untouched.", false);
+      return;
+    }
     if (/^(?:continue this intent|keep developing this intent|build on this intent)$/.test(lower)) {
       if (!chosen.current) speak("First retrieve the intent crystal you want to continue.");
       else {
@@ -450,9 +464,20 @@ export function CrystalExperience() {
           setMuted(value => !value);
           if (!muted) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
         }}>{muted ? "◖×" : "◖))"}</button>
-      {working && <span className="sr-only" role="status">The governed engine is working on your intent.</span>}
+      {working && <span className="sr-only" role="status">Your device is saving this intent.</span>}
       {answer && <span className="sr-only" role="status">{answer.body}</span>}
     </>}
+    {archiveMode && <LibraryBackupDialog
+      mode={archiveMode}
+      beforeExport={async () => { await syncDevice(); }}
+      onRestored={async () => {
+        chosen.current = null;
+        continuing.current = false;
+        setSelectedId(null);
+        setAnswer(null);
+        await refreshCrystals();
+      }}
+      onClose={() => setArchiveMode(null)}/>}
     {issue && <p role="alert" className="ascension-crystal-error">{issue}</p>}
   </main>;
 }

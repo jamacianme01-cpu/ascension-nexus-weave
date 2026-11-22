@@ -28,13 +28,28 @@ This opens ASCENSION at `http://127.0.0.1:4174` and starts the optional local co
 ### Important truth and privacy boundaries
 
 - **Locally generated model text is an unverified draft**, not a scientifically verified discovery, a physical prototype or a governed ASCENSION transaction. Drafts do not increment `verifiedGrowthCount`. The Tree must never be animated to claim unsupported advances.
-- The browser encrypts its crystal records using WebCrypto + IndexedDB, but the key is local to that browser profile. Clearing site data can destroy both key and records. **An encrypted portable backup/export flow is still required before relying on this for irreplaceable inventions.**
+- The browser encrypts its crystal records using WebCrypto + IndexedDB, but the key is local to that browser profile. Clearing site data can destroy both key and records. **Portable encrypted Library Card archives can now be exported and restored by the owner.** They protect the browser's crystal records, but not a separate desktop companion SQLite database whose completed jobs have not yet been synchronized into the browser.
 - **The Python companion's SQLite database is currently not application-encrypted.** Use full-disk encryption and normal OS account security for the computer. Do not treat browser encryption as applying to the companion's files.
 - A web origin that can execute malicious JavaScript can access the browser-origin encryption key through the app runtime; origin security and trusted code remain necessary.
 - Cross-device Library Card authentication/synchronization is **not yet implemented**. The browser Library Card is specific to its origin and device. Nothing is automatically uploaded to a central knowledge database.
 - The previously created **server-hosted crystal archives are not deleted or overwritten**. Automatic migration has not occurred; doing so requires an explicit, safe import mechanism.
 - Browser speech recognition is restricted to **`processLocally = true`**. If offline recognition or a locally installed English voice is unavailable, a text input is offered instead of silently sending microphone audio to a cloud speech service.
 - Desktop local AI operation **does not mean the groundskeeper's approved static picture is lip-synced** or that browser-side physics/3D generation has been implemented.
+
+### Portable encrypted Library Card backup (owner-controlled)
+
+Once inside ASCENSION, say **"back up my Library Card"** or type that command in the optional private text input. A temporary passphrase form appears; enter a private passphrase twice (12–256 characters). The app synchronizes available **local** companion drafts, then encrypts the local crystal records **in the browser** using PBKDF2-HMAC-SHA-256 (310,000 iterations, 128-bit random salt) and AES-256-GCM (96-bit random IV). The downloaded file is named `ASCENSION-Library-Card-YYYY-MM-DD.ascension`. The archive contains no plaintext inventions or transferable Library Card capability. No server or cloud upload is made.
+
+To recover on another device, say **"restore my Library Card"** and select that `.ascension` file. Enter the original passphrase **privately**. The receiving browser authenticates the complete archive and validates all crystal/draft records **before changing any local data**. It then encrypts the recovered data under its own fresh non-exportable AES key and its own local Library Card capability. New crystals are added atomically; existing originals are never overwritten, and incompatible duplicates abort import.
+
+Safety boundaries:
+- **Keep your archive and passphrase:** the passphrase is not stored or recoverable by ASCENSION.
+- **A saved archive is a point-in-time snapshot**, not automatic sync. You control how it travels between devices; no hosted account is created.
+- The encrypted file includes browser-synchronized crystal records and local draft history. **It does not yet back up the Python companion's SQLite database** or drafts that have not been synchronized into the browser.
+- Browser-local encryption and passphrase encryption are separate. Neither provides full disk protection or protection against malicious code running in the same application origin.
+- Archives are limited to 64 MB; the app refuses oversized files rather than processing them without bounds.
+- Imported model drafts remain **unverified**, not governed proof. Imported pending-job identifiers are cleared, not executed as current tasks.
+- Existing crystals are not overwritten. If the receiving device already has a crystal with the same ID, it is skipped and reported; no history merge happens silently.
 
 ### Background growth
 
@@ -47,4 +62,4 @@ Set `ASCENSION_DEVICE_AUTOGROW=false` to disable local background continuation. 
 - `python3 -m unittest discover -s tests -p test_device_companion.py -v` proves local SQL persistence, crash recovery, absence of hidden remote model URL, and bounded continuation behavior.
 - `node tests/crystal-experience.test.mjs` checks that the front page uses device storage exclusively and preserves the exact approved asset.
 - `npm run test:interface`, `npm run build`, `npx tsc --noEmit` verify existing application compatibility.
-- Real desktop/mobile validation, durable backups, model inference and true 24/7 background execution remain **subject to an actual device test**. Build checks alone do not establish end-to-end live operation.
+- Portable archive encryption, cross-browser restore and data-integrity handling are covered by the Chromium browser test. **Production device recovery, companion SQLite backup, model inference, and full 24/7 operation remain subject to actual device testing.** Build checks alone do not establish end-to-end live operation.

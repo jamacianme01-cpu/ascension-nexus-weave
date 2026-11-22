@@ -68,6 +68,21 @@ export async function synchronizeDeviceCompanion(): Promise<number> {
   });
   const local = await listDeviceCrystals();
   const lookup = new Map(local.map(crystal => [crystal.id, crystal]));
+  // When a user launches the optional desktop companion later, register
+  // existing device-owned crystals there; never require a central migration.
+  // Bound intake per refresh to avoid flooding a newly installed local model.
+  const present = new Set(remote.crystals.map(crystal => crystal.id));
+  let registered = 0;
+  for (const own of local) {
+    if (registered >= 2) break;
+    if (present.has(own.id)) continue;
+    try {
+      await submitDeviceComputation(own, own.intent);
+      registered++;
+    } catch {
+      // The encrypted IndexedDB original remains intact.
+    }
+  }
   let newDrafts = 0;
   for (const item of remote.crystals) {
     const own = lookup.get(item.id);

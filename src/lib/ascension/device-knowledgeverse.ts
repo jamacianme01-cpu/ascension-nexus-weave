@@ -324,7 +324,10 @@ function validateImportedCrystal(value: unknown): DeviceCrystal {
 
 export async function importDeviceCrystals(
   values: unknown,
-): Promise<{ imported: number; skipped: number }> {
+): Promise<{
+  imported: number; skipped: number;
+  mergedDrafts?: number; mergedGovernedResults?: number;
+}> {
   if (!Array.isArray(values) || values.length > MAX)
     throw new Error("Invalid archive crystal count.");
   const imported = values.map(validateImportedCrystal);

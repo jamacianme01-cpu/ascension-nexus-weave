@@ -1,6 +1,7 @@
 import {
   createDeviceCrystal, listDeviceCrystals, readDeviceCrystal,
   markDeviceJob, appendDeviceDraft, importDeviceCrystals,
+  recordDeviceGovernedReceipt, selectDeviceGovernedResult,
 } from "../../src/lib/ascension/device-knowledgeverse";
 import { createEncryptedLibraryBackup, restoreEncryptedLibraryBackup } from "../../src/lib/ascension/device-backup";
 import { startOwnerFolderSync, deviceSyncFileName, getOrCreateSyncDeviceId } from "../../src/lib/ascension/device-folder-sync";
@@ -53,6 +54,8 @@ Object.assign(window, {
     readDeviceCrystal,
     markDeviceJob,
     appendDeviceDraft,
+    recordDeviceGovernedReceipt,
+    selectDeviceGovernedResult,
     createEncryptedLibraryBackup,
     restoreEncryptedLibraryBackup,
     importDeviceCrystals,

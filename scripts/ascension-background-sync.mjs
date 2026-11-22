@@ -12,6 +12,9 @@ import { createHash, createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes, 
 import { readFile, writeFile, rename, unlink, readdir, stat, realpath } from "node:fs/promises";
 import { resolve, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  validateGovernedHistory, mergeGovernedHistory,
+} from "../src/lib/ascension/governed-crystal-memory.mjs";
 
 const PREFIX = "ASCENSION-Private-Sync-";
 const SUFFIX = ".ascension";
@@ -129,7 +132,8 @@ function validCrystal(c) {
   });
   return { id:c.id, intent:c.intent, createdAt:c.createdAt, updatedAt:c.updatedAt,
     verifiedRevision:null, verifiedAt:null, verifiedGrowthCount:0,
-    developing:false, drafts, queuedJobId:null, lastLocalJobAt:null };
+    developing:false, drafts, queuedJobId:null, lastLocalJobAt:null,
+    governedResults: validateGovernedHistory(c.governedResults) };
 }
 function companionCrystals(snapshot) {
   ensure(snapshot && snapshot.format === "ascension-companion-finished-history" &&
@@ -179,6 +183,11 @@ export function mergeArchives(payloads, companion = null) {
       }
       ensure(drafts.size <= 64, "Development history exceeds the no-loss limit.");
       prev.drafts = [...drafts.values()].sort((a,b) => a.recordedAt.localeCompare(b.recordedAt));
+      // The desktop worker may run after both browsers close. It must
+      // preserve authorized, encrypted, original-linked governed receipts
+      // and real later GLBs exactly as the browser's merge does.
+      prev.governedResults = mergeGovernedHistory(
+        prev.governedResults, next.governedResults);
       if (Date.parse(next.updatedAt) > Date.parse(prev.updatedAt))
         prev.updatedAt = next.updatedAt;
     }

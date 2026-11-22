@@ -47,6 +47,7 @@ export type LibraryRestoreSummary = {
   companionRestored?: boolean;
   importedCompanionJobs?: number;
   mergedDrafts?: number;
+  mergedGovernedResults?: number;
 };
 function passwordAllowed(password: string) {
   if (typeof password !== "string" || password.length < 12 || password.length > 256)

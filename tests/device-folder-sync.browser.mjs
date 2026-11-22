@@ -27,6 +27,20 @@ try {
       content: "Local experimental design notes A, not verified.",
       status: "unverified_local_draft",
     });
+    await api.recordDeviceGovernedReceipt(item.id, {
+      source: "governed",
+      requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      guestToken: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      receivedAt: new Date().toISOString(),
+      choices: [{
+        id: "owner-private-knowledge",
+        title: "Owner's recorded guided result",
+        body: "An actual authorized engine result associated with this intent.",
+        parts: [], design: null,
+        modelStatus: null, limitations: [],
+      }],
+      selectedIndex: null,
+    });
     const sharing = api.fakeSharedFolder();
     window.testFolder = sharing;
     window.testSession = api.startOwnerFolderSync(sharing.folder, pass, () => {});
@@ -42,6 +56,8 @@ try {
   assert.ok(!aFiles[aFilename].includes(primary.intent), "Do not write plaintext owner intents.");
   assert.ok(!aFiles[aFilename].includes("experimental design"), "Do not reveal development text.");
   assert.ok(!aFiles[aFilename].includes(passphrase), "Passphrase must stay in device memory.");
+  assert.ok(!aFiles[aFilename].includes("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+    "Governed guest authorization must remain encrypted in shared folders.");
 
   const other = await pageB.evaluate(async data => {
     const api = window.deviceTestAPI;
@@ -62,6 +78,14 @@ try {
   assert.equal(other.summary.peersRead, 1);
   assert.equal(other.summary.importedCrystals, 1);
   assert.equal((await pageB.evaluate(() => window.deviceTestAPI.listDeviceCrystals())).length, 2);
+  const recoveredGoverned = await pageB.evaluate(id =>
+    window.deviceTestAPI.readDeviceCrystal(id), primary.id);
+  assert.equal(recoveredGoverned.intent, primary.intent);
+  assert.equal(recoveredGoverned.governedResults.length, 1,
+    "Owner-approved private folder sync must carry encrypted governed receipt memory");
+  assert.equal(recoveredGoverned.governedResults[0].choices[0].id, "owner-private-knowledge");
+  assert.equal(recoveredGoverned.verifiedGrowthCount, 0,
+    "Synced governed delivery is not physical verification");
 
   const bFiles = await pageB.evaluate(() => window.testFolder.readFiles());
   assert.equal(Object.keys(bFiles).length, 2, "Each installation must write a separate archive.");

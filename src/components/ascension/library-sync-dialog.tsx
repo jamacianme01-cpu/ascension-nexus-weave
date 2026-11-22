@@ -67,7 +67,8 @@ export function LibrarySyncDialog({
           : "Encrypted folder sync is active while this page is open. ") +
         result.peersRead + " peer archives processed; " +
         result.importedCrystals + " new crystals and " +
-        result.mergedDrafts + " missing developments restored." +
+        result.mergedDrafts + " missing developments and " +
+        result.mergedGovernedResults + " recorded engine histories restored." +
         (result.backgroundError ? " Desktop background pairing failed: " + result.backgroundError : "")
       );
     } catch (cause) {

@@ -27,6 +27,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 export type SyncSummary = {
   importedCrystals: number;
   mergedDrafts: number;
+  mergedGovernedResults: number;
   peersRead: number;
   scannedAt: string;
 };
@@ -126,6 +127,7 @@ export function startOwnerFolderSync(
     try {
       let importedCrystals = 0;
       let mergedDrafts = 0;
+      let mergedGovernedResults = 0;
       const peers: string[] = [];
       for await (const [name, entry] of folder.entries()) {
         if (entry.kind === "file" && isOtherDeviceArchive(name, ownName)) {
@@ -148,9 +150,11 @@ export function startOwnerFolderSync(
           await file.text(), passphrase, { restoreCompanion: false });
         importedCrystals += result.imported;
         mergedDrafts += result.mergedDrafts ?? 0;
+        mergedGovernedResults += result.mergedGovernedResults ?? 0;
       }
       if (stopped) throw new Error("The sync session was stopped.");
-      if ((importedCrystals || mergedDrafts) && onImported) await onImported();
+      if ((importedCrystals || mergedDrafts || mergedGovernedResults) && onImported)
+        await onImported();
 
       // Re-export the complete locally merged state for other devices.
       // Never write any other installation's file.
@@ -167,6 +171,7 @@ export function startOwnerFolderSync(
       lastSummary = {
         importedCrystals,
         mergedDrafts,
+        mergedGovernedResults,
         peersRead: peers.length,
         scannedAt: new Date().toISOString(),
       };

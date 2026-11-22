@@ -8,6 +8,12 @@
  * Protection scope: browser-origin storage; NOT a substitute for a device disk
  * password or encrypted user-controlled backup. Clearing site data deletes it.
  */
+import {
+  validateGovernedReceipt, validateGovernedHistory,
+  mergeGovernedHistory, markGovernedSelection,
+  type GovernedCrystalReceipt,
+} from "./governed-crystal-memory.mjs";
+
 export type LocalDevelopment = {
   jobId: string;
   recordedAt: string;
@@ -27,6 +33,8 @@ export type DeviceCrystal = {
   drafts: LocalDevelopment[];
   queuedJobId: string | null;
   lastLocalJobAt: string | null;
+  /** The owner's actual authorized engine receipts, not physical proof. */
+  governedResults?: GovernedCrystalReceipt[];
 };
 type Envelope = { id: string; iv: number[]; cipher: number[] };
 const DB_NAME = "ascension-user-owned-knowledgeverse-v1";
@@ -163,6 +171,7 @@ export async function createDeviceCrystal(intent: string) {
     verifiedRevision: null, verifiedAt: null,
     verifiedGrowthCount: 0, developing: false,
     drafts: [], queuedJobId: null, lastLocalJobAt: null,
+    governedResults: [],
   });
 }
 export async function markDeviceJob(id: string, jobId: string) {
@@ -200,6 +209,67 @@ export async function failDeviceJob(id: string, jobId: string) {
   }
 }
 
+
+/**
+ * Guard against a concurrent library import/background device update.
+ * An encrypted original must not silently lose drafts or governed history.
+ */
+async function updateDeviceCrystalSafely(
+  id: string,
+  transform: (current: DeviceCrystal) => DeviceCrystal,
+): Promise<DeviceCrystal> {
+  if (!/^[a-f0-9-]{36}$/i.test(id)) throw new Error("Invalid intent crystal.");
+  const db = await database();
+  const key = card() + ":" + id;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const before = await waitRequest<Envelope | undefined>(
+      db.transaction(STORE, "readonly").objectStore(STORE).get(key));
+    if (!before) throw new Error("This original intent is not saved on this Library Card.");
+    const original = await decrypt(before);
+    const next = transform(original);
+    if (next === original) return original;
+    const secured = await encrypt(next);
+    const tx = db.transaction(STORE, "readwrite");
+    const ready = transactionComplete(tx);
+    const store = tx.objectStore(STORE);
+    const current = store.get(key);
+    current.onsuccess = () => {
+      const actual = current.result as Envelope | undefined;
+      if (!actual || JSON.stringify(actual) !== JSON.stringify(before)) {
+        tx.abort(); // Concurrent change; retry from the latest original.
+      } else store.put(secured);
+    };
+    try { await ready; return next; }
+    catch {
+      if (attempt === 3) throw new Error(
+        "Concurrent Library Card changes prevented safely saving this governed result.");
+    }
+  }
+  throw new Error("Governed result could not be added safely.");
+}
+
+/** Only a real returned owner-authorized delivery may be recorded here. */
+export async function recordDeviceGovernedReceipt(
+  crystalId: string, payload: GovernedCrystalReceipt,
+): Promise<DeviceCrystal> {
+  const incoming = validateGovernedReceipt(payload);
+  return updateDeviceCrystalSafely(crystalId, original => {
+    const merged = mergeGovernedHistory(original.governedResults, [incoming]);
+    if (merged === original.governedResults) return original;
+    return {...original, governedResults: merged};
+  });
+}
+
+export async function selectDeviceGovernedResult(
+  crystalId: string, requestId: string, selectedIndex: number,
+): Promise<DeviceCrystal> {
+  return updateDeviceCrystalSafely(crystalId, original => {
+    const updated = markGovernedSelection(
+      original.governedResults, requestId, selectedIndex);
+    if (updated === original.governedResults) return original;
+    return {...original, governedResults:updated};
+  });
+}
 
 /** Local-only portable restore. Never overwrite an existing user intent. */
 function validIsoDate(value: unknown): value is string {
@@ -248,12 +318,16 @@ function validateImportedCrystal(value: unknown): DeviceCrystal {
     drafts, verifiedRevision: null, verifiedAt: null,
     verifiedGrowthCount: 0, developing: false,
     queuedJobId: null, lastLocalJobAt: null,
+    governedResults: validateGovernedHistory(input.governedResults),
   };
 }
 
 export async function importDeviceCrystals(
   values: unknown,
-): Promise<{ imported: number; skipped: number }> {
+): Promise<{
+  imported: number; skipped: number;
+  mergedDrafts?: number; mergedGovernedResults?: number;
+}> {
   if (!Array.isArray(values) || values.length > MAX)
     throw new Error("Invalid archive crystal count.");
   const imported = values.map(validateImportedCrystal);
@@ -275,6 +349,7 @@ export async function importDeviceCrystals(
   const newlyAdded: DeviceCrystal[] = [];
   const merges: DeviceCrystal[] = [];
   let mergedDrafts = 0;
+  let mergedGovernedResults = 0;
   let skipped = 0;
   for (const item of imported) {
     const previous = present.get(item.id);
@@ -297,7 +372,11 @@ export async function importDeviceCrystals(
         prior.set(draft.jobId, draft);
       }
     }
-    if (!additions.length) {
+    const recorded = mergeGovernedHistory(
+      previous.governedResults, item.governedResults);
+    const changedResults = JSON.stringify(previous.governedResults ?? []) !==
+      JSON.stringify(recorded);
+    if (!additions.length && !changedResults) {
       skipped++;
       continue;
     }
@@ -305,11 +384,12 @@ export async function importDeviceCrystals(
       throw new Error("Merging the archive would discard older developments. Nothing was imported.");
     const drafts = [...prior.values()].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
     merges.push({
-      ...previous, drafts,
+      ...previous, drafts, governedResults: recorded,
       updatedAt: Date.parse(item.updatedAt) > Date.parse(previous.updatedAt)
         ? item.updatedAt : previous.updatedAt,
     });
     mergedDrafts += additions.length;
+    if (changedResults) mergedGovernedResults++;
   }
   if (existing.length + newlyAdded.length > MAX)
     throw new Error("Restore would exceed the 128-crystal device limit. Nothing was imported.");
@@ -355,5 +435,6 @@ export async function importDeviceCrystals(
   return {
     imported: newlyAdded.length, skipped,
     ...(mergedDrafts ? { mergedDrafts } : {}),
+    ...(mergedGovernedResults ? { mergedGovernedResults } : {}),
   };
 }

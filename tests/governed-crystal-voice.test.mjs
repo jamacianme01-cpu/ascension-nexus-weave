@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   governedVoiceCommand, deliveredCrystalChoices, choiceForVoiceCommand,
+  crystalHasPendingModels, reconcileCrystalMedia,
 } from "../src/lib/ascension/governed-crystal-voice.mjs";
 const entry=readFileSync("src/components/ascension/crystal-experience.tsx","utf8");
 const fixture = id=>({
@@ -23,6 +24,24 @@ assert.equal(choices[0].design.blueprintUrl,"https://example.invalid/blueprint.p
 assert.deepEqual(choices[0].parts,[{name:"claude component",
   location:"the actual recorded location",purpose:"the recorded purpose"}]);
 assert.equal(choices[3].title,"Distinct combined result");
+assert.equal(crystalHasPendingModels(choices),false);
+const waiting={...payload,pathways:[{
+  ...fixture("claude"),model_url:null,model_status:"running",
+},fixture("grok"),fixture("openai")]};
+const pendingChoices=deliveredCrystalChoices(waiting);
+assert.equal(crystalHasPendingModels(pendingChoices),true);
+const refreshed=reconcileCrystalMedia(pendingChoices,choices);
+assert.equal(refreshed[0].design.modelUrl,"https://example.invalid/verified-job-output.glb");
+assert.equal(refreshed[0].design.imageUrl,pendingChoices[0].design.imageUrl);
+assert.equal(crystalHasPendingModels(refreshed),false);
+assert.strictEqual(reconcileCrystalMedia(refreshed,choices),refreshed);
+assert.strictEqual(reconcileCrystalMedia(refreshed,choices.slice(0,3)),refreshed,
+  "No shape mismatch may erase a prior result");
+assert.strictEqual(reconcileCrystalMedia(refreshed,[
+  {...choices[0],body:"A different intent"},...choices.slice(1),
+]),refreshed,"No other invention may replace this original");
+assert.strictEqual(reconcileCrystalMedia(refreshed,pendingChoices),refreshed,
+  "A stale model status must not regress a real delivered GLB");
 assert.equal(choiceForVoiceCommand("choose one",choices),0);
 assert.equal(choiceForVoiceCommand("open pathway grok",choices),1);
 assert.equal(choiceForVoiceCommand("select openai",choices),2);
@@ -57,6 +76,10 @@ assert.match(entry,/followUp: "continue"/);
 assert.match(entry,/delivery\.source !== "governed"/);
 assert.match(entry,/if \(choices\.length > 1\)/,
   "Show only the real number of delivered pathways");
+assert.match(entry,/reconcileCrystalMedia\(older, newer\)/);
+assert.match(entry,/governedAuth\.current\?\.requestId !== authorized\.requestId/,
+  "Only the same authorized original run can hydrate a delivered GLB");
+assert.match(entry,/setGovernedMediaPending\(crystalHasPendingModels\(choices\)\)/);
 assert.match(entry,/setView\("assembled"\)/);
 assert.match(entry,/setAnswer\(governedChoiceAnswer\(selected\)\)/);
 assert.match(entry,/The server's verified run is NOT automatically copied/,

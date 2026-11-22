@@ -43,8 +43,9 @@ assert.match(companionPython, /def restore_snapshot\(self, payload/);
 assert.match(companionPython, /MAX_SNAPSHOT_BYTES/);
 
 assert.match(storage, /importDeviceCrystals/);
-assert.match(storage, /tx.objectStore\(STORE\).add\(item\)/);
-assert.doesNotMatch(storage, /tx.objectStore\(STORE\).put\(item\)/);
+assert.match(storage, /store.add\(envelope\)/);
+assert.match(storage, /store.put\(envelope\)/);
+assert.match(storage, /const baseline = baselines.get\(envelope.id\)/);
 assert.match(backupUI, /type="password"/);
 assert.match(backupUI, /Restore without overwriting/);
 assert.doesNotMatch(backups, /\bfetch\(|\bXMLHttpRequest\b|localStorage\./);

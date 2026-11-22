@@ -339,6 +339,16 @@ export function CrystalExperience() {
       setIssue("Library Card is not available: " + String(cause));
     }
   }
+  // The Tree keeps showing newly verified crystal growth while this page is open.
+  // Work itself belongs to the persistent server, not the user's browser.
+  useEffect(() => {
+    if (!entered) return;
+    const refresh = window.setInterval(() => {
+      void refreshCrystals().catch(() => { /* A temporary refresh failure is not growth. */ });
+    }, 60000);
+    return () => window.clearInterval(refresh);
+  }, [entered]);
+
   useEffect(() => () => {
     requestEpoch.current++;
     clearPoll();

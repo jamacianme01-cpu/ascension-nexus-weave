@@ -37,6 +37,7 @@ export function CrystalSurface({
             "--intent-x": `${49 + ((index * 37) % 42)}%`,
             "--intent-y": `${8 + ((index * 23) % 43)}%`,
             "--intent-delay": `${(index % 7) * -0.47}s`,
+            "--intent-growth": `${1 + Math.min(0.6, crystal.verifiedGrowthCount * 0.09)}`,
           } as CSSProperties}
           onClick={() => onRecall(crystal.id)}>
           <span className="ascension-crystal-facet" aria-hidden="true"/>

@@ -14,7 +14,6 @@ import {
 import {
   submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery,
 } from "@/lib/ascension/guest.functions";
-import { governedPersisted, type ObjectiveDelivery } from "@/lib/ascension/result-model";
 import {
   choiceForVoiceCommand, deliveredCrystalChoices, governedVoiceCommand,
   type CrystalGovernedChoice,
@@ -494,6 +493,23 @@ export function CrystalExperience() {
     const lower = input.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!enteredRef.current) { void enter(); return; }
     if (workingRef.current) return;
+    if (governedVoiceCommand(input)) {
+      if (governedPending.current) {
+        speak("This intent is already processing in the authorized ASCENSION runtime.");
+      } else {
+        void runGovernedIntent();
+      }
+      return;
+    }
+    if (governedChoices.current.length) {
+      const index = choiceForVoiceCommand(input, governedChoices.current);
+      if (index >= 0) { revealGovernedChoice(index); return; }
+      if (/^(?:what did the engines produce|show the pathways|what are the pathways)$/.test(lower)) {
+        speak("The recorded results are " + governedChoices.current.map(p => p.title).join(", ") +
+          ". Tell me which one to enter.");
+        return;
+      }
+    }
     if (/^(?:sync|synchronize|connect) (?:my |the )?(?:library card|knowledgeverse|crystals|library)$/.test(lower)) {
       setIssue("");
       setSyncDialog(true);
@@ -528,6 +544,12 @@ export function CrystalExperience() {
       return;
     }
     if (/^(?:new intent|start a new intent)$/.test(lower)) {
+      // This only stops browser polling; the authorized external run may still
+      // be processing, and is never claimed cancelled by the Tree.
+      stopGovernedPolling();
+      governedAuth.current = null;
+      governedChoices.current = [];
+      governedIndex.current = null;
       chosen.current = null; continuing.current = false;
       setAnswer(null); setSelectedId(null);
       speak("I'm here. What would you like to create or explore?");
@@ -558,6 +580,15 @@ export function CrystalExperience() {
       return;
     }
     if (answerRef.current) {
+      const chosenPart = governedChoices.current[governedIndex.current ?? -1]?.parts.find(
+        part => lower.includes(part.name.toLowerCase()),
+      );
+      if (chosenPart && /^(?:explain|describe|tell|what|where)/.test(lower)) {
+        speak(chosenPart.name + ". Where: " +
+          (chosenPart.location || "The delivered engine result did not specify a location.") +
+          ". Does: " + (chosenPart.purpose || "The delivered result did not specify a function."));
+        return;
+      }
       if (/^(?:rotate|turn) (?:left|right)$/.test(lower)) {
         if (!answerRef.current.design?.modelUrl) speak("I need the delivered three-dimensional model to rotate it accurately.");
         else setRotation(value => value + (lower.endsWith("right") ? 1 : -1));
@@ -625,6 +656,8 @@ export function CrystalExperience() {
       void (async () => {
         const saved = await syncDevice();
         if (!active || !selectedId || workingRef.current) return;
+        if (governedAuth.current?.crystalId === selectedId &&
+            governedChoices.current.length) return;
         const crystal = saved.find(item => item.id === selectedId);
         const latest = crystal?.drafts.at(-1);
         if (!latest || latest.jobId === lastPresentedJob.current || !crystal) return;
@@ -645,6 +678,8 @@ export function CrystalExperience() {
     syncSession.current?.stop();
     syncSession.current = null;
     requestEpoch.current++;
+    governedEpoch.current++;
+    if (governedTimer.current) clearInterval(governedTimer.current);
     speechSerial.current++;
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
@@ -693,12 +728,17 @@ export function CrystalExperience() {
           if (!muted) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
         }}>{muted ? "◖×" : "◖))"}</button>
       {working && <span className="sr-only" role="status">Your device is saving this intent.</span>}
+      {governedWorking && <span className="sr-only" role="status">The authorized governed ASCENSION engine is processing the selected intent.</span>}
       {answer && <span className="sr-only" role="status">{answer.body}</span>}
     </>}
     {archiveMode && <LibraryBackupDialog
       mode={archiveMode}
       beforeExport={async () => { await syncDevice(); }}
       onRestored={async () => {
+        stopGovernedPolling();
+        governedAuth.current = null;
+        governedChoices.current = [];
+        governedIndex.current = null;
         chosen.current = null;
         continuing.current = false;
         setSelectedId(null);

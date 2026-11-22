@@ -19,7 +19,7 @@ process.env.ASCENSION_STORAGE_DIR = dir;
 const card = "d".repeat(64);
 const filename = ledger.crystalLedgerFilename(card);
 const crystal = n => ({
-  id: \`00000000-0000-4000-8000-\${String(n).padStart(12, "0")}\`,
+  id: "00000000-0000-4000-8000-" + String(n).padStart(12, "0"),
   intent: "Owner-intent-" + n,
   requestId: "22222222-2222-4222-8222-" + String(n).padStart(12, "0"),
   guestToken: "33333333-3333-4333-8333-" + String(n).padStart(12, "0"),

@@ -500,6 +500,36 @@ export function CrystalExperience() {
         await refreshCrystals();
       }}
       onClose={() => setArchiveMode(null)}/>}
+    {syncDialog && <LibrarySyncDialog
+      active={syncActive}
+      onStart={async (folder: DeviceSyncFolder, passphrase: string) => {
+        syncSession.current?.stop();
+        const session = startOwnerFolderSync(folder, passphrase, state => {
+          if (state.state === "error")
+            setIssue("Private folder synchronization: " + state.message);
+          else if (state.state === "ready") setIssue("");
+        }, async () => {
+          await refreshCrystals();
+        });
+        syncSession.current = session;
+        try {
+          const result = await session.syncNow();
+          setSyncActive(true);
+          await refreshCrystals();
+          return result;
+        } catch (error) {
+          session.stop();
+          syncSession.current = null;
+          setSyncActive(false);
+          throw error;
+        }
+      }}
+      onStop={() => {
+        syncSession.current?.stop();
+        syncSession.current = null;
+        setSyncActive(false);
+      }}
+      onClose={() => setSyncDialog(false)}/>}
     {issue && <p role="alert" className="ascension-crystal-error">{issue}</p>}
   </main>;
 }

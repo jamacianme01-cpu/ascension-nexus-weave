@@ -12,6 +12,14 @@ import {
   continueDeviceIntent, startDeviceIntent, synchronizeDeviceCompanion,
 } from "@/lib/ascension/device-companion";
 import {
+  submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery,
+} from "@/lib/ascension/guest.functions";
+import {
+  choiceForVoiceCommand, deliveredCrystalChoices, governedVoiceCommand,
+  crystalHasPendingModels, reconcileCrystalMedia,
+  type CrystalGovernedChoice,
+} from "@/lib/ascension/governed-crystal-voice.mjs";
+import {
   isContinuationPrompt, isDesignEditInstruction, isCancelContinuation,
 } from "@/lib/ascension/voice-intent-flow.mjs";
 import {
@@ -53,6 +61,14 @@ function deviceDraftAnswer(crystal: DeviceCrystal): StoredAnswer | null {
   };
 }
 
+function governedChoiceAnswer(choice: CrystalGovernedChoice): StoredAnswer {
+  return {
+    title: choice.title, body: choice.body,
+    limitations: choice.limitations,
+    design: choice.design,
+    parts: choice.parts.map(part => part.name),
+  };
+}
 function guideSuggestion(answer: StoredAnswer): string {
   if (answer.parts.length >= 2) return "Would you like to examine how " +
     answer.parts[0] + " and " + answer.parts[1] + " work together?";
@@ -94,6 +110,8 @@ export function CrystalExperience() {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(0);
   const [working, setWorking] = useState(false);
+  const [governedWorking, setGovernedWorking] = useState(false);
+  const [governedMediaPending, setGovernedMediaPending] = useState(false);
   const [listening, setListening] = useState(false);
   const [muted, setMuted] = useState(false);
   const [backup, setBackup] = useState(false);
@@ -113,6 +131,14 @@ export function CrystalExperience() {
   const requestEpoch = useRef(0);
   const chosen = useRef<IntentRecord | null>(null);
   const continuing = useRef(false);
+  // The owner explicitly chooses whether an original leaves this device for
+  // the existing governed runtime. Guest tokens remain in this tab's memory.
+  const governedPending = useRef(false);
+  const governedChoices = useRef<CrystalGovernedChoice[]>([]);
+  const governedIndex = useRef<number | null>(null);
+  const governedAuth = useRef<{ crystalId: string; requestId: string; guestToken: string } | null>(null);
+  const governedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const governedEpoch = useRef(0);
   const crystalsRef = useRef<DeviceCrystal[]>([]);
   const answerRef = useRef<StoredAnswer | null>(null);
   const mutedRef = useRef(false);
@@ -225,7 +251,7 @@ export function CrystalExperience() {
   }
 
   async function recallCrystal(id: string) {
-    if (workingRef.current) return;
+    if (workingRef.current || governedPending.current) return;
     const epoch = ++requestEpoch.current;
     setIssue("");
     try {
@@ -233,6 +259,12 @@ export function CrystalExperience() {
       const crystal = await readDeviceCrystal(id);
       if (epoch !== requestEpoch.current) return;
       chosen.current = { id: crystal.id, intent: crystal.intent };
+      if (governedAuth.current?.crystalId !== id) {
+        governedAuth.current = null;
+        governedChoices.current = [];
+        governedIndex.current = null;
+        setGovernedMediaPending(false);
+      }
       setSelectedId(id);
       // On-device drafts are not governed revisions.
       setView("assembled");
@@ -261,6 +293,13 @@ export function CrystalExperience() {
     if (!statement || workingRef.current) return;
     const parent = continuing.current ? chosen.current : null;
     continuing.current = false;
+    if (parent && governedAuth.current?.crystalId === parent.id &&
+        governedChoices.current.length) {
+      // The owner already authorized this crystal's governed run. Continue
+      // THAT exact run using its guest token, not a new local crystal.
+      void runGovernedIntent(statement);
+      return;
+    }
     const epoch = ++requestEpoch.current;
     workingRef.current = true;
     setWorking(true);
@@ -287,6 +326,10 @@ export function CrystalExperience() {
       } else {
         const result = await startDeviceIntent(statement);
         chosen.current = { id: result.crystal.id, intent: result.crystal.intent };
+        governedAuth.current = null;
+        governedChoices.current = [];
+        governedIndex.current = null;
+        setGovernedMediaPending(false);
         setSelectedId(result.crystal.id);
         message = result.submitted
           ? "Your intent is now a crystal saved on your device. Your local model is queued to develop it."
@@ -302,6 +345,141 @@ export function CrystalExperience() {
       workingRef.current = false;
       setWorking(false);
       setIssue("Device intent storage: " + String(cause));
+    }
+  }
+
+  function stopGovernedPolling() {
+    governedEpoch.current += 1;
+    if (governedTimer.current) clearInterval(governedTimer.current);
+    governedTimer.current = null;
+    governedPending.current = false;
+    setGovernedWorking(false);
+  }
+
+  function revealGovernedChoice(index: number) {
+    const selected = governedChoices.current[index];
+    if (!selected || !chosen.current ||
+        governedAuth.current?.crystalId !== chosen.current.id) return;
+    governedIndex.current = index;
+    setView("assembled");
+    setAnswer(governedChoiceAnswer(selected));
+    const components = selected.parts.length
+      ? "Its delivered components include " + selected.parts.map(p => p.name).join(", ") + "."
+      : "The engine has not supplied a component specification for this result.";
+    speak(selected.title + ". " + selected.body + " " + components);
+  }
+
+  async function runGovernedIntent(change: string | null = null) {
+    const selected = chosen.current;
+    if (!selected || workingRef.current || governedPending.current) {
+      if (!selected) speak("First speak or recall the intent you want ASCENSION's engines to develop.");
+      return;
+    }
+    const previous = governedAuth.current?.crystalId === selected.id
+      ? governedAuth.current : null;
+    // A change to a governed result always remains linked to its original
+    // authorized request; the first submission is explicitly owner-invoked.
+    if (change && !previous) {
+      speak("First run this intent through ASCENSION's governed engines.");
+      return;
+    }
+    const epoch = ++governedEpoch.current;
+    governedPending.current = true;
+    setGovernedWorking(true);
+    setIssue("");
+    recognition.current?.stop();
+    if (!change) {
+      governedChoices.current = [];
+      governedIndex.current = null;
+      setGovernedMediaPending(false);
+    }
+    try {
+      const original = await readDeviceCrystal(selected.id);
+      if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+      const authorized = await submitGuestObjective({ data: {
+        objective: change || original.intent,
+        ...(previous ? {
+          parentRequestId: previous.requestId,
+          parentGuestToken: previous.guestToken,
+          followUp: "continue" as const,
+          evidence: [JSON.stringify({
+            source: "ASCENSION_SELECTED_RESULT",
+            pathway_id: governedChoices.current[governedIndex.current ?? 0]?.id ?? "",
+          })],
+        } : {}),
+      } });
+      if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+      const credentials = {
+        crystalId: selected.id,
+        requestId: authorized.request.id,
+        guestToken: authorized.guestToken,
+      };
+      governedAuth.current = credentials;
+      speak("Your selected intent has been accepted by ASCENSION's configured governed runtime. I'll report what it actually delivers.", false);
+      let polling = false;
+      let failures = 0;
+      let finished = false;
+      const poll = async () => {
+        if (finished || polling || epoch !== governedEpoch.current ||
+            chosen.current?.id !== selected.id) return;
+        polling = true;
+        try {
+          const state = await getGuestObjectiveStatus({
+            data: { requestId: credentials.requestId, guestToken: credentials.guestToken },
+          });
+          if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+          const run = state.request;
+          if (!run) throw new Error("The authorized ASCENSION run could not be retrieved.");
+          if (run.status === "failed" || run.status === "rejected") {
+            throw new Error(run.error || "The governed engine rejected this intent.");
+          }
+          if (run.status !== "verified") { failures = 0; return; }
+          const delivery = await getGuestObjectiveDelivery({
+            data: { requestId: credentials.requestId, guestToken: credentials.guestToken },
+          });
+          if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+          if (delivery?.status !== "completed") { failures = 0; return; }
+          if (delivery.source !== "governed" || !delivery.response_payload ||
+              delivery.response_payload.kind === "not_produced") {
+            throw new Error(delivery.error || "The governed runtime did not deliver a real result.");
+          }
+          const choices = deliveredCrystalChoices(delivery.response_payload);
+          if (!choices.length) throw new Error("No actual engine result was delivered.");
+          governedChoices.current = choices;
+          setGovernedMediaPending(crystalHasPendingModels(choices));
+          finished = true;
+          stopGovernedPolling();
+          // The server's verified run is NOT automatically copied into the
+          // device's verified-growth field; no physical proof is invented.
+          if (choices.length > 1) {
+            setAnswer(null);
+            const names = choices.map((p, i) =>
+              choices.length === 4 && i === 3 ? "BLEND" : p.title);
+            speak("ASCENSION's governed runtime delivered " + choices.length +
+              " recorded pathways: " + names.join(", ") +
+              ". Tell me which pathway to enter.");
+          } else {
+            revealGovernedChoice(0);
+          }
+        } catch (error) {
+          failures++;
+          if (failures >= 3) {
+            finished = true;
+            stopGovernedPolling();
+            setIssue("Governed engine: " + (error instanceof Error ? error.message : String(error)).slice(0, 300));
+            speak("The governed engine did not deliver a usable result. Your original intent is still saved privately.");
+          }
+        } finally { polling = false; }
+      };
+      await poll();
+      if (!finished && epoch === governedEpoch.current) {
+        governedTimer.current = setInterval(() => { void poll(); }, 3500);
+      }
+    } catch (error) {
+      if (epoch !== governedEpoch.current) return;
+      stopGovernedPolling();
+      setIssue("Governed engine: " + (error instanceof Error ? error.message : String(error)).slice(0, 300));
+      speak("The governed runtime is unavailable. Your original intent remains on your device.");
     }
   }
 
@@ -324,6 +502,23 @@ export function CrystalExperience() {
     const lower = input.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!enteredRef.current) { void enter(); return; }
     if (workingRef.current) return;
+    if (governedVoiceCommand(input)) {
+      if (governedPending.current) {
+        speak("This intent is already processing in the authorized ASCENSION runtime.");
+      } else {
+        void runGovernedIntent();
+      }
+      return;
+    }
+    if (governedChoices.current.length) {
+      const index = choiceForVoiceCommand(input, governedChoices.current);
+      if (index >= 0) { revealGovernedChoice(index); return; }
+      if (/^(?:what did the engines produce|show the pathways|what are the pathways)$/.test(lower)) {
+        speak("The recorded results are " + governedChoices.current.map(p => p.title).join(", ") +
+          ". Tell me which one to enter.");
+        return;
+      }
+    }
     if (/^(?:sync|synchronize|connect) (?:my |the )?(?:library card|knowledgeverse|crystals|library)$/.test(lower)) {
       setIssue("");
       setSyncDialog(true);
@@ -358,6 +553,13 @@ export function CrystalExperience() {
       return;
     }
     if (/^(?:new intent|start a new intent)$/.test(lower)) {
+      // This only stops browser polling; the authorized external run may still
+      // be processing, and is never claimed cancelled by the Tree.
+      stopGovernedPolling();
+      governedAuth.current = null;
+      governedChoices.current = [];
+      governedIndex.current = null;
+      setGovernedMediaPending(false);
       chosen.current = null; continuing.current = false;
       setAnswer(null); setSelectedId(null);
       speak("I'm here. What would you like to create or explore?");
@@ -388,6 +590,15 @@ export function CrystalExperience() {
       return;
     }
     if (answerRef.current) {
+      const chosenPart = governedChoices.current[governedIndex.current ?? -1]?.parts.find(
+        part => lower.includes(part.name.toLowerCase()),
+      );
+      if (chosenPart && /^(?:explain|describe|tell|what|where)/.test(lower)) {
+        speak(chosenPart.name + ". Where: " +
+          (chosenPart.location || "The delivered engine result did not specify a location.") +
+          ". Does: " + (chosenPart.purpose || "The delivered result did not specify a function."));
+        return;
+      }
       if (/^(?:rotate|turn) (?:left|right)$/.test(lower)) {
         if (!answerRef.current.design?.modelUrl) speak("I need the delivered three-dimensional model to rotate it accurately.");
         else setRotation(value => value + (lower.endsWith("right") ? 1 : -1));
@@ -445,6 +656,51 @@ export function CrystalExperience() {
       setIssue("Library Card is not available: " + String(cause));
     }
   }
+  // A completed governed answer may precede a real Hunyuan3D GLB.
+  // While this original, authorized crystal is selected, append only real
+  // subsequently delivered assets from the SAME run. Never invent geometry.
+  useEffect(() => {
+    if (!entered || !governedMediaPending || !selectedId) return;
+    const authorized = governedAuth.current;
+    if (!authorized || authorized.crystalId !== selectedId) return;
+    let closed = false;
+    let running = false;
+    const refreshMedia = async () => {
+      if (closed || running ||
+          governedAuth.current?.requestId !== authorized.requestId ||
+          governedAuth.current?.guestToken !== authorized.guestToken ||
+          chosen.current?.id !== authorized.crystalId) return;
+      running = true;
+      try {
+        const delivery = await getGuestObjectiveDelivery({ data: {
+          requestId: authorized.requestId, guestToken: authorized.guestToken,
+        } });
+        if (closed || governedAuth.current?.requestId !== authorized.requestId ||
+            chosen.current?.id !== authorized.crystalId ||
+            delivery?.status !== "completed" || delivery.source !== "governed" ||
+            !delivery.response_payload) return;
+        const newer = deliveredCrystalChoices(delivery.response_payload);
+        const older = governedChoices.current;
+        const merged = reconcileCrystalMedia(older, newer);
+        if (merged !== older) {
+          governedChoices.current = merged;
+          const index = governedIndex.current;
+          if (index !== null && merged[index]) {
+            setAnswer(governedChoiceAnswer(merged[index]));
+            if (!older[index]?.design?.modelUrl && merged[index]?.design?.modelUrl) {
+              speak("The actual delivered three-dimensional model is now available for this design.", false);
+            }
+          }
+        }
+        if (!crystalHasPendingModels(merged)) setGovernedMediaPending(false);
+      } catch { /* Keep the exact original selected image and model status. */ }
+      finally { running = false; }
+    };
+    void refreshMedia();
+    const timer = window.setInterval(() => { void refreshMedia(); }, 6000);
+    return () => { closed = true; window.clearInterval(timer); };
+  }, [entered, governedMediaPending, selectedId]);
+
   // The browser mirrors only results computed on this device. A desktop
   // companion can work while this page is closed; phones/tablets cannot rely
   // on unrestricted background execution.
@@ -454,7 +710,9 @@ export function CrystalExperience() {
     const refresh = window.setInterval(() => {
       void (async () => {
         const saved = await syncDevice();
-        if (!active || !selectedId || workingRef.current) return;
+        if (!active || !selectedId || workingRef.current || governedPending.current) return;
+        if (governedAuth.current?.crystalId === selectedId &&
+            governedChoices.current.length) return;
         const crystal = saved.find(item => item.id === selectedId);
         const latest = crystal?.drafts.at(-1);
         if (!latest || latest.jobId === lastPresentedJob.current || !crystal) return;
@@ -475,6 +733,8 @@ export function CrystalExperience() {
     syncSession.current?.stop();
     syncSession.current = null;
     requestEpoch.current++;
+    governedEpoch.current++;
+    if (governedTimer.current) clearInterval(governedTimer.current);
     speechSerial.current++;
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
@@ -523,12 +783,18 @@ export function CrystalExperience() {
           if (!muted) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
         }}>{muted ? "◖×" : "◖))"}</button>
       {working && <span className="sr-only" role="status">Your device is saving this intent.</span>}
+      {governedWorking && <span className="sr-only" role="status">The authorized governed ASCENSION engine is processing the selected intent.</span>}
       {answer && <span className="sr-only" role="status">{answer.body}</span>}
     </>}
     {archiveMode && <LibraryBackupDialog
       mode={archiveMode}
       beforeExport={async () => { await syncDevice(); }}
       onRestored={async () => {
+        stopGovernedPolling();
+        governedAuth.current = null;
+        governedChoices.current = [];
+        governedIndex.current = null;
+        setGovernedMediaPending(false);
         chosen.current = null;
         continuing.current = false;
         setSelectedId(null);

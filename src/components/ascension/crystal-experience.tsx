@@ -7,7 +7,10 @@ import {
 } from "@/lib/ascension/device-folder-sync";
 import { startDesktopBackgroundSync, stopDesktopBackgroundSync } from "@/lib/ascension/device-background-sync";
 import type { DesignView } from "./v1-design-viewport";
-import { listDeviceCrystals, readDeviceCrystal, type DeviceCrystal } from "@/lib/ascension/device-knowledgeverse";
+import {
+  listDeviceCrystals, readDeviceCrystal, recordDeviceGovernedReceipt,
+  selectDeviceGovernedResult, type DeviceCrystal,
+} from "@/lib/ascension/device-knowledgeverse";
 import {
   continueDeviceIntent, startDeviceIntent, synchronizeDeviceCompanion,
 } from "@/lib/ascension/device-companion";
@@ -266,6 +269,32 @@ export function CrystalExperience() {
         setGovernedMediaPending(false);
       }
       setSelectedId(id);
+      // A real governed result is stored with this encrypted original
+      // across tab closure and owner-chosen Library Card backup/sync.
+      // It is still a recorded answer, never physical or scientific proof.
+      const recorded = crystal.governedResults?.at(-1);
+      if (recorded) {
+        governedAuth.current = {
+          crystalId: crystal.id, requestId: recorded.requestId,
+          guestToken: recorded.guestToken,
+        };
+        governedChoices.current = recorded.choices;
+        governedIndex.current = recorded.selectedIndex;
+        setGovernedMediaPending(crystalHasPendingModels(recorded.choices));
+        if (recorded.selectedIndex !== null &&
+            recorded.choices[recorded.selectedIndex]) {
+          revealGovernedChoice(recorded.selectedIndex);
+        } else if (recorded.choices.length === 1) {
+          revealGovernedChoice(0);
+        } else {
+          setAnswer(null);
+          speak("I've retrieved the recorded ASCENSION pathways for this original intent. " +
+            recorded.choices.map((p, index) =>
+              recorded.choices.length === 4 && index === 3 ? "BLEND" : p.title
+            ).join(", ") + ". Tell me which pathway to enter.");
+        }
+        return;
+      }
       // On-device drafts are not governed revisions.
       setView("assembled");
       const last = crystal.drafts.at(-1);
@@ -361,6 +390,11 @@ export function CrystalExperience() {
     if (!selected || !chosen.current ||
         governedAuth.current?.crystalId !== chosen.current.id) return;
     governedIndex.current = index;
+    const credentials = governedAuth.current;
+    if (credentials) {
+      void selectDeviceGovernedResult(credentials.crystalId, credentials.requestId, index)
+        .catch(error => setIssue("Private result selection was not saved: " + String(error)));
+    }
     setView("assembled");
     setAnswer(governedChoiceAnswer(selected));
     const components = selected.parts.length
@@ -447,6 +481,20 @@ export function CrystalExperience() {
           if (!choices.length) throw new Error("No actual engine result was delivered.");
           governedChoices.current = choices;
           setGovernedMediaPending(crystalHasPendingModels(choices));
+          // Write the actually delivered result under the same non-exportable
+          // AES-GCM key as its original crystal. Do not mark verified growth.
+          try {
+            await recordDeviceGovernedReceipt(selected.id, {
+              source: "governed",
+              requestId: credentials.requestId, guestToken: credentials.guestToken,
+              receivedAt: new Date().toISOString(),
+              choices, selectedIndex: null,
+            });
+          } catch (error) {
+            setIssue("Result delivered, but its encrypted recall could not be saved: " +
+              String(error));
+          }
+          if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
           finished = true;
           stopGovernedPolling();
           // The server's verified run is NOT automatically copied into the
@@ -684,6 +732,21 @@ export function CrystalExperience() {
         const merged = reconcileCrystalMedia(older, newer);
         if (merged !== older) {
           governedChoices.current = merged;
+          // Keep the completed asset in the same encrypted, owner-owned
+          // record so a later visit or device backup sees the real GLB too.
+          try {
+            await recordDeviceGovernedReceipt(authorized.crystalId, {
+              source: "governed", requestId: authorized.requestId,
+              guestToken: authorized.guestToken,
+              receivedAt: new Date().toISOString(),
+              choices: merged, selectedIndex: governedIndex.current,
+            });
+          } catch (error) {
+            if (!closed) setIssue("Completed model could not be added to encrypted recall: " +
+              String(error));
+          }
+          if (closed || governedAuth.current?.requestId !== authorized.requestId ||
+              chosen.current?.id !== authorized.crystalId) return;
           const index = governedIndex.current;
           if (index !== null && merged[index]) {
             setAnswer(governedChoiceAnswer(merged[index]));

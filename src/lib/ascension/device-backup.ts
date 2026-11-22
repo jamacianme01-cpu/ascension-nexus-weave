@@ -162,10 +162,13 @@ export async function createEncryptedLibraryBackupWithStatus(
     // The browser archive remains usable on mobile or when the local
     // companion is shut down. Report the missing companion data explicitly.
   }
-  const crystals = companion ? addFinishedCompanionHistory(local, companion) : local;
+  // Validate ahead of encryption; store SQLite history ONCE in the archive,
+  // then fold it into device crystals during restore. Avoid duplicating up to
+  // 20 MB of private development history and exhausting archive limits.
+  if (companion) addFinishedCompanionHistory(local, companion);
   const payload: Payload = {
     format: PAYLOAD_FORMAT, version: VERSION,
-    exportedAt: new Date().toISOString(), crystals,
+    exportedAt: new Date().toISOString(), crystals: local,
     ...(companion ? { companion } : {}),
   };
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));

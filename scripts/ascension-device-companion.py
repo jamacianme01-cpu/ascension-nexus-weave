@@ -67,8 +67,15 @@ def valid_uuid(value: object) -> str:
 class LocalKnowledgeverse:
     def __init__(self, location: Path):
         self.path = location.expanduser().resolve()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(str(self.path), check_same_thread=False, timeout=15)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.path.parent, 0o700)
+        # SQLite and its WAL files must not inherit world-readable defaults.
+        old_umask = os.umask(0o077)
+        try:
+            self.db = sqlite3.connect(str(self.path), check_same_thread=False, timeout=15)
+        finally:
+            os.umask(old_umask)
+        os.chmod(self.path, 0o600)
         self.db.row_factory = sqlite3.Row
         self.lock = threading.RLock()
         self.db.execute("PRAGMA journal_mode=WAL")

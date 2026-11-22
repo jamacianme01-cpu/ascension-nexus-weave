@@ -128,8 +128,18 @@ export function CrystalExperience() {
     const localVoice = voices.find(voice => /samantha|jenny|aria|zira|serena|ava|female/i.test(voice.name))
       ?? voices[0];
     if (!localVoice) {
-      setBackup(true);
-      setIssue("No installed on-device English voice is available; typed intent remains local.");
+      // Some browsers report zero voices until their local list loads.
+      const retryWhenLoaded = () => {
+        synthesis.removeEventListener("voiceschanged", retryWhenLoaded);
+        if (speechSerial.current === serial) speak(words, thenListen);
+      };
+      synthesis.addEventListener("voiceschanged", retryWhenLoaded, { once: true });
+      window.setTimeout(() => {
+        synthesis.removeEventListener("voiceschanged", retryWhenLoaded);
+        if (speechSerial.current !== serial) return;
+        setBackup(true);
+        setIssue("No installed on-device English voice is available; typed intent remains local.");
+      }, 1500);
       return;
     }
     utterance.voice = localVoice;

@@ -21,6 +21,19 @@ const receipt = {
   selectedIndex: null,
 };
 const clean=validateGovernedReceipt(receipt);
+const explicitBlend=validateGovernedReceipt({
+  ...receipt, choices:[
+    {...receipt.choices[0],isBlend:false},
+    {...receipt.choices[0],id:"genuine-source-blend",isBlend:true},
+  ],
+});
+assert.equal(explicitBlend.choices[1].isBlend,true,
+  "Actual BLEND identity must survive encrypted receipt validation");
+assert.equal(explicitBlend.choices[0].isBlend,false,
+  "Ordinary pathways must not be mistaken for BLEND");
+assert.throws(()=>validateGovernedReceipt({
+  ...receipt,choices:[{...receipt.choices[0],isBlend:"fabricated"}],
+}),/invalid source or description/);
 assert.deepEqual(clean,receipt,"Do not rewrite original result text");
 assert.deepEqual(validateGovernedHistory(undefined),[],
   "Old encrypted Library Cards without engine receipts remain compatible");

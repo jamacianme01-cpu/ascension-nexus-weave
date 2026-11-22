@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
+import { isContinuationPrompt } from "../src/lib/ascension/voice-intent-flow.mjs";
 
 const source = readFileSync("src/lib/ascension/crystal-return.ts", "utf8");
 const result = ts.transpileModule(source, {
@@ -48,7 +49,9 @@ assert.match(component, /readDeviceCrystal\(id\)/);
 assert.match(component, /if \(!parent\) setAnswer\(null\)/);
 assert.match(component, /Unverified local draft|unverified draft|not been independently verified/);
 assert.match(component, /if \(speechSerial\.current !== serial\) return/);
-assert.match(component, /continue this intent/);
+assert.match(component, /isContinuationPrompt\(input\)/);
+assert.equal(isContinuationPrompt("continue this intent"), true);
+assert.equal(isContinuationPrompt("build on result"), true);
 assert.match(component, /I haven't found that intent on this Library Card/);
 assert.match(component, /Tell me which intent crystal you would like me to retrieve/);
 assert.ok(component.indexOf("if (/^(?:what has grown") < component.indexOf("if (answerRef.current)"),

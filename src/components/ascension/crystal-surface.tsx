@@ -1,8 +1,14 @@
-import { type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { V1DesignViewport, type DesignView } from "./v1-design-viewport";
 import type { CrystalSummary } from "@/lib/ascension/intent-crystals.functions";
 type VisualCrystal = CrystalSummary & { drafts?: readonly {status: string}[] };
 import "./crystal-surface.css";
+
+export type RevealedPart = {
+  name: string;
+  location: string;
+  purpose: string;
+};
 
 export type CrystalDesign = {
   title: string;
@@ -14,6 +20,7 @@ export type CrystalDesign = {
 
 export function CrystalSurface({
   working, design, view, rotateRequest, zoomRequest, crystals, selectedId, onRecall,
+  parts = [], onExplainPart,
 }: {
   working: boolean;
   design: CrystalDesign | null;
@@ -23,7 +30,15 @@ export function CrystalSurface({
   crystals: VisualCrystal[];
   selectedId: string | null;
   onRecall: (id: string) => void;
+  /** Only actual components returned by the selected governed pathway. */
+  parts?: readonly RevealedPart[];
+  onExplainPart?: (part: RevealedPart) => void;
 }) {
+  const [selectedPart, setSelectedPart] = useState<number | null>(null);
+  useEffect(() => {
+    setSelectedPart(null);
+  }, [selectedId, design?.title, design?.modelUrl, design?.imageUrl]);
+  const highlighted = selectedPart === null ? null : parts[selectedPart] ?? null;
   const hasVisualization = Boolean(design?.modelUrl || design?.imageUrl || design?.blueprintUrl);
   return <div className="ascension-crystals" aria-label="Living intent crystals">
     <div className="ascension-tree-intents" aria-label="Saved intentions on the Tree">
@@ -54,9 +69,33 @@ export function CrystalSurface({
     </div>}
     {design && hasVisualization && <section className="ascension-crystal-reality"
       aria-label={`Knowledge revealed for ${design.title}`}>
-      <V1DesignViewport modelUrl={design.modelUrl} imageUrl={design.imageUrl}
-        blueprintUrl={design.blueprintUrl} mode={view}
-        rotateRequest={rotateRequest} zoomRequest={zoomRequest}/>
+      <div className="ascension-crystal-design-view">
+        <V1DesignViewport modelUrl={design.modelUrl} imageUrl={design.imageUrl}
+          blueprintUrl={design.blueprintUrl} mode={view}
+          rotateRequest={rotateRequest} zoomRequest={zoomRequest}/>
+      </div>
+      {parts.length > 0 && <aside className="ascension-crystal-components"
+        aria-label="Component labels for the selected pathway">
+        <ul>
+          {parts.map((part, index) => <li key={part.name + ":" + index}>
+            <button type="button" aria-pressed={selectedPart === index}
+              onClick={() => {
+                setSelectedPart(index);
+                onExplainPart?.(part);
+              }}>{part.name}</button>
+          </li>)}
+        </ul>
+        {highlighted && <div className="ascension-component-details" aria-live="polite">
+          <dl>
+            <dt>What</dt>
+            <dd>{highlighted.name}</dd>
+            <dt>Where</dt>
+            <dd>{highlighted.location || "Not specified by the delivered model."}</dd>
+            <dt>Does</dt>
+            <dd>{highlighted.purpose || "Not specified by the delivered model."}</dd>
+          </dl>
+        </div>}
+      </aside>}
     </section>}
     {design && !hasVisualization && <span className="sr-only">
       The recorded knowledge is available to hear. No measured model or picture was delivered for this intent.

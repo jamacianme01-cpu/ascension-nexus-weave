@@ -46,6 +46,7 @@ export type LibraryRestoreSummary = {
   companionIncluded?: boolean;
   companionRestored?: boolean;
   importedCompanionJobs?: number;
+  mergedDrafts?: number;
 };
 function passwordAllowed(password: string) {
   if (typeof password !== "string" || password.length < 12 || password.length > 256)
@@ -204,6 +205,7 @@ export async function createEncryptedLibraryBackup(passphrase: string): Promise<
  */
 export async function restoreEncryptedLibraryBackup(
   archivedText: string, passphrase: string,
+  options: { restoreCompanion?: boolean } = {},
 ): Promise<LibraryRestoreSummary> {
   const archive = parseArchive(archivedText);
   const salt = fromBase64(archive.salt, 16);
@@ -228,6 +230,11 @@ export async function restoreEncryptedLibraryBackup(
     : payload.crystals;
   const outcome = await importDeviceCrystals(crystals);
   if (payload.companion) {
+    if (options.restoreCompanion === false)
+      return {
+        ...outcome, totalInArchive: crystals.length,
+        companionIncluded: true, companionRestored: false,
+      };
     try {
       const added = await restoreDeviceCompanionSnapshot(payload.companion);
       return {

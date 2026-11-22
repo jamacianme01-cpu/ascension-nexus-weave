@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { CrystalSurface, type CrystalDesign } from "./crystal-surface";
 import { LibraryBackupDialog } from "./library-backup-dialog";
+import { LibrarySyncDialog } from "./library-sync-dialog";
+import {
+  startOwnerFolderSync, type DeviceSyncFolder, type FolderSyncSession,
+} from "@/lib/ascension/device-folder-sync";
 import type { DesignView } from "./v1-design-viewport";
 import { listDeviceCrystals, readDeviceCrystal, type DeviceCrystal } from "@/lib/ascension/device-knowledgeverse";
 import {
@@ -92,6 +96,9 @@ export function CrystalExperience() {
   const [draft, setDraft] = useState("");
   const [issue, setIssue] = useState("");
   const [archiveMode, setArchiveMode] = useState<"export" | "import" | null>(null);
+  const [syncDialog, setSyncDialog] = useState(false);
+  const [syncActive, setSyncActive] = useState(false);
+  const syncSession = useRef<FolderSyncSession | null>(null);
   const [sceneAvailable, setSceneAvailable] = useState(true);
 
   const [speaking, setSpeaking] = useState(false);
@@ -299,6 +306,19 @@ export function CrystalExperience() {
     const lower = input.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!enteredRef.current) { void enter(); return; }
     if (workingRef.current) return;
+    if (/^(?:sync|synchronize|connect) (?:my |the )?(?:library card|knowledgeverse|crystals|library)$/.test(lower)) {
+      setIssue("");
+      setSyncDialog(true);
+      speak("I can synchronize your Library Card through a private folder you choose. Select that folder and enter the shared passphrase privately.", false);
+      return;
+    }
+    if (/^(?:stop syncing|stop synchronization|disconnect library|stop library sync)$/.test(lower)) {
+      syncSession.current?.stop();
+      syncSession.current = null;
+      setSyncActive(false);
+      speak("Your Library Card has stopped exchanging encrypted files.");
+      return;
+    }
     if (/^(?:back ?up|export|save) (?:my |the )?(?:library card|knowledgeverse|crystals|library)$/.test(lower)) {
       setIssue("");
       setArchiveMode("export");
@@ -416,6 +436,8 @@ export function CrystalExperience() {
   }, [entered, selectedId]);
 
   useEffect(() => () => {
+    syncSession.current?.stop();
+    syncSession.current = null;
     requestEpoch.current++;
     speechSerial.current++;
     recognition.current?.stop();
@@ -478,6 +500,37 @@ export function CrystalExperience() {
         await refreshCrystals();
       }}
       onClose={() => setArchiveMode(null)}/>}
+    {syncDialog && <LibrarySyncDialog
+      active={syncActive}
+      onStart={async (folder: DeviceSyncFolder, passphrase: string) => {
+        syncSession.current?.stop();
+        const session = startOwnerFolderSync(folder, passphrase, state => {
+          if (state.state === "error")
+            setIssue("Private folder synchronization: " + state.message);
+          else if (state.state === "ready") setIssue("");
+        }, async () => {
+          await refreshCrystals();
+          speak("Your other device has brought new crystals or developments into this Knowledgeverse. They are saved here, but unverified local drafts are not proven discoveries.", false);
+        });
+        syncSession.current = session;
+        try {
+          const result = await session.syncNow();
+          setSyncActive(true);
+          await refreshCrystals();
+          return result;
+        } catch (error) {
+          session.stop();
+          syncSession.current = null;
+          setSyncActive(false);
+          throw error;
+        }
+      }}
+      onStop={() => {
+        syncSession.current?.stop();
+        syncSession.current = null;
+        setSyncActive(false);
+      }}
+      onClose={() => setSyncDialog(false)}/>}
     {issue && <p role="alert" className="ascension-crystal-error">{issue}</p>}
   </main>;
 }

@@ -24,6 +24,27 @@ assert.equal(choices[0].design.blueprintUrl,"https://example.invalid/blueprint.p
 assert.deepEqual(choices[0].parts,[{name:"claude component",
   location:"the actual recorded location",purpose:"the recorded purpose"}]);
 assert.equal(choices[3].title,"Distinct combined result");
+assert.equal(choices[3].isBlend,true);
+assert.equal(choices[0].isBlend,false);
+const partial=deliveredCrystalChoices({
+  ...payload, pathways:[fixture("claude"),fixture("grok")],
+});
+assert.deepEqual(partial.map(c=>c.id),["claude","grok","combined"],
+  "A real BLEND must not erase two actually delivered pathways");
+assert.equal(choiceForVoiceCommand("choose blend",partial),2,
+  "The actual BLEND remains voice-accessible without a fabricated fourth slot");
+const fourWithoutBlend=deliveredCrystalChoices({
+  ...payload, pathways:[fixture("claude"),fixture("grok"),fixture("openai"),fixture("fourth")],
+});
+assert.deepEqual(fourWithoutBlend.map(c=>c.id),["claude","grok","openai","fourth"],
+  "Never invent a fifth slot or hide genuine delivered pathways");
+assert.equal(choiceForVoiceCommand("choose blend",fourWithoutBlend),-1,
+  "Four real pathways alone must not be mislabeled as a BLEND");
+const collision=deliveredCrystalChoices({
+  ...payload, pathways:[fixture("claude"),fixture("combined")],
+});
+assert.deepEqual(collision.map(c=>c.id),["claude","combined"],
+  "A repeated BLEND id may never create a duplicate encrypted pathway");
 assert.equal(crystalHasPendingModels(choices),false);
 const waiting={...payload,pathways:[{
   ...fixture("claude"),model_url:null,model_status:"running",

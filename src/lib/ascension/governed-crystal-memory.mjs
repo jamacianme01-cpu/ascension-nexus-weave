@@ -20,7 +20,8 @@ function choice(value) {
       !Array.isArray(value.limitations) || value.limitations.length>32 ||
       value.limitations.some(v=>!trimlessString(v,2000)) ||
       (value.modelStatus!==null && value.modelStatus!==undefined &&
-       !STATUSES.has(value.modelStatus))) {
+       !STATUSES.has(value.modelStatus)) ||
+      (value.isBlend!==undefined && typeof value.isBlend!=="boolean")) {
     throw Error("An archived governed result has an invalid source or description.");
   }
   const parts=value.parts.map(part=>{
@@ -48,6 +49,7 @@ function choice(value) {
   return {
     id:value.id,title:value.title,body:value.body,parts,design,
     limitations:[...value.limitations],modelStatus:value.modelStatus??null,
+    ...(value.isBlend===undefined ? {} : {isBlend:value.isBlend}),
   };
 }
 export function validateGovernedReceipt(value) {

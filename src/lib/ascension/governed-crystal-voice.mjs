@@ -6,12 +6,17 @@
 export function deliveredCrystalChoices(delivery) {
   if (!delivery || delivery.kind === "not_produced" ||
       typeof delivery.body !== "string" || !delivery.body.trim()) return [];
-  const realFour = delivery.pathways?.length === 3 && delivery.blend &&
-    new Set([...delivery.pathways, delivery.blend].map(item => item.id)).size === 4;
-  const actual = realFour
-    ? [...delivery.pathways, delivery.blend]
-    : delivery.blend ? [delivery.blend]
-      : delivery.pathways?.length ? [...delivery.pathways] : [];
+  const pathways = Array.isArray(delivery.pathways) ? delivery.pathways : [];
+  // Preserve genuine partial deliveries. Previously, 1–2 genuine pathways
+  // disappeared whenever a real BLEND accompanied them.
+  // Do not invent a fifth result or a duplicate identity.
+  const appendBlend = Boolean(
+    delivery.blend && pathways.length < 4 &&
+    !pathways.some(path => path.id === delivery.blend.id)
+  );
+  const actual = appendBlend
+    ? [...pathways, delivery.blend]
+    : [...pathways];
   if (!actual.length) return [{
     id: "governed-single-output",
     title: delivery.title,
@@ -32,6 +37,7 @@ export function deliveredCrystalChoices(delivery) {
     const modelUrl = choice.model_url ?? null;
     return {
       id: choice.id,
+      isBlend: Boolean(appendBlend && index === pathways.length),
       title: choice.label || delivery.title,
       body: choice.summary || delivery.body,
       design: imageUrl || blueprintUrl || modelUrl ? {
@@ -61,7 +67,10 @@ export function choiceForVoiceCommand(words, choices) {
   const position = positions[phrase];
   if (position !== undefined) return position < choices.length ? position : -1;
   if (phrase === "blend") {
-    if (choices.length === 4) return 3; // Only a recorded 3 + blend delivery earns this slot.
+    const marked = choices.findIndex(c => c.isBlend === true);
+    if (marked >= 0) return marked;
+    // Legacy encrypted receipts predate explicit BLEND provenance.
+    if (choices.length === 4 && choices.every(c => c.isBlend === undefined)) return 3;
     const found = choices.findIndex(c => /\bblend\b/i.test(c.title));
     return found < 0 ? -1 : found;
   }

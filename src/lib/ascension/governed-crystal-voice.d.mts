@@ -1,6 +1,8 @@
 import type { ObjectiveDelivery } from "./result-model";
 export interface CrystalGovernedChoice {
   id: string;
+  /** True only when an actual delivered source BLEND occupies this slot. */
+  isBlend?: boolean;
   title: string;
   body: string;
   design: {

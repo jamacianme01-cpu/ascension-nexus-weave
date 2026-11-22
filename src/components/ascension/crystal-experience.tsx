@@ -177,7 +177,9 @@ export function CrystalExperience() {
       const next = state.delivery ? deliveredAnswer(state.delivery) : null;
       setAnswer(next);
       await refreshCrystals();
-      if (next) speak("I have retrieved your intent. " + next.body + " " + guideSuggestion(next));
+      if (next) speak("I have retrieved your intent. " +
+        (state.status === "verified" ? "" : "Its next development is still running. Here is the latest verified answer. ") +
+        next.body + " " + guideSuggestion(next));
       else speak("This crystal holds your intent. The governed runtime reports " + state.status +
         ". I will only present developments the runtime actually records.");
     } catch (cause) { if (epoch === requestEpoch.current) setIssue("Crystal recall: " + String(cause)); }
@@ -213,7 +215,7 @@ export function CrystalExperience() {
       try {
         const stored = await recordIntentCrystal({ data: {
           libraryKey: libraryCapability(), intent: parent?.intent ?? statement,
-          ...run, ...(parent ? { crystalId: parent.id } : {}),
+          ...run, ...(parent ? { crystalId: parent.id, parentRequestId: parent.run.requestId } : {}),
         } });
         if (epoch !== requestEpoch.current) return;
         chosen.current = { id: stored.id, intent: stored.intent, run };
@@ -288,6 +290,10 @@ export function CrystalExperience() {
       if (match) { void recallCrystal(match.id); return; }
     }
     if (answerRef.current) {
+      if (/^(?:what has grown|what changed|what is new with this intent)$/.test(lower)) {
+        if (chosen.current) { void recallCrystal(chosen.current.id); }
+        return;
+      }
       if (/^(?:rotate|turn) (?:left|right)$/.test(lower)) {
         if (!answerRef.current.design?.modelUrl) speak("I need the delivered three-dimensional model to rotate it accurately.");
         else setRotation(value => value + (lower.endsWith("right") ? 1 : -1));
@@ -333,6 +339,16 @@ export function CrystalExperience() {
       setIssue("Library Card is not available: " + String(cause));
     }
   }
+  // The Tree keeps showing newly verified crystal growth while this page is open.
+  // Work itself belongs to the persistent server, not the user's browser.
+  useEffect(() => {
+    if (!entered) return;
+    const refresh = window.setInterval(() => {
+      void refreshCrystals().catch(() => { /* A temporary refresh failure is not growth. */ });
+    }, 60000);
+    return () => window.clearInterval(refresh);
+  }, [entered]);
+
   useEffect(() => () => {
     requestEpoch.current++;
     clearPoll();

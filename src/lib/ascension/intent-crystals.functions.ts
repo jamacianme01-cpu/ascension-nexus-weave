@@ -1,126 +1,124 @@
 /**
- * Each crystal is one continuing intent. The record is stored in the owner's
- * configured persistent storage, never in an in-memory substitute.
- * The Library Card capability controls retrieval of its own intent records.
- * Real evolution still requires the governed engine to record new work.
+ * A crystal is a persistent owner intent and a sequence of real governed runs.
+ * Library Card capability remains local to the browser until account identity
+ * is integrated. Never invent a result or attribute progress to a draft.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { createHash, randomUUID } from "node:crypto";
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { governedPersisted } from "./result-model";
 import { projectGuestDelivery } from "./guest.functions";
 import type { ObjectiveRun } from "./objectives.functions";
+import {
+  crystalLedgerFilename, readCrystalLedger, withCrystalLedgerLock,
+  saveCrystalLedger, appendVerifiedSnapshot,
+  type IntentCrystalRecord, type VerifiedCrystalSnapshot,
+} from "./intent-crystal-ledger.server";
 
-type StoredCrystal = {
-  id: string;
-  intent: string;
-  requestId: string;
-  guestToken: string;
-  createdAt: string;
-  updatedAt: string;
-  verifiedRevision: number | null;
-  verifiedAt: string | null;
-};
-export type CrystalSummary = Pick<StoredCrystal,
-  "id" | "intent" | "createdAt" | "updatedAt" | "verifiedRevision" | "verifiedAt">;
-
-function keyOf(value: string): string {
-  if (!/^[a-f0-9]{64}$/i.test(value || "")) throw new Error("A valid Library Card key is required.");
-  return createHash("sha256").update(value.toLowerCase()).digest("hex");
-}
+export type CrystalSummary = Pick<IntentCrystalRecord,
+  "id" | "intent" | "createdAt" | "updatedAt" | "verifiedRevision" | "verifiedAt"> & {
+    verifiedGrowthCount: number;
+    developing: boolean;
+  };
 function uuid(value: string): string {
-  if (!/^[a-f0-9-]{36}$/i.test(value || "")) throw new Error("Invalid intent crystal identifier.");
+  if (!/^[a-f0-9-]{36}$/i.test(value ?? ""))
+    throw new Error("Invalid intent or governed run identifier.");
   return value;
 }
-function directory(): string {
-  const root = process.env["ASCENSION_STORAGE_DIR"]?.trim() || "";
-  if (!root || !path.isAbsolute(root))
-    throw new Error("Persistent ASCENSION_STORAGE_DIR is required for growing intent crystals.");
-  return path.join(root, "intent-crystals");
-}
-async function load(libraryKey: string): Promise<StoredCrystal[]> {
-  const file = path.join(directory(), keyOf(libraryKey) + ".json");
-  try {
-    const records: unknown = JSON.parse(await fs.readFile(file, "utf8"));
-    if (!Array.isArray(records)) throw new Error("Invalid intent crystal ledger.");
-    return records as StoredCrystal[];
-  } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw cause;
-  }
-}
-async function store(libraryKey: string, items: StoredCrystal[]) {
-  const root = directory();
-  await fs.mkdir(root, { recursive: true, mode: 0o700 });
-  const filename = path.join(root, keyOf(libraryKey) + ".json");
-  const pending = filename + "." + randomUUID() + ".tmp";
-  try {
-    await fs.writeFile(pending, JSON.stringify(items), { encoding: "utf8", mode: 0o600, flag: "wx" });
-    await fs.rename(pending, filename);
-  } finally {
-    await fs.unlink(pending).catch(() => {});
-  }
-}
-const summary = (item: StoredCrystal): CrystalSummary => ({
-  id: item.id, intent: item.intent, createdAt: item.createdAt,
-  updatedAt: item.updatedAt, verifiedRevision: item.verifiedRevision,
-  verifiedAt: item.verifiedAt,
+const toSummary = (record: IntentCrystalRecord): CrystalSummary => ({
+  id: record.id, intent: record.intent, createdAt: record.createdAt,
+  updatedAt: record.updatedAt, verifiedRevision: record.verifiedRevision,
+  verifiedAt: record.verifiedAt,
+  verifiedGrowthCount: record.history?.length ?? (record.lastVerified ? 1 : 0),
+  developing: Boolean(record.lastAutoQueuedAt && record.requestId !== record.lastVerified?.requestId),
 });
-async function runFor(item: StoredCrystal): Promise<ObjectiveRun | null> {
+async function runFor(requestId: string, guestToken: string): Promise<ObjectiveRun | null> {
   const volume = await import("./data/volume-transport.server");
   if (volume.ownerVolumeTransportEnabled()) {
-    const data = await volume.callOwnerVolumeTransport<{request: ObjectiveRun | null}>(
-      "/guest/status", "POST", { requestId: item.requestId, guestToken: item.guestToken });
-    return data.request ?? null;
+    const response = await volume.callOwnerVolumeTransport<{ request: ObjectiveRun | null }>(
+      "/guest/status", "POST", { requestId, guestToken });
+    return response.request ?? null;
   }
   const { ascensionDb } = await import("./data/client.server");
   const response = await ascensionDb.rpc("ascension_guest_status", {
-    p_request_id: item.requestId, p_guest_token: item.guestToken });
+    p_request_id: requestId, p_guest_token: guestToken,
+  });
   if (response.error) throw new Error(response.error.message);
   return (response.data ?? null) as ObjectiveRun | null;
 }
+async function verifiedDelivery(requestId: string, guestToken: string) {
+  const delivered = await projectGuestDelivery(requestId, guestToken, false);
+  return delivered?.status === "completed" && delivered.source === "governed" &&
+    delivered.response_payload?.kind !== "not_produced" &&
+    Boolean(delivered.response_payload?.body.trim())
+    ? delivered.response_payload : null;
+}
+function snapshotFor(run: ObjectiveRun, requestId: string, guestToken: string): VerifiedCrystalSnapshot | null {
+  return governedPersisted(run) && typeof run.runtime_revision === "number" &&
+    Number.isInteger(run.runtime_revision) && run.runtime_revision > 0
+    ? {
+        requestId, guestToken, revision: run.runtime_revision,
+        completedAt: run.completed_at || run.updated_at || new Date().toISOString(),
+      }
+    : null;
+}
+
 export const listIntentCrystals = createServerFn({ method: "GET" })
-  .inputValidator((input: { libraryKey: string }) => ({ libraryKey: input.libraryKey }))
-  .handler(async ({ data }) => (await load(data.libraryKey)).map(summary));
+  .inputValidator((input: { libraryKey: string }) => ({
+    libraryKey: input.libraryKey,
+  }))
+  .handler(async ({ data }) =>
+    (await readCrystalLedger(crystalLedgerFilename(data.libraryKey))).map(toSummary));
 
 export const recordIntentCrystal = createServerFn({ method: "POST" })
   .inputValidator((input: {
-    libraryKey: string; intent: string; requestId: string; guestToken: string; crystalId?: string;
+    libraryKey: string; intent: string; requestId: string; guestToken: string;
+    crystalId?: string; parentRequestId?: string;
   }) => ({
     libraryKey: input.libraryKey,
     intent: input.intent.trim().slice(0, 4000),
     requestId: uuid(input.requestId),
     guestToken: uuid(input.guestToken),
     crystalId: input.crystalId ? uuid(input.crystalId) : null,
+    parentRequestId: input.parentRequestId ? uuid(input.parentRequestId) : null,
   }))
   .handler(async ({ data }) => {
-    if (!data.intent) throw new Error("The intent cannot be empty.");
-    // Verify the supplied run capability before associating it with this Library Card.
-    const confirmed = await runFor({
-      id: data.crystalId || randomUUID(), intent: data.intent,
-      requestId: data.requestId, guestToken: data.guestToken,
-      createdAt: "", updatedAt: "", verifiedRevision: null, verifiedAt: null,
-    });
+    if (!data.intent) throw new Error("An intent is required.");
+    const confirmed = await runFor(data.requestId, data.guestToken);
     if (!confirmed) throw new Error("The original governed run was not found.");
-    const items = await load(data.libraryKey);
-    const now = new Date().toISOString();
-    const existing = data.crystalId ? items.find(item => item.id === data.crystalId) : null;
-    if (data.crystalId && !existing) throw new Error("That crystal is not on this Library Card.");
-    const item: StoredCrystal = existing ?? {
-      id: randomUUID(), intent: data.intent, requestId: data.requestId,
-      guestToken: data.guestToken, createdAt: now, updatedAt: now,
-      verifiedRevision: null, verifiedAt: null,
-    };
-    item.requestId = data.requestId;
-    item.guestToken = data.guestToken;
-    item.updatedAt = now;
-    if (!existing) {
-      if (items.length >= 128) throw new Error("Library Card crystal limit reached.");
-      items.push(item);
-    }
-    await store(data.libraryKey, items);
-    return summary(item);
+
+    const filename = crystalLedgerFilename(data.libraryKey);
+    return withCrystalLedgerLock(filename, async records => {
+      const previous = data.crystalId ? records.find(item => item.id === data.crystalId) : null;
+      if (data.crystalId && !previous)
+        throw new Error("That intent crystal is not associated with this Library Card.");
+      if (previous && (!data.parentRequestId ||
+          data.parentRequestId !== previous.requestId))
+        throw new Error("The intent has evolved since this continuation began. Recall the latest crystal first.");
+      if (!previous && records.length >= 128)
+        throw new Error("Library Card intent crystal limit reached.");
+      const now = new Date().toISOString();
+      const crystal: IntentCrystalRecord = previous ?? {
+        id: randomUUID(), intent: data.intent,
+        requestId: data.requestId, guestToken: data.guestToken,
+        createdAt: now, updatedAt: now,
+        verifiedRevision: null, verifiedAt: null,
+      };
+
+      // Preserve any verified answer already shown to the visitor before a
+      // manual continuation makes its latest run pending.
+      if (previous && previous.lastVerified?.requestId !== previous.requestId) {
+        const prior = await runFor(previous.requestId, previous.guestToken);
+        const last = prior ? snapshotFor(prior, previous.requestId, previous.guestToken) : null;
+        if (last && await verifiedDelivery(last.requestId, last.guestToken))
+          appendVerifiedSnapshot(crystal, last);
+      }
+      crystal.requestId = data.requestId;
+      crystal.guestToken = data.guestToken;
+      crystal.updatedAt = now;
+      if (!previous) records.push(crystal);
+      await saveCrystalLedger(filename, records);
+      return toSummary(crystal);
+    });
   });
 
 export const inspectIntentCrystal = createServerFn({ method: "GET" })
@@ -128,27 +126,44 @@ export const inspectIntentCrystal = createServerFn({ method: "GET" })
     libraryKey: input.libraryKey, crystalId: uuid(input.crystalId),
   }))
   .handler(async ({ data }) => {
-    const items = await load(data.libraryKey);
-    const item = items.find(value => value.id === data.crystalId);
-    if (!item) throw new Error("That intent is not on this Library Card.");
-    const run = await runFor(item);
-    if (!run) return { crystal: summary(item), status: "unavailable", delivery: null };
-    const complete = run.status === "verified";
-    const delivery = complete ? await projectGuestDelivery(item.requestId, item.guestToken, false) : null;
-    if (complete && governedPersisted(run) && typeof run.runtime_revision === "number" &&
-      Number.isInteger(run.runtime_revision) && run.runtime_revision > 0 &&
-      item.verifiedRevision !== run.runtime_revision) {
-      item.verifiedRevision = run.runtime_revision;
-      item.verifiedAt = run.completed_at ?? new Date().toISOString();
-      item.updatedAt = new Date().toISOString();
-      await store(data.libraryKey, items);
+    const filename = crystalLedgerFilename(data.libraryKey);
+    const item = (await readCrystalLedger(filename))
+      .find(record => record.id === data.crystalId);
+    if (!item) throw new Error("This intent is not associated with the Library Card.");
+
+    const run = await runFor(item.requestId, item.guestToken);
+    const status = run?.status ?? "unavailable";
+    const current = run?.status === "verified"
+      ? await verifiedDelivery(item.requestId, item.guestToken) : null;
+
+    // Only a published, governed delivery is added to growth history. A
+    // submitted continuation is not counted as an achieved discovery.
+    const latestVerified = run && current
+      ? snapshotFor(run, item.requestId, item.guestToken) : null;
+    let summary = toSummary(item);
+    if (latestVerified && item.lastVerified?.requestId !== item.requestId) {
+      summary = await withCrystalLedgerLock(filename, async records => {
+        const actual = records.find(record => record.id === data.crystalId);
+        if (!actual) throw new Error("Intent crystal disappeared during inspection.");
+        if (actual.requestId === item.requestId) {
+          appendVerifiedSnapshot(actual, latestVerified);
+          actual.updatedAt = new Date().toISOString();
+          await saveCrystalLedger(filename, records);
+        }
+        return toSummary(actual);
+      });
+    }
+    let presented = current;
+    // Do not hide an existing verified creation while the next governed
+    // development is still running in the background.
+    if (!presented && item.lastVerified) {
+      const stable = await runFor(item.lastVerified.requestId, item.lastVerified.guestToken);
+      if (stable && governedPersisted(stable))
+        presented = await verifiedDelivery(item.lastVerified.requestId, item.lastVerified.guestToken);
     }
     return {
-      crystal: summary(item),
-      status: run.status,
+      crystal: summary, status,
       continuation: { requestId: item.requestId, guestToken: item.guestToken },
-      // Only governed completed delivery is presented as an answer.
-      delivery: delivery?.status === "completed" && delivery.source === "governed"
-        ? delivery.response_payload : null,
+      delivery: presented,
     };
   });

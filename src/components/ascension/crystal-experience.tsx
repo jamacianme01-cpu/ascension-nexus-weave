@@ -354,9 +354,13 @@ export function CrystalExperience() {
       libraryCapability();
       enteredRef.current = true;
       setEntered(true);
+      // Greet immediately on Book entry, before IndexedDB or a local companion
+      // can delay the groundskeeper's first words.
+      speak("Welcome to ASCENSION. I'm your groundskeeper and guide. Speak your intent, or ask me to retrieve a crystal.");
       const saved = await syncDevice();
       const unseen = pendingGrowthSummary(saved, seenVerifiedGrowth());
-      speak(welcomeBackGrowth(unseen.crystalCount, unseen.revisionCount));
+      if (unseen.crystalCount > 0)
+        speak(welcomeBackGrowth(unseen.crystalCount, unseen.revisionCount));
     } catch (cause) {
       setIssue("Library Card is not available: " + String(cause));
     }

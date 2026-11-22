@@ -410,6 +410,7 @@ export function CrystalExperience() {
         guestToken: authorized.guestToken,
       };
       governedAuth.current = credentials;
+      speak("Your selected intent has been accepted by ASCENSION's configured governed runtime. I'll report what it actually delivers.", false);
       let polling = false;
       let failures = 0;
       let finished = false;
@@ -444,10 +445,12 @@ export function CrystalExperience() {
           stopGovernedPolling();
           // The server's verified run is NOT automatically copied into the
           // device's verified-growth field; no physical proof is invented.
-          if (choices.length === 4) {
+          if (choices.length > 1) {
             setAnswer(null);
-            speak("ASCENSION's governed engine delivered four recorded pathways: " +
-              choices.map(p => p.title).join(", ") +
+            const names = choices.map((p, i) =>
+              choices.length === 4 && i === 3 ? "BLEND" : p.title);
+            speak("ASCENSION's governed runtime delivered " + choices.length +
+              " recorded pathways: " + names.join(", ") +
               ". Tell me which pathway to enter.");
           } else {
             revealGovernedChoice(0);

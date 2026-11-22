@@ -7,7 +7,7 @@
  *
  * Production activation requires an always-on server process, persistent
  * ASCENSION_STORAGE_DIR, the existing governed runtime and
- * ASCENSION_ENABLE_CRYSTAL_EVOLUTION=true.
+ * ASCENSION_ENABLE_CRYSTAL_EVOLUTION not set to false.
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";

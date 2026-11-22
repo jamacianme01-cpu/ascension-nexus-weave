@@ -49,5 +49,9 @@ assert.match(component, /if \(!parent\) setAnswer\(null\)/);
 assert.match(component, /if \(crystal\.delivery\) acknowledgeVerifiedGrowth\(crystal\.crystal\)/);
 assert.match(component, /if \(speechSerial\.current !== serial\) return/);
 assert.match(component, /continue this intent/);
+assert.match(component, /I haven't found that intent on this Library Card/);
+assert.match(component, /Tell me which intent crystal you would like me to retrieve/);
+assert.ok(component.indexOf("if (/^(?:what has grown") < component.indexOf("if (answerRef.current)"),
+  "Growth questions must work even without an open answer");
 assert.doesNotMatch(component, /const TREE = |const KEEPER = /);
 console.log("PASS: persisted verified return growth, no fabricated progress, no lost continuation answer, safe voice callbacks.");

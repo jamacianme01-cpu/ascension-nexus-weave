@@ -45,4 +45,5 @@ jobs:
             exit 1
           fi
           node tests/device-local-first.browser.mjs
+          node tests/governed-crystal-memory.browser.mjs
           node tests/device-folder-sync.browser.mjs

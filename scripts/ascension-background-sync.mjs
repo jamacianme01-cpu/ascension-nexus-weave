@@ -24,7 +24,12 @@ const AAD = Buffer.from("ASCENSION:owner-owned-library-card-backup:v1");
 const KDF_ITERATIONS = 310000;
 const FORMAT = "ascension-library-card-encrypted";
 const PAYLOAD = "ascension-device-crystals";
-const INTERVAL_MS = 180000;
+// An explicit test-only cadence allows OS acceptance to exercise repeated cycles
+// without waiting three minutes; normal owner sessions retain the 3-minute rate.
+const INTERVAL_MS = process.env.NODE_ENV === "test" &&
+  /^\\d{1,5}$/.test(process.env.ASCENSION_BG_ACCEPTANCE_INTERVAL_MS || "")
+    ? Math.max(1000, Number(process.env.ASCENSION_BG_ACCEPTANCE_INTERVAL_MS))
+    : 180000;
 const validUuid = value => typeof value === "string" && UUID.test(value);
 const validDate = value => typeof value === "string" && value.length <= 35 &&
   /^\d{4}-\d{2}-\d{2}T[\d:.+-]+Z$/.test(value) && !Number.isNaN(Date.parse(value));

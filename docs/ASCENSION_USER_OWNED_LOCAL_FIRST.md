@@ -31,7 +31,7 @@ This opens ASCENSION at `http://127.0.0.1:4174` and starts the optional local co
 - The browser encrypts its crystal records using WebCrypto + IndexedDB, but the key is local to that browser profile. Clearing site data can destroy both key and records. **Portable encrypted Library Card archives can now be exported and restored by the owner.** When the desktop companion is running, its previously unsynchronized completed job history is included too. If it is unavailable, the app explicitly reports a browser-only archive.
 - **The Python companion's SQLite database is currently not application-encrypted.** Use full-disk encryption and normal OS account security for the computer. Do not treat browser encryption as applying to the companion's files.
 - A web origin that can execute malicious JavaScript can access the browser-origin encryption key through the app runtime; origin security and trusted code remain necessary.
-- Cross-device Library Card authentication/synchronization is **not yet implemented**. The browser Library Card is specific to its origin and device. Nothing is automatically uploaded to a central knowledge database.
+- Cross-device login/authentication is **not implemented**. Owner-chosen encrypted shared-folder exchange is supported where the browser grants native folder permission; each browser retains its own Library Card capability and encryption key. **No central knowledge database exists or is automatically uploaded to.**
 - The previously created **server-hosted crystal archives are not deleted or overwritten**. Automatic migration has not occurred; doing so requires an explicit, safe import mechanism.
 - Browser speech recognition is restricted to **`processLocally = true`**. If offline recognition or a locally installed English voice is unavailable, a text input is offered instead of silently sending microphone audio to a cloud speech service.
 - Desktop local AI operation **does not mean the groundskeeper's approved static picture is lip-synced** or that browser-side physics/3D generation has been implemented.
@@ -50,6 +50,24 @@ Safety boundaries:
 - Archives are limited to 64 MB; the app refuses oversized files rather than processing them without bounds.
 - Imported model drafts remain **unverified**, not governed proof. Imported pending-job identifiers are cleared, not executed as current tasks.
 - Existing crystals are not overwritten. New, previously unseen historical drafts may be added after validation and atomic conflict checks; the import report distinguishes added crystals, previously present records and newly merged history. Incompatible originals or histories are rejected.
+
+### Owner-controlled encrypted device-to-device folder exchange
+
+In supported desktop browsers, the Groundskeeper now understands **"sync my Library Card"**. The owner chooses a **private directory using the native folder permission dialog**, such as a folder on a user-controlled home LAN share, mounted drive, or removable disk. The owner enters the **same private archive passphrase** on each device. ASCENSION does not choose a host, relay, account, cloud provider or external database.
+
+The existing AES-256-GCM/PBKDF2 encrypted Library Card backup format is used unmodified. Each browser generates its **own random local sync device UUID** and writes only its own `ASCENSION-Private-Sync-{device-id}.ascension` file into the selected folder. Other devices' files are read, authenticated, and merged additively into the device's **own encrypted IndexedDB**. Original intent wording is never replaced, competing versions of the same development ID cause an error, and historical drafts never count as governed verification. The owner can say **"stop syncing"** to end the exchange.
+
+**Execution and availability boundaries:**
+- The browser exchanges peer archives on first pairing and approximately every three minutes **while the ASCENSION tab is open and visible**. Background browser timers cannot be trusted when the tab closes or the operating system suspends it; this does not yet constitute always-on cross-device sync.
+- The folder is explicitly selected and permissions granted by the user. **No folder path, passphrase or derived encryption key is sent to ASCENSION servers.** The passphrase stays in the active browser-session memory; restart pairing after refreshing the page.
+- Both devices must have access to **the same owner-selected folder**. For a removable disk, this is sequential transfer, not simultaneous live synchronization. For a private local-network share, it can converge when both devices run the app and can reach the share.
+- Native folder access (File System Access API) varies by browser and operating system. When unavailable, the existing **encrypted manual backup/restore** is the supported fallback. Mobile browsers are not promised uninterrupted folder synchronization.
+- This is **not an Internet relay** and makes no remote storage available automatically. If the owner deliberately chooses a folder synchronized by some outside provider, that provider may transport the **encrypted** archives; ASCENSION does not activate one.
+- Each device has a uniquely named archive so peers do not overwrite each other's files. Peer archives require the shared passphrase; corrupted or wrong-password files fail authentication rather than silently replacing a user's original knowledge.
+- The transfer uses bounded peer counts and archive sizes. It is an additive history exchange, not a general-purpose file mirror; conflicts are surfaced and are never silently resolved by discarding an existing original.
+- Finished SQLite-companion history is included when that local companion is running during an export, but **background work completed after the browser is closed is not automatically exchanged until the browser runs again**.
+
+**Browser verification:** `node tests/device-folder-sync.browser.mjs` tests independent browser profiles converging through a shared-folder stand-in, with real AES-GCM/IndexedDB, wrong-passphrase rejection, ciphertext tampering, original retention, idempotency and no plaintext leakage. Real native folder-picker and LAN share tests still require owner-device acceptance.
 
 ### Background growth
 

@@ -52,7 +52,15 @@ function isH3SwallowedErrorBody(body: string): boolean {
  */
 let crystalEvolutionLoop: ReturnType<typeof setInterval> | null = null;
 function startCrystalEvolutionLoop() {
-  if (crystalEvolutionLoop || process.env["ASCENSION_ENABLE_CRYSTAL_EVOLUTION"] !== "true") return;
+  if (crystalEvolutionLoop || process.env["ASCENSION_ENABLE_CRYSTAL_EVOLUTION"] === "false") return;
+  // Owner-approved crystal growth activates only on a configured durable host.
+  // Never start a replacement runtime, provider, or deployment.
+  const hasStorage = Boolean(process.env["ASCENSION_STORAGE_DIR"]?.trim());
+  const hasRuntime = Boolean(
+    (process.env["ASCENSION_VOLUME_TRANSPORT_URL"]?.trim() && process.env["ASCENSION_PUBLISH_TOKEN"]?.trim()) ||
+    process.env["ASCENSION_DATABASE_URL"]?.trim() || process.env["DATABASE_URL"]?.trim()
+  );
+  if (!hasStorage || !hasRuntime) return;
   const run = async () => {
     try {
       const { advanceIntentCrystalsOnce } = await import("./lib/ascension/intent-evolution.server");

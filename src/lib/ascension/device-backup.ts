@@ -8,8 +8,12 @@
  */
 import {
   listDeviceCrystals, importDeviceCrystals,
-  type DeviceCrystal,
+  type DeviceCrystal, type LocalDevelopment,
 } from "./device-knowledgeverse";
+import {
+  readDeviceCompanionSnapshot, restoreDeviceCompanionSnapshot,
+  type CompanionHistorySnapshot,
+} from "./device-companion";
 
 const FILE_FORMAT = "ascension-library-card-encrypted";
 const PAYLOAD_FORMAT = "ascension-device-crystals";
@@ -33,11 +37,15 @@ type Payload = {
   version: 1;
   exportedAt: string;
   crystals: DeviceCrystal[];
+  companion?: CompanionHistorySnapshot;
 };
 export type LibraryRestoreSummary = {
   imported: number;
   skipped: number;
   totalInArchive: number;
+  companionIncluded?: boolean;
+  companionRestored?: boolean;
+  importedCompanionJobs?: number;
 };
 function passwordAllowed(password: string) {
   if (typeof password !== "string" || password.length < 12 || password.length > 256)
@@ -91,12 +99,74 @@ function decodePayload(value: unknown): Payload {
   return entry as Payload;
 }
 
-export async function createEncryptedLibraryBackup(passphrase: string): Promise<Blob> {
+function addFinishedCompanionHistory(
+  records: DeviceCrystal[],
+  snapshot: CompanionHistorySnapshot,
+): DeviceCrystal[] {
+  if (snapshot?.format !== "ascension-companion-finished-history" ||
+      snapshot.version !== 1 || !Array.isArray(snapshot.crystals) ||
+      snapshot.crystals.length > 128)
+    throw new Error("Invalid local companion history; no backup was written.");
+  const byId = new Map(records.map(item => [item.id, {
+    ...item, drafts: [...item.drafts],
+  }]));
+  let jobs = 0;
+  for (const source of snapshot.crystals) {
+    if (!source || typeof source.id !== "string" ||
+        typeof source.intent !== "string" || !Array.isArray(source.jobs))
+      throw new Error("Invalid companion crystal history.");
+    let item = byId.get(source.id);
+    if (item && item.intent !== source.intent)
+      throw new Error("Local companion intent does not match the Library Card original.");
+    if (!item) {
+      item = {
+        id: source.id, intent: source.intent,
+        createdAt: source.createdAt, updatedAt: source.updatedAt,
+        verifiedRevision: null, verifiedAt: null, verifiedGrowthCount: 0,
+        developing: false, drafts: [], queuedJobId: null, lastLocalJobAt: null,
+      };
+      byId.set(item.id, item);
+    }
+    for (const job of source.jobs) {
+      jobs++;
+      if (jobs > 4096) throw new Error("Companion history exceeds the safe job limit.");
+      if (job.status === "blocked") continue; // Archive still preserves its error history.
+      if (job.status !== "completed" || typeof job.id !== "string" ||
+          typeof job.model !== "string" || typeof job.result !== "string" ||
+          typeof job.finished_at !== "string")
+        throw new Error("Invalid companion completed development.");
+      if (item.drafts.some(existing => existing.jobId === job.id)) continue;
+      const next: LocalDevelopment = {
+        jobId: job.id,
+        recordedAt: job.finished_at, model: job.model,
+        content: job.result, status: "unverified_local_draft",
+      };
+      item.drafts.push(next);
+    }
+    item.drafts.sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
+    item.drafts = item.drafts.slice(-64);
+  }
+  if (byId.size > 128) throw new Error("Companion archive exceeds the safe crystal limit.");
+  return [...byId.values()];
+}
+
+export async function createEncryptedLibraryBackupWithStatus(
+  passphrase: string,
+): Promise<{ file: Blob; companionIncluded: boolean }> {
   passwordAllowed(passphrase);
-  const crystals = await listDeviceCrystals();
+  const local = await listDeviceCrystals();
+  let companion: CompanionHistorySnapshot | undefined;
+  try {
+    companion = await readDeviceCompanionSnapshot();
+  } catch {
+    // The browser archive remains usable on mobile or when the local
+    // companion is shut down. Report the missing companion data explicitly.
+  }
+  const crystals = companion ? addFinishedCompanionHistory(local, companion) : local;
   const payload: Payload = {
     format: PAYLOAD_FORMAT, version: VERSION,
     exportedAt: new Date().toISOString(), crystals,
+    ...(companion ? { companion } : {}),
   };
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
   if (plaintext.length > MAX_ARCHIVE_BYTES / 2)
@@ -117,7 +187,11 @@ export async function createEncryptedLibraryBackup(passphrase: string): Promise<
   const content = JSON.stringify(archive);
   if (new TextEncoder().encode(content).length > MAX_ARCHIVE_BYTES)
     throw new Error("The encrypted Knowledgeverse archive exceeds 64 MB.");
-  return new Blob([content], { type: "application/octet-stream" });
+  return { file: new Blob([content], { type: "application/octet-stream" }),
+    companionIncluded: Boolean(companion) };
+}
+export async function createEncryptedLibraryBackup(passphrase: string): Promise<Blob> {
+  return (await createEncryptedLibraryBackupWithStatus(passphrase)).file;
 }
 
 /**
@@ -146,8 +220,28 @@ export async function restoreEncryptedLibraryBackup(
   try { result = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(clear)); }
   catch { throw new Error("Decrypted archive was damaged. No local records were changed."); }
   const payload = decodePayload(result);
-  const outcome = await importDeviceCrystals(payload.crystals);
-  return { ...outcome, totalInArchive: payload.crystals.length };
+  const crystals = payload.companion
+    ? addFinishedCompanionHistory(payload.crystals, payload.companion)
+    : payload.crystals;
+  const outcome = await importDeviceCrystals(crystals);
+  if (payload.companion) {
+    try {
+      const added = await restoreDeviceCompanionSnapshot(payload.companion);
+      return {
+        ...outcome, totalInArchive: crystals.length,
+        companionIncluded: true, companionRestored: true,
+        importedCompanionJobs: added.importedJobs,
+      };
+    } catch {
+      // All completed local drafts in the archive have still been added into
+      // encrypted browser storage. Restoring SQLite requires a running companion.
+      return {
+        ...outcome, totalInArchive: crystals.length,
+        companionIncluded: true, companionRestored: false,
+      };
+    }
+  }
+  return { ...outcome, totalInArchive: crystals.length };
 }
 
 export function encryptedLibraryBackupFilename(): string {

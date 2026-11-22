@@ -6,6 +6,7 @@
   position:absolute; left:var(--intent-x); top:var(--intent-y);
   width:clamp(.55rem, 1.4vw, 1.1rem); height:clamp(.9rem, 2.3vw, 1.9rem);
   padding:0; border:0; background:transparent; pointer-events:auto; cursor:pointer;
+  scale: var(--intent-growth, 1);
   filter:drop-shadow(0 0 .4rem #3d9eff);
   animation:intent-crystal-breathe 6s ease-in-out var(--intent-delay) infinite alternate;
 }

@@ -34,7 +34,9 @@ try {
   await labels.getByText("Gives guidance using the real recorded pathway").waitFor();
   assert.equal(await labels.getByRole("button",{name:"Guidance drone"}).getAttribute("aria-pressed"),"true");
   await page.getByRole("button",{name:"Switch to Dissect"}).click();
-  await page.getByText(/This view needs the matching 3D model/).waitFor();
+  await page.getByText("A delivered 3D model is required for dissect. A flat image is not a 3D inspection.").waitFor();
+  assert.equal(await page.locator(".v1-design-image-view img").count(),0,
+    "Dissect must never disguise a flat concept image as 3D");
   assert.equal(await labels.count(),1,"Side list must persist while changing inspection views");
   await page.getByRole("button",{name:"Test unavailable media"}).click();
   await page.waitForFunction(()=>

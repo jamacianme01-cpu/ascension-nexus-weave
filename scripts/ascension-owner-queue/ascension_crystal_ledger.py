@@ -16,6 +16,7 @@ import json
 import os
 import re
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
@@ -31,6 +32,23 @@ _SKIP_NAMES = {
     "verification.json", "acceptance_result.json", "metadata.json",
     "lineage.json", "ascension_readme.md",
 }
+
+
+def _atomic_json(file, records):
+    """Commit a complete ledger atomically, with private file permissions."""
+    tmp = file.with_name("." + file.name + "." + uuid.uuid4().hex + ".tmp")
+    try:
+        with tmp.open("x", encoding="utf-8") as handle:
+            json.dump(records, handle, separators=(",", ":"), ensure_ascii=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, file)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def _now():
@@ -150,7 +168,7 @@ class CrystalLedger:
         return self.root / (hashlib.sha256(library_key.encode("ascii")).hexdigest() + ".json")
 
     def _read(self, library_key):
-        value = self.transport and self._path(library_key)
+        value = self._path(library_key)
         if not value.is_file():
             return []
         data = json.loads(value.read_text(encoding="utf-8"))
@@ -161,10 +179,7 @@ class CrystalLedger:
     def _save(self, library_key, records):
         # Use the existing transport's atomic write behavior and enforce private
         # permissions on the completed stored ledger.
-        from ascension_volume_transport import atomic_json
-        target = self._path(library_key)
-        atomic_json(target, records)
-        os.chmod(target, 0o600)
+        _atomic_json(self._path(library_key), records)
 
     def _authorized_bundle(self, request_id, token):
         bundle = self.transport.authorized(_uuid(request_id), _uuid(token))
@@ -204,7 +219,6 @@ class CrystalLedger:
                     _append(existing, _snapshot(old_bundle))
                 item = existing
             else:
-                import uuid
                 item = {
                     "id": str(uuid.uuid4()), "intent": intent.strip(),
                     "createdAt": now, "verifiedRevision": None, "verifiedAt": None,
@@ -321,7 +335,5 @@ class CrystalLedger:
                 if dirty:
                     # This key is not stored: use the known valid SHA-256-derived
                     # filename within the authenticated worker storage directory.
-                    from ascension_volume_transport import atomic_json
-                    atomic_json(file, records)
-                    os.chmod(file, 0o600)
+                    _atomic_json(file, records)
         return report

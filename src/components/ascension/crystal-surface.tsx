@@ -59,7 +59,7 @@ export function CrystalSurface({
         rotateRequest={rotateRequest} zoomRequest={zoomRequest}/>
     </section>}
     {design && !hasVisualization && <span className="sr-only">
-      The governed knowledge is available to hear. No measured model or picture was delivered for this intent.
+      The recorded knowledge is available to hear. No measured model or picture was delivered for this intent.
     </span>}
   </div>;
 }

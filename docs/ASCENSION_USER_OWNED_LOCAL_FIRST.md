@@ -86,6 +86,20 @@ Privacy and operating limits:
 
 **Automated verification:** node --test tests/device-background-sync.test.mjs validates two encrypted desktop archive workers, convergence and replay, new finished local companion developments while browsers are closed, wrong-passphrase and ciphertext-tampering refusal, and original intent conflicts. The GitHub device-local-first workflow also runs the existing independent Chromium two-device synchronization tests. Real native shared-folder acceptance remains outstanding.
 
+### Actual owner-device private shared-folder acceptance
+
+This test is available **only when the owner chooses to run it**. On TWO desktop computers that have Node.js 22+ and this ASCENSION repository, open a terminal in the repository and run the SAME command on each computer:
+
+```sh
+node scripts/accept-private-library-share.mjs
+```
+
+Each device is prompted for its own absolute path to the **same private shared directory** (paths can differ on different machines). The first device creates an isolated, uniquely named `.ascension-owner-acceptance-...` test subfolder, then displays a **temporary, randomly generated, test-only code**. Leave the first test running while running the command on the second computer; enter the temporary code on the second computer. Do **not** enter the real Library Card passphrase or any original intentions. No account or remote connection is needed.
+
+Both devices verify **encrypted two-device archive convergence**, immutability of their original synthetic intentions, repeat import safety, and no false verified-growth claims. Each device writes a non-sensitive `host-report.json` or `join-report.json` into that **test subfolder**. The test deliberately leaves the isolated subfolder for inspection and does **not** alter, delete, rename, or read any existing `ASCENSION-Private-Sync-*.ascension` files from the root shared folder. Test results and the synthetic code are never uploaded by ASCENSION.
+
+This is a physical **shared-file visibility and archive exchange** acceptance test, not a demonstration that the tablet/mobile browser supports OS-directory permissions, and not a guarantee of a permanently running OS service. The real Python+Node closed-browser process lifecycle is covered separately by the Windows/Linux companion tests. No owner device has been tested until the owner runs this command on both actual computers; never mark this physical-device acceptance requirement complete based only on GitHub CI.
+
 ### Background growth
 
 The desktop worker reuses each exact original intent, keeps the original owner specifications intact, explores potential connections/limitations, and saves a separate unverified draft per completed locally generated response. It does not perform external research, claim physical testing, or change owner-approved designs. At most two scheduled continuations are queued per scheduler pass and no intent is automatically queued more than once in 12 hours.

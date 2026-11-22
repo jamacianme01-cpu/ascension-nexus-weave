@@ -199,3 +199,98 @@ export async function failDeviceJob(id: string, jobId: string) {
     await write(record);
   }
 }
+
+
+/** Local-only portable restore. Never overwrite an existing user intent. */
+function validIsoDate(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 35 &&
+    /^\d{4}-\d{2}-\d{2}T[\d:.+-]+Z$/.test(value) &&
+    Number.isFinite(Date.parse(value));
+}
+function validUuid(value: unknown): value is string {
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+function validateImportedCrystal(value: unknown): DeviceCrystal {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("An archived crystal has an invalid structure.");
+  const input = value as Partial<DeviceCrystal>;
+  if (!validUuid(input.id) || typeof input.intent !== "string" ||
+      !input.intent.trim() || input.intent.length > 4000 ||
+      !validIsoDate(input.createdAt) || !validIsoDate(input.updatedAt) ||
+      !Array.isArray(input.drafts) || input.drafts.length > 64 ||
+      input.verifiedGrowthCount !== 0 || input.verifiedRevision !== null ||
+      input.verifiedAt !== null)
+    throw new Error("The archive contains a damaged crystal or unsupported verification claims.");
+  const jobIds = new Set<string>();
+  const drafts: LocalDevelopment[] = [];
+  for (const candidate of input.drafts) {
+    if (!candidate || typeof candidate !== "object" ||
+        candidate.status !== "unverified_local_draft" ||
+        !validUuid(candidate.jobId) || jobIds.has(candidate.jobId) ||
+        !validIsoDate(candidate.recordedAt) ||
+        typeof candidate.model !== "string" || !candidate.model.trim() ||
+        candidate.model.length > 300 ||
+        typeof candidate.content !== "string" || !candidate.content.trim() ||
+        candidate.content.length > 50_000)
+      throw new Error("The archive contains an invalid or duplicate local development.");
+    jobIds.add(candidate.jobId);
+    drafts.push({
+      jobId: candidate.jobId, status: "unverified_local_draft",
+      recordedAt: candidate.recordedAt,
+      model: candidate.model, content: candidate.content,
+    });
+  }
+  // Interrupted work cannot silently resume with old device credentials.
+  return {
+    id: input.id, intent: input.intent,
+    createdAt: input.createdAt, updatedAt: input.updatedAt,
+    drafts, verifiedRevision: null, verifiedAt: null,
+    verifiedGrowthCount: 0, developing: false,
+    queuedJobId: null, lastLocalJobAt: null,
+  };
+}
+
+export async function importDeviceCrystals(
+  values: unknown,
+): Promise<{ imported: number; skipped: number }> {
+  if (!Array.isArray(values) || values.length > MAX)
+    throw new Error("Invalid archive crystal count.");
+  const imported = values.map(validateImportedCrystal);
+  const allIds = new Set<string>();
+  for (const item of imported) {
+    if (allIds.has(item.id)) throw new Error("An archive crystal is duplicated.");
+    allIds.add(item.id);
+  }
+  const existing = await listDeviceCrystals();
+  const present = new Map(existing.map(record => [record.id, record]));
+  const newlyAdded: DeviceCrystal[] = [];
+  let skipped = 0;
+  for (const item of imported) {
+    const previous = present.get(item.id);
+    if (previous) {
+      if (previous.intent !== item.intent)
+        throw new Error("The archive conflicts with an existing original intent. Nothing was imported.");
+      skipped++;
+    } else {
+      newlyAdded.push(item);
+    }
+  }
+  if (existing.length + newlyAdded.length > MAX)
+    throw new Error("Restore would exceed the 128-crystal device limit. Nothing was imported.");
+
+  // Derive the target DEVICE key and encrypt before opening the IndexedDB
+  // readwrite transaction. All add() operations then commit together or abort.
+  const envelopes = await Promise.all(newlyAdded.map(encrypt));
+  if (!envelopes.length) return { imported: 0, skipped };
+  const db = await database();
+  const tx = db.transaction(STORE, "readwrite");
+  const ready = transactionComplete(tx);
+  for (const item of envelopes) tx.objectStore(STORE).add(item);
+  try { await ready; }
+  catch {
+    // A concurrent tab can add the same record; never replace the original.
+    throw new Error("Restore encountered a concurrent device change. No archived crystals were overwritten.");
+  }
+  return { imported: envelopes.length, skipped };
+}

@@ -93,6 +93,34 @@ class DeviceCompanionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "local loopback"):
                 device.local_model()
 
+    def test_background_worker_persists_result_after_browser_is_closed(self):
+        # Simulate a real installed model; no external model/API is contacted.
+        submitted = self._submit()
+        stop = device.threading.Event()
+        with patch.object(device, "generate_local",
+                          return_value=("installed-local-model", "Model-produced draft")):
+            thread = device.threading.Thread(target=device.work_forever,
+                                             args=(self.ledger, stop), daemon=True)
+            thread.start()
+            try:
+                deadline = time.time() + 3
+                while time.time() < deadline:
+                    jobs = self.ledger.library({"libraryKey": CARD})["crystals"][0]["jobs"]
+                    if jobs and jobs[0]["status"] == "completed":
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(jobs[0]["status"], "completed")
+            finally:
+                stop.set()
+                thread.join(timeout=2)
+        self.ledger.close()
+        self.ledger = device.LocalKnowledgeverse(Path(self.directory.name) / "knowledgeverse.sqlite3")
+        restored = self.ledger.library({"libraryKey": CARD})["crystals"][0]["jobs"]
+        self.assertEqual(restored[0]["id"], submitted["jobId"])
+        self.assertEqual(restored[0]["result"], "Model-produced draft")
+        self.assertEqual(restored[0]["model"], "installed-local-model")
+        self.assertNotIn("verified", restored[0]["status"])
+
     def test_auto_growth_can_be_disabled(self):
         self._submit()
         first = self.ledger.claim()

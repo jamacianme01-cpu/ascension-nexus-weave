@@ -17,6 +17,7 @@ import socket
 import threading
 import uuid
 from datetime import datetime, timezone
+from ascension_crystal_ledger import CrystalLedger
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -80,6 +81,7 @@ class TransportStore:
         self.initial_revision = pub['publication_revision']
         self.runs = self.root / 'runs'
         self.runs.mkdir(parents=True, exist_ok=True)
+        self.crystal_ledger = CrystalLedger(self)
 
     def file(self, request_id):
         return self.runs / (uuid_str(request_id) + '.json')
@@ -261,6 +263,10 @@ class Handler(BaseHTTPRequestHandler):
                 '/guest/status': store.status,
                 '/guest/bundle': store.bundle,
                 '/queue/report': store.report,
+                '/crystals/list': store.crystal_ledger.list,
+                '/crystals/record': store.crystal_ledger.record,
+                '/crystals/inspect': store.crystal_ledger.inspect,
+                '/crystals/confirm': store.crystal_ledger.confirm,
             }
             action = routes.get(self.path)
             if not action:
@@ -298,6 +304,21 @@ def main():
     httpd = server((bind_host, args.port), Handler)
     httpd.ascension_store = store
     print('ASCENSION_OWNER_TRANSPORT_READY root=/data/ascension revision_at_start=' + str(store.initial_revision), flush=True)
+    # Continues running on the existing persistent worker, even when the web
+    # browser and web process are stopped. No new service is deployed.
+    def crystal_growth_cycle():
+        import time
+        time.sleep(30)
+        while True:
+            try:
+                result = store.crystal_ledger.advance_once()
+                if result['queued'] or result['failures']:
+                    print('ASCENSION_CRYSTAL_CYCLE queued=' + str(result['queued']) +
+                          ' failures=' + str(result['failures']), flush=True)
+            except Exception as exc:
+                print('ASCENSION_CRYSTAL_CYCLE_FAILED type=' + type(exc).__name__, flush=True)
+            time.sleep(1800)
+    threading.Thread(target=crystal_growth_cycle, name='ascension-crystal-growth', daemon=True).start()
     httpd.serve_forever(poll_interval=.5)
 
 

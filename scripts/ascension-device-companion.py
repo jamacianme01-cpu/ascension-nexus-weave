@@ -12,7 +12,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import sqlite3
+import subprocess
 import threading
 import time
 import uuid
@@ -458,6 +460,96 @@ def work_forever(storage: LocalKnowledgeverse, stop: threading.Event):
         stop.wait(10)
 
 
+
+class BackgroundSyncManager:
+    """Explicitly paired desktop process; secrets are piped to Node once in RAM.
+
+    Never stores credentials, derives a server account, or selects a folder.
+    The worker lives only while this local companion process remains alive.
+    """
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.process = None
+        self.card = None
+
+    def start(self, request: dict) -> dict:
+        card = valid_card(request.get("libraryKey"))
+        directory = request.get("directory")
+        passphrase = request.get("passphrase")
+        browser_id = request.get("deviceId")
+        marker = request.get("marker")
+        token = request.get("token")
+        if not isinstance(passphrase, str) or not 12 <= len(passphrase) <= 256:
+            raise ValueError("A 12-256-character private passphrase is required")
+        valid_uuid(browser_id)
+        if not isinstance(directory, str) or not 1 <= len(directory) <= 1024:
+            raise ValueError("Choose the absolute local shared-folder path")
+        folder = Path(directory).expanduser()
+        if not folder.is_absolute() or not folder.is_dir() or folder.is_symlink():
+            raise ValueError("The chosen desktop folder must exist at an absolute path")
+        if not isinstance(token, str) or not re.fullmatch(r"[0-9a-f-]{36}", token):
+            raise ValueError("Missing private folder pairing proof")
+        if marker != ".ascension-bg-pair-" + token + ".tmp":
+            raise ValueError("Invalid owner-selected folder pairing proof")
+        proof = folder / marker
+        if proof.is_symlink() or not proof.is_file() or proof.stat().st_size > 100:
+            raise ValueError("The browser's folder does not match the desktop folder path")
+        if proof.read_text(encoding="utf-8") != token:
+            raise ValueError("The browser's folder does not match the desktop folder path")
+        node = shutil.which("node")
+        worker = Path(__file__).resolve().with_name("ascension-background-sync.mjs")
+        if not node or not worker.is_file():
+            raise ValueError("The local Node.js background companion is unavailable")
+        config = {
+            "directory": str(folder.resolve()),
+            "passphrase": passphrase,
+            "libraryKey": card,
+            "browserDeviceId": browser_id,
+        }
+        with self.lock:
+            self._stop()
+            process = subprocess.Popen(
+                [node, str(worker)], stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cwd=str(worker.parent.parent),
+            )
+            try:
+                assert process.stdin is not None
+                process.stdin.write(json.dumps(config).encode("utf-8"))
+                process.stdin.close()
+            except (BrokenPipeError, OSError):
+                process.terminate()
+                raise ValueError("Local background sync did not start")
+            self.process = process
+            self.card = card
+        return {"active": True, "execution": "desktop_companion_while_running"}
+
+    def stop(self, request: dict) -> dict:
+        card = valid_card(request.get("libraryKey"))
+        with self.lock:
+            if self.card is not None and self.card != card:
+                raise ValueError("Another Library Card owns the background exchange")
+            self._stop()
+        return {"active": False}
+
+    def _stop(self):
+        process = self.process
+        self.process = None
+        self.card = None
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=4)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=4)
+
+    def shutdown(self):
+        with self.lock:
+            self._stop()
+
+
 class DeviceHandler(BaseHTTPRequestHandler):
     server_version = "ASCENSION-Device-Knowledgeverse/1"
 
@@ -510,6 +602,8 @@ class DeviceHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._allowed():
             return self._reply(403, {"error": "origin_not_allowed"})
+        if self.path in ("/v1/background-sync-start", "/v1/background-sync-stop") and self.headers.get("Origin") not in ALLOWED_ORIGINS:
+            return self._reply(403, {"error": "owner_browser_origin_required"})
         try:
             request_limit = (MAX_SNAPSHOT_BYTES + 4096
                              if self.path == "/v1/restore-finished" else MAX_JSON)
@@ -529,6 +623,10 @@ class DeviceHandler(BaseHTTPRequestHandler):
                 payload = self.server.library.snapshot(data)
             elif self.path == "/v1/restore-finished":
                 payload = self.server.library.restore_snapshot(data)
+            elif self.path == "/v1/background-sync-start":
+                payload = self.server.background_sync.start(data)
+            elif self.path == "/v1/background-sync-stop":
+                payload = self.server.background_sync.stop(data)
             else:
                 return self._reply(404, {"error": "not_found"})
             return self._reply(200, payload)
@@ -558,6 +656,7 @@ def main():
     thread = threading.Thread(target=work_forever, args=(library, stop), daemon=True)
     server = LocalServer(("127.0.0.1", args.port), DeviceHandler)
     server.library = library
+    server.background_sync = BackgroundSyncManager()
     thread.start()
     print("ASCENSION_DEVICE_COMPANION_LOCAL_ONLY " + str(library.path), flush=True)
     try:
@@ -567,6 +666,7 @@ def main():
     finally:
         server.shutdown()
         stop.set()
+        server.background_sync.shutdown()
         thread.join(timeout=2)
         library.close()
 

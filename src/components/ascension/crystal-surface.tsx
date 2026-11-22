@@ -46,9 +46,9 @@ export function CrystalSurface({
         </button>
       ); })}
     </div>
-    {(working || design) && <div className="ascension-held-crystal"
+    {(working || selectedId || design) && <div className="ascension-held-crystal"
       data-phase={working ? "descending" : "revealed"}
-      role="status" aria-label={working ? "The Tree is working on your intent" : "Intent crystal in the groundskeeper's hand"}>
+      role="status" aria-label={working ? "The Tree is saving your intent" : "The selected intent crystal is in the groundskeeper's hand"}>
       <span className="ascension-held-crystal-shell" aria-hidden="true"/>
       <span className="ascension-held-crystal-heart" aria-hidden="true"/>
     </div>}

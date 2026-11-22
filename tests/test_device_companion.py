@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import sqlite3
 import tempfile
@@ -132,6 +133,76 @@ class DeviceCompanionTests(unittest.TestCase):
         self.assertEqual(restored[0]["result"], "Model-produced draft")
         self.assertEqual(restored[0]["model"], "installed-local-model")
         self.assertNotIn("verified", restored[0]["status"])
+
+    def test_finished_sqlite_history_exports_and_restores_additively(self):
+        first = self._submit()
+        run = self.ledger.claim()
+        self.ledger.complete(run["id"], "my-installed-local-model", "Finished work created with the browser closed")
+        second = self._submit("Develop one alternative")
+        blocked = self.ledger.claim()
+        self.ledger.fail(blocked["id"], "Local model was offline")
+        snapshot = self.ledger.snapshot({"libraryKey": CARD})
+        self.assertEqual(snapshot["format"], "ascension-companion-finished-history")
+        self.assertEqual(snapshot["version"], 1)
+        self.assertNotIn("libraryKey", repr(snapshot))
+        self.assertEqual(len(snapshot["crystals"]), 1)
+        self.assertEqual(len(snapshot["crystals"][0]["jobs"]), 2)
+        target = device.LocalKnowledgeverse(Path(self.directory.name) / "recovered.sqlite3")
+        new_card = "b" * 64
+        try:
+            restored = target.restore_snapshot({"libraryKey": new_card, "snapshot": snapshot})
+            self.assertEqual(restored["importedCrystals"], 1)
+            self.assertEqual(restored["importedJobs"], 2)
+            self.assertEqual(restored["skippedJobs"], 0)
+            jobs = target.library({"libraryKey": new_card})["crystals"][0]["jobs"]
+            self.assertEqual(jobs[0]["result"], "Finished work created with the browser closed")
+            self.assertEqual(jobs[0]["status"], "completed")
+            self.assertEqual(jobs[1]["status"], "blocked")
+            self.assertEqual(target.library({"libraryKey": CARD})["crystals"], [])
+            self.assertEqual(target.maybe_queue_growth(), 0, "Restored old history cannot queue itself")
+            again = target.restore_snapshot({"libraryKey": new_card, "snapshot": snapshot})
+            self.assertEqual(again["importedCrystals"], 0)
+            self.assertEqual(again["importedJobs"], 0)
+            self.assertEqual(again["skippedJobs"], 2)
+            self.assertEqual(len(target.library({"libraryKey": new_card})["crystals"][0]["jobs"]), 2)
+        finally:
+            target.close()
+
+    def test_tampered_or_conflicting_sqlite_snapshot_is_atomic(self):
+        submitted = self._submit()
+        claimed = self.ledger.claim()
+        self.ledger.complete(claimed["id"], "local-model", "Owner's finished work")
+        source = self.ledger.snapshot({"libraryKey": CARD})
+        destination = device.LocalKnowledgeverse(Path(self.directory.name) / "new-owner.sqlite3")
+        new_card = "b" * 64
+        try:
+            altered = json.loads(json.dumps(source))
+            altered["crystals"][0]["jobs"][0]["status"] = "verified"
+            with self.assertRaisesRegex(ValueError, "Malformed"):
+                destination.restore_snapshot({"libraryKey": new_card, "snapshot": altered})
+            self.assertEqual(destination.library({"libraryKey": new_card})["crystals"], [])
+
+            copied = json.loads(json.dumps(source))
+            copied["crystals"][0]["intent"] = "An unauthorized replacement for the owner intent"
+            destination.restore_snapshot({"libraryKey": new_card, "snapshot": copied})
+            before = destination.library({"libraryKey": new_card})["crystals"][0]["intent"]
+            with self.assertRaisesRegex(ValueError, "conflicts"):
+                destination.restore_snapshot({"libraryKey": new_card, "snapshot": source})
+            self.assertEqual(destination.library({"libraryKey": new_card})["crystals"][0]["intent"], before)
+            self.assertEqual(len(destination.library({"libraryKey": new_card})["crystals"][0]["jobs"]), 1)
+        finally:
+            destination.close()
+
+    def test_pending_jobs_are_not_exported_as_active_background_work(self):
+        self._submit()
+        snapshot = self.ledger.snapshot({"libraryKey": CARD})
+        self.assertEqual(snapshot["crystals"][0]["jobs"], [])
+        recovered = device.LocalKnowledgeverse(Path(self.directory.name) / "pending-recovered.sqlite3")
+        try:
+            recovered.restore_snapshot({"libraryKey": "b" * 64, "snapshot": snapshot})
+            self.assertEqual(recovered.library({"libraryKey": "b" * 64})["crystals"][0]["jobs"], [])
+        finally:
+            recovered.close()
 
     def test_auto_growth_can_be_disabled(self):
         self._submit()

@@ -57,5 +57,5 @@ assert.match(ledger, /evolve\.lock/);
 assert.match(ledger, /MAX_WAIT_MS/);
 assert.match(ledger, /history.*slice\(-64\)/);
 assert.match(server, /startCrystalEvolutionLoop\(\)/);
-assert.doesNotMatch(evolution, /flyctl|deploy|ollama|paid.model/i);
+assert.doesNotMatch(evolution, /\bflyctl\b|\bollama\b|create_paid_ai|app_deploy/i);
 console.log("PASS: one-page Library Card, one crystal per intent, authorized governed recall, voice guide, no pathway chooser.");

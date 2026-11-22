@@ -4,6 +4,11 @@ import type { DesignView } from "./v1-design-viewport";
 import { submitGuestObjective, getGuestObjectiveStatus, getGuestObjectiveDelivery } from "@/lib/ascension/guest.functions";
 import { listIntentCrystals, recordIntentCrystal, inspectIntentCrystal, type CrystalSummary } from "@/lib/ascension/intent-crystals.functions";
 import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
+import {
+  parseSeenGrowth, newlyVerifiedCount, pendingGrowthSummary,
+  markGrowthSeen, describeNewGrowth, welcomeBackGrowth,
+  type CrystalGrowth,
+} from "@/lib/ascension/crystal-return";
 import "./crystal-experience.css";
 
 const BOOK = "/approved-scene/01-closed-book.jpg";
@@ -11,6 +16,7 @@ const BOOK = "/approved-scene/01-closed-book.jpg";
 // Do not split, crop, recolor, regenerate, or replace either figure.
 const APPROVED_SCENE = "/approved-scene/ascension-exact-approved-scene.png";
 const LIBRARY_KEY = "ascension-library-card-capability-v1";
+const VERIFIED_SEEN_KEY = "ascension-library-card-last-viewed-verified-v1";
 
 type Recognition = {
   lang: string; continuous: boolean; interimResults: boolean;
@@ -47,6 +53,17 @@ function guideSuggestion(answer: StoredAnswer): string {
     answer.parts[0] + " and " + answer.parts[1] + " work together?";
   if (answer.limitations.length) return "There is a limitation worth exploring. Would you like me to explain it?";
   return "Would you like me to explain this further or develop your intent?";
+}
+function seenVerifiedGrowth() {
+  try { return parseSeenGrowth(window.localStorage.getItem(VERIFIED_SEEN_KEY)); }
+  catch { return {}; }
+}
+function acknowledgeVerifiedGrowth(crystal: CrystalGrowth) {
+  try {
+    window.localStorage.setItem(VERIFIED_SEEN_KEY, JSON.stringify(
+      markGrowthSeen(crystal, seenVerifiedGrowth()),
+    ));
+  } catch { /* Voice recall still works without locally stored visit markers. */ }
 }
 function libraryCapability(): string {
   const existing = window.localStorage.getItem(LIBRARY_KEY);
@@ -90,6 +107,7 @@ export function CrystalExperience() {
   const crystalsRef = useRef<CrystalSummary[]>([]);
   const answerRef = useRef<StoredAnswer | null>(null);
   const mutedRef = useRef(false);
+  const speechSerial = useRef(0);
   const processVoice = useRef<(words: string) => void>(() => {});
   const hasArtwork = sceneAvailable;
 
@@ -99,6 +117,7 @@ export function CrystalExperience() {
   useEffect(() => { mutedRef.current = muted; }, [muted]);
 
   function speak(words: string, thenListen = true) {
+    const serial = ++speechSerial.current;
     if (mutedRef.current || !("speechSynthesis" in window)) return;
     recognition.current?.stop();
     const synthesis = window.speechSynthesis;
@@ -108,9 +127,13 @@ export function CrystalExperience() {
     utterance.pitch = 1.01;
     const voices = synthesis.getVoices().filter(voice => voice.lang.toLowerCase().startsWith("en"));
     utterance.voice = voices.find(voice => /samantha|jenny|aria|zira|serena|ava|female/i.test(voice.name)) ?? null;
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => { setSpeaking(false); if (thenListen && enteredRef.current && !workingRef.current) listen(true); };
-    utterance.onerror = () => setSpeaking(false);
+    utterance.onstart = () => { if (speechSerial.current === serial) setSpeaking(true); };
+    utterance.onend = () => {
+      if (speechSerial.current !== serial) return;
+      setSpeaking(false);
+      if (thenListen && enteredRef.current && !workingRef.current) listen(true);
+    };
+    utterance.onerror = () => { if (speechSerial.current === serial) setSpeaking(false); };
     synthesis.speak(utterance);
   }
   function listen(automatic = false) {
@@ -125,6 +148,7 @@ export function CrystalExperience() {
       if (!automatic) setIssue("Speech recognition is unavailable here. You can type your intent.");
       return;
     }
+    speechSerial.current++; // Cancelled utterances must never restart the microphone.
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
     const mic = new Ctor();
@@ -150,9 +174,10 @@ export function CrystalExperience() {
       if (!automatic) setIssue("Microphone could not start. You can type instead.");
     }
   }
-  async function refreshCrystals() {
+  async function refreshCrystals(): Promise<CrystalSummary[]> {
     const list = await listIntentCrystals({ data: { libraryKey: libraryCapability() } });
     setCrystals(list);
+    return list;
   }
   function clearPoll() {
     if (timer.current) clearInterval(timer.current);
@@ -174,11 +199,16 @@ export function CrystalExperience() {
       setRevision(state.crystal.verifiedRevision);
       setView("assembled");
       const next = state.delivery ? deliveredAnswer(state.delivery) : null;
+      const newRevisions = newlyVerifiedCount(state.crystal, seenVerifiedGrowth());
       setAnswer(next);
       await refreshCrystals();
-      if (next) speak("I have retrieved your intent. " +
-        (state.status === "verified" ? "" : "Its next development is still running. Here is the latest verified answer. ") +
-        next.body + " " + guideSuggestion(next));
+      if (next) {
+        acknowledgeVerifiedGrowth(state.crystal);
+        speak("I have retrieved your intent. " +
+          describeNewGrowth(newRevisions) +
+          (state.status === "verified" ? "" : "Its next development is still running. Here is the latest verified answer. ") +
+          next.body + " " + guideSuggestion(next));
+      }
       else speak("This crystal holds your intent. The governed runtime reports " + state.status +
         ". I will only present developments the runtime actually records.");
     } catch (cause) { if (epoch === requestEpoch.current) setIssue("Crystal recall: " + String(cause)); }
@@ -193,7 +223,9 @@ export function CrystalExperience() {
     workingRef.current = true;
     setWorking(true);
     setIssue("");
-    setAnswer(null);
+    // A continuation must not hide the last verified creation while the next
+    // governed run is pending. New intentions start with an empty crystal.
+    if (!parent) setAnswer(null);
     setView("assembled");
     setDraft("");
     recognition.current?.stop();
@@ -245,6 +277,7 @@ export function CrystalExperience() {
                   libraryKey: libraryCapability(), crystalId: chosen.current.id,
                 } });
                 setRevision(crystal.crystal.verifiedRevision);
+                if (crystal.delivery) acknowledgeVerifiedGrowth(crystal.crystal);
                 await refreshCrystals();
               } catch { /* The real answer still belongs to the governed run. */ }
             }
@@ -276,6 +309,14 @@ export function CrystalExperience() {
     const lower = input.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!enteredRef.current) { void enter(); return; }
     if (workingRef.current) return;
+    if (/^(?:continue this intent|keep developing this intent|build on this intent)$/.test(lower)) {
+      if (!chosen.current) speak("First retrieve the intent crystal you want to continue.");
+      else {
+        continuing.current = true;
+        void sendIntent(input);
+      }
+      return;
+    }
     if (/^(?:new intent|start a new intent)$/.test(lower)) {
       chosen.current = null; continuing.current = false;
       setAnswer(null); setSelectedId(null);
@@ -332,8 +373,9 @@ export function CrystalExperience() {
       libraryCapability();
       enteredRef.current = true;
       setEntered(true);
-      await refreshCrystals();
-      speak("Welcome to ASCENSION. I'm your groundskeeper and guide. Speak your intent, or ask me to retrieve one you've already grown.");
+      const saved = await refreshCrystals();
+      const unseen = pendingGrowthSummary(saved, seenVerifiedGrowth());
+      speak(welcomeBackGrowth(unseen.crystalCount, unseen.revisionCount));
     } catch (cause) {
       setIssue("Library Card is not available: " + String(cause));
     }
@@ -351,6 +393,7 @@ export function CrystalExperience() {
   useEffect(() => () => {
     requestEpoch.current++;
     clearPoll();
+    speechSerial.current++;
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
   }, []);
@@ -395,7 +438,7 @@ export function CrystalExperience() {
         aria-label={muted ? "Unmute groundskeeper" : "Mute groundskeeper"}
         onClick={() => {
           setMuted(value => !value);
-          if (!muted) { window.speechSynthesis?.cancel(); setSpeaking(false); }
+          if (!muted) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
         }}>{muted ? "◖×" : "◖))"}</button>
       {working && <span className="sr-only" role="status">The governed engine is working on your intent.</span>}
       {revision && <span className="sr-only">Verified runtime revision {revision} is attached to the active intent.</span>}

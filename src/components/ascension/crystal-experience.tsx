@@ -7,8 +7,9 @@ import type { ObjectiveDelivery } from "@/lib/ascension/result-model";
 import "./crystal-experience.css";
 
 const BOOK = "/approved-scene/01-closed-book.jpg";
-const TREE = "/approved-scene/ascension-knowledge-tree-crystals.png";
-const KEEPER = "/approved-scene/ascension-approved-cosmic-groundskeeper.png";
+// Original owner-approved single composition, Tree + Groundskeeper + Book together.
+// Do not split, crop, recolor, regenerate, or replace either figure.
+const APPROVED_SCENE = "/approved-scene/ascension-exact-approved-scene.png";
 const LIBRARY_KEY = "ascension-library-card-capability-v1";
 
 type Recognition = {
@@ -76,8 +77,7 @@ export function CrystalExperience() {
   const [backup, setBackup] = useState(false);
   const [draft, setDraft] = useState("");
   const [issue, setIssue] = useState("");
-  const [treeAvailable, setTreeAvailable] = useState(true);
-  const [keeperAvailable, setKeeperAvailable] = useState(true);
+  const [sceneAvailable, setSceneAvailable] = useState(true);
   const [revision, setRevision] = useState<number | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const enteredRef = useRef(false);
@@ -91,8 +91,7 @@ export function CrystalExperience() {
   const answerRef = useRef<StoredAnswer | null>(null);
   const mutedRef = useRef(false);
   const processVoice = useRef<(words: string) => void>(() => {});
-  const keeperPresent = entered && keeperAvailable;
-  const hasArtwork = treeAvailable && keeperAvailable;
+  const hasArtwork = sceneAvailable;
 
   useEffect(() => { crystalsRef.current = crystals; }, [crystals]);
   useEffect(() => { answerRef.current = answer; }, [answer]);
@@ -363,16 +362,13 @@ export function CrystalExperience() {
         Enter ASCENSION
       </button>
     </section> : <>
-      <div className="ascension-knowledge-tree" aria-label="Knowledge container">
-        {treeAvailable && <img src={TREE} alt="" draggable={false}
-          onError={() => setTreeAvailable(false)}/>}
+      <div className="ascension-approved-scene" data-speaking={speaking}
+        aria-label="The owner-approved Groundskeeper, Tree of Knowledge, Book, and crystal scene">
+        {sceneAvailable && <img src={APPROVED_SCENE} alt=""
+          draggable={false} onError={() => setSceneAvailable(false)}/>}
       </div>
-      {keeperPresent && <div className="ascension-groundskeeper" data-speaking={speaking}
-        aria-label="The ever-present groundskeeper and voice guide">
-        <img src={KEEPER} alt="" draggable={false} onError={() => setKeeperAvailable(false)}/>
-      </div>}
       {!hasArtwork && <p className="ascension-artwork-pending" role="status">
-        The approved Tree or groundskeeper image has not been installed; no replacement image will be substituted.
+        The exact owner-approved ASCENSION scene file is missing. No replacement image will be shown.
       </p>}
       <CrystalSurface working={working} design={answer?.design ?? null}
         view={view} rotateRequest={rotation} zoomRequest={zoom}

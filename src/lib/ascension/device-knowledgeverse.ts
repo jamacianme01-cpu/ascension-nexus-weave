@@ -262,35 +262,98 @@ export async function importDeviceCrystals(
     if (allIds.has(item.id)) throw new Error("An archive crystal is duplicated.");
     allIds.add(item.id);
   }
-  const existing = await listDeviceCrystals();
+  // Read the same encrypted source records used for the transaction conflict
+  // check. New drafts may be ADDED but existing originals are never replaced.
+  const db = await database();
+  const prefix = card() + ":";
+  const onDisk = (await waitRequest<Envelope[]>(
+    db.transaction(STORE, "readonly").objectStore(STORE).getAll()
+  )).filter(value => value.id.startsWith(prefix));
+  const existing = await Promise.all(onDisk.map(decrypt));
   const present = new Map(existing.map(record => [record.id, record]));
+  const baselines = new Map(onDisk.map(value => [value.id, value]));
   const newlyAdded: DeviceCrystal[] = [];
+  const merges: DeviceCrystal[] = [];
+  let mergedDrafts = 0;
   let skipped = 0;
   for (const item of imported) {
     const previous = present.get(item.id);
-    if (previous) {
-      if (previous.intent !== item.intent)
-        throw new Error("The archive conflicts with an existing original intent. Nothing was imported.");
-      skipped++;
-    } else {
+    if (!previous) {
       newlyAdded.push(item);
+      continue;
     }
+    if (previous.intent !== item.intent)
+      throw new Error("The archive conflicts with an existing original intent. Nothing was imported.");
+    const prior = new Map(previous.drafts.map(draft => [draft.jobId, draft]));
+    const additions: LocalDevelopment[] = [];
+    for (const draft of item.drafts) {
+      const match = prior.get(draft.jobId);
+      if (match) {
+        if (match.model !== draft.model || match.content !== draft.content ||
+            match.recordedAt !== draft.recordedAt)
+          throw new Error("A saved development conflicts with archive history. Nothing was imported.");
+      } else {
+        additions.push(draft);
+        prior.set(draft.jobId, draft);
+      }
+    }
+    if (!additions.length) {
+      skipped++;
+      continue;
+    }
+    if (prior.size > 64)
+      throw new Error("Merging the archive would discard older developments. Nothing was imported.");
+    const drafts = [...prior.values()].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
+    merges.push({
+      ...previous, drafts,
+      updatedAt: Date.parse(item.updatedAt) > Date.parse(previous.updatedAt)
+        ? item.updatedAt : previous.updatedAt,
+    });
+    mergedDrafts += additions.length;
   }
   if (existing.length + newlyAdded.length > MAX)
     throw new Error("Restore would exceed the 128-crystal device limit. Nothing was imported.");
 
-  // Derive the target DEVICE key and encrypt before opening the IndexedDB
-  // readwrite transaction. All add() operations then commit together or abort.
-  const envelopes = await Promise.all(newlyAdded.map(encrypt));
+  // Encrypt under the receiving device's non-exportable key before opening a
+  // write transaction. Every update is guarded against changes from other tabs.
+  const toWrite = [...newlyAdded, ...merges];
+  const envelopes = await Promise.all(toWrite.map(encrypt));
   if (!envelopes.length) return { imported: 0, skipped };
-  const db = await database();
   const tx = db.transaction(STORE, "readwrite");
   const ready = transactionComplete(tx);
-  for (const item of envelopes) tx.objectStore(STORE).add(item);
+  const store = tx.objectStore(STORE);
+  for (let i = 0; i < toWrite.length; i++) {
+    const archived = toWrite[i]!;
+    const envelope = envelopes[i]!;
+    if (!present.has(archived.id)) {
+      store.add(envelope); // Concurrent duplicates abort the entire transaction.
+      continue;
+    }
+    const baseline = baselines.get(envelope.id);
+    if (!baseline) {
+      tx.abort();
+      break;
+    }
+    const req = store.get(envelope.id);
+    req.onsuccess = () => {
+      const current = req.result as Envelope | undefined;
+      if (!current ||
+          current.iv.length !== baseline.iv.length ||
+          current.cipher.length !== baseline.cipher.length ||
+          current.iv.some((byte, pos) => byte !== baseline.iv[pos]) ||
+          current.cipher.some((byte, pos) => byte !== baseline.cipher[pos])) {
+        tx.abort();
+      } else {
+        store.put(envelope);
+      }
+    };
+  }
   try { await ready; }
   catch {
-    // A concurrent tab can add the same record; never replace the original.
     throw new Error("Restore encountered a concurrent device change. No archived crystals were overwritten.");
   }
-  return { imported: envelopes.length, skipped };
+  return {
+    imported: newlyAdded.length, skipped,
+    ...(mergedDrafts ? { mergedDrafts } : {}),
+  };
 }

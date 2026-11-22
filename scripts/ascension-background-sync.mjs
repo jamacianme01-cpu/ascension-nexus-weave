@@ -27,7 +27,7 @@ const PAYLOAD = "ascension-device-crystals";
 // An explicit test-only cadence allows OS acceptance to exercise repeated cycles
 // without waiting three minutes; normal owner sessions retain the 3-minute rate.
 const INTERVAL_MS = process.env.NODE_ENV === "test" &&
-  /^\\d{1,5}$/.test(process.env.ASCENSION_BG_ACCEPTANCE_INTERVAL_MS || "")
+  /^[0-9]{1,5}$/.test(process.env.ASCENSION_BG_ACCEPTANCE_INTERVAL_MS || "")
     ? Math.max(1000, Number(process.env.ASCENSION_BG_ACCEPTANCE_INTERVAL_MS))
     : 180000;
 const validUuid = value => typeof value === "string" && UUID.test(value);

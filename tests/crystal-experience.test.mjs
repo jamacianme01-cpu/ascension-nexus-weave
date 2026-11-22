@@ -40,7 +40,7 @@ assert.match(storage, /await crypto.subtle.encrypt/);
 assert.match(storage, /await crypto.subtle.decrypt/);
 assert.match(storage, /unverified_local_draft/);
 assert.match(device, /127\.0\.0\.1:8788/);
-assert.match(device, /No cloud fallback or fake knowledge updates/);
+assert.match(device, /No remote fallback or invented work/);
 assert.match(localWorker, /sqlite3\.connect/);
 assert.match(localWorker, /127\.0\.0\.1/);
 assert.match(localWorker, /MAX_QUEUED_AUTOMATIC/);

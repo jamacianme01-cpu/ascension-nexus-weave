@@ -43,10 +43,10 @@ assert.equal(growth.newlyVerifiedCount({ ...one, verifiedGrowthCount: -50 }, {})
 
 const component = readFileSync("src/components/ascension/crystal-experience.tsx", "utf8");
 assert.match(component, /const unseen = pendingGrowthSummary\(saved, seenVerifiedGrowth\(\)\)/);
-assert.match(component, /describeNewGrowth\(newRevisions\)/);
-assert.match(component, /acknowledgeVerifiedGrowth\(state\.crystal\)/);
+assert.match(component, /deviceDraftAnswer\(crystal\)/);
+assert.match(component, /readDeviceCrystal\(id\)/);
 assert.match(component, /if \(!parent\) setAnswer\(null\)/);
-assert.match(component, /if \(crystal\.delivery\) acknowledgeVerifiedGrowth\(crystal\.crystal\)/);
+assert.match(component, /Unverified local draft|unverified draft|not been independently verified/);
 assert.match(component, /if \(speechSerial\.current !== serial\) return/);
 assert.match(component, /continue this intent/);
 assert.match(component, /I haven't found that intent on this Library Card/);
@@ -54,4 +54,4 @@ assert.match(component, /Tell me which intent crystal you would like me to retri
 assert.ok(component.indexOf("if (/^(?:what has grown") < component.indexOf("if (answerRef.current)"),
   "Growth questions must work even without an open answer");
 assert.doesNotMatch(component, /const TREE = |const KEEPER = /);
-console.log("PASS: persisted verified return growth, no fabricated progress, no lost continuation answer, safe voice callbacks.");
+console.log("PASS: local intent recall and return-state helpers, no fabricated verification, safe voice callbacks.");

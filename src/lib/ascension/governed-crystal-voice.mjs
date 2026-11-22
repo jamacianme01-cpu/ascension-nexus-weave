@@ -18,6 +18,7 @@ export function deliveredCrystalChoices(delivery) {
     body: delivery.body,
     design: null,
     parts: [],
+    modelStatus: null,
     limitations: delivery.limitations ?? [],
   }];
   return actual.map((choice, index) => {
@@ -39,6 +40,7 @@ export function deliveredCrystalChoices(delivery) {
         imageUrl, blueprintUrl, modelUrl,
       } : null,
       parts,
+      modelStatus: choice.model_status ?? null,
       limitations: delivery.limitations ?? [],
     };
   });
@@ -68,4 +70,47 @@ export function choiceForVoiceCommand(words, choices) {
     name === phrase || name.startsWith(phrase + " ") || name.includes(" " + phrase + " ")
       ? i : -1).filter(i => i >= 0);
   return matched.length === 1 ? matched[0] : -1;
+}
+
+
+const pendingModels = new Set(["queued", "claimed", "running"]);
+export function crystalHasPendingModels(choices) {
+  return choices.some(choice =>
+    pendingModels.has(choice.modelStatus) && !choice.design?.modelUrl);
+}
+/**
+ * The same authorized governed request may later deliver its queued GLB.
+ * Only append real missing assets; never overwrite existing original wording,
+ * images, dimensions or selected pathway identity.
+ */
+export function reconcileCrystalMedia(original, later) {
+  if (!Array.isArray(original) || !Array.isArray(later) ||
+      original.length !== later.length) return original;
+  if (original.some((choice,i) =>
+    choice.id !== later[i]?.id || choice.title !== later[i]?.title ||
+    choice.body !== later[i]?.body)) return original;
+  let updated = false;
+  const merged = original.map((choice,i) => {
+    const next=later[i];
+    const earlier=choice.design;
+    const newer=next.design;
+    const imageUrl=earlier?.imageUrl ?? newer?.imageUrl ?? null;
+    const blueprintUrl=earlier?.blueprintUrl ?? newer?.blueprintUrl ?? null;
+    const modelUrl=earlier?.modelUrl ?? newer?.modelUrl ?? null;
+    const statusPriority={queued:1,claimed:2,running:3,completed:4,failed:4};
+    const modelStatus=(statusPriority[next.modelStatus] ?? 0) >=
+      (statusPriority[choice.modelStatus] ?? 0)
+      ? next.modelStatus : choice.modelStatus;
+    const change=imageUrl !== (earlier?.imageUrl ?? null) ||
+      blueprintUrl !== (earlier?.blueprintUrl ?? null) ||
+      modelUrl !== (earlier?.modelUrl ?? null) ||
+      modelStatus !== choice.modelStatus;
+    if (!change) return choice;
+    updated=true;
+    return {...choice,modelStatus,
+      design:imageUrl || blueprintUrl || modelUrl
+        ? {title:choice.title,summary:choice.body,imageUrl,blueprintUrl,modelUrl}
+        : null};
+  });
+  return updated ? merged : original;
 }

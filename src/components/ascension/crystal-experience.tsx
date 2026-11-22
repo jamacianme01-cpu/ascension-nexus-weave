@@ -12,6 +12,9 @@ import {
   continueDeviceIntent, startDeviceIntent, synchronizeDeviceCompanion,
 } from "@/lib/ascension/device-companion";
 import {
+  isContinuationPrompt, isDesignEditInstruction, isCancelContinuation,
+} from "@/lib/ascension/voice-intent-flow.mjs";
+import {
   parseSeenGrowth, newlyVerifiedCount, pendingGrowthSummary,
   markGrowthSeen, describeNewGrowth, welcomeBackGrowth,
   type CrystalGrowth,
@@ -343,11 +346,14 @@ export function CrystalExperience() {
       speak("Choose your encrypted Library Card file and type its passphrase privately. Your existing crystals will stay untouched.", false);
       return;
     }
-    if (/^(?:continue this intent|keep developing this intent|build on this intent)$/.test(lower)) {
-      if (!chosen.current) speak("First retrieve the intent crystal you want to continue.");
-      else {
+    if (isContinuationPrompt(input)) {
+      if (!chosen.current) {
+        speak("First retrieve the intent crystal you want to continue.");
+      } else {
+        // Do not send "build on this intent" to the model as if it were a
+        // design change. Wait for the owner's actual spoken instructions.
         continuing.current = true;
-        void sendIntent(input);
+        speak("What would you like to add, remove, or change? I'll preserve your original intent.");
       }
       return;
     }
@@ -355,6 +361,17 @@ export function CrystalExperience() {
       chosen.current = null; continuing.current = false;
       setAnswer(null); setSelectedId(null);
       speak("I'm here. What would you like to create or explore?");
+      return;
+    }
+    if (continuing.current) {
+      if (isCancelContinuation(input)) {
+        continuing.current = false;
+        speak("Your original intent is unchanged.");
+      } else {
+        // The selected crystal is still the parent; save exactly the next
+        // owner-spoken change, not the command that requested continuation.
+        void sendIntent(input);
+      }
       return;
     }
     const recall = lower.match(/^(?:recall|bring back|retrieve|open my|show my|recall my)\s+(.+)$/);
@@ -397,9 +414,16 @@ export function CrystalExperience() {
       if (/^(?:what do you suggest|any suggestions|suggest an improvement)$/.test(lower)) {
         speak(guideSuggestion(answerRef.current)); return;
       }
-      if (/^(?:build on|improve|change|modify|add|remove|replace|extend|reduce)\b/.test(lower)) {
+      // When a real answer exists, changing it still uses the saved
+      // original intent and the existing authorized device companion.
+      if (chosen.current && isDesignEditInstruction(input)) {
         continuing.current = true; void sendIntent(input); return;
       }
+    }
+    if (chosen.current && isDesignEditInstruction(input)) {
+      continuing.current = true;
+      void sendIntent(input);
+      return;
     }
     chosen.current = null;
     continuing.current = false;

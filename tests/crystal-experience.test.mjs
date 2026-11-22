@@ -65,7 +65,15 @@ assert.match(backupUI, /type="password"/);
 assert.match(backupUI, /Restore without overwriting/);
 assert.doesNotMatch(backups, /\bfetch\(|\bXMLHttpRequest\b|localStorage\./);
 
-assert.doesNotMatch(scene, /submitGuestObjective|recordIntentCrystal|inspectIntentCrystal|getGuestObjectiveStatus|getGuestObjectiveDelivery/);
+assert.match(scene, /if \(governedVoiceCommand\(input\)\)/);
+assert.match(scene, /submitGuestObjective/);
+assert.match(scene, /getGuestObjectiveStatus/);
+assert.match(scene, /getGuestObjectiveDelivery/);
+assert.doesNotMatch(scene, /recordIntentCrystal|inspectIntentCrystal/);
+const engineTrigger = scene.indexOf("if (governedVoiceCommand(input))");
+const engineSubmit = scene.indexOf("async function runGovernedIntent");
+assert.ok(engineSubmit > 0 && engineTrigger > engineSubmit,
+  "Only an explicit owner voice command enters the original governed engine path.");
 assert.match(scene, /onRecall=\{id => void recallCrystal\(id\)\}/);
 assert.match(scene, /guideSuggestion/);
 assert.match(scene, /getVoice|SpeechRecognition|webkitSpeechRecognition/);

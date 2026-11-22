@@ -12,7 +12,13 @@ export interface CrystalGovernedChoice {
   } | null;
   parts: Array<{name: string; location: string; purpose: string}>;
   limitations: string[];
+  modelStatus: "queued" | "claimed" | "running" | "completed" | "failed" | null;
 }
 export function deliveredCrystalChoices(delivery: ObjectiveDelivery | null): CrystalGovernedChoice[];
 export function governedVoiceCommand(words: string): boolean;
 export function choiceForVoiceCommand(words: string, choices: readonly CrystalGovernedChoice[]): number;
+export function crystalHasPendingModels(choices: readonly CrystalGovernedChoice[]): boolean;
+export function reconcileCrystalMedia(
+  original: CrystalGovernedChoice[],
+  later: readonly CrystalGovernedChoice[],
+): CrystalGovernedChoice[];

@@ -63,7 +63,7 @@ async function deriveBackupKey(passphrase: string, salt: Uint8Array) {
   const base = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt: new Uint8Array(salt), iterations: ITERATIONS, hash: "SHA-256" },
     base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 function parseArchive(bytes: string): Archive {
@@ -138,7 +138,7 @@ export async function restoreEncryptedLibraryBackup(
   let clear: ArrayBuffer;
   try {
     clear = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv, additionalData: AAD }, key, encrypted);
+      { name: "AES-GCM", iv: new Uint8Array(iv), additionalData: AAD }, key, new Uint8Array(encrypted));
   } catch {
     throw new Error("Incorrect passphrase or damaged archive. No local records were changed.");
   }

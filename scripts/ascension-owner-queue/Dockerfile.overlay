@@ -13,6 +13,7 @@ ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY .output/ /app/.output/
 COPY ascension-volume-transport.py /app/ascension-volume-transport.py
+COPY ascension_crystal_ledger.py /app/ascension_crystal_ledger.py
 COPY ascension-private-supervisor.py /app/ascension-private-supervisor.py
 COPY probe-ascension-private.py /app/probe-ascension-private.py
 COPY ascension-start.sh /app/ascension-start.sh
@@ -27,7 +28,7 @@ RUN test -f /app/ASCENSION_CORE/cloud_queue_worker.py \
     && test -f /app/.output/server/index.mjs \
     && test -x /usr/local/bin/bun \
     && test -s /etc/ssl/certs/ca-certificates.crt \
-    && /usr/bin/python3 -m py_compile /app/ascension-volume-transport.py /app/ascension-private-supervisor.py \
+    && /usr/bin/python3 -m py_compile /app/ascension-volume-transport.py /app/ascension_crystal_ledger.py /app/ascension-private-supervisor.py \
     && chmod 0755 /app/ascension-start.sh
 ENV PYTHONPATH=/app
 ENTRYPOINT ["/app/ascension-start.sh"]

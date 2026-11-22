@@ -11,8 +11,19 @@ The approved image is **one composition** containing the cosmic-black groundskee
 
 ### Source availability and integration status
 
-This repository branch contains the **code** that references the exact approved asset. The binary image is supplied separately in the user-owned package `ASCENSION_Exact_Approved_Scene_20261122.zip` and **is not included in this code branch** until its original bytes are committed into `public/approved-scene/`. The branch must not be merged or deployed as a completed artwork integration before the original image is committed and the SHA-256 above has been verified. Do not replace the missing artwork with a placeholder.
+The original **unmodified binary image is committed** to this repository's
+`assets/ascension-exact-approved-original-20261122` branch, under
+`public/approved-scene/ascension-exact-approved-scene.png`.
 
-The package's `Install-Exact-ASCENSION-Scene.ps1` adds the original image on this branch only; it does not deploy, modify hosting, change the owner runtime, or reconnect any retired computer. After its image commit is pushed, review GitHub tests and the actual screen before merging.
+- Git blob SHA: `b452ff3d9e6cea68d9cf13ca4ef260fb3a1bca0b`
+- SHA-256: `cba074376cdb684e7286392f55e6bb95abdb37192325bdd9e3e37bc6d8c73495`
+- Size: 3,102,205 bytes, 1672 × 941 pixels
+- `tests/approved-scene-original.test.mjs` validates the original bytes and
+  dimensions as part of `npm run test:interface`. Any missing or changed
+  artwork makes CI fail.
+
+The earlier user-owned ZIP is now merely a backup; the original bytes have
+been transferred directly to GitHub. This commit **does not deploy**, change
+hosting, reconnect a former machine, or assert that the live scene is animated.
 
 User-visible interaction remains governed by the original ASCENSION run, Tree crystal ledger, and groundskeeper voice. The image is a static, faithful visual reference; no autonomous lip synchronization or 3D scene animation should be claimed merely because the picture is installed.

@@ -510,6 +510,7 @@ export function CrystalExperience() {
           else if (state.state === "ready") setIssue("");
         }, async () => {
           await refreshCrystals();
+          speak("Your other device has brought new crystals or developments into this Knowledgeverse. They are saved here, but unverified local drafts are not proven discoveries.", false);
         });
         syncSession.current = session;
         try {

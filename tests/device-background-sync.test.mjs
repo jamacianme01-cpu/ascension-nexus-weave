@@ -54,6 +54,53 @@ test("desktop companion exchanges encrypted originals while both browser tabs ar
     assert.equal(decryptArchive(await readFile(join(directory,backgroundFileName(a)),"utf8"),PASS).crystals.length,2);
   });
 });
+test("closed-browser native exchange retains encrypted governed memory, selected result and later real GLB",async()=>{
+  await withFolder(async directory=>{
+    const a=randomUUID(),b=randomUUID();
+    const original="Owner original: two autonomous guidance/environment drones and shared-memory dock";
+    const secret="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const result={
+      source:"governed",requestId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      guestToken:secret,receivedAt:DATE,selectedIndex:0,
+      choices:[{
+        id:"owner-governed",title:"Guidance system",
+        body:"Exactly the actual returned governed design",
+        parts:[],limitations:["Not physically verified"],modelStatus:"running",
+        design:{title:"Guidance system",summary:"Exactly the actual returned governed design",
+          imageUrl:"https://example.invalid/owner-original.png",blueprintUrl:null,modelUrl:null},
+      }],
+    };
+    const later=structuredClone(result);
+    later.selectedIndex=null;
+    later.choices[0].modelStatus="completed";
+    later.choices[0].design.modelUrl="https://example.invalid/real-hunyuan-model.glb";
+    await writeFile(join(directory,"ASCENSION-Private-Sync-"+a+".ascension"),
+      encryptArchive([{...crystal(CRYSTAL,original),governedResults:[result]}],PASS));
+    await writeFile(join(directory,"ASCENSION-Private-Sync-"+b+".ascension"),
+      encryptArchive([{...crystal(CRYSTAL,original),governedResults:[later]}],PASS));
+    const noCompanion=async()=>({format:"ascension-companion-finished-history",version:1,crystals:[]});
+    await runBackgroundCycle(cfg(directory,a),noCompanion);
+    const file=await readFile(join(directory,backgroundFileName(a)),"utf8");
+    for(const sensitive of [original,secret,result.choices[0].body])
+      assert.ok(!file.includes(sensitive),"Owner memory is private even after browsers close");
+    const records=decryptArchive(file,PASS).crystals;
+    assert.equal(records.length,1);
+    assert.equal(records[0].intent,original);
+    assert.equal(records[0].governedResults.length,1);
+    const saved=records[0].governedResults[0];
+    assert.equal(saved.selectedIndex,0);
+    assert.equal(saved.choices[0].design.imageUrl,
+      "https://example.invalid/owner-original.png");
+    assert.equal(saved.choices[0].design.modelUrl,
+      "https://example.invalid/real-hunyuan-model.glb");
+    assert.equal(records[0].verifiedGrowthCount,0);
+    await runBackgroundCycle(cfg(directory,a),noCompanion);
+    const replay=decryptArchive(await readFile(join(directory,backgroundFileName(a)),"utf8"),PASS).crystals;
+    assert.equal(replay[0].governedResults.length,1,
+      "Repeated closed-browser sync cannot duplicate governed history");
+  });
+});
+
 test("finished on-device companion developments enter encrypted peer archive after browser closes",async()=>{
   await withFolder(async directory=>{
     const a=randomUUID(), b=randomUUID();

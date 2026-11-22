@@ -1,0 +1,35 @@
+name: Verify real desktop Library Card background exchange
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  closed-browser-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - name: Checkout owner-approved source without deploying
+        uses: actions/checkout@v4
+      - name: Prepare local Node.js runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare local Python companion runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Accept real SQLite plus encrypted folder exchange after browser closure
+        run: node --test tests/device-background-os-acceptance.test.mjs
+      - name: Verify no hosted deployment or old computer connection
+        run: node --test tests/device-background-sync.test.mjs

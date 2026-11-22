@@ -16,6 +16,7 @@ import {
 } from "@/lib/ascension/guest.functions";
 import {
   choiceForVoiceCommand, deliveredCrystalChoices, governedVoiceCommand,
+  crystalHasPendingModels, reconcileCrystalMedia,
   type CrystalGovernedChoice,
 } from "@/lib/ascension/governed-crystal-voice.mjs";
 import {
@@ -110,6 +111,7 @@ export function CrystalExperience() {
   const [zoom, setZoom] = useState(0);
   const [working, setWorking] = useState(false);
   const [governedWorking, setGovernedWorking] = useState(false);
+  const [governedMediaPending, setGovernedMediaPending] = useState(false);
   const [listening, setListening] = useState(false);
   const [muted, setMuted] = useState(false);
   const [backup, setBackup] = useState(false);
@@ -261,6 +263,7 @@ export function CrystalExperience() {
         governedAuth.current = null;
         governedChoices.current = [];
         governedIndex.current = null;
+        setGovernedMediaPending(false);
       }
       setSelectedId(id);
       // On-device drafts are not governed revisions.
@@ -326,6 +329,7 @@ export function CrystalExperience() {
         governedAuth.current = null;
         governedChoices.current = [];
         governedIndex.current = null;
+        setGovernedMediaPending(false);
         setSelectedId(result.crystal.id);
         message = result.submitted
           ? "Your intent is now a crystal saved on your device. Your local model is queued to develop it."
@@ -387,6 +391,7 @@ export function CrystalExperience() {
     if (!change) {
       governedChoices.current = [];
       governedIndex.current = null;
+      setGovernedMediaPending(false);
     }
     try {
       const original = await readDeviceCrystal(selected.id);
@@ -441,6 +446,7 @@ export function CrystalExperience() {
           const choices = deliveredCrystalChoices(delivery.response_payload);
           if (!choices.length) throw new Error("No actual engine result was delivered.");
           governedChoices.current = choices;
+          setGovernedMediaPending(crystalHasPendingModels(choices));
           finished = true;
           stopGovernedPolling();
           // The server's verified run is NOT automatically copied into the
@@ -553,6 +559,7 @@ export function CrystalExperience() {
       governedAuth.current = null;
       governedChoices.current = [];
       governedIndex.current = null;
+      setGovernedMediaPending(false);
       chosen.current = null; continuing.current = false;
       setAnswer(null); setSelectedId(null);
       speak("I'm here. What would you like to create or explore?");
@@ -649,6 +656,51 @@ export function CrystalExperience() {
       setIssue("Library Card is not available: " + String(cause));
     }
   }
+  // A completed governed answer may precede a real Hunyuan3D GLB.
+  // While this original, authorized crystal is selected, append only real
+  // subsequently delivered assets from the SAME run. Never invent geometry.
+  useEffect(() => {
+    if (!entered || !governedMediaPending || !selectedId) return;
+    const authorized = governedAuth.current;
+    if (!authorized || authorized.crystalId !== selectedId) return;
+    let closed = false;
+    let running = false;
+    const refreshMedia = async () => {
+      if (closed || running ||
+          governedAuth.current?.requestId !== authorized.requestId ||
+          governedAuth.current?.guestToken !== authorized.guestToken ||
+          chosen.current?.id !== authorized.crystalId) return;
+      running = true;
+      try {
+        const delivery = await getGuestObjectiveDelivery({ data: {
+          requestId: authorized.requestId, guestToken: authorized.guestToken,
+        } });
+        if (closed || governedAuth.current?.requestId !== authorized.requestId ||
+            chosen.current?.id !== authorized.crystalId ||
+            delivery?.status !== "completed" || delivery.source !== "governed" ||
+            !delivery.response_payload) return;
+        const newer = deliveredCrystalChoices(delivery.response_payload);
+        const older = governedChoices.current;
+        const merged = reconcileCrystalMedia(older, newer);
+        if (merged !== older) {
+          governedChoices.current = merged;
+          const index = governedIndex.current;
+          if (index !== null && merged[index]) {
+            setAnswer(governedChoiceAnswer(merged[index]));
+            if (!older[index]?.design?.modelUrl && merged[index]?.design?.modelUrl) {
+              speak("The actual delivered three-dimensional model is now available for this design.", false);
+            }
+          }
+        }
+        if (!crystalHasPendingModels(merged)) setGovernedMediaPending(false);
+      } catch { /* Keep the exact original selected image and model status. */ }
+      finally { running = false; }
+    };
+    void refreshMedia();
+    const timer = window.setInterval(() => { void refreshMedia(); }, 6000);
+    return () => { closed = true; window.clearInterval(timer); };
+  }, [entered, governedMediaPending, selectedId]);
+
   // The browser mirrors only results computed on this device. A desktop
   // companion can work while this page is closed; phones/tablets cannot rely
   // on unrestricted background execution.
@@ -742,6 +794,7 @@ export function CrystalExperience() {
         governedAuth.current = null;
         governedChoices.current = [];
         governedIndex.current = null;
+        setGovernedMediaPending(false);
         chosen.current = null;
         continuing.current = false;
         setSelectedId(null);

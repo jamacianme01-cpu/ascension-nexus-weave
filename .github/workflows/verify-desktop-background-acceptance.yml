@@ -31,5 +31,7 @@ jobs:
           python-version: '3.12'
       - name: Accept real SQLite plus encrypted folder exchange after browser closure
         run: node --test tests/device-background-os-acceptance.test.mjs
+      - name: Test two native share users with production-style encrypted archives
+        run: node --test tests/device-owner-share-acceptance.test.mjs
       - name: Verify no hosted deployment or old computer connection
         run: node --test tests/device-background-sync.test.mjs

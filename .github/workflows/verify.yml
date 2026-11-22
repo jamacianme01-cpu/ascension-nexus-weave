@@ -24,6 +24,8 @@ jobs:
       - run: node --test tests/no-unauthorized-apps.test.mjs
       - run: npm run test:interface
       - run: node tests/tree-voice.test.mjs
+      - name: Verify owner-device SQLite AI companion (local only)
+        run: python3 -m unittest discover -s tests -p test_device_companion.py -v
       - run: npm run build
       - name: Verify original authored construction capability patch (offline, no Fly changes)
         run: python3 -m unittest discover -s tests -p test_original_physical_capability_patch.py -v

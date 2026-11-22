@@ -46,7 +46,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 
 /**
- * Explicitly opt-in autonomous intent growth. The process only runs against
+ * Owner-approved autonomous intent growth. The process only runs against
  * mounted persistent ASCENSION storage and the original governed runtime.
  * No hosting/provider activation is performed here.
  */

@@ -62,7 +62,7 @@ export function choiceForVoiceCommand(words, choices) {
     .replace(/[.!?]+$/g, "").replace(/\s+/g, " ");
   const match = text.match(/^(?:choose|select|open|enter|show|inspect) (?:pathway )?(.+)$/);
   if (!match) return -1;
-  const phrase = match[1];
+  const phrase = match[1].replace(/^the /, "").replace(/ pathway$/, "");
   const positions = { one:0,two:1,three:2,four:3,"1":0,"2":1,"3":2,"4":3,first:0,second:1,third:2,fourth:3 };
   const position = positions[phrase];
   if (position !== undefined) return position < choices.length ? position : -1;
@@ -74,10 +74,15 @@ export function choiceForVoiceCommand(words, choices) {
     const found = choices.findIndex(c => /\bblend\b/i.test(c.title));
     return found < 0 ? -1 : found;
   }
-  const names = choices.map(c => String(c.title).toLowerCase());
-  const matched = names.map((name,i) =>
-    name === phrase || name.startsWith(phrase + " ") || name.includes(" " + phrase + " ")
-      ? i : -1).filter(i => i >= 0);
+  // Engine IDs are stable recorded identities; the spoken model names must
+  // still work when an engine supplies a descriptive, non-provider title.
+  const matched = choices.map((choice,i) => {
+    const name = String(choice.title || "").toLowerCase();
+    const id = String(choice.id || "").toLowerCase();
+    return id === phrase || name === phrase ||
+      name.startsWith(phrase + " ") || name.includes(" " + phrase + " ")
+      ? i : -1;
+  }).filter(i => i >= 0);
   return matched.length === 1 ? matched[0] : -1;
 }
 

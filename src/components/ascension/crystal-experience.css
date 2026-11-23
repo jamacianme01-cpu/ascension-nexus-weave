@@ -7,7 +7,7 @@
   color:#fbeac7;
 }
 .ascension-library-book { position:absolute; inset:0; z-index:50; display:grid; place-items:end center; overflow:hidden; }
-.ascension-library-book img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.ascension-library-book img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:center; }
 .ascension-library-book button {
   position:relative; z-index:1; margin-bottom:6vh; padding:.9rem 1.5rem;
   color:#f6d89b; background:rgb(3 12 27 / 82%); cursor:pointer;

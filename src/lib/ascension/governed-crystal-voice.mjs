@@ -56,6 +56,14 @@ export function deliveredCrystalChoices(delivery) {
     };
   });
 }
+/** A single spoken instruction can explicitly authorize ONE governed intent.
+ * Plain speech remains device-private; no invented response or new pathway.
+ */
+export function explicitlyEngagedIntent(words) {
+  const raw = String(words || "").trim();
+  const match = raw.match(/^(?:engage\s+ascension(?:\s+engines)?|run\s+ascension(?:'s)?\s+engines)\s*[,;:]\s*(\S[\s\S]*)$/i);
+  return match ? match[1].trim() : null;
+}
 export function governedVoiceCommand(words) {
   const normalized = String(words || "").trim().toLowerCase()
     .replace(/[.!?]+$/g, "").replace(/\s+/g, " ");

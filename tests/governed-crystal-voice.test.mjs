@@ -118,6 +118,8 @@ assert.match(smoke,/tests\/ascension-live-engage\.mjs/,
   "Only the actual approved Tree/Library Card live acceptance can declare V1 complete");
 assert.doesNotMatch(smoke,/structured-four-20261028|phase.*initial|\/api\/public\/ascension\/independent/,
   "The obsolete pre-Tree answer endpoint cannot certify V1");
-assert.doesNotMatch(smoke,/flyctl|FLY_API_TOKEN|\.fly\.dev|\.fly\.io/i,
-  "Live V1 acceptance may never reconnect Fly after owner disconnection");
+assert.doesNotMatch(smoke,/flyctl|FLY_API_TOKEN|superfly\//i,
+  "Live V1 acceptance may never use Fly credentials or CLI after disconnection");
+assert.match(smoke,/Fly\/internal hosts are disconnected by the owner/,
+  "Reject retired Fly hosts rather than connecting to them");
 console.log("PASS: owner-authorized engine handoff, literal original preservation, truthful four-or-single pathway voice reveal, no automatic disclosure");

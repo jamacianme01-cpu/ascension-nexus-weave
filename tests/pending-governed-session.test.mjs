@@ -76,3 +76,17 @@ assert.match(governedResumeGuard,
   /if \(pending && \(pending\.crystalId !== selected\.id \|\| change !== null\)\) \{/);
 assert.ok(governedResumeGuard.indexOf("if (pending &&") <
   governedResumeGuard.indexOf("if (!change && pending?.crystalId === selected.id)"));
+
+
+// Re-ENGAGE after a terminal or completed run must never inherit an unrelated
+// previous request. Only an explicit edit may include parent credentials.
+const submitBlock = tree.slice(
+  tree.indexOf("async function runGovernedIntent("),
+  tree.indexOf("async function stopLibrarySync()")
+);
+assert.match(submitBlock,
+  /const previous = change !== null &&\s*governedAuth\.current\?\.crystalId === selected\.id/);
+assert.match(submitBlock, /if \(change && !previous\) \{/);
+assert.match(submitBlock, /\.\.\.\(previous \? \{\s*parentRequestId: previous\.requestId,/);
+assert.ok(submitBlock.indexOf("const previous = change !== null") <
+  submitBlock.indexOf("await submitGuestObjective("));

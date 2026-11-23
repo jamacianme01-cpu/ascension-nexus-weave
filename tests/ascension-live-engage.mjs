@@ -11,7 +11,9 @@ import { pathToFileURL } from "node:url";
 if (!process.env.PLAYWRIGHT_MODULE) throw Error("Missing Playwright location");
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
 const website = process.env.ASCENSION_V1_WEBSITE || "http://127.0.0.1:4174/";
-const objective = "I want to make worker drones for people with dementia.";
+// Exercise the real runtime with a neutral acceptance fixture, never an
+// owner's invention or unpublished project description.
+const objective = "Design a modular tabletop cable organizer with removable dividers.";
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.ASCENSION_CHROME_BIN,

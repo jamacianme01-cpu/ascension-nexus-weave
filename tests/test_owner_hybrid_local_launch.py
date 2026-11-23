@@ -8,7 +8,6 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TRANSPORT = ROOT / "scripts" / "ascension-owner-queue" / "ascension-volume-transport.py"
 LAUNCH = ROOT / "scripts" / "Start-ASCENSION-OwnerHybrid.ps1"
-AUTODEPLOY = ROOT / ".github" / "workflows" / "activate-owner-fly-volume-queue.yml"
 
 
 class OwnerHybridLaunchTest(unittest.TestCase):
@@ -39,11 +38,21 @@ class OwnerHybridLaunchTest(unittest.TestCase):
         self.assertNotIn("flyctl", source.lower())
         self.assertNotIn("api.machines.dev", source.lower())
 
-    def test_previous_fly_deploy_can_no_longer_run_on_main_push(self):
-        text = AUTODEPLOY.read_text(encoding="utf-8")
-        preamble = text.split("permissions:", 1)[0]
-        self.assertIn("workflow_dispatch:", preamble)
-        self.assertNotIn("  push:", preamble)
+    def test_owner_disconnected_all_fly_workflows(self):
+        # Owner removed every Fly workflow entirely; do not require a
+        # deleted workflow to exist in order to pass offline CI.
+        workflows = ROOT / ".github" / "workflows"
+        for retired in (
+            "activate-owner-fly-volume-queue.yml",
+            "deploy-ascension-fly.yml",
+            "ascension-fly-disconnect-once.yml",
+            "verify-ascension-fly-governed-wiring.yml",
+        ):
+            self.assertFalse((workflows / retired).exists(), retired)
+        for active in workflows.glob("*.yml"):
+            text = active.read_text(encoding="utf-8")
+            self.assertNotIn("FLY_API_TOKEN", text, active.name)
+            self.assertNotIn("flyctl ", text, active.name)
 
 
 if __name__ == "__main__":

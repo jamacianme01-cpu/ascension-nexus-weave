@@ -165,4 +165,10 @@ assert.doesNotMatch(smoke,/flyctl|FLY_API_TOKEN|superfly\//i,
   "Live V1 acceptance may never use Fly credentials or CLI after disconnection");
 assert.match(smoke,/Fly\/internal hosts are disconnected by the owner/,
   "Reject retired Fly hosts rather than connecting to them");
+assert.doesNotMatch(smoke,/ascension-nexus-weave-production\.up\.railway\.app/,
+  "Never select the retired Railway page as the default ASCENSION live test");
+assert.match(smoke,/retired Railway deployment is not an approved ASCENSION live-test target/,
+  "Reject the retired Railway deployment before network access");
+assert.doesNotMatch(smoke,/default: https?:\/\//,
+  "Require the owner to explicitly supply the current live ASCENSION host");
 console.log("PASS: one owner-approved evolving result, genuine provider provenance saved, no selection menu or automatic disclosure");

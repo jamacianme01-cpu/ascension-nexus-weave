@@ -113,4 +113,11 @@ assert.doesNotMatch(begin,/submitGuestObjective|runGovernedIntent/,
 const local=entry.slice(entry.indexOf("async function syncDevice()"),entry.indexOf("async function runGovernedIntent"));
 assert.match(local,/await startDeviceIntent\(statement\)/,
   "Original private device crystal creation must remain local-first");
+const smoke=readFileSync(".github/workflows/ascension-live-answer-smoke.yml","utf8");
+assert.match(smoke,/tests\/ascension-live-engage\.mjs/,
+  "Only the actual approved Tree/Library Card live acceptance can declare V1 complete");
+assert.doesNotMatch(smoke,/structured-four-20261028|phase.*initial|\/api\/public\/ascension\/independent/,
+  "The obsolete pre-Tree answer endpoint cannot certify V1");
+assert.doesNotMatch(smoke,/flyctl|FLY_API_TOKEN|\.fly\.dev|\.fly\.io/i,
+  "Live V1 acceptance may never reconnect Fly after owner disconnection");
 console.log("PASS: owner-authorized engine handoff, literal original preservation, truthful four-or-single pathway voice reveal, no automatic disclosure");

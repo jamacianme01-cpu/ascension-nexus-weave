@@ -346,6 +346,13 @@ export function CrystalExperience() {
   async function sendIntent(intent: string) {
     const statement = intent.trim();
     if (!statement || workingRef.current) return;
+    // New/edited on-device intent must not replace the currently tracked
+    // authorized run's crystal while its callback is still polling.
+    if (governedPending.current) {
+      setIssue("An authorized ASCENSION run is still processing. Say New Intent to stop tracking it before starting another.");
+      speak("Your authorized ASCENSION run is still processing. Say new intent if you want to stop following it.", false);
+      return;
+    }
     const parent = continuing.current ? chosen.current : null;
     continuing.current = false;
     if (parent && governedAuth.current?.crystalId === parent.id &&
@@ -550,6 +557,13 @@ export function CrystalExperience() {
     }
     // Re-ENGAGE resumes the previously authorized request; never duplicate it.
     const pending = readPendingGoverned(window.sessionStorage);
+    if (pending && (pending.crystalId !== selected.id || change !== null)) {
+      // A transient error can stop polling while the original server run is
+      // still in flight. Never silently replace its only resume correlation.
+      setIssue("An earlier authorized run is still pending. Resume that original crystal, or say New Intent to stop tracking it.");
+      speak("An earlier ASCENSION run is still pending. Resume the original intent first, or say new intent to stop tracking it.", false);
+      return;
+    }
     if (!change && pending?.crystalId === selected.id) {
       const epoch = ++governedEpoch.current;
       governedPending.current = true;
@@ -761,6 +775,12 @@ export function CrystalExperience() {
     if (chosen.current && isDesignEditInstruction(input)) {
       continuing.current = true;
       void sendIntent(input);
+      return;
+    }
+    if (governedPending.current) {
+      // Do not lose the crystal ID that the running poll is bound to.
+      setIssue("An authorized ASCENSION run is still processing. Say New Intent to stop tracking it.");
+      speak("Your authorized run is still processing. Say new intent to stop tracking it before starting another.", false);
       return;
     }
     chosen.current = null;

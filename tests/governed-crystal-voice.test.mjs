@@ -69,6 +69,14 @@ assert.equal(choiceForVoiceCommand("select openai",choices),2);
 assert.equal(choiceForVoiceCommand("choose BLEND",choices),3,
   "The recorded fourth blend must remain voice-accessible even with a different authentic label");
 assert.equal(choiceForVoiceCommand("choose five",choices),-1);
+const descriptiveTitles = choices.map((choice,i) => ({
+  ...choice, title: ["Structural design", "Mechanical approach", "Software system", "Combined result"][i],
+}));
+assert.equal(choiceForVoiceCommand("choose claude",descriptiveTitles),0,
+  "A genuine provider ID must remain selectable even with a descriptive title");
+assert.equal(choiceForVoiceCommand("enter the grok pathway",descriptiveTitles),1);
+assert.equal(choiceForVoiceCommand("select openai",descriptiveTitles),2);
+assert.equal(choiceForVoiceCommand("choose blend",descriptiveTitles),3);
 assert.equal(choiceForVoiceCommand("open a different invention",choices),-1);
 assert.equal(deliveredCrystalChoices({...payload,blend:null}).length,3,
   "No fourth pathway may be fabricated when the engine did not deliver BLEND");
@@ -89,6 +97,13 @@ assert.match(entry,/if \(governedVoiceCommand\(input\)\)/,
   "Only an explicit voice command can initiate the initial governed submission");
 assert.match(entry,/void runGovernedIntent\(\)/);
 assert.match(entry,/const original = await readDeviceCrystal\(selected\.id\)/);
+assert.match(entry,/const browserRecognitionAllowed = useRef\(false\)/);
+assert.match(entry,/const localRecognitionUnavailable = useRef\(false\)/);
+assert.match(entry,/if \(automatic\) \{ setBackup\(true\); return; \}/,
+  "Automatic Tree welcome must never authorize a remote speech provider");
+assert.match(entry,/window\.confirm\(/,
+  "Browser speech service requires explicit owner consent");
+assert.match(entry,/mic\.processLocally = true/);
 assert.match(entry,/objective: change \|\| original\.intent/,
   "Send the EXACT locally stored original only after owner authorization");
 assert.match(entry,/parentRequestId: previous\.requestId/);

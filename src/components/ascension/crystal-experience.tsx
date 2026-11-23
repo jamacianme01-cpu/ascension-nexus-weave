@@ -574,7 +574,11 @@ export function CrystalExperience() {
       await watchGovernedIntent(selected, pending, epoch);
       return;
     }
-    const previous = governedAuth.current?.crystalId === selected.id
+    // A fresh ENGAGE of the original intent is a fresh root request, not
+    // a continuation of a prior completed, failed, or rejected run.
+    // Only an explicit owner change can carry the authorized parent.
+    const previous = change !== null &&
+      governedAuth.current?.crystalId === selected.id
       ? governedAuth.current : null;
     // A change to a governed result always remains linked to its original
     // authorized request; the first submission is explicitly owner-invoked.

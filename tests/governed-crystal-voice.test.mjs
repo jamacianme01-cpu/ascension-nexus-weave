@@ -39,7 +39,6 @@ assert.deepEqual(partial.map(c=>c.id),["claude","grok","combined"],
   "Partial source deliveries remain genuine and are never filled with fake slots");
 assert.equal(evolvingCrystalResultIndex(partial),2,
   "Use a real delivered blend even when only partial source outputs exist");
-  "A real BLEND must not erase two actually delivered pathways");
 assert.equal(choiceForVoiceCommand("choose blend",partial),2,
   "The actual BLEND remains voice-accessible without a fabricated fourth slot");
 assert.equal(evolvingCrystalResultIndex(deliveredCrystalChoices({
@@ -53,7 +52,6 @@ assert.deepEqual(fourWithoutBlend.map(c=>c.id),["claude","grok","openai","fourth
   "Real source outputs remain stored without inventing BLEND");
 assert.equal(evolvingCrystalResultIndex(fourWithoutBlend),0,
   "Without a recorded blend choose the first actual answer, never synthesize one");
-  "Never invent a fifth slot or hide genuine delivered pathways");
 assert.equal(choiceForVoiceCommand("choose blend",fourWithoutBlend),-1,
   "Four real pathways alone must not be mislabeled as a BLEND");
 const collision=deliveredCrystalChoices({
@@ -65,7 +63,6 @@ assert.equal(collision[1].isBlend,true,
   "Preserve real BLEND provenance when the source already included it");
 assert.equal(evolvingCrystalResultIndex(collision),1,
   "Prefer the original recorded BLEND without synthesizing a replacement");
-  "A repeated BLEND id may never create a duplicate encrypted pathway");
 assert.equal(crystalHasPendingModels(choices),false);
 const waiting={...payload,pathways:[{
   ...fixture("claude"),model_url:null,model_status:"running",

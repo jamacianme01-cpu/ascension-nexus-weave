@@ -10,7 +10,7 @@ assert.doesNotMatch(source, /api\.machines\.dev|ensureWorkerAwake|FLY_API_TOKEN|
 const js = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
 }).outputText;
-const { callOwnerVolumeTransport } = await import(
+const { callOwnerVolumeTransport, ownerVolumeTransportEnabled } = await import(
   "data:text/javascript;base64," + Buffer.from(js).toString("base64"));
 
 const originalFetch = globalThis.fetch;
@@ -30,6 +30,7 @@ try {
   };
 
   process.env.ASCENSION_VOLUME_TRANSPORT_URL = "http://127.0.0.1:9091";
+  assert.equal(ownerVolumeTransportEnabled(), true);
   const local = await callOwnerVolumeTransport("/health", "GET");
   assert.equal(local.status, "LIVE_GOVERNED_TRANSPORT");
   assert.deepEqual(calls.map(c => c.url), ["http://127.0.0.1:9091/health"]);
@@ -51,6 +52,8 @@ try {
   ]) {
     calls.length = 0;
     process.env.ASCENSION_VOLUME_TRANSPORT_URL = forbidden;
+    assert.equal(ownerVolumeTransportEnabled(), false,
+      "Retired or unsafe endpoint must not be selected over the existing database");
     await assert.rejects(callOwnerVolumeTransport("/health", "GET"));
     assert.equal(calls.length, 0, `Do not send token or call network for ${forbidden}`);
   }

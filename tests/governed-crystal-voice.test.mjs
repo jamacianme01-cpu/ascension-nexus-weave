@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   governedVoiceCommand, deliveredCrystalChoices, choiceForVoiceCommand,
-  crystalHasPendingModels, reconcileCrystalMedia,
+  crystalHasPendingModels, reconcileCrystalMedia, evolvingCrystalResultIndex,
 } from "../src/lib/ascension/governed-crystal-voice.mjs";
 const entry=readFileSync("src/components/ascension/crystal-experience.tsx","utf8");
 const fixture = id=>({
@@ -18,6 +18,12 @@ const payload={kind:"answer",title:"Governed owner result",body:"Owner's origina
   files:[],limitations:["Engineering measurements not physically tested"]};
 const choices=deliveredCrystalChoices(payload);
 assert.equal(choices.length,4);
+assert.equal(evolvingCrystalResultIndex(choices),3,
+  "The actual blend becomes the continuing result, not a menu");
+assert.equal(evolvingCrystalResultIndex(choices,1),1,
+  "A previously selected recorded result is preserved on recall");
+assert.equal(evolvingCrystalResultIndex(choices,99),3,
+  "Invalid legacy saved selection must never become a fabricated result");
 assert.deepEqual(choices.map(x=>x.id),["claude","grok","openai","combined"]);
 assert.equal(choices[0].design.modelUrl,"https://example.invalid/verified-job-output.glb");
 assert.equal(choices[0].design.blueprintUrl,"https://example.invalid/blueprint.png");
@@ -30,13 +36,23 @@ const partial=deliveredCrystalChoices({
   ...payload, pathways:[fixture("claude"),fixture("grok")],
 });
 assert.deepEqual(partial.map(c=>c.id),["claude","grok","combined"],
+  "Partial source deliveries remain genuine and are never filled with fake slots");
+assert.equal(evolvingCrystalResultIndex(partial),2,
+  "Use a real delivered blend even when only partial source outputs exist");
   "A real BLEND must not erase two actually delivered pathways");
 assert.equal(choiceForVoiceCommand("choose blend",partial),2,
   "The actual BLEND remains voice-accessible without a fabricated fourth slot");
+assert.equal(evolvingCrystalResultIndex(deliveredCrystalChoices({
+  ...payload, pathways:[], blend:null,
+})),0, "An original single governed result remains a usable evolving result");
+assert.equal(evolvingCrystalResultIndex([]),-1);
 const fourWithoutBlend=deliveredCrystalChoices({
   ...payload, pathways:[fixture("claude"),fixture("grok"),fixture("openai"),fixture("fourth")],
 });
 assert.deepEqual(fourWithoutBlend.map(c=>c.id),["claude","grok","openai","fourth"],
+  "Real source outputs remain stored without inventing BLEND");
+assert.equal(evolvingCrystalResultIndex(fourWithoutBlend),0,
+  "Without a recorded blend choose the first actual answer, never synthesize one");
   "Never invent a fifth slot or hide genuine delivered pathways");
 assert.equal(choiceForVoiceCommand("choose blend",fourWithoutBlend),-1,
   "Four real pathways alone must not be mislabeled as a BLEND");
@@ -116,8 +132,12 @@ assert.match(entry,/parentRequestId: previous\.requestId/);
 assert.match(entry,/parentGuestToken: previous\.guestToken/);
 assert.match(entry,/followUp: "continue"/);
 assert.match(entry,/delivery\.source !== "governed"/);
-assert.match(entry,/if \(choices\.length > 1\)/,
-  "Show only the real number of delivered pathways");
+assert.match(entry,/const selectedResult = evolvingCrystalResultIndex\(choices\)/,
+  "The Tree must reveal the recorded evolving result without a chooser");
+assert.match(entry,/revealGovernedChoice\(selectedResult, false\)/,
+  "Present the real result automatically and do not duplicate receipt writes");
+assert.doesNotMatch(entry,/Tell me which pathway to enter\./,
+  "No obsolete spoken four-pathway menu on the current one-result screen");
 assert.match(entry,/reconcileCrystalMedia\(older, newer\)/);
 assert.match(entry,/governedAuth\.current\?\.requestId !== authorized\.requestId/,
   "Only the same authorized original run can hydrate a delivered GLB");
@@ -143,4 +163,4 @@ assert.doesNotMatch(smoke,/flyctl|FLY_API_TOKEN|superfly\//i,
   "Live V1 acceptance may never use Fly credentials or CLI after disconnection");
 assert.match(smoke,/Fly\/internal hosts are disconnected by the owner/,
   "Reject retired Fly hosts rather than connecting to them");
-console.log("PASS: owner-authorized engine handoff, literal original preservation, truthful four-or-single pathway voice reveal, no automatic disclosure");
+console.log("PASS: one owner-approved evolving result, genuine provider provenance saved, no selection menu or automatic disclosure");

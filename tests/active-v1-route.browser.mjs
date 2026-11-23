@@ -77,7 +77,12 @@ try {
   assert.equal(await page.getByText(/Tell me which pathway to enter\./).count(), 0,
     "Do not restore an obsolete pathway-choice instruction");
 
-  await page.getByRole("button", { name: "Speak with groundskeeper" }).click();
+  // The spoken welcome may already start the local microphone. Verify both
+  // supported states without toggling an active microphone off.
+  const mic = page.locator(".ascension-voice-anchor > button");
+  const micLabel = await mic.getAttribute("aria-label");
+  if (micLabel === "Speak with groundskeeper") await mic.click();
+  else assert.equal(micLabel, "Stop microphone");
   await page.waitForFunction(() => window.__micStarts > 0, null, { timeout: 10000 });
   await page.evaluate(() => {
     window.__activeRecognition.onresult({

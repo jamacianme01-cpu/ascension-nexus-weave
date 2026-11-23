@@ -24,3 +24,8 @@ export function reconcileCrystalMedia(
   original: CrystalGovernedChoice[],
   later: readonly CrystalGovernedChoice[],
 ): CrystalGovernedChoice[];
+/** Return the actually recorded continuing result index; never fabricate a provider or design. */
+export function evolvingCrystalResultIndex(
+  choices: readonly CrystalGovernedChoice[],
+  recordedIndex?: number | null,
+): number;

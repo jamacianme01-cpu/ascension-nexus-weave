@@ -17,6 +17,8 @@ export interface CrystalGovernedChoice {
   modelStatus: "queued" | "claimed" | "running" | "completed" | "failed" | null;
 }
 export function deliveredCrystalChoices(delivery: ObjectiveDelivery | null): CrystalGovernedChoice[];
+/** Explicit owner voice authorization bundled with a new intent; never matches plain intent. */
+export function explicitlyEngagedIntent(words: string): string | null;
 export function governedVoiceCommand(words: string): boolean;
 export function choiceForVoiceCommand(words: string, choices: readonly CrystalGovernedChoice[]): number;
 export function crystalHasPendingModels(choices: readonly CrystalGovernedChoice[]): boolean;

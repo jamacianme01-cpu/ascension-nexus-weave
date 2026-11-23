@@ -60,6 +60,11 @@ const collision=deliveredCrystalChoices({
   ...payload, pathways:[fixture("claude"),fixture("combined")],
 });
 assert.deepEqual(collision.map(c=>c.id),["claude","combined"],
+  "An already-included BLEND must not be duplicated");
+assert.equal(collision[1].isBlend,true,
+  "Preserve real BLEND provenance when the source already included it");
+assert.equal(evolvingCrystalResultIndex(collision),1,
+  "Prefer the original recorded BLEND without synthesizing a replacement");
   "A repeated BLEND id may never create a duplicate encrypted pathway");
 assert.equal(crystalHasPendingModels(choices),false);
 const waiting={...payload,pathways:[{

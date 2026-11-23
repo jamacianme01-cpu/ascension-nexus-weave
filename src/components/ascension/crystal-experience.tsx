@@ -31,6 +31,8 @@ import {
   type CrystalGrowth,
 } from "@/lib/ascension/crystal-return";
 import "./crystal-experience.css";
+import { readPendingGoverned, savePendingGoverned, clearPendingGoverned,
+  type PendingGoverned } from "@/lib/ascension/pending-governed-session.mjs";
 
 const BOOK = "/approved-scene/01-closed-book.jpg";
 // Original owner-approved single composition, Tree + Groundskeeper + Book together.
@@ -435,10 +437,100 @@ export function CrystalExperience() {
     speak(selected.title + ". " + selected.body + " " + components);
   }
 
+  async function watchGovernedIntent(
+    selected: IntentRecord, credentials: PendingGoverned, epoch: number,
+  ) {
+  let polling = false;
+  let failures = 0;
+  let finished = false;
+  const poll = async () => {
+    if (finished || polling || epoch !== governedEpoch.current ||
+        chosen.current?.id !== selected.id) return;
+    polling = true;
+    try {
+      const state = await getGuestObjectiveStatus({
+        data: { requestId: credentials.requestId, guestToken: credentials.guestToken },
+      });
+      if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+      const run = state.request;
+      if (!run) throw new Error("The authorized ASCENSION run could not be retrieved.");
+      if (run.status === "failed" || run.status === "rejected") {
+        throw new Error(run.error || "The governed engine rejected this intent.");
+      }
+      if (run.status !== "verified") { failures = 0; return; }
+      const delivery = await getGuestObjectiveDelivery({
+        data: { requestId: credentials.requestId, guestToken: credentials.guestToken },
+      });
+      if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+      if (delivery?.status !== "completed") { failures = 0; return; }
+      if (delivery.source !== "governed" || !delivery.response_payload ||
+          delivery.response_payload.kind === "not_produced") {
+        throw new Error(delivery.error || "The governed runtime did not deliver a real result.");
+      }
+      const choices = deliveredCrystalChoices(delivery.response_payload);
+      if (!choices.length) throw new Error("No actual engine result was delivered.");
+      governedChoices.current = choices;
+      setGovernedMediaPending(crystalHasPendingModels(choices));
+      // Write the actually delivered result under the same non-exportable
+      // AES-GCM key as its original crystal. Do not mark verified growth.
+      try {
+        await recordDeviceGovernedReceipt(selected.id, {
+          source: "governed",
+          requestId: credentials.requestId, guestToken: credentials.guestToken,
+          receivedAt: new Date().toISOString(),
+          choices, selectedIndex: null,
+        });
+      } catch (error) {
+        setIssue("Result delivered, but its encrypted recall could not be saved: " +
+          String(error));
+      }
+      if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
+      finished = true;
+      clearPendingGoverned(window.sessionStorage);
+      stopGovernedPolling();
+      // The server's verified run is NOT automatically copied into the
+      // device's verified-growth field; no physical proof is invented.
+      if (choices.length > 1) {
+        setAnswer(null);
+        const names = choices.map(p => p.isBlend === true ? "BLEND" : p.title);
+        speak("ASCENSION's governed runtime delivered " + choices.length +
+          " recorded pathways: " + names.join(", ") +
+          ". Tell me which pathway to enter.");
+      } else {
+        revealGovernedChoice(0);
+      }
+    } catch (error) {
+      failures++;
+      if (failures >= 3) {
+        finished = true;
+        stopGovernedPolling();
+        setIssue("Governed engine: " + (error instanceof Error ? error.message : String(error)).slice(0, 300));
+        speak("The governed engine did not deliver a usable result. Your original intent is still saved privately.");
+      }
+    } finally { polling = false; }
+  };
+  await poll();
+  if (!finished && epoch === governedEpoch.current) {
+    governedTimer.current = setInterval(() => { void poll(); }, 3500);
+  }
+  }
+
   async function runGovernedIntent(change: string | null = null) {
     const selected = chosen.current;
     if (!selected || workingRef.current || governedPending.current) {
       if (!selected) speak("First speak or recall the intent you want ASCENSION's engines to develop.");
+      return;
+    }
+    // Re-ENGAGE resumes the previously authorized request; never duplicate it.
+    const pending = readPendingGoverned(window.sessionStorage);
+    if (!change && pending?.crystalId === selected.id) {
+      const epoch = ++governedEpoch.current;
+      governedPending.current = true;
+      governedAuth.current = pending;
+      setGovernedWorking(true);
+      setIssue("");
+      speak("Resuming your existing authorized ASCENSION run. No new intent is being submitted.", false);
+      await watchGovernedIntent(selected, pending, epoch);
       return;
     }
     const previous = governedAuth.current?.crystalId === selected.id
@@ -482,78 +574,8 @@ export function CrystalExperience() {
       };
       governedAuth.current = credentials;
       speak("Your selected intent has been accepted by ASCENSION's configured governed runtime. I'll report what it actually delivers.", false);
-      let polling = false;
-      let failures = 0;
-      let finished = false;
-      const poll = async () => {
-        if (finished || polling || epoch !== governedEpoch.current ||
-            chosen.current?.id !== selected.id) return;
-        polling = true;
-        try {
-          const state = await getGuestObjectiveStatus({
-            data: { requestId: credentials.requestId, guestToken: credentials.guestToken },
-          });
-          if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
-          const run = state.request;
-          if (!run) throw new Error("The authorized ASCENSION run could not be retrieved.");
-          if (run.status === "failed" || run.status === "rejected") {
-            throw new Error(run.error || "The governed engine rejected this intent.");
-          }
-          if (run.status !== "verified") { failures = 0; return; }
-          const delivery = await getGuestObjectiveDelivery({
-            data: { requestId: credentials.requestId, guestToken: credentials.guestToken },
-          });
-          if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
-          if (delivery?.status !== "completed") { failures = 0; return; }
-          if (delivery.source !== "governed" || !delivery.response_payload ||
-              delivery.response_payload.kind === "not_produced") {
-            throw new Error(delivery.error || "The governed runtime did not deliver a real result.");
-          }
-          const choices = deliveredCrystalChoices(delivery.response_payload);
-          if (!choices.length) throw new Error("No actual engine result was delivered.");
-          governedChoices.current = choices;
-          setGovernedMediaPending(crystalHasPendingModels(choices));
-          // Write the actually delivered result under the same non-exportable
-          // AES-GCM key as its original crystal. Do not mark verified growth.
-          try {
-            await recordDeviceGovernedReceipt(selected.id, {
-              source: "governed",
-              requestId: credentials.requestId, guestToken: credentials.guestToken,
-              receivedAt: new Date().toISOString(),
-              choices, selectedIndex: null,
-            });
-          } catch (error) {
-            setIssue("Result delivered, but its encrypted recall could not be saved: " +
-              String(error));
-          }
-          if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
-          finished = true;
-          stopGovernedPolling();
-          // The server's verified run is NOT automatically copied into the
-          // device's verified-growth field; no physical proof is invented.
-          if (choices.length > 1) {
-            setAnswer(null);
-            const names = choices.map(p => p.isBlend === true ? "BLEND" : p.title);
-            speak("ASCENSION's governed runtime delivered " + choices.length +
-              " recorded pathways: " + names.join(", ") +
-              ". Tell me which pathway to enter.");
-          } else {
-            revealGovernedChoice(0);
-          }
-        } catch (error) {
-          failures++;
-          if (failures >= 3) {
-            finished = true;
-            stopGovernedPolling();
-            setIssue("Governed engine: " + (error instanceof Error ? error.message : String(error)).slice(0, 300));
-            speak("The governed engine did not deliver a usable result. Your original intent is still saved privately.");
-          }
-        } finally { polling = false; }
-      };
-      await poll();
-      if (!finished && epoch === governedEpoch.current) {
-        governedTimer.current = setInterval(() => { void poll(); }, 3500);
-      }
+      savePendingGoverned(window.sessionStorage, credentials);
+      await watchGovernedIntent(selected, credentials, epoch);
     } catch (error) {
       if (epoch !== governedEpoch.current) return;
       stopGovernedPolling();
@@ -635,6 +657,7 @@ export function CrystalExperience() {
       // This only stops browser polling; the authorized external run may still
       // be processing, and is never claimed cancelled by the Tree.
       stopGovernedPolling();
+      clearPendingGoverned(window.sessionStorage);
       governedAuth.current = null;
       governedChoices.current = [];
       governedIndex.current = null;
@@ -729,6 +752,23 @@ export function CrystalExperience() {
       const unseen = pendingGrowthSummary(saved, seenVerifiedGrowth());
       if (unseen.crystalCount > 0)
         speak(welcomeBackGrowth(unseen.crystalCount, unseen.revisionCount));
+      // A page refresh never submits a new request or creates a false result.
+      const pending = readPendingGoverned(window.sessionStorage);
+      if (pending) {
+        const crystal = saved.find(item => item.id === pending.crystalId);
+        if (crystal) {
+          chosen.current = { id: crystal.id, intent: crystal.intent };
+          governedAuth.current = pending;
+          setSelectedId(crystal.id);
+          const epoch = ++governedEpoch.current;
+          governedPending.current = true;
+          setGovernedWorking(true);
+          speak("I'm restoring the already-authorized ASCENSION run for your saved intent.", false);
+          void watchGovernedIntent(chosen.current, pending, epoch);
+        } else {
+          clearPendingGoverned(window.sessionStorage);
+        }
+      }
     } catch (cause) {
       setIssue("Library Card is not available: " + String(cause));
     }

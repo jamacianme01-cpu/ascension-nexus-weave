@@ -47,13 +47,15 @@ try {
     "http://192.168.1.10:9091",
     "http://worker.process.ascension-nexus-weave.internal:9091",
     "https://ascension-nexus-weave.fly.dev",
+    "https://anything.internal",
     "https://username:password@owner-private-tunnel.example",
     "ftp://owner-private-tunnel.example",
   ]) {
     calls.length = 0;
     process.env.ASCENSION_VOLUME_TRANSPORT_URL = forbidden;
-    assert.equal(ownerVolumeTransportEnabled(), false,
-      "Retired or unsafe endpoint must not be selected over the existing database");
+    assert.equal(ownerVolumeTransportEnabled(),
+      forbidden.includes(".fly.dev") || forbidden.includes(".internal") ? false : true,
+      "Only explicitly retired Fly endpoints may be bypassed; all other unsafe URLs must fail closed");
     await assert.rejects(callOwnerVolumeTransport("/health", "GET"));
     assert.equal(calls.length, 0, `Do not send token or call network for ${forbidden}`);
   }

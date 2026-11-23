@@ -128,3 +128,21 @@ export function reconcileCrystalMedia(original, later) {
   });
   return updated ? merged : original;
 }
+
+/**
+ * The active V1 Tree reveals ONE continuing result, never a provider chooser.
+ * Prefer an already owner-selected, recorded answer on recall; otherwise use
+ * the original runtime's actual BLEND when present, or its first real output.
+ * This chooses among genuine returned data and does not synthesize a result.
+ */
+export function evolvingCrystalResultIndex(choices, recordedIndex = null) {
+  if (!Array.isArray(choices) || !choices.length) return -1;
+  const usable = index => typeof choices[index]?.body === "string" &&
+    Boolean(choices[index].body.trim());
+  if (Number.isInteger(recordedIndex) && recordedIndex >= 0 &&
+      recordedIndex < choices.length && usable(recordedIndex)) return recordedIndex;
+  const blend = choices.findIndex((choice, index) =>
+    choice?.isBlend === true && usable(index));
+  if (blend !== -1) return blend;
+  return choices.findIndex((_, index) => usable(index));
+}

@@ -98,7 +98,15 @@ try {
 
   // The existing voice-first result can be a single delivered output or
   // multiple REAL engine choices. In either case, select only a real result.
-  await command("enter first");
+  // A genuine SINGLE result is revealed automatically. Sending "enter first"
+  // in that case would be mistaken for a NEW invention by the voice handler,
+  // falsely satisfying the test with an unrelated local crystal.
+  if (pathways) {
+    const count = Number(pathways.match(/delivered (\\d+) recorded pathways:/i)?.[1] ?? 0);
+    if (!Number.isInteger(count) || count < 2 || count > 4)
+      throw Error("Governed runtime announced an invalid number of real pathways");
+    await command("enter first");
+  }
   const delivered = page.locator("span.sr-only[role='status']").filter({
     hasNotText: "The authorized governed ASCENSION engine is processing",
   });

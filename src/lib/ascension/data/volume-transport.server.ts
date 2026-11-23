@@ -6,7 +6,17 @@
  */
 
 export function ownerVolumeTransportEnabled(): boolean {
-  return Boolean(process.env["ASCENSION_VOLUME_TRANSPORT_URL"]?.trim());
+  const endpoint = process.env["ASCENSION_VOLUME_TRANSPORT_URL"]?.trim();
+  if (!endpoint) return false;
+  // A retired Fly URL may remain in an old deployment's environment.
+  // Never select it as a transport: use the existing database path instead.
+  // Direct calls remain guarded separately by validatedOwnerEndpoint.
+  try {
+    validatedOwnerEndpoint(endpoint);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Credentials are never sent to a remote plaintext address. */

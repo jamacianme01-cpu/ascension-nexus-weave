@@ -31,3 +31,15 @@ import { readFileSync } from "node:fs";
 const tree = readFileSync(new URL("../src/components/ascension/crystal-experience.tsx", import.meta.url), "utf8");
 assert.match(tree, /if \(run\.status === "failed" \|\| run\.status === "rejected"\) \{[\s\S]*?finished = true;[\s\S]*?clearPendingGoverned\(window\.sessionStorage\);[\s\S]*?stopGovernedPolling\(\);[\s\S]*?return;/);
 assert.match(tree, /if \(failures >= 3\) \{[\s\S]*?stopGovernedPolling\(\);[\s\S]*?setIssue\("Governed engine:/);
+
+// A verified run with a completed but empty/invalid delivery is terminal;
+// a response still marked running continues polling as before.
+const completedEmpty = tree.slice(
+  tree.indexOf('if (delivery.source !== "governed"'),
+  tree.indexOf("governedChoices.current = choices;", tree.indexOf('if (delivery.source !== "governed"')),
+);
+assert.ok(completedEmpty.includes("clearPendingGoverned(window.sessionStorage);"));
+assert.ok(completedEmpty.includes("stopGovernedPolling();"));
+assert.ok(completedEmpty.includes("if (!choices.length) {"));
+assert.ok(completedEmpty.includes('speak("The completed governed run has no usable result.'));
+assert.match(tree, /if \(delivery\?\.status !== "completed"\) \{ failures = 0; return; \}/);

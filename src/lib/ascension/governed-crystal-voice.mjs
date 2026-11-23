@@ -35,9 +35,14 @@ export function deliveredCrystalChoices(delivery) {
     const imageUrl = choice.generated_image_url ?? null;
     const blueprintUrl = choice.generated_blueprint_url ?? null;
     const modelUrl = choice.model_url ?? null;
+    const recordedBlendId = typeof delivery.blend?.id === "string" &&
+      delivery.blend.id.trim() ? delivery.blend.id : null;
     return {
       id: choice.id,
-      isBlend: Boolean(appendBlend && index === pathways.length),
+      // A BLEND can already be in the original source pathways. Preserve its
+      // genuine identity without creating a duplicate or a synthetic slot.
+      isBlend: Boolean((appendBlend && index === pathways.length) ||
+        (recordedBlendId && choice.id === recordedBlendId)),
       title: choice.label || delivery.title,
       body: choice.summary || delivery.body,
       design: imageUrl || blueprintUrl || modelUrl ? {

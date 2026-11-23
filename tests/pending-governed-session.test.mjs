@@ -43,3 +43,36 @@ assert.ok(completedEmpty.includes("stopGovernedPolling();"));
 assert.ok(completedEmpty.includes("if (!choices.length) {"));
 assert.ok(completedEmpty.includes('speak("The completed governed run has no usable result.'));
 assert.match(tree, /if \(delivery\?\.status !== "completed"\) \{ failures = 0; return; \}/);
+
+
+// A live poll stays associated with its original crystal. A spoken new
+// objective or edit cannot silently replace its single-tab resume reference.
+const newIntentFlow = tree.slice(
+  tree.indexOf("processVoice.current = words =>"),
+  tree.indexOf("async function enter()")
+);
+const explicitReset = newIntentFlow.indexOf("clearPendingGoverned(window.sessionStorage);");
+const activeIntentGuard = newIntentFlow.lastIndexOf("if (governedPending.current)");
+const clearChosen = newIntentFlow.lastIndexOf("chosen.current = null;");
+assert.ok(explicitReset >= 0 && activeIntentGuard > explicitReset &&
+  clearChosen > activeIntentGuard);
+assert.match(newIntentFlow.slice(activeIntentGuard, clearChosen),
+  /setIssue\("An authorized ASCENSION run is still processing/);
+assert.match(newIntentFlow.slice(activeIntentGuard, clearChosen),
+  /return;/);
+
+const sendIntentGuard = tree.slice(
+  tree.indexOf("async function sendIntent(intent: string)"),
+  tree.indexOf("const parent = continuing.current")
+);
+assert.match(sendIntentGuard, /if \(governedPending\.current\) \{/);
+assert.match(sendIntentGuard, /return;/);
+
+const governedResumeGuard = tree.slice(
+  tree.indexOf("async function runGovernedIntent("),
+  tree.indexOf("const previous = governedAuth.current")
+);
+assert.match(governedResumeGuard,
+  /if \(pending && \(pending\.crystalId !== selected\.id \|\| change !== null\)\) \{/);
+assert.ok(governedResumeGuard.indexOf("if (pending &&") <
+  governedResumeGuard.indexOf("if (!change && pending?.crystalId === selected.id)"));

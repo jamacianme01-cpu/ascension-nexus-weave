@@ -455,7 +455,15 @@ export function CrystalExperience() {
       const run = state.request;
       if (!run) throw new Error("The authorized ASCENSION run could not be retrieved.");
       if (run.status === "failed" || run.status === "rejected") {
-        throw new Error(run.error || "The governed engine rejected this intent.");
+        // A definitive server rejection is not a temporary polling failure.
+        // Do not restore this terminal request forever after a tab refresh.
+        finished = true;
+        clearPendingGoverned(window.sessionStorage);
+        stopGovernedPolling();
+        setIssue("Governed engine: " + (run.error ||
+          "The governed engine rejected this intent.").slice(0, 300));
+        speak("The governed runtime did not complete this intent. Your original intent is still saved privately.");
+        return;
       }
       if (run.status !== "verified") { failures = 0; return; }
       const delivery = await getGuestObjectiveDelivery({

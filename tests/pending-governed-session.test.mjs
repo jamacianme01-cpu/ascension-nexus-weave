@@ -24,3 +24,10 @@ savePendingGoverned(store,creds,now);
 clearPendingGoverned(store);
 assert.equal(readPendingGoverned(store,now),null);
 console.log("PASS: same-tab governed request continuation with expiry and cleanup.");
+
+// Terminal governed failures must stop polling and drop the tab resume token;
+// transient communication errors must retain it for a later retry.
+import { readFileSync } from "node:fs";
+const tree = readFileSync(new URL("../src/components/ascension/crystal-experience.tsx", import.meta.url), "utf8");
+assert.match(tree, /if \(run\.status === "failed" \|\| run\.status === "rejected"\) \{[\s\S]*?finished = true;[\s\S]*?clearPendingGoverned\(window\.sessionStorage\);[\s\S]*?stopGovernedPolling\(\);[\s\S]*?return;/);
+assert.match(tree, /if \(failures >= 3\) \{[\s\S]*?stopGovernedPolling\(\);[\s\S]*?setIssue\("Governed engine:/);

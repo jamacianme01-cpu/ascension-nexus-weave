@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { assertNotRetiredFlyAddress } from "../src/lib/ascension/data/deny-retired-fly.mjs";
 
 // Execute the actual TypeScript bridge without accessing the network or secrets.
 const source = readFileSync(fileURLToPath(new URL(
@@ -12,6 +13,24 @@ const js = ts.transpileModule(source, {
 }).outputText;
 const { callOwnerVolumeTransport, ownerVolumeTransportEnabled } = await import(
   "data:text/javascript;base64," + Buffer.from(js).toString("base64"));
+
+const dbCode = readFileSync(fileURLToPath(new URL(
+  "../src/lib/ascension/data/postgres.server.ts", import.meta.url)), "utf8");
+assert.match(dbCode, /assertNotRetiredFlyAddress\(address\)/,
+  "Database must refuse old Fly addresses before opening a connection");
+for (const forbiddenDb of [
+  "postgres://owner:unused@ascension-nexus-weave.fly.dev/ascension",
+  "postgresql://owner:unused@top2.nearest.of.private.internal/ascension",
+  "postgres://owner:unused@private.flycast/ascension",
+  "postgres://owner:unused@fly.io/ascension",
+]) {
+  assert.throws(() => assertNotRetiredFlyAddress(forbiddenDb), /retired Fly database/,
+    "A leftover Fly database URL must never reconnect");
+}
+for (const existingDb of [
+  "postgresql://owner:unused@127.0.0.1:5432/ascension",
+  "postgres://owner:unused@existing-owner-db.example:5432/ascension",
+]) assert.doesNotThrow(() => assertNotRetiredFlyAddress(existingDb));
 
 const originalFetch = globalThis.fetch;
 const originalEnv = {

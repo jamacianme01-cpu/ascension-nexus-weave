@@ -293,9 +293,7 @@ export function CrystalExperience() {
         } else {
           setAnswer(null);
           speak("I've retrieved the recorded ASCENSION pathways for this original intent. " +
-            recorded.choices.map((p, index) =>
-              recorded.choices.length === 4 && index === 3 ? "BLEND" : p.title
-            ).join(", ") + ". Tell me which pathway to enter.");
+            recorded.choices.map(p => p.isBlend === true ? "BLEND" : p.title).join(", ") + ". Tell me which pathway to enter.");
         }
         return;
       }
@@ -513,8 +511,7 @@ export function CrystalExperience() {
           // device's verified-growth field; no physical proof is invented.
           if (choices.length > 1) {
             setAnswer(null);
-            const names = choices.map((p, i) =>
-              choices.length === 4 && i === 3 ? "BLEND" : p.title);
+            const names = choices.map(p => p.isBlend === true ? "BLEND" : p.title);
             speak("ASCENSION's governed runtime delivered " + choices.length +
               " recorded pathways: " + names.join(", ") +
               ". Tell me which pathway to enter.");

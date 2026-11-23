@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   governedVoiceCommand, deliveredCrystalChoices, choiceForVoiceCommand,
   crystalHasPendingModels, reconcileCrystalMedia, evolvingCrystalResultIndex,
+  explicitlyEngagedIntent,
 } from "../src/lib/ascension/governed-crystal-voice.mjs";
 const entry=readFileSync("src/components/ascension/crystal-experience.tsx","utf8");
 const fixture = id=>({
@@ -106,6 +107,25 @@ assert.equal(deliveredCrystalChoices({...payload,pathways:[{
   ...fixture("only"),generated_image_url:null,model_url:null,generated_blueprint_url:null,
 }],blend:null})[0].design,null,
 "Never invent a design image or geometry when the governed runtime has none");
+for(const [spoken, expected] of [
+  ["Engage ASCENSION, Design a modular workbench.", "Design a modular workbench."],
+  ["Run ASCENSION's engines: Model a garden irrigation nozzle.", "Model a garden irrigation nozzle."],
+  ["engage ascension; Build a folding chair.", "Build a folding chair."],
+]) assert.equal(explicitlyEngagedIntent(spoken), expected,
+  "One owner-authorized spoken objective is extracted verbatim");
+for(const unapproved of ["Design a modular workbench.", "engage ASCENSION",
+  "show the blueprint", "Engage ASCENSION I want to build an engine"]) {
+  assert.equal(explicitlyEngagedIntent(unapproved), null,
+    "Never infer remote authorization from an ordinary intent or incomplete command");
+}
+assert.match(entry, /const explicitlyAuthorized = explicitlyEngagedIntent\(input\)/,
+  "The active voice route recognizes the owner's explicit one-utterance instruction");
+assert.match(entry, /void sendIntent\(explicitlyAuthorized, true\)/,
+  "The one-utterance command preserves the owner-spoken objective");
+assert.match(entry, /if \(authorizeGoverned && !parent\)/,
+  "Only the explicit owner-spoken command may submit a fresh crystal to the governed engine");
+assert.match(entry, /await runGovernedIntent\(\)/,
+  "Submit only once the owner's original local crystal has been saved");
 for(const spoken of ["run ASCENSION's engines","run my intent through ASCENSION engines",
   "engage ASCENSION","use ASCENSION engines"]) assert.equal(governedVoiceCommand(spoken),true);
 for(const input of ["make a drone","build on result","open my original crystal","save my library card","show blueprint"]) {

@@ -101,6 +101,8 @@ assert.match(entry,/savePendingGoverned\(window\.sessionStorage, credentials\)/)
 assert.match(entry,/readPendingGoverned\(window\.sessionStorage\)/);
 assert.match(entry,/await watchGovernedIntent\(selected, pending, epoch\)/);
 assert.match(entry,/clearPendingGoverned\(window\.sessionStorage\)/);
+assert.match(entry,/if \(receiptSaved\) clearPendingGoverned\(window\.sessionStorage\)/,
+  "Only clear recovery after the actual encrypted governed receipt was saved");
 assert.match(entry,/const browserRecognitionAllowed = useRef\(false\)/);
 assert.match(entry,/const localRecognitionUnavailable = useRef\(false\)/);
 assert.match(entry,/if \(automatic\) \{ setBackup\(true\); return; \}/,

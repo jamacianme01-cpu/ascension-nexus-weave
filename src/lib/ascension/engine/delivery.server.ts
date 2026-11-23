@@ -1,4 +1,5 @@
 import type { Json } from "@/lib/ascension/data/types";
+import { selectGovernedAuthoredDelivery } from "./governed-authored-delivery.mjs";
 import { ASCENSION_GUIDE_INSTRUCTIONS } from "./guide-personality.server";
 import { buildGuideFallbackDelivery } from "./guide-fallback.server";
 import { callOpenAIResponse, type OpenAIWebSource } from "./openai.server";
@@ -93,34 +94,11 @@ export function governedDelivery(
   const result = record(run.result);
   if (!Object.keys(result).length) return null;
 
-  // The original governed runtime may publish an authored pathway delivery
-  // directly with its verified run. Preserve the actual four authored results
-  // instead of replacing them with an artifact summary. A planning branch alone
-  // is NOT a delivered solution, and no BLEND is constructed by this projection.
-  const authoredCandidates = [
-    record(result["objective_delivery"]),
-    record(result["delivery"]),
-    record(result["response_payload"]),
-    result,
-  ];
-  for (const authored of authoredCandidates) {
-    const paths = authored["pathways"];
-    if (!Array.isArray(paths) || paths.length !== 3 || !record(authored["blend"])["blend_reason"]) continue;
-    const body = typeof authored["body"] === "string" && authored["body"].trim()
-      ? authored["body"].trim()
-      : typeof authored["answer"] === "string" ? authored["answer"].trim() : "";
-    if (!body) continue;
-    const candidate = {
-      kind: authored["kind"] ?? "answer",
-      title: authored["title"] ?? run.objective,
-      body,
-      pathways: paths,
-      blend: authored["blend"],
-      files: artifactFiles(authored),
-      limitations: Array.isArray(authored["limitations"]) ? authored["limitations"] : [],
-    };
-    return parseDelivery(candidate);
-  }
+  // Accept only source-authored solutions, not the runtime's planning branches
+  // or artifact receipts. The earlier exact-3-plus-BLEND gate discarded actual
+  // one/two-pathway results even when they were delivered by the original core.
+  const authored = selectGovernedAuthoredDelivery(result, run.objective, artifactFiles);
+  if (authored) return parseDelivery(authored);
 
   const receipts = Array.isArray(result["execution_receipts"])
     ? result["execution_receipts"].flatMap((rawReceipt) => {

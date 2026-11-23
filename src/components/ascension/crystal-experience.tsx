@@ -473,6 +473,7 @@ export function CrystalExperience() {
       setGovernedMediaPending(crystalHasPendingModels(choices));
       // Write the actually delivered result under the same non-exportable
       // AES-GCM key as its original crystal. Do not mark verified growth.
+      let receiptSaved = false;
       try {
         await recordDeviceGovernedReceipt(selected.id, {
           source: "governed",
@@ -480,13 +481,16 @@ export function CrystalExperience() {
           receivedAt: new Date().toISOString(),
           choices, selectedIndex: null,
         });
+        receiptSaved = true;
       } catch (error) {
         setIssue("Result delivered, but its encrypted recall could not be saved: " +
           String(error));
       }
       if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
       finished = true;
-      clearPendingGoverned(window.sessionStorage);
+      // If encrypted persistence failed, keep the tab's correlation so the
+      // same delivered result can be recovered without another submission.
+      if (receiptSaved) clearPendingGoverned(window.sessionStorage);
       stopGovernedPolling();
       // The server's verified run is NOT automatically copied into the
       // device's verified-growth field; no physical proof is invented.

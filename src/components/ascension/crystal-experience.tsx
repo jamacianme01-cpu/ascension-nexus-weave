@@ -471,12 +471,27 @@ export function CrystalExperience() {
       });
       if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
       if (delivery?.status !== "completed") { failures = 0; return; }
+      // A completed delivery is final, even when it contains no usable
+      // governed output. Do not keep restoring the same terminal response.
       if (delivery.source !== "governed" || !delivery.response_payload ||
           delivery.response_payload.kind === "not_produced") {
-        throw new Error(delivery.error || "The governed runtime did not deliver a real result.");
+        finished = true;
+        clearPendingGoverned(window.sessionStorage);
+        stopGovernedPolling();
+        setIssue("Governed engine: " + (delivery.error ||
+          "The governed runtime did not deliver a real result.").slice(0, 300));
+        speak("The completed governed run has no usable result. Your original intent remains saved privately.");
+        return;
       }
       const choices = deliveredCrystalChoices(delivery.response_payload);
-      if (!choices.length) throw new Error("No actual engine result was delivered.");
+      if (!choices.length) {
+        finished = true;
+        clearPendingGoverned(window.sessionStorage);
+        stopGovernedPolling();
+        setIssue("Governed engine: No actual engine result was delivered.");
+        speak("The completed governed run has no usable result. Your original intent remains saved privately.");
+        return;
+      }
       governedChoices.current = choices;
       setGovernedMediaPending(crystalHasPendingModels(choices));
       // Write the actually delivered result under the same non-exportable

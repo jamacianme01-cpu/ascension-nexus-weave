@@ -66,6 +66,10 @@ assert.match(backupUI, /Restore without overwriting/);
 assert.doesNotMatch(backups, /\bfetch\(|\bXMLHttpRequest\b|localStorage\./);
 
 assert.match(scene, /if \(governedVoiceCommand\(input\)\)/);
+assert.match(scene, /p\.isBlend === true \? "BLEND" : p\.title/,
+  "The Tree must announce only a real BLEND, not always the fourth position");
+assert.doesNotMatch(scene, /choices\.length === 4 && i === 3/,
+  "Four genuine non-BLEND pathways must never be mislabeled");
 assert.match(scene, /submitGuestObjective/);
 assert.match(scene, /getGuestObjectiveStatus/);
 assert.match(scene, /getGuestObjectiveDelivery/);

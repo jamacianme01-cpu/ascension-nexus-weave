@@ -19,6 +19,7 @@ import {
 } from "@/lib/ascension/guest.functions";
 import {
   choiceForVoiceCommand, deliveredCrystalChoices, governedVoiceCommand,
+  explicitlyEngagedIntent,
   crystalHasPendingModels, reconcileCrystalMedia, evolvingCrystalResultIndex,
   type CrystalGovernedChoice,
 } from "@/lib/ascension/governed-crystal-voice.mjs";
@@ -340,7 +341,7 @@ export function CrystalExperience() {
     }
   }
 
-  async function sendIntent(intent: string) {
+  async function sendIntent(intent: string, authorizeGoverned = false) {
     const statement = intent.trim();
     if (!statement || workingRef.current) return;
     // New/edited on-device intent must not replace the currently tracked
@@ -398,7 +399,14 @@ export function CrystalExperience() {
       await refreshCrystals();
       workingRef.current = false;
       setWorking(false);
-      speak(message);
+      if (authorizeGoverned && !parent) {
+        // Owner spoke explicit ENGAGE together with the objective. Submit
+        // only after its original encrypted on-device crystal was created.
+        // A plain spoken objective still stays private on this device.
+        await runGovernedIntent();
+      } else {
+        speak(message);
+      }
     } catch (cause) {
       if (epoch !== requestEpoch.current) return;
       workingRef.current = false;
@@ -650,6 +658,11 @@ export function CrystalExperience() {
     const lower = input.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!enteredRef.current) { void enter(); return; }
     if (workingRef.current) return;
+    const explicitlyAuthorized = explicitlyEngagedIntent(input);
+    if (explicitlyAuthorized) {
+      void sendIntent(explicitlyAuthorized, true);
+      return;
+    }
     if (governedVoiceCommand(input)) {
       if (governedPending.current) {
         speak("This intent is already processing in the authorized ASCENSION runtime.");

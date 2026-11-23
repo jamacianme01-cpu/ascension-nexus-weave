@@ -19,7 +19,7 @@ import {
 } from "@/lib/ascension/guest.functions";
 import {
   choiceForVoiceCommand, deliveredCrystalChoices, governedVoiceCommand,
-  crystalHasPendingModels, reconcileCrystalMedia,
+  crystalHasPendingModels, reconcileCrystalMedia, evolvingCrystalResultIndex,
   type CrystalGovernedChoice,
 } from "@/lib/ascension/governed-crystal-voice.mjs";
 import {
@@ -307,17 +307,14 @@ export function CrystalExperience() {
           guestToken: recorded.guestToken,
         };
         governedChoices.current = recorded.choices;
-        governedIndex.current = recorded.selectedIndex;
+        const selectedResult = evolvingCrystalResultIndex(recorded.choices, recorded.selectedIndex);
+        governedIndex.current = selectedResult >= 0 ? selectedResult : null;
         setGovernedMediaPending(crystalHasPendingModels(recorded.choices));
-        if (recorded.selectedIndex !== null &&
-            recorded.choices[recorded.selectedIndex]) {
-          revealGovernedChoice(recorded.selectedIndex);
-        } else if (recorded.choices.length === 1) {
-          revealGovernedChoice(0);
+        if (selectedResult >= 0) {
+          revealGovernedChoice(selectedResult, false);
         } else {
           setAnswer(null);
-          speak("I've retrieved the recorded ASCENSION pathways for this original intent. " +
-            recorded.choices.map(p => p.isBlend === true ? "BLEND" : p.title).join(", ") + ". Tell me which pathway to enter.");
+          speak("This original intent is saved, but it has no usable governed result.");
         }
         return;
       }
@@ -426,13 +423,13 @@ export function CrystalExperience() {
       ". Does: " + (part.purpose || "The delivered result does not specify a function."));
   }
 
-  function revealGovernedChoice(index: number) {
+  function revealGovernedChoice(index: number, persistSelection = true) {
     const selected = governedChoices.current[index];
     if (!selected || !chosen.current ||
         governedAuth.current?.crystalId !== chosen.current.id) return;
     governedIndex.current = index;
     const credentials = governedAuth.current;
-    if (credentials) {
+    if (credentials && persistSelection) {
       void selectDeviceGovernedResult(credentials.crystalId, credentials.requestId, index)
         .catch(error => setIssue("Private result selection was not saved: " + String(error)));
     }
@@ -499,7 +496,17 @@ export function CrystalExperience() {
         speak("The completed governed run has no usable result. Your original intent remains saved privately.");
         return;
       }
+      const selectedResult = evolvingCrystalResultIndex(choices);
+      if (selectedResult < 0) {
+        finished = true;
+        clearPendingGoverned(window.sessionStorage);
+        stopGovernedPolling();
+        setIssue("Governed engine: The completed result contains no usable answer.");
+        speak("The governed runtime did not deliver a usable result. Your intent remains saved.");
+        return;
+      }
       governedChoices.current = choices;
+      governedIndex.current = selectedResult;
       setGovernedMediaPending(crystalHasPendingModels(choices));
       // Write the actually delivered result under the same non-exportable
       // AES-GCM key as its original crystal. Do not mark verified growth.
@@ -509,7 +516,7 @@ export function CrystalExperience() {
           source: "governed",
           requestId: credentials.requestId, guestToken: credentials.guestToken,
           receivedAt: new Date().toISOString(),
-          choices, selectedIndex: null,
+          choices, selectedIndex: selectedResult,
         });
         receiptSaved = true;
       } catch (error) {
@@ -524,15 +531,10 @@ export function CrystalExperience() {
       stopGovernedPolling();
       // The server's verified run is NOT automatically copied into the
       // device's verified-growth field; no physical proof is invented.
-      if (choices.length > 1) {
-        setAnswer(null);
-        const names = choices.map(p => p.isBlend === true ? "BLEND" : p.title);
-        speak("ASCENSION's governed runtime delivered " + choices.length +
-          " recorded pathways: " + names.join(", ") +
-          ". Tell me which pathway to enter.");
-      } else {
-        revealGovernedChoice(0);
-      }
+      // The Groundskeeper presents one actual evolving design/conversation.
+      // Other authentic source outputs remain recorded privately, not
+      // displayed as an old provider selection screen.
+      revealGovernedChoice(selectedResult, false);
     } catch (error) {
       failures++;
       if (failures >= 3) {
@@ -657,11 +659,13 @@ export function CrystalExperience() {
       return;
     }
     if (governedChoices.current.length) {
-      const index = choiceForVoiceCommand(input, governedChoices.current);
-      if (index >= 0) { revealGovernedChoice(index); return; }
-      if (/^(?:what did the engines produce|show the pathways|what are the pathways)$/.test(lower)) {
-        speak("The recorded results are " + governedChoices.current.map(p => p.title).join(", ") +
-          ". Tell me which one to enter.");
+      // Legacy pathway commands must never open a second chooser or become a
+      // new invention. The active experience keeps one evolving result.
+      const oldSelection = choiceForVoiceCommand(input, governedChoices.current);
+      if (oldSelection >= 0 ||
+          /^(?:what did the engines produce|show the pathways|what are the pathways)$/.test(lower)) {
+        speak(answerRef.current?.body ||
+          "The original governed results are saved. Recall this crystal to hear the current design.");
         return;
       }
     }

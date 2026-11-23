@@ -1,9 +1,11 @@
 /**
  * ASCENSION's native PostgreSQL transport, using the existing database.
  * Does not initialize tables, create a replacement database, or alter governed state.
- * Requires DATABASE_URL / ASCENSION_DATABASE_URL as a private Fly secret.
+ * Uses an existing owner-approved DATABASE_URL / ASCENSION_DATABASE_URL.
+ * Retired Fly database addresses are rejected before a connection is created.
  */
 import postgres from "postgres";
+import { assertNotRetiredFlyAddress } from "./deny-retired-fly.mjs";
 
 export type DatabaseError = { message: string; code?: string };
 type Result<T> = { data: T | null; error: DatabaseError | null; count: number | null };
@@ -16,7 +18,7 @@ type Row = {
   [key: string]: any;
 };
 const OFFLINE: DatabaseError = {
-  message: "ASCENSION database connection is not configured on Fly (DATABASE_URL).",
+  message: "ASCENSION database connection is not configured (DATABASE_URL or ASCENSION_DATABASE_URL).",
   code: "ASCENSION_DB_NOT_CONFIGURED",
 };
 const connectionString = () => process.env["ASCENSION_DATABASE_URL"]?.trim() || process.env["DATABASE_URL"]?.trim() || "";
@@ -24,6 +26,7 @@ let connection: ReturnType<typeof postgres> | null = null;
 function database() {
   const address = connectionString();
   if (!address) throw Object.assign(new Error(OFFLINE.message), { code: OFFLINE.code });
+  assertNotRetiredFlyAddress(address);
   if (!connection) connection = postgres(address, { max: 3, prepare: false, connect_timeout: 8, idle_timeout: 15 });
   return connection;
 }

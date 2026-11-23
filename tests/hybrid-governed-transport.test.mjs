@@ -10,7 +10,7 @@ assert.doesNotMatch(source, /api\.machines\.dev|ensureWorkerAwake|FLY_API_TOKEN|
 const js = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
 }).outputText;
-const { callOwnerVolumeTransport } = await import(
+const { callOwnerVolumeTransport, ownerVolumeTransportEnabled } = await import(
   "data:text/javascript;base64," + Buffer.from(js).toString("base64"));
 
 const originalFetch = globalThis.fetch;
@@ -30,6 +30,7 @@ try {
   };
 
   process.env.ASCENSION_VOLUME_TRANSPORT_URL = "http://127.0.0.1:9091";
+  assert.equal(ownerVolumeTransportEnabled(), true);
   const local = await callOwnerVolumeTransport("/health", "GET");
   assert.equal(local.status, "LIVE_GOVERNED_TRANSPORT");
   assert.deepEqual(calls.map(c => c.url), ["http://127.0.0.1:9091/health"]);
@@ -46,11 +47,15 @@ try {
     "http://192.168.1.10:9091",
     "http://worker.process.ascension-nexus-weave.internal:9091",
     "https://ascension-nexus-weave.fly.dev",
+    "https://anything.internal",
     "https://username:password@owner-private-tunnel.example",
     "ftp://owner-private-tunnel.example",
   ]) {
     calls.length = 0;
     process.env.ASCENSION_VOLUME_TRANSPORT_URL = forbidden;
+    assert.equal(ownerVolumeTransportEnabled(),
+      forbidden.includes(".fly.dev") || forbidden.includes(".internal") ? false : true,
+      "Only explicitly retired Fly endpoints may be bypassed; all other unsafe URLs must fail closed");
     await assert.rejects(callOwnerVolumeTransport("/health", "GET"));
     assert.equal(calls.length, 0, `Do not send token or call network for ${forbidden}`);
   }

@@ -130,6 +130,10 @@ export function CrystalExperience() {
   const enteredRef = useRef(false);
   const workingRef = useRef(false);
   const recognition = useRef<Recognition | null>(null);
+  // A browser speech provider may receive audio. Only a direct microphone
+  // tap and explicit owner consent may enable that non-local fallback.
+  const browserRecognitionAllowed = useRef(false);
+  const localRecognitionUnavailable = useRef(false);
   const lastPresentedJob = useRef<string | null>(null);
   const requestEpoch = useRef(0);
   const chosen = useRef<IntentRecord | null>(null);
@@ -210,12 +214,24 @@ export function CrystalExperience() {
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
     const mic = new Ctor();
-    if (!("processLocally" in mic)) {
-      setBackup(true);
-      if (!automatic) setIssue("This browser does not support on-device speech recognition; typed intent stays private on your device.");
-      return;
+    if ("processLocally" in mic && !localRecognitionUnavailable.current) {
+      mic.processLocally = true;
+    } else if (!browserRecognitionAllowed.current) {
+      // Never turn on remote browser recognition after an automatic welcome.
+      // Only the explicit microphone button may request informed consent.
+      if (automatic) { setBackup(true); return; }
+      const allowed = window.confirm(
+        "On-device speech recognition is unavailable in this browser. " +
+        "Using the browser's speech service may send microphone audio to its provider. " +
+        "Allow browser speech recognition for this ASCENSION session?"
+      );
+      if (!allowed) {
+        setBackup(true);
+        setIssue("Browser speech recognition was not enabled. Your intent stays on this device.");
+        return;
+      }
+      browserRecognitionAllowed.current = true;
     }
-    mic.processLocally = true;
     recognition.current = mic;
     mic.lang = "en-US";
     mic.continuous = false;
@@ -227,6 +243,12 @@ export function CrystalExperience() {
     mic.onerror = event => {
       if (recognition.current !== mic) return;
       setListening(false);
+      if (event.error === "language-not-supported" && mic.processLocally) {
+        localRecognitionUnavailable.current = true;
+        setIssue("On-device English speech recognition is unavailable. Tap the microphone again to choose whether to use the browser speech provider.");
+        setBackup(true);
+        return;
+      }
       if (event.error !== "no-speech" && event.error !== "aborted") {
         setIssue("Microphone: " + event.error);
         setBackup(true);

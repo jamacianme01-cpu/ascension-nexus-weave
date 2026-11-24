@@ -100,7 +100,8 @@ try {
   const neutralIntent = "Design a modular tabletop organizer with two compartments.";
   const transmitted = [];
   page.on("request", request => {
-    if (request.method() !== "POST") return;
+    if (request.method() !== "POST" ||
+        new URL(request.url()).origin !== new URL(address).origin) return;
     const body = request.postData() || "";
     if (body.includes(neutralIntent) || body.includes("folding cable tray")) {
       transmitted.push({url: request.url(), body});
@@ -124,6 +125,7 @@ try {
   const spokenAuthorized = "Engage ASCENSION, Design a folding cable tray.";
   const submission = page.waitForEvent("request", {
     predicate: request => request.method() === "POST" &&
+      new URL(request.url()).origin === new URL(address).origin &&
       (request.postData() || "").includes("Design a folding cable tray."),
     timeout: 30000,
   });

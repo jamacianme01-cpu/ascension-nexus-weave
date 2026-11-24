@@ -61,7 +61,10 @@ export function deliveredCrystalChoices(delivery) {
  */
 export function explicitlyEngagedIntent(words) {
   const raw = String(words || "").trim();
-  const match = raw.match(/^(?:engage\s+ascension(?:\s+engines)?|run\s+ascension(?:'s)?\s+engines)\s*[,;:]\s*(\S[\s\S]*)$/i);
+  // Speech recognizers often omit punctuation after "Engage ASCENSION".
+  // Accept a clearly spoken action/request without requiring a comma, while
+  // rejecting bare ENGAGE or unrelated words as remote-upload permission.
+  const match = raw.match(/^(?:engage\s+ascension(?:\s+engines)?|run\s+ascension(?:'s)?\s+engines)(?:\s*[,;:.]\s*|\s+(?:to\s+)?(?=(?:i|we|design|create|build|make|develop|invent|improve|explore|explain|fix|repair|produce|generate|show|plan|research|analyze|help)\b))(\S[\s\S]*)$/i);
   return match ? match[1].trim() : null;
 }
 export function governedVoiceCommand(words) {

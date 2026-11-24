@@ -111,10 +111,16 @@ for(const [spoken, expected] of [
   ["Engage ASCENSION, Design a modular workbench.", "Design a modular workbench."],
   ["Run ASCENSION's engines: Model a garden irrigation nozzle.", "Model a garden irrigation nozzle."],
   ["engage ascension; Build a folding chair.", "Build a folding chair."],
+  ["Engage ASCENSION design a folding cable tray.", "design a folding cable tray."],
+  ["Engage ASCENSION I want to design a memory aid.", "I want to design a memory aid."],
+  ["Run ASCENSION's engines to make a model.", "make a model."],
+  ["Engage ASCENSION. Create an equipment rack.", "Create an equipment rack."],
 ]) assert.equal(explicitlyEngagedIntent(spoken), expected,
   "One owner-authorized spoken objective is extracted verbatim");
 for(const unapproved of ["Design a modular workbench.", "engage ASCENSION",
-  "show the blueprint", "Engage ASCENSION I want to build an engine"]) {
+  "show the blueprint", "Engage ASCENSION without permission",
+  "Engage ASCENSION please", "Engage ASCENSION and tell me",
+  "I want to engage ASCENSION to design a lamp"]) {
   assert.equal(explicitlyEngagedIntent(unapproved), null,
     "Never infer remote authorization from an ordinary intent or incomplete command");
 }

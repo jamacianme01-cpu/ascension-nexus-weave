@@ -95,6 +95,48 @@ try {
     )), null, { timeout: 10000 });
   assert.equal(await page.locator(".ascension-crystal-reality").count(), 0,
     "A voice question with no recorded result must not fabricate one");
+  // Exercise the real local-first creation flow on the ACTUAL route.
+  // No backend is mocked as successful and no invented result is accepted.
+  const neutralIntent = "Design a modular tabletop organizer with two compartments.";
+  const transmitted = [];
+  page.on("request", request => {
+    if (request.method() !== "POST") return;
+    const body = request.postData() || "";
+    if (body.includes(neutralIntent) || body.includes("folding cable tray")) {
+      transmitted.push({url: request.url(), body});
+    }
+  });
+  await page.evaluate(words => window.__activeRecognition.onresult({
+    results: [[{ transcript: words }]],
+  }), neutralIntent);
+  await page.locator(".ascension-tree-crystal[data-active='true']").waitFor({ timeout: 15000 });
+  assert.equal(transmitted.filter(request => request.body.includes(neutralIntent)).length, 0,
+    "A plain owner intent must never leak to the governed web server");
+  assert.equal(await page.locator(".ascension-crystal-reality").count(), 0,
+    "Saving an intent is not a completed design");
+
+  // Reuse the same voice-only interaction to make a deliberate, explicit
+  // owner-authorized governed submission. The existing backend may be
+  // unconfigured in CI, but the actual submission must be attempted once.
+  await page.evaluate(() => window.__activeRecognition.onresult({
+    results: [[{ transcript: "new intent" }]],
+  }));
+  const spokenAuthorized = "Engage ASCENSION, Design a folding cable tray.";
+  const submission = page.waitForEvent("request", {
+    predicate: request => request.method() === "POST" &&
+      (request.postData() || "").includes("Design a folding cable tray."),
+    timeout: 30000,
+  });
+  await page.evaluate(words => {
+    if (!window.__activeRecognition) throw Error("Voice recognition disappeared");
+    window.__activeRecognition.onresult({results: [[{ transcript: words }]]});
+  }, spokenAuthorized);
+  await submission;
+  assert.equal(transmitted.filter(request =>
+    request.body.includes("Design a folding cable tray.")).length, 1,
+    "The explicit spoken authorized intent must produce exactly one governed submission");
+  assert.equal(await page.locator(".ascension-crystal-reality").count(), 0,
+    "A server submission is not proof of a delivered design");
   assert.deepEqual(errors, [], "The REAL active Book/Tree route must not crash");
 
   console.log("PASS: real / route loads original Book and Tree, spoken welcome and active voice control; no fabricated result or old chooser.");

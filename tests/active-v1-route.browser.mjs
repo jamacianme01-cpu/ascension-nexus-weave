@@ -122,7 +122,8 @@ try {
   await page.evaluate(() => window.__activeRecognition.onresult({
     results: [[{ transcript: "new intent" }]],
   }));
-  const spokenAuthorized = "Engage ASCENSION, Design a folding cable tray.";
+  // Real speech recognizers may omit a comma after the ENGAGE command.
+  const spokenAuthorized = "Engage ASCENSION design a folding cable tray.";
   const submission = page.waitForEvent("request", {
     predicate: request => request.method() === "POST" &&
       new URL(request.url()).origin === new URL(address).origin &&

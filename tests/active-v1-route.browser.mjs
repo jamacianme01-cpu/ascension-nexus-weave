@@ -127,7 +127,7 @@ try {
   const submission = page.waitForEvent("request", {
     predicate: request => request.method() === "POST" &&
       new URL(request.url()).origin === new URL(address).origin &&
-      (request.postData() || "").includes("Design a folding cable tray."),
+      (request.postData() || "").includes("design a folding cable tray."),
     timeout: 30000,
   });
   await page.evaluate(words => {
@@ -136,7 +136,7 @@ try {
   }, spokenAuthorized);
   await submission;
   assert.equal(transmitted.filter(request =>
-    request.body.includes("Design a folding cable tray.")).length, 1,
+    request.body.includes("design a folding cable tray.")).length, 1,
     "The explicit spoken authorized intent must produce exactly one governed submission");
   assert.equal(await page.locator(".ascension-crystal-reality").count(), 0,
     "A server submission is not proof of a delivered design");

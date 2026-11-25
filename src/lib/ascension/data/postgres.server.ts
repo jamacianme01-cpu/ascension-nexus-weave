@@ -6,6 +6,7 @@
  */
 import postgres from "postgres";
 import { assertNotRetiredFlyAddress } from "./deny-retired-fly.mjs";
+import { shouldAcceptRelayRevision, governedQueueTransition } from "./relay-queue-safety.mjs";
 
 export type DatabaseError = { message: string; code?: string };
 type Result<T> = { data: T | null; error: DatabaseError | null; count: number | null };
@@ -212,7 +213,7 @@ export async function persistRelayPublication(
       'SELECT MAX("revision") AS "latest" FROM public."ascension_relay_documents"',
     );
     const latest = current[0]?.latest;
-    if (latest != null && revision <= Number(latest)) {
+    if (!shouldAcceptRelayRevision(latest, revision)) {
       // Exact or outdated replay: no prune, no upsert, no sidecar rollback.
       return { accepted: false, revision: Number(latest) };
     }
@@ -266,16 +267,9 @@ export async function persistRuntimeQueueReport(
       [id, "governed_runtime"],
     );
     const existing = found[0]?.status as string | undefined;
-    if (!existing) return { kind: "missing" as const };
-    const final = ["verified", "failed", "rejected"].includes(existing);
-    if (final) {
-      return existing === requested
-        ? { kind: "replayed" as const, status: existing }
-        : { kind: "conflict" as const, status: existing };
-    }
-    if (!["claimed", "running"].includes(existing) ||
-        (existing === "running" && requested === "claimed"))
-      return { kind: "conflict" as const, status: existing };
+    const transition = governedQueueTransition(existing, requested);
+    if (transition !== "updated")
+      return { kind: transition, status: existing };
     const params: unknown[] = [];
     const assignments = Object.entries(patch).map(([field, value]) =>
       identifier(field) + "=" + valueSql(params, field, value)

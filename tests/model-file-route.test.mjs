@@ -67,14 +67,43 @@ try {
     "https://owner.example.invalid/api/public/ascension/model-file?path=" +
     encodeURIComponent(object) + "&expires=" + expires + "&signature=" + sig;
 
-  // A valid, minimal GLB container: glTF v2 + one four-byte JSON chunk.
-  const glb = Buffer.alloc(24);
+  // Structurally valid geometry, not a fake 'glTF' header or empty JSON.
+  const gltf = {
+    asset: {version: "2.0"},
+    buffers: [{byteLength: 36}],
+    bufferViews: [{buffer: 0, byteOffset: 0, byteLength: 36}],
+    accessors: [{bufferView: 0, componentType: 5126, count: 3, type: "VEC3"}],
+    meshes: [{primitives: [{attributes: {POSITION: 0}}]}],
+    nodes: [{mesh: 0}],
+    scenes: [{nodes: [0]}],
+    scene: 0,
+  };
+  const json = Buffer.from(JSON.stringify(gltf));
+  const paddedJson = Buffer.concat([json, Buffer.alloc((4 - json.length % 4) % 4, 0x20)]);
+  const bin = Buffer.alloc(36);
+  for (const [i, n] of [0,0,0, 1,0,0, 0,1,0].entries()) bin.writeFloatLE(n, i*4);
+  const glb = Buffer.alloc(12 + 8 + paddedJson.length + 8 + bin.length);
   glb.write("glTF", 0, "ascii");
   glb.writeUInt32LE(2, 4);
-  glb.writeUInt32LE(24, 8);
-  glb.writeUInt32LE(4, 12);
+  glb.writeUInt32LE(glb.length, 8);
+  glb.writeUInt32LE(paddedJson.length, 12);
   glb.writeUInt32LE(0x4e4f534a, 16);
-  glb.write("{}  ", 20, "ascii");
+  paddedJson.copy(glb, 20);
+  const binaryOffset = 20 + paddedJson.length;
+  glb.writeUInt32LE(bin.length, binaryOffset);
+  glb.writeUInt32LE(0x004e4942, binaryOffset+4);
+  bin.copy(glb, binaryOffset+8);
+
+  const { validateGlbGeometry } = await server.ssrLoadModule(
+    "/src/lib/ascension/data/glb-geometry.mjs");
+  assert.equal(validateGlbGeometry(glb), true);
+  const emptyGlb = Buffer.from(glb);
+  const gltfNoMesh = {...gltf, meshes: []};
+  // A geometrically empty JSON chunk cannot be accepted as a 3D invention.
+  const emptyJson = Buffer.from(JSON.stringify(gltfNoMesh).padEnd(paddedJson.length," "));
+  emptyJson.copy(emptyGlb,20);
+  assert.equal(validateGlbGeometry(emptyGlb), false);
+
   assert.equal((await handlers.PUT({request:new Request(makeUrl("0".repeat(64)),{
     method:"PUT",body:glb})})).status, 403);
   assert.equal((await handlers.PUT({request:new Request(makeUrl(),{

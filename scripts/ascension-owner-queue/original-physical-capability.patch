@@ -18,9 +18,10 @@
 +        capability_id="physical_design",
 +        name="Universal Construction (Physical Design)",
 +        description=(
-+            "Routes physical/hardware design objectives through the existing "
-+            "UniversalConstructionEngine (design specification, layers, twin lattice, evidence). "
-+            "Does not claim physical manufacture when only design/simulation artifacts are produced."
++            "Routes physical/hardware design objectives through the original "
++            "UniversalConstructionEngine Hunyuan3D generation adapter. Only an "
++            "integrity-validated model candidate is a deliverable; unmeasured "
++            "designs never claim dimensional or manufacturing verification."
 +        ),
 +        accepted_intent_tokens=[
 +            "build", "create", "construct", "design", "make", "produce",
@@ -29,13 +30,13 @@
 +        ],
 +        output_contract="physical_design",
 +        constraints=[
-+            "design and simulation artifacts only unless fabrication backends are present",
-+            "no false manufacture claims",
-+            "evidence required",
++            "owner-approved local reference image required",
++            "no simulated crystal or triangle placeholder output",
++            "GLB source hashes and validation evidence required",
 +        ],
 +        required_authority="CLARITY:orchestrator",
-+        evidence_produced="construction job evidence, design specification, layer and provenance records",
-+        verification_method="ConstructionJob verification_evidence + file receipts",
++        evidence_produced="actual Hunyuan GLB digest and matched original metadata receipt",
++        verification_method="glTF v2 header, byte length and SHA256 against original metadata",
 +        risk_class="medium",
 +        available=True,
 +    )

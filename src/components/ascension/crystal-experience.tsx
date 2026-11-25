@@ -271,8 +271,14 @@ export function CrystalExperience() {
     mic.continuous = false;
     mic.interimResults = false;
     mic.onresult = event => {
+      if (recognition.current !== mic) return;
       const spoken = Array.from(event.results).at(-1)?.[0]?.transcript?.trim();
-      if (spoken) processVoice.current(spoken);
+      if (spoken) {
+        recognition.current = null;
+        setListening(false);
+        mic.stop();
+        processVoice.current(spoken);
+      }
     };
     mic.onerror = event => {
       if (recognition.current !== mic) return;
@@ -797,11 +803,16 @@ export function CrystalExperience() {
       }
       if (/^(?:rotate|turn) (?:left|right)$/.test(lower)) {
         if (!answerRef.current.design?.modelUrl) speak("I need the delivered three-dimensional model to rotate it accurately.");
-        else setRotation(value => value + (lower.endsWith("right") ? 1 : -1));
+        else {
+          setRotation(value => value + (lower.endsWith("right") ? 1 : -1));
+          listen(true);
+        }
         return;
       }
       if (lower === "zoom in" || lower === "zoom out") {
-        setZoom(value => value + (lower.endsWith("in") ? 1 : -1)); return;
+        setZoom(value => value + (lower.endsWith("in") ? 1 : -1));
+        listen(true);
+        return;
       }
       const views: Record<string, DesignView> = {
         "show me inside": "dissect", "show inside": "dissect",
@@ -812,7 +823,10 @@ export function CrystalExperience() {
       };
       if (views[lower]) {
         if (!answerRef.current.design) speak("There is no delivered measured model or drawing for that view yet.");
-        else setView(views[lower]);
+        else {
+          setView(views[lower]);
+          listen(true);
+        }
         return;
       }
       if (/^(?:explain|tell me about it|how does it work)$/.test(lower)) {
@@ -998,7 +1012,12 @@ export function CrystalExperience() {
       <div className="ascension-voice-anchor">
         <button type="button" aria-label={listening ? "Stop microphone" : "Speak with groundskeeper"}
           aria-pressed={listening} onClick={() => {
-            if (listening) recognition.current?.stop(); else listen();
+            if (listening) {
+              const active = recognition.current;
+              recognition.current = null;
+              setListening(false);
+              active?.stop();
+            } else listen();
           }}>
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
             strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">

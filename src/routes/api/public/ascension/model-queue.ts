@@ -186,9 +186,13 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         }
 
         const objectPath = claimed.request_id + "/" + claimed.id + ".glb";
+        // Same owner-controlled HTTPS origin already serving this secured queue.
+        // Relative saved model/image URLs must reach the device worker as absolute URLs.
+        const origin = process.env["ASCENSION_PUBLIC_BASE_URL"]?.trim().replace(/\/$/, "") ||
+          new URL(request.url).origin;
         const signed = await ascensionDb.storage
           .from(BUCKET)
-          .createSignedUploadUrl(objectPath, { upsert: true });
+          .createSignedUploadUrl(objectPath, { upsert: true, origin });
         if (signed.error || !signed.data) {
           await table
             .update({
@@ -206,9 +210,13 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         return json({
           item: {
             ...claimed,
+            source_image_url: claimed.source_image_url &&
+              claimed.source_image_url.startsWith("/")
+              ? new URL(claimed.source_image_url, origin).toString()
+              : claimed.source_image_url,
             upload_path: objectPath,
             upload_url: signed.data.signedUrl,
-            public_url: publicData.publicUrl,
+            public_url: new URL(publicData.publicUrl, origin).toString(),
           },
         });
       },
@@ -274,8 +282,11 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         if (folder.error || !(folder.data ?? []).some((item) => item.name === job.id + ".glb")) {
           return json({ error: "model_upload_missing" }, 409);
         }
-        const publicUrl = ascensionDb.storage.from(BUCKET).getPublicUrl(objectPath)
+        const relativePublicUrl = ascensionDb.storage.from(BUCKET).getPublicUrl(objectPath)
           .data.publicUrl;
+        const origin = process.env["ASCENSION_PUBLIC_BASE_URL"]?.trim().replace(/\/$/, "") ||
+          new URL(request.url).origin;
+        const publicUrl = new URL(relativePublicUrl, origin).toString();
         const { error } = await table
           .update({
             status: "completed",

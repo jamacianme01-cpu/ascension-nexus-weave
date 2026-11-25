@@ -40,7 +40,6 @@ def verify_core_attestation(report):
     if not isinstance(encoded_signature, str):
         return False
     try:
-        import base64
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
         signed = json.loads(signed_text)
@@ -59,7 +58,7 @@ def verify_core_attestation(report):
         if not isinstance(key, Ed25519PublicKey):
             return False
         key.verify(signature,
-                   b'ASCENSION-GOVERNED-REPORT-V1\\n' + signed_text.encode('utf-8'))
+                   b'ASCENSION-GOVERNED-REPORT-V1\n' + signed_text.encode('utf-8'))
         result = unsigned.get('result')
         publication = result.get('publication') if isinstance(result, dict) else None
         return bool(isinstance(result, dict) and
@@ -68,7 +67,7 @@ def verify_core_attestation(report):
                     result.get('autosync_verdict') == 'VERIFIED' and
                     isinstance(publication, dict) and
                     publication.get('delta_in_persisted_ledger') is True)
-    except (ValueError, TypeError, KeyError, ImportError, UnicodeError, Exception):
+    except Exception:
         return False
 
 

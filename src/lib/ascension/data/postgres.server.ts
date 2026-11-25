@@ -70,14 +70,17 @@ export class Query<T = Row[]> implements PromiseLike<Result<T>> {
   private singleResult = false;
   private allowEmpty = false;
   private conflict = "id";
+  private ignoreDuplicates = false;
   private unsupported = "";
   constructor(private readonly table: string) {}
   select(columns = "*", _options?: Record<string, unknown>) { this.projection = columns; this.returning = this.action !== "select"; return this; }
   insert(input: Record<string, unknown> | Record<string, unknown>[]) { this.action = "insert"; this.records = Array.isArray(input) ? input : [input]; return this; }
   update(input: Record<string, unknown>) { this.action = "update"; this.records = [input]; return this; }
-  upsert(input: Record<string, unknown> | Record<string, unknown>[], options?: { onConflict?: string }) {
+  upsert(input: Record<string, unknown> | Record<string, unknown>[], options?: { onConflict?: string; ignoreDuplicates?: boolean }) {
     this.action = "upsert"; this.records = Array.isArray(input) ? input : [input];
-    this.conflict = options?.onConflict || "id"; return this;
+    this.conflict = options?.onConflict || "id";
+    this.ignoreDuplicates = options?.ignoreDuplicates === true;
+    return this;
   }
   delete() { this.action = "delete"; return this; }
   eq(column: string, value: unknown) { this.filters.push({kind:"eq",column,value}); return this; }
@@ -152,7 +155,9 @@ export class Query<T = Row[]> implements PromiseLike<Result<T>> {
           const unique = this.conflict.split(",").map(x => identifier(x.trim()));
           const mutable = keys.filter(k => !this.conflict.split(",").map(x=>x.trim()).includes(k));
           statement += " ON CONFLICT (" + unique.join(",") + ") ";
-          statement += mutable.length ? "DO UPDATE SET " + mutable.map(k=>identifier(k)+"=EXCLUDED."+identifier(k)).join(",") : "DO NOTHING";
+          statement += this.ignoreDuplicates || !mutable.length
+            ? "DO NOTHING"
+            : "DO UPDATE SET " + mutable.map(k=>identifier(k)+"=EXCLUDED."+identifier(k)).join(",");
         }
       }
       if (this.action === "select") {

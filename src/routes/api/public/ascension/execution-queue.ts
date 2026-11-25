@@ -191,6 +191,26 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
           return json({ error: `status must be one of ${STATUSES.join(", ")}` }, 400);
         }
 
+        // The legacy publish token authorizes reporting, not core verification.
+        // A separate owner-held Ed25519 key must authenticate the *entire*
+        // original completed report, including request_id and result.
+        if (status === "verified") {
+          const key = process.env["ASCENSION_CORE_REPORT_PUBLIC_KEY_PEM"];
+          if (!key) return json({ error: "core_report_attestation_not_configured" }, 503);
+          const { verifyGovernedReport } = await import(
+            "@/lib/ascension/governed-report-auth.server.mjs"
+          );
+          if (!verifyGovernedReport(body, key))
+            return json({ error: "invalid_core_report_attestation" }, 403);
+          const result = body["result"];
+          if (!result || typeof result !== "object" || Array.isArray(result))
+            return json({ error: "verified_result_required" }, 422);
+          body = {
+            ...body,
+            result: { ...result, core_attestation_verified: true },
+          };
+        }
+
         const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
         const normalizedArtifacts = has("artifacts") ? normalizeArtifacts(body["artifacts"]) : null;
         if (normalizedArtifacts && "error" in normalizedArtifacts) return json({ error: normalizedArtifacts.error }, 400);

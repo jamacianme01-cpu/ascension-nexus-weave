@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-DEFAULT_QUEUE_URL = "https://ascensionweave.app/api/public/ascension/model-queue"
+DEFAULT_QUEUE_URL = ""  # Explicit owner-selected active host only; no retired platform default.
 DEFAULT_HUNYUAN_URL = "http://127.0.0.1:8081/generate"
 
 
@@ -266,13 +266,23 @@ def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--queue-url", default=DEFAULT_QUEUE_URL)
+    parser.add_argument("--queue-url", default=os.getenv("ASCENSION_MODEL_QUEUE_URL", DEFAULT_QUEUE_URL))
     parser.add_argument("--hunyuan-url", default=DEFAULT_HUNYUAN_URL)
     parser.add_argument("--runner", default=socket.gethostname() + "-hunyuan")
     parser.add_argument("--poll-seconds", type=float, default=3.0)
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
 
+    if not args.queue_url:
+        raise SystemExit("ASCENSION_MODEL_QUEUE_URL is required; retired hosting defaults are forbidden")
+    parsed = urllib.parse.urlsplit(args.queue_url)
+    host = (parsed.hostname or "").lower()
+    retired = ("fly.dev", "fly.io", "flycast", "internal", "railway.app", "railway.internal")
+    if any(host == suffix or host.endswith("." + suffix) for suffix in retired):
+        raise SystemExit("ASCENSION model worker refuses retired Fly/Railway hosts")
+    if (parsed.scheme != "https" and
+            not (parsed.scheme == "http" and host in ("localhost", "127.0.0.1", "::1"))):
+        raise SystemExit("ASCENSION model queue must use owner HTTPS or local loopback")
     token = _token()
     print("[Hunyuan] ASCENSION model worker online", flush=True)
     while True:

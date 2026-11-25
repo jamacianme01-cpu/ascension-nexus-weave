@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/ascension/model-file")({
           const stat = await fs.stat(full);
           if (!stat.isFile() || stat.size > MAX_BYTES) return response({ error: "model_file_unavailable" }, 404);
           const bytes = await fs.readFile(full);
-          return new Response(bytes, {
+          return new Response(Uint8Array.from(bytes).buffer, {
             status: 200,
             headers: {
               "content-type": contentType(relative),

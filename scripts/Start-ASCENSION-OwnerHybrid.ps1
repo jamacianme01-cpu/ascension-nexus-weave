@@ -60,7 +60,7 @@ $required = @(
   (Join-Path $OriginalRoot 'clarity\core_runtime.py'),
   (Join-Path $live 'published\governed_state.json'),
   (Join-Path $webRoot 'scripts\ascension-owner-queue\ascension-volume-transport.py'),
-  (Join-Path $webRoot 'node_modules\vite\bin\vite.js')
+  (Join-Path $webRoot 'package.json')
 )
 foreach ($requiredFile in $required) {
   if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
@@ -71,6 +71,21 @@ $python = Get-Command python.exe -ErrorAction SilentlyContinue
 $node = Get-Command node.exe -ErrorAction SilentlyContinue
 if (-not $python -or -not $node) {
   throw 'Python and Node.js are required to run the existing owner source. No remote model or platform will be substituted.'
+}
+
+# On a clean checkout, install from the existing manifest. npm ci fails when
+# the committed lockfile is stale; npm install reconciles it locally.
+if (-not (Test-Path -LiteralPath (Join-Path $webRoot 'node_modules\vite\bin\vite.js') -PathType Leaf)) {
+  $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
+  if (-not $npm) { throw 'npm is required to install the existing ASCENSION web dependencies.' }
+  Push-Location $webRoot
+  try {
+    & $npm.Source install --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw 'ASCENSION dependency installation failed.' }
+  } finally { Pop-Location }
+}
+if (-not (Test-Path -LiteralPath (Join-Path $webRoot 'node_modules\vite\bin\vite.js') -PathType Leaf)) {
+  throw 'ASCENSION Vite dependency is still missing after installation.'
 }
 
 if (-not $env:ASCENSION_PUBLISH_TOKEN) {

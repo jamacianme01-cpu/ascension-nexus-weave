@@ -15,6 +15,7 @@ import os
 import secrets
 import socket
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -80,6 +81,17 @@ class TransportStore:
         self.initial_revision = pub['publication_revision']
         self.runs = self.root / 'runs'
         self.runs.mkdir(parents=True, exist_ok=True)
+        self.last_worker_poll = None
+
+    def health(self):
+        with lock:
+            age = None if self.last_worker_poll is None else max(0, time.monotonic() - self.last_worker_poll)
+            return {'status': 'LIVE_GOVERNED_TRANSPORT',
+                    'original_publication_revision_at_start': self.initial_revision,
+                    'persistent_volume': True,
+                    'worker_poll_seen': age is not None,
+                    'worker_poll_age_seconds': None if age is None else round(age, 1),
+                    'worker_recently_polling': age is not None and age <= 60}
 
     def file(self, request_id):
         return self.runs / (uuid_str(request_id) + '.json')
@@ -147,6 +159,7 @@ class TransportStore:
                 if item and item.get('run', {}).get('status') == 'queued':
                     candidates.append((item['run']['created_at'], p, item))
             if not candidates:
+                self.last_worker_poll = time.monotonic()
                 return {'item': None}
             _, p, item = min(candidates, key=lambda x: (x[0], str(x[1])))
             run = item['run']
@@ -154,6 +167,7 @@ class TransportStore:
             run.update({'status': 'claimed', 'claimed_at': now, 'claimed_by': runner,
                         'stage': 'cloud_claimed', 'updated_at': now})
             atomic_json(p, item)
+            self.last_worker_poll = time.monotonic()
             return {'item': {key: run[key] for key in ('id', 'objective', 'evidence',
                                                        'constraints', 'submitted_by',
                                                        'submitted_via', 'created_at')}}
@@ -239,9 +253,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.command == 'GET':
                 if self.path.startswith('/health'):
-                    return self.respond(200, {'status': 'LIVE_GOVERNED_TRANSPORT',
-                                              'original_publication_revision_at_start': store.initial_revision,
-                                              'persistent_volume': True})
+                    return self.respond(200, store.health())
                 if self.path.startswith('/queue/claim?'):
                     from urllib.parse import urlsplit, parse_qs
                     runner = parse_qs(urlsplit(self.path).query).get('runner', ['fly-ascension-core'])[0]

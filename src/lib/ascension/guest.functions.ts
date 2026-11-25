@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { Json } from "@/lib/ascension/data/types";
 import type { ObjectiveRun } from "./objectives.functions";
 import type { ObjectiveDelivery } from "./result-model";
+import { governedPersisted } from "./result-model";
 import { priorResultContext } from "./iteration-model";
 
 type RpcResult<T> = { data: T | null; error: { message: string } | null };
@@ -92,8 +93,8 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }) => {
-    // The owner's existing Fly state volume is the authoritative queue transport
-    // whenever the former web database is absent. Never create a substitute DB.
+    // The owner's currently configured private governed transport is authoritative
+    // when explicitly enabled. Never reconnect retired hosting or create a substitute DB.
     const volume = await import("@/lib/ascension/data/volume-transport.server");
     if (volume.ownerVolumeTransportEnabled()) {
       return volume.callOwnerVolumeTransport<GuestSubmission>("/guest/submit", "POST", data);
@@ -177,6 +178,15 @@ export async function projectGuestDelivery(
     if (run.status !== "verified") {
       return {...base,status:"running",response_payload:null,error:null,source:null,
         note:"Your original ASCENSION worker is processing this objective."};
+    }
+    // A legacy publish token or a status string cannot establish provenance.
+    // The original core must have signed a real committed publication.
+    if (!governedPersisted({
+      engine: run.engine, status: run.status, result: run.result,
+    })) {
+      return {...base,status:"completed",response_payload:null,source:null,
+        error:"The original core's signed VERIFIED / PERSISTED publication is missing.",
+        note:"An unsigned or unpersisted run cannot be displayed as governed verification."};
     }
     // Only project files and pathways actually returned by the ORIGINAL runtime.
     // Neither the transport nor the website invents a Claude/Grok/OpenAI answer.

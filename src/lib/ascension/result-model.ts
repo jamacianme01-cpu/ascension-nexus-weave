@@ -49,6 +49,9 @@ export function governedPersisted(run: {
   return (
     run.engine === "governed_runtime" &&
     run.status === "verified" &&
+    // Inserted only by the authenticated queue bridge after verifying a
+    // signature from the original core. Legacy/unattested rows fail closed.
+    r["core_attestation_verified"] === true &&
     r["transaction"] === "PERSISTED" &&
     r["autosync_verdict"] === "VERIFIED" &&
     record(r["publication"])["delta_in_persisted_ledger"] === true

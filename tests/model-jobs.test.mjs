@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import { createServer } from "vite";
 import { resolve } from "node:path";
 
+// Guard against an earlier native adapter bug: ignoreDuplicates was silently
+// discarded, replacing a completed 3D model with a fresh queued row.
+import { readFileSync } from "node:fs";
+const nativeAdapter = readFileSync("src/lib/ascension/data/postgres.server.ts", "utf8");
+const jobWriter = readFileSync("src/lib/ascension/model-jobs.server.ts", "utf8");
+assert.match(jobWriter, /ignoreDuplicates:\s*true/, "Existing jobs must not be reset by requeue");
+assert.match(nativeAdapter, /ignoreDuplicates\?:\s*boolean/, "The native adapter must accept duplicate preservation");
+assert.match(nativeAdapter, /this\.ignoreDuplicates\s*=\s*options\?\.ignoreDuplicates\s*===\s*true/);
+assert.match(nativeAdapter, /this\.ignoreDuplicates\s*\|\|\s*!mutable\.length[\s\S]{0,80}?"DO NOTHING"/);
+console.log("PASS repeated 3D enqueues preserve completed native PostgreSQL jobs");
+
 // Isolated queue projection tests. These are not evidence of live generation.
 const rows = [];
 let writes = 0;

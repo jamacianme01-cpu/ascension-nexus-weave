@@ -191,6 +191,26 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
           return json({ error: `status must be one of ${STATUSES.join(", ")}` }, 400);
         }
 
+        // The legacy publish token authorizes reporting, not core verification.
+        // A separate owner-held Ed25519 key must authenticate the *entire*
+        // original completed report, including request_id and result.
+        if (status === "verified") {
+          const key = process.env["ASCENSION_CORE_REPORT_PUBLIC_KEY_PEM"];
+          if (!key) return json({ error: "core_report_attestation_not_configured" }, 503);
+          const { verifyGovernedReport } = await import(
+            "@/lib/ascension/governed-report-auth.server.mjs"
+          );
+          if (!verifyGovernedReport(body, key))
+            return json({ error: "invalid_core_report_attestation" }, 403);
+          const result = body["result"];
+          if (!result || typeof result !== "object" || Array.isArray(result))
+            return json({ error: "verified_result_required" }, 422);
+          body = {
+            ...body,
+            result: { ...result, core_attestation_verified: true },
+          };
+        }
+
         const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
         const normalizedArtifacts = has("artifacts") ? normalizeArtifacts(body["artifacts"]) : null;
         if (normalizedArtifacts && "error" in normalizedArtifacts) return json({ error: normalizedArtifacts.error }, 400);
@@ -264,60 +284,67 @@ export const Route = createFileRoute("/api/public/ascension/execution-queue")({
           };
         }
 
-        const { data, error } = await ascensionDb
-          .from("ascension_execution_requests")
-          .update(patch)
-          .eq("id", id)
-          .eq("engine", "governed_runtime")
-          .select("id, status, stage, completed_at")
-          .maybeSingle();
-        if (error) return json({ error: "update_failed" }, 500);
-        if (!data) return json({ error: "unknown_request_id" }, 404);
-
+        // Commit the queue transition and both optional sidecars together.
+        // The DB transaction owns status-order enforcement and makes a
+        // completion retry safe after a transient HTTP 500/lost response.
+        const sidecars: Record<string, unknown>[] = [];
         if (localDraft) {
           const now = new Date().toISOString();
-          const { error: draftError } = await ascensionDb.from("ascension_run_stages").upsert(
-            {
-              request_id: id,
-              ordinal: 102,
-              stage: "external_result",
-              engine_label: "LOCAL_MODEL_DRAFT",
-              engine_model: optionalString(body["draft_model"], 120) ?? "local-model",
-              status: "completed",
-              request_payload: { source_key: `local:${id}` } as Json,
-              response_payload: localDraft as unknown as Json,
-              response_text: localDraft.body,
-              duration_ms: 0,
-              error: null,
-              completed_at: now,
-            },
-            { onConflict: "request_id,ordinal" },
-          );
-          if (draftError) return json({ error: "local_draft_transport_failed" }, 500);
+          sidecars.push({
+            request_id: id,
+            ordinal: 102,
+            stage: "external_result",
+            engine_label: "LOCAL_MODEL_DRAFT",
+            engine_model: optionalString(body["draft_model"], 120) ?? "local-model",
+            status: "completed",
+            request_payload: { source_key: `local:${id}` },
+            response_payload: localDraft,
+            response_text: localDraft.body,
+            duration_ms: 0,
+            error: null,
+            completed_at: now,
+          });
         }
 
         if (normalizedArtifacts && "files" in normalizedArtifacts) {
-          const now = new Date().toISOString();
-          const { error: artifactError } = await ascensionDb.from("ascension_run_stages").upsert(
-            {
-              request_id: id,
-              ordinal: ARTIFACT_ORDINAL,
-              stage: "runtime_artifacts",
-              engine_label: ARTIFACT_LABEL,
-              engine_model: "governed-runtime",
-              status: "completed",
-              response_payload: { files: normalizedArtifacts.files } as unknown as Json,
-              response_text: null,
-              duration_ms: 0,
-              error: null,
-              completed_at: now,
-            },
-            { onConflict: "request_id,ordinal" },
+          sidecars.push({
+            request_id: id,
+            ordinal: ARTIFACT_ORDINAL,
+            stage: "runtime_artifacts",
+            engine_label: ARTIFACT_LABEL,
+            engine_model: "governed-runtime",
+            status: "completed",
+            response_payload: { files: normalizedArtifacts.files },
+            response_text: null,
+            duration_ms: 0,
+            error: null,
+            completed_at: new Date().toISOString(),
+          });
+        }
+        try {
+          const { persistRuntimeQueueReport } = await import(
+            "@/lib/ascension/data/postgres.server"
           );
-          if (artifactError) return json({ error: "artifact_transport_failed" }, 500);
+          const outcome = await persistRuntimeQueueReport(
+            id, patch as Record<string, unknown>, sidecars,
+          );
+          if (outcome.kind === "missing") return json({ error: "unknown_request_id" }, 404);
+          if (outcome.kind === "conflict") return json({
+            error: "invalid_status_transition", current_status: outcome.status,
+          }, 409);
+          return json({
+            ok: true,
+            request: { id, status: outcome.status },
+            idempotent: outcome.kind === "replayed",
+            artifacts: normalizedArtifacts && "files" in normalizedArtifacts
+              ? normalizedArtifacts.files.length : 0,
+          }, 200);
+        } catch (cause) {
+          console.error("[ASCENSION queue bridge] atomic report failed",
+            cause instanceof Error ? cause.message : "unknown");
+          return json({ error: "update_failed" }, 500);
         }
 
-        return json({ ok: true, request: data, artifacts: normalizedArtifacts && "files" in normalizedArtifacts ? normalizedArtifacts.files.length : 0 }, 200);
       },
     },
   },

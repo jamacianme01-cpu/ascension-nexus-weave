@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "crypto";
+import { modelJobTransition } from "@/lib/ascension/data/model-job-safety.mjs";
 
 const BUCKET = "ascension-models";
 const MODEL_MIME = "model/gltf-binary";
@@ -186,9 +187,13 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         }
 
         const objectPath = claimed.request_id + "/" + claimed.id + ".glb";
+        // Same owner-controlled HTTPS origin already serving this secured queue.
+        // Relative saved model/image URLs must reach the device worker as absolute URLs.
+        const origin = process.env["ASCENSION_PUBLIC_BASE_URL"]?.trim().replace(/\/$/, "") ||
+          new URL(request.url).origin;
         const signed = await ascensionDb.storage
           .from(BUCKET)
-          .createSignedUploadUrl(objectPath, { upsert: true });
+          .createSignedUploadUrl(objectPath, { upsert: true, origin });
         if (signed.error || !signed.data) {
           await table
             .update({
@@ -206,9 +211,13 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         return json({
           item: {
             ...claimed,
+            source_image_url: claimed.source_image_url &&
+              claimed.source_image_url.startsWith("/")
+              ? new URL(claimed.source_image_url, origin).toString()
+              : claimed.source_image_url,
             upload_path: objectPath,
             upload_url: signed.data.signedUrl,
-            public_url: publicData.publicUrl,
+            public_url: new URL(publicData.publicUrl, origin).toString(),
           },
         });
       },
@@ -239,31 +248,45 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         }
         const table = ascensionDb.from("ascension_model_jobs" as never) as any;
         const { data: job, error: readError } = await table
-          .select("id, request_id, pathway_id, status")
+          .select("id, request_id, pathway_id, status, model_url")
           .eq("id", jobId)
           .maybeSingle();
         if (readError) return json({ error: "model_job_read_failed" }, 500);
         if (!job) return json({ error: "unknown_model_job" }, 404);
 
+        const transition = modelJobTransition(job.status, status);
+        if (transition === "conflict") {
+          return json({ error: "invalid_model_status_transition", current_status: job.status }, 409);
+        }
+        if (transition === "replayed") {
+          return json({ ok: true, idempotent: true,
+            ...(status === "completed" ? { model_url: job.model_url } : {}) });
+        }
+
         const now = new Date().toISOString();
         if (status === "running") {
-          const { error } = await table
+          const { data: updated, error } = await table
             .update({ status: "running", updated_at: now, error: null })
             .eq("id", jobId)
-            .in("status", ["claimed", "running"]);
-          return error ? json({ error: "model_running_update_failed" }, 500) : json({ ok: true });
+            .in("status", ["claimed", "running"])
+            .select("id").maybeSingle();
+          if (error) return json({ error: "model_running_update_failed" }, 500);
+          return updated ? json({ ok: true }) : json({ error: "model_status_changed" }, 409);
         }
 
         if (status === "failed") {
-          const { error } = await table
+          const { data: updated, error } = await table
             .update({
               status: "failed",
               error: clean(body["error"], 4000) ?? "Hunyuan3D generation failed.",
               updated_at: now,
               completed_at: now,
             })
-            .eq("id", jobId);
-          return error ? json({ error: "model_failed_update_failed" }, 500) : json({ ok: true });
+            .eq("id", jobId)
+            .in("status", ["claimed", "running"])
+            .select("id").maybeSingle();
+          if (error) return json({ error: "model_failed_update_failed" }, 500);
+          return updated ? json({ ok: true }) : json({ error: "model_status_changed" }, 409);
         }
 
         const objectPath = job.request_id + "/" + job.id + ".glb";
@@ -274,9 +297,12 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
         if (folder.error || !(folder.data ?? []).some((item) => item.name === job.id + ".glb")) {
           return json({ error: "model_upload_missing" }, 409);
         }
-        const publicUrl = ascensionDb.storage.from(BUCKET).getPublicUrl(objectPath)
+        const relativePublicUrl = ascensionDb.storage.from(BUCKET).getPublicUrl(objectPath)
           .data.publicUrl;
-        const { error } = await table
+        const origin = process.env["ASCENSION_PUBLIC_BASE_URL"]?.trim().replace(/\/$/, "") ||
+          new URL(request.url).origin;
+        const publicUrl = new URL(relativePublicUrl, origin).toString();
+        const { data: updated, error } = await table
           .update({
             status: "completed",
             model_url: publicUrl,
@@ -284,11 +310,14 @@ export const Route = createFileRoute("/api/public/ascension/model-queue")({
             updated_at: now,
             completed_at: now,
           })
-          .eq("id", jobId);
+          .eq("id", jobId)
+          .in("status", ["claimed", "running"])
+          .select("id").maybeSingle();
 
-        return error
-          ? json({ error: "model_complete_update_failed" }, 500)
-          : json({ ok: true, model_url: publicUrl });
+        if (error) return json({ error: "model_complete_update_failed" }, 500);
+        return updated
+          ? json({ ok: true, model_url: publicUrl })
+          : json({ error: "model_status_changed" }, 409);
       },
     },
   },

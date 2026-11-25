@@ -117,3 +117,23 @@ jobs:
           node tree-voice-ci.browser.mjs
           node tests/active-tree-inspection.browser.mjs
           node tests/v1-real-3d-inspection.browser.mjs
+      - name: Test actual ASCENSION Book, Groundskeeper and voice on the active route
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT=4179 npm run dev > "$RUNNER_TEMP/ascension-active-route.log" 2>&1 &
+          app=$!
+          trap 'kill "$app" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:4179/ > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then
+            cat "$RUNNER_TEMP/ascension-active-route.log"
+            exit 1
+          fi
+          node tests/active-v1-route.browser.mjs

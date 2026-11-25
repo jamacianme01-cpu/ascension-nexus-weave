@@ -82,6 +82,88 @@ class OriginalEngineAdapterTests(unittest.TestCase):
         self.assertIn("class DigitalArtifactWriter:", result)
         self.assertIn("class DocumentBundleCapability:", result)
 
+    def test_physical_design_never_uses_placeholder_geometry(self):
+        original = synthetic_original()
+        patched = mod.patched(original, PATCH.read_text(encoding="utf-8"))
+        physical = patched.split("class PhysicalDesignCapability:", 1)[1].split("REGISTRY:", 1)[0]
+        self.assertIn('artifact_type="generative_3d_form"', physical)
+        self.assertNotIn('artifact_type="physical_design"', physical)
+        self.assertIn('job.build_state != "candidate_validated"', physical)
+        self.assertIn('model.suffix.lower() != ".glb"', physical)
+        self.assertIn('metadata.get("mesh_sha256") != digest', physical)
+        self.assertIn('metadata.get("dimensionally_authoritative") is not False', physical)
+        self.assertNotIn('files["construction_job.json"]', physical)
+        self.assertNotIn('job.build_state = "verified"', physical)
+
+    def test_unapproved_reference_blocks_without_a_model_engine(self):
+        import os
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        source = mod.patched(synthetic_original(), PATCH.read_text(encoding="utf-8"))
+        node = next(item for item in ast.parse(source).body
+                    if isinstance(item, ast.ClassDef) and
+                    item.name == "PhysicalDesignCapability")
+        ns = {
+            "CapabilityContract": lambda **kwargs: SimpleNamespace(**kwargs),
+            "CapabilityResult": lambda **kwargs: SimpleNamespace(**kwargs),
+            "Branch": object,
+            "MeaningElement": object,
+            "List": list,
+            "Dict": dict,
+        }
+        exec(compile(ast.Module(body=[node], type_ignores=[]),
+                     "ASCENSION_CORE/capabilities.py", "exec"), ns)
+        writer = ns["PhysicalDesignCapability"]()
+        branch = SimpleNamespace(approach="Make worker drones for people with dementia",
+                                 expected=SimpleNamespace(artifact_name="drone.md"))
+        elements = [SimpleNamespace(text="dementia guidance and environmental awareness")]
+        with patch.dict(os.environ, {"ASCENSION_PHYSICAL_REFERENCE_IMAGE": ""}):
+            with self.assertRaisesRegex(RuntimeError, "REAL_PHYSICAL_GENERATION_BLOCKED"):
+                writer.write(branch, elements)
+
+    def test_exact_user_intent_survives_original_dtf_branches(self):
+        from types import SimpleNamespace
+        from dataclasses import dataclass, field, replace
+        from typing import Any, Dict
+        schema = (
+            "from dataclasses import dataclass, field\n"
+            "from typing import Dict, Any\n"
+            "@dataclass\n"
+            "class Branch:\n"
+            "    capability: str = \"digital_artifact_writer\"\n"
+            "    evaluation: Dict[str, Any] = field(default_factory=dict)\n\n"
+            "    def to_dict(self) -> Dict:\n"
+            "        return {}\n"
+        )
+        pipeline = (
+            "from dataclasses import replace\n"
+            "def construct_branches(branches, delegated, destiny):\n"
+            "    branches = [replace(b, capability=delegated) for b in branches]\n"
+            "    return branches\n"
+        )
+        capability = mod.patched(synthetic_original(), PATCH.read_text(encoding="utf-8"))
+        schema_out, pipeline_out, capability_out = mod.preserve_original_objective(
+            schema, pipeline, capability,
+        )
+        ns = {}
+        exec(schema_out, ns)
+        original = "Make worker drones for people with dementia"
+        original_branch = ns["Branch"]()
+        original_branch.capability = "unused"
+        # Use the actual patched branch data model; no normalizing, guessing,
+        # changing words, or substituting a generic construction branch label.
+        exec(pipeline_out, {"replace": replace}, fn := {})
+        result = fn["construct_branches"]([original_branch], "physical_design", original)
+        self.assertEqual(result[0].original_objective, original)
+        self.assertIn('getattr(branch, "original_objective"', capability_out)
+        self.assertNotIn('getattr(branch, "approach"', capability_out)
+        with self.assertRaises(ValueError):
+            mod.preserve_original_objective(schema.replace("evaluation:", "evaluation_changed:"),
+                                            pipeline, capability)
+        with self.assertRaises(ValueError):
+            mod.preserve_original_objective(schema,
+                pipeline.replace("capability=delegated", "capability=obsolete"), capability)
+
     def test_modified_original_source_is_rejected(self):
         old = synthetic_original().replace("DocumentBundleCapability()", "MissingOwnerCapability()")
         with self.assertRaises(ValueError):

@@ -6,6 +6,7 @@
  */
 import postgres from "postgres";
 import { assertNotRetiredFlyAddress } from "./deny-retired-fly.mjs";
+import { shouldAcceptRelayRevision, governedQueueTransition } from "./relay-queue-safety.mjs";
 
 export type DatabaseError = { message: string; code?: string };
 type Result<T> = { data: T | null; error: DatabaseError | null; count: number | null };
@@ -69,14 +70,17 @@ export class Query<T = Row[]> implements PromiseLike<Result<T>> {
   private singleResult = false;
   private allowEmpty = false;
   private conflict = "id";
+  private ignoreDuplicates = false;
   private unsupported = "";
   constructor(private readonly table: string) {}
   select(columns = "*", _options?: Record<string, unknown>) { this.projection = columns; this.returning = this.action !== "select"; return this; }
   insert(input: Record<string, unknown> | Record<string, unknown>[]) { this.action = "insert"; this.records = Array.isArray(input) ? input : [input]; return this; }
   update(input: Record<string, unknown>) { this.action = "update"; this.records = [input]; return this; }
-  upsert(input: Record<string, unknown> | Record<string, unknown>[], options?: { onConflict?: string }) {
+  upsert(input: Record<string, unknown> | Record<string, unknown>[], options?: { onConflict?: string; ignoreDuplicates?: boolean }) {
     this.action = "upsert"; this.records = Array.isArray(input) ? input : [input];
-    this.conflict = options?.onConflict || "id"; return this;
+    this.conflict = options?.onConflict || "id";
+    this.ignoreDuplicates = options?.ignoreDuplicates === true;
+    return this;
   }
   delete() { this.action = "delete"; return this; }
   eq(column: string, value: unknown) { this.filters.push({kind:"eq",column,value}); return this; }
@@ -151,7 +155,9 @@ export class Query<T = Row[]> implements PromiseLike<Result<T>> {
           const unique = this.conflict.split(",").map(x => identifier(x.trim()));
           const mutable = keys.filter(k => !this.conflict.split(",").map(x=>x.trim()).includes(k));
           statement += " ON CONFLICT (" + unique.join(",") + ") ";
-          statement += mutable.length ? "DO UPDATE SET " + mutable.map(k=>identifier(k)+"=EXCLUDED."+identifier(k)).join(",") : "DO NOTHING";
+          statement += this.ignoreDuplicates || !mutable.length
+            ? "DO NOTHING"
+            : "DO UPDATE SET " + mutable.map(k=>identifier(k)+"=EXCLUDED."+identifier(k)).join(",");
         }
       }
       if (this.action === "select") {
@@ -177,6 +183,125 @@ export class Query<T = Row[]> implements PromiseLike<Result<T>> {
     onfulfilled?: ((value: Result<T>) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2> { return this.execute().then(onfulfilled,onrejected); }
+}
+
+
+/**
+ * Atomically accept an ordered, complete observation publication. A newer
+ * publication must never be rolled back by an older HTTP retry, and pruning
+ * must never happen outside the same transaction as the accepted upsert.
+ *
+ * All writes through this relay are serialized with a transaction-scoped
+ * advisory lock. No tables, external services, or new database are created.
+ */
+export interface RelayPublicationRow {
+  path: string;
+  body: string;
+  revision: number;
+  source_classification: string | null;
+  http_status: number;
+  received_at: string;
+}
+export async function persistRelayPublication(
+  rows: RelayPublicationRow[],
+  replace: boolean,
+): Promise<{ accepted: boolean; revision: number }> {
+  if (!rows.length) throw new Error("Refusing an empty relay publication");
+  const revision = rows[0]!.revision;
+  if (!Number.isSafeInteger(revision) || revision < 0 ||
+      rows.some(row => row.revision !== revision))
+    throw new Error("A coherent relay publication requires a nonnegative integer revision");
+  const sql = database();
+  return sql.begin(async tx => {
+    await tx.unsafe("SELECT pg_advisory_xact_lock(2026112501::bigint)");
+    const current = await tx.unsafe(
+      'SELECT MAX("revision") AS "latest" FROM public."ascension_relay_documents"',
+    );
+    const latest = current[0]?.["latest"];
+    if (!shouldAcceptRelayRevision(latest, revision)) {
+      // Exact or outdated replay: no prune, no upsert, no sidecar rollback.
+      return { accepted: false, revision: Number(latest) };
+    }
+    if (replace) {
+      await tx.unsafe(
+        'DELETE FROM public."ascension_relay_documents" WHERE NOT ("path" = ANY($1::text[]))',
+        [rows.map(row => row.path)],
+      );
+    }
+    const values: unknown[] = [];
+    const tuples = rows.map(row => {
+      const fields: unknown[] = [
+        row.path, row.body, row.revision, row.source_classification,
+        row.http_status, row.received_at,
+      ];
+      const slots = fields.map(value => bind(values, value));
+      return "(" + slots.join(",") + ")";
+    });
+    await tx.unsafe(
+      'INSERT INTO public."ascension_relay_documents" ' +
+      '("path","body","revision","source_classification","http_status","received_at") ' +
+      'VALUES ' + tuples.join(",") + ' ON CONFLICT ("path") DO UPDATE SET ' +
+      '"body"=EXCLUDED."body", "revision"=EXCLUDED."revision", ' +
+      '"source_classification"=EXCLUDED."source_classification", ' +
+      '"http_status"=EXCLUDED."http_status", "received_at"=EXCLUDED."received_at"',
+      values as any[],
+    );
+    return { accepted: true, revision };
+  });
+}
+
+
+/**
+ * A governed queue completion and its attached stage data are committed as
+ * one transaction. Retries after a lost HTTP response are acknowledged without
+ * changing a terminal result or replaying sidecar data.
+ */
+export async function persistRuntimeQueueReport(
+  id: string,
+  patch: Record<string, unknown>,
+  sidecars: Record<string, unknown>[],
+): Promise<{ kind: "updated" | "replayed" | "conflict" | "missing"; status?: string | undefined }> {
+  const requested = String(patch["status"] || "");
+  if (!["claimed", "running", "verified", "failed", "rejected"].includes(requested))
+    throw new Error("Invalid governed queue report status");
+  const db = database();
+  return db.begin(async tx => {
+    const found = await tx.unsafe(
+      'SELECT "status" FROM public."ascension_execution_requests" ' +
+      'WHERE "id" = $1 AND "engine" = $2 FOR UPDATE',
+      [id, "governed_runtime"],
+    );
+    const existing = found[0]?.["status"] as string | undefined;
+    const transition = governedQueueTransition(existing, requested);
+    if (transition !== "updated")
+      return { kind: transition, status: existing };
+    const params: unknown[] = [];
+    const assignments = Object.entries(patch).map(([field, value]) =>
+      identifier(field) + "=" + valueSql(params, field, value)
+    );
+    const target = bind(params, id);
+    await tx.unsafe(
+      'UPDATE public."ascension_execution_requests" SET ' + assignments.join(",") +
+      ' WHERE "id" = ' + target + ' AND "engine" = \'governed_runtime\'',
+      params as any[],
+    );
+    for (const row of sidecars) {
+      const keys = Object.keys(row);
+      if (row["request_id"] !== id || !keys.includes("ordinal"))
+        throw new Error("Invalid runtime sidecar correlation");
+      const values: unknown[] = [];
+      const args = keys.map(key => valueSql(values, key, row[key]));
+      const setters = keys.filter(key => !["request_id", "ordinal"].includes(key))
+        .map(key => identifier(key) + "=EXCLUDED." + identifier(key));
+      await tx.unsafe(
+        'INSERT INTO public."ascension_run_stages" (' +
+        keys.map(identifier).join(",") + ') VALUES (' + args.join(",") + ')' +
+        ' ON CONFLICT ("request_id","ordinal") DO UPDATE SET ' + setters.join(","),
+        values as any[],
+      );
+    }
+    return { kind: "updated" as const, status: requested };
+  });
 }
 
 export async function rpcDatabase(name: string, args: Record<string, unknown> = {}): Promise<Result<any>> {

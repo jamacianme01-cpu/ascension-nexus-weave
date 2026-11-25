@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Strictly register the owner-authored construction engine in a private Fly image.
+"""Apply the original owner's physical-generation repair only to matching core files.
 
-Apply the reviewed unified diff only against matching original ASCENSION_CORE.
-Abort if source differs, before writing. Never touch the mounted governed volume.
+Preserve the user's exact spoken objective through the existing DTF branches;
+do not submit branch labels (single_pass_construct etc.) to the 3D engine.
+Abort on any source mismatch, without altering governed runtime state.
 """
 import ast
 import re
@@ -55,13 +56,56 @@ def patched(source: str, diff: str) -> str:
         raise ValueError('Capability adapter registry invariants missing')
     return result
 
+def preserve_original_objective(schema: str, pipeline: str, capabilities: str):
+    """Carry original Destiny untouched through Branch, planner, and writer."""
+    needle_schema = "    evaluation: Dict[str, Any] = field(default_factory=dict)\n\n    def to_dict(self) -> Dict:\n"
+    replaced_schema = (
+        "    evaluation: Dict[str, Any] = field(default_factory=dict)\n"
+        "    # Exact owner objective is not the branch plan label.\n"
+        '    original_objective: str = ""\n\n'
+        "    def to_dict(self) -> Dict:\n"
+    )
+    needle_pipeline = "    branches = [replace(b, capability=delegated) for b in branches]\n"
+    replaced_pipeline = (
+        "    branches = [replace(b, capability=delegated, "
+        "original_objective=destiny) for b in branches]\n"
+    )
+    if schema.count(needle_schema) != 1 or pipeline.count(needle_pipeline) != 1:
+        raise ValueError("Original Destiny/DTF source differs; refusing to invent a replacement")
+    if 'getattr(branch, "original_objective"' not in capabilities:
+        raise ValueError("Physical generation must use original_objective, not branch.approach")
+    schema = schema.replace(needle_schema, replaced_schema)
+    pipeline = pipeline.replace(needle_pipeline, replaced_pipeline)
+    ast.parse(schema, filename="ASCENSION_CORE/schemas.py")
+    ast.parse(pipeline, filename="ASCENSION_CORE/pipeline.py")
+    ast.parse(capabilities, filename="ASCENSION_CORE/capabilities.py")
+    return schema, pipeline, capabilities
+
+
 def main() -> None:
     root = Path(sys.argv[1] if len(sys.argv) > 1 else '/app')
-    target = root / 'ASCENSION_CORE/capabilities.py'
-    diff = root / 'original-physical-capability.patch'
-    updated = patched(target.read_text(encoding='utf-8'), diff.read_text(encoding='utf-8'))
-    target.write_text(updated, encoding='utf-8')
-    print('ASCENSION_ORIGINAL_PHYSICAL_DESIGN_CAPABILITY_REGISTERED_IN_PRIVATE_IMAGE')
+    cap_file = root / "ASCENSION_CORE/capabilities.py"
+    schema_file = root / "ASCENSION_CORE/schemas.py"
+    pipeline_file = root / "ASCENSION_CORE/pipeline.py"
+    diff = root / "original-physical-capability.patch"
+    cap_new = patched(cap_file.read_text(encoding="utf-8"), diff.read_text(encoding="utf-8"))
+    schema_new, pipeline_new, cap_new = preserve_original_objective(
+        schema_file.read_text(encoding="utf-8"),
+        pipeline_file.read_text(encoding="utf-8"), cap_new,
+    )
+    # Every file and structural invariant is validated before the first write.
+    originals = {p: p.read_text(encoding="utf-8")
+                 for p in (cap_file, schema_file, pipeline_file)}
+    try:
+        for target, contents in ((schema_file, schema_new),
+                                 (pipeline_file, pipeline_new),
+                                 (cap_file, cap_new)):
+            target.write_text(contents, encoding="utf-8")
+    except Exception:
+        for target, original in originals.items():
+            target.write_text(original, encoding="utf-8")
+        raise
+    print("ASCENSION_ORIGINAL_DESTINY_PRESERVED_AND_REAL_3D_ADAPTER_REGISTERED")
 
 if __name__ == '__main__':
     main()

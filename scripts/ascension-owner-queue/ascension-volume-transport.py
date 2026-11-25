@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Owner-governed ASCENSION transport on the existing Fly volume.
+"""Owner-controlled ASCENSION transport for an existing private local volume.
 
-This transports submissions and verbatim runtime reports; it never runs an
-objective, creates a Knowledgeverse, infers outcomes, or changes the authored
-ASCENSION_CORE Python modules. Only an internal authenticated Fly peer can call.
+This transports submissions and original governed runtime reports; it never
+manufactures outcomes or executes objectives. The original ASCENSION_CORE remains
+authoritative; only core-signed VERIFIED reports may be accepted.
+No retired Fly or Railway service is connected or started.
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import hmac
 import json
@@ -22,6 +24,52 @@ from pathlib import Path
 
 
 lock = threading.RLock()
+
+
+def verify_core_attestation(report):
+    """Require the original owner-held core signature, independently of the
+    queue publish token. This is a signature check, not a web-layer verdict.
+    """
+    if not isinstance(report, dict) or report.get('status') != 'verified':
+        return False
+    signed_text = report.get('core_signed_payload')
+    encoded_signature = report.get('core_attestation')
+    pem = os.environ.get('ASCENSION_CORE_REPORT_PUBLIC_KEY_PEM', '').strip()
+    if not pem or not isinstance(signed_text, str) or not 0 < len(signed_text) <= 1500000:
+        return False
+    if not isinstance(encoded_signature, str):
+        return False
+    try:
+        import base64
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        signed = json.loads(signed_text)
+        if not isinstance(signed, dict):
+            return False
+        unsigned = {key: value for key, value in report.items()
+                    if key not in ('core_signed_payload', 'core_attestation')}
+        normal = lambda value: json.dumps(value, sort_keys=True, separators=(',', ':'),
+                                          ensure_ascii=False, allow_nan=False)
+        if normal(signed) != normal(unsigned):
+            return False
+        signature = base64.b64decode(encoded_signature, validate=True)
+        if len(signature) != 64:
+            return False
+        key = serialization.load_pem_public_key(pem.encode('utf-8'))
+        if not isinstance(key, Ed25519PublicKey):
+            return False
+        key.verify(signature,
+                   b'ASCENSION-GOVERNED-REPORT-V1\\n' + signed_text.encode('utf-8'))
+        result = unsigned.get('result')
+        publication = result.get('publication') if isinstance(result, dict) else None
+        return bool(isinstance(result, dict) and
+                    result.get('local_status') == 'PERSISTED' and
+                    result.get('transaction') == 'PERSISTED' and
+                    result.get('autosync_verdict') == 'VERIFIED' and
+                    isinstance(publication, dict) and
+                    publication.get('delta_in_persisted_ledger') is True)
+    except (ValueError, TypeError, KeyError, ImportError, UnicodeError, Exception):
+        return False
 
 
 def utc_now():
@@ -178,13 +226,16 @@ class TransportStore:
                 raise ValueError('Cannot report an unclaimed objective')
             if old == 'running' and status == 'claimed':
                 raise ValueError('Cannot regress a running objective')
-            if status == 'verified' and not isinstance(payload.get('result'), dict):
-                raise ValueError('VERIFIED requires the original governed result')
+            if status == 'verified' and not verify_core_attestation(payload):
+                raise ValueError('VERIFIED requires an authenticated original-core publication')
             allowed = ('stage','runtime_revision','transition_id','guardian_verdict',
                        'outcome_status','accepted_delta','result','error')
             for key in allowed:
                 if key in payload:
                     run[key] = payload[key]
+            if status == 'verified':
+                run['result'] = dict(run['result'])
+                run['result']['core_attestation_verified'] = True
             run['status'] = status
             run['updated_at'] = utc_now()
             if status in ('verified', 'failed', 'rejected'):
@@ -244,7 +295,7 @@ class Handler(BaseHTTPRequestHandler):
                                               'persistent_volume': True})
                 if self.path.startswith('/queue/claim?'):
                     from urllib.parse import urlsplit, parse_qs
-                    runner = parse_qs(urlsplit(self.path).query).get('runner', ['fly-ascension-core'])[0]
+                    runner = parse_qs(urlsplit(self.path).query).get('runner', ['ascension-owner-core'])[0]
                     return self.respond(200, store.claim(runner))
                 return self.respond(404, {'error':'not_found'})
             if self.command != 'POST':
@@ -286,7 +337,7 @@ def main():
     parser.add_argument('--port', type=int, default=9091)
     # Default keeps the existing private IPv6 worker unchanged.
     # Owner-computer mode explicitly binds 127.0.0.1 (not the public network).
-    parser.add_argument('--host', default=os.environ.get('ASCENSION_TRANSPORT_HOST', '::'))
+    parser.add_argument('--host', default=os.environ.get('ASCENSION_TRANSPORT_HOST', '127.0.0.1'))
     args = parser.parse_args()
     if not os.environ.get('ASCENSION_PUBLISH_TOKEN', '').strip():
         raise SystemExit('ASCENSION_PUBLISH_TOKEN is required')
@@ -297,7 +348,7 @@ def main():
     bind_host = '127.0.0.1' if args.host == 'localhost' else args.host
     httpd = server((bind_host, args.port), Handler)
     httpd.ascension_store = store
-    print('ASCENSION_OWNER_TRANSPORT_READY root=/data/ascension revision_at_start=' + str(store.initial_revision), flush=True)
+    print('ASCENSION_OWNER_TRANSPORT_READY revision_at_start=' + str(store.initial_revision), flush=True)
     httpd.serve_forever(poll_interval=.5)
 
 

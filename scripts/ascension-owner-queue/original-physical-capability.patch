@@ -65,7 +65,7 @@
 +            raise RuntimeError(
 +                "REAL_PHYSICAL_GENERATION_BLOCKED: approved reference image is unavailable."
 +            )
-+        objective = str(getattr(branch, "approach", "") or "").strip()
++        objective = str(getattr(branch, "original_objective", "") or "").strip()
 +        meaning = [str(m.text).strip() for m in mes if str(m.text).strip()]
 +        if not objective or not meaning:
 +            raise RuntimeError("REAL_PHYSICAL_GENERATION_BLOCKED: objective and Meaning Elements are required.")

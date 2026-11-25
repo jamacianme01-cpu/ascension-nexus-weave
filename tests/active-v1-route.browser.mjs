@@ -84,11 +84,17 @@ try {
   if (micLabel === "Speak with groundskeeper") await mic.click();
   else assert.equal(micLabel, "Stop microphone");
   await page.waitForFunction(() => window.__micStarts > 0, null, { timeout: 10000 });
-  await page.evaluate(() => {
-    window.__activeRecognition.onresult({
-      results: [[{ transcript: "what has grown" }]],
-    });
-  });
+  async function spokenCommand(words) {
+    await page.waitForFunction(() => document.querySelector('.ascension-voice-anchor > button')?.getAttribute('aria-pressed') === 'true', null, { timeout: 15000 });
+    await page.evaluate(transcript => {
+      const active = window.__activeRecognition;
+      active.onresult({ results: [[{ transcript }]] });
+      // A recognition provider can deliver a late duplicate event after stop.
+      // It must not create another intent or interrupt the new voice session.
+      active.onresult({ results: [[{ transcript }]] });
+    }, words);
+  }
+  await spokenCommand("what has grown");
   await page.waitForFunction(() =>
     window.__ascensionSpoken.some(text => text.includes(
       "Tell me which intent crystal you would like me to retrieve."
@@ -107,10 +113,10 @@ try {
       transmitted.push({url: request.url(), body});
     }
   });
-  await page.evaluate(words => window.__activeRecognition.onresult({
-    results: [[{ transcript: words }]],
-  }), neutralIntent);
+  await spokenCommand(neutralIntent);
   await page.locator(".ascension-tree-crystal[data-active='true']").waitFor({ timeout: 15000 });
+  assert.equal(await page.locator(".ascension-tree-crystal").count(), 1,
+    "A duplicate microphone event must not save a second intent crystal");
   assert.equal(transmitted.filter(request => request.body.includes(neutralIntent)).length, 0,
     "A plain owner intent must never leak to the governed web server");
   assert.equal(await page.locator(".ascension-crystal-reality").count(), 0,
@@ -119,9 +125,7 @@ try {
   // Reuse the same voice-only interaction to make a deliberate, explicit
   // owner-authorized governed submission. The existing backend may be
   // unconfigured in CI, but the actual submission must be attempted once.
-  await page.evaluate(() => window.__activeRecognition.onresult({
-    results: [[{ transcript: "new intent" }]],
-  }));
+  await spokenCommand("new intent");
   // Real speech recognizers may omit a comma after the ENGAGE command.
   const spokenAuthorized = "Engage ASCENSION design a folding cable tray.";
   const submission = page.waitForEvent("request", {
@@ -130,10 +134,7 @@ try {
       (request.postData() || "").includes("design a folding cable tray."),
     timeout: 30000,
   });
-  await page.evaluate(words => {
-    if (!window.__activeRecognition) throw Error("Voice recognition disappeared");
-    window.__activeRecognition.onresult({results: [[{ transcript: words }]]});
-  }, spokenAuthorized);
+  await spokenCommand(spokenAuthorized);
   await submission;
   assert.equal(transmitted.filter(request =>
     request.body.includes("design a folding cable tray.")).length, 1,

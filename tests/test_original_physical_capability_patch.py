@@ -126,19 +126,20 @@ class OriginalEngineAdapterTests(unittest.TestCase):
         from dataclasses import dataclass, field, replace
         from typing import Any, Dict
         schema = (
-            "from dataclasses import dataclass, field\\n"
-            "from typing import Dict, Any\\n"
-            "@dataclass\\n"
-            "class Branch:\\n"
-            "    evaluation: Dict[str, Any] = field(default_factory=dict)\\n\\n"
-            "    def to_dict(self) -> Dict:\\n"
-            "        return {}\\n"
+            "from dataclasses import dataclass, field\n"
+            "from typing import Dict, Any\n"
+            "@dataclass\n"
+            "class Branch:\n"
+            "    capability: str = \"digital_artifact_writer\"\n"
+            "    evaluation: Dict[str, Any] = field(default_factory=dict)\n\n"
+            "    def to_dict(self) -> Dict:\n"
+            "        return {}\n"
         )
         pipeline = (
-            "from dataclasses import replace\\n"
-            "def construct_branches(branches, delegated, destiny):\\n"
-            "    branches = [replace(b, capability=delegated) for b in branches]\\n"
-            "    return branches\\n"
+            "from dataclasses import replace\n"
+            "def construct_branches(branches, delegated, destiny):\n"
+            "    branches = [replace(b, capability=delegated) for b in branches]\n"
+            "    return branches\n"
         )
         capability = mod.patched(synthetic_original(), PATCH.read_text(encoding="utf-8"))
         schema_out, pipeline_out, capability_out = mod.preserve_original_objective(

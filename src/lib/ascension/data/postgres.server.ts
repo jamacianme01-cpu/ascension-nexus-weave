@@ -244,6 +244,67 @@ export async function persistRelayPublication(
   });
 }
 
+
+/**
+ * A governed queue completion and its attached stage data are committed as
+ * one transaction. Retries after a lost HTTP response are acknowledged without
+ * changing a terminal result or replaying sidecar data.
+ */
+export async function persistRuntimeQueueReport(
+  id: string,
+  patch: Record<string, unknown>,
+  sidecars: Record<string, unknown>[],
+): Promise<{ kind: "updated" | "replayed" | "conflict" | "missing"; status?: string }> {
+  const requested = String(patch["status"] || "");
+  if (!["claimed", "running", "verified", "failed", "rejected"].includes(requested))
+    throw new Error("Invalid governed queue report status");
+  const db = database();
+  return db.begin(async tx => {
+    const found = await tx.unsafe(
+      'SELECT "status" FROM public."ascension_execution_requests" ' +
+      'WHERE "id" = $1 AND "engine" = $2 FOR UPDATE',
+      [id, "governed_runtime"],
+    );
+    const existing = found[0]?.status as string | undefined;
+    if (!existing) return { kind: "missing" as const };
+    const final = ["verified", "failed", "rejected"].includes(existing);
+    if (final) {
+      return existing === requested
+        ? { kind: "replayed" as const, status: existing }
+        : { kind: "conflict" as const, status: existing };
+    }
+    if (!["claimed", "running"].includes(existing) ||
+        (existing === "running" && requested === "claimed"))
+      return { kind: "conflict" as const, status: existing };
+    const params: unknown[] = [];
+    const assignments = Object.entries(patch).map(([field, value]) =>
+      identifier(field) + "=" + valueSql(params, field, value)
+    );
+    const target = bind(params, id);
+    await tx.unsafe(
+      'UPDATE public."ascension_execution_requests" SET ' + assignments.join(",") +
+      ' WHERE "id" = ' + target + ' AND "engine" = \'governed_runtime\'',
+      params as any[],
+    );
+    for (const row of sidecars) {
+      const keys = Object.keys(row);
+      if (row["request_id"] !== id || !keys.includes("ordinal"))
+        throw new Error("Invalid runtime sidecar correlation");
+      const values: unknown[] = [];
+      const args = keys.map(key => valueSql(values, key, row[key]));
+      const setters = keys.filter(key => !["request_id", "ordinal"].includes(key))
+        .map(key => identifier(key) + "=EXCLUDED." + identifier(key));
+      await tx.unsafe(
+        'INSERT INTO public."ascension_run_stages" (' +
+        keys.map(identifier).join(",") + ') VALUES (' + args.join(",") + ')' +
+        ' ON CONFLICT ("request_id","ordinal") DO UPDATE SET ' + setters.join(","),
+        values as any[],
+      );
+    }
+    return { kind: "updated" as const, status: requested };
+  });
+}
+
 export async function rpcDatabase(name: string, args: Record<string, unknown> = {}): Promise<Result<any>> {
   if (!connectionString()) return {data:null,error:OFFLINE,count:null};
   try {

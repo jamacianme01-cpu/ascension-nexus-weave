@@ -20,12 +20,13 @@ export function canonicalReport(value) {
 }
 
 export function governedReportMessage(report) {
-  if (!report || typeof report !== "object" || Array.isArray(report))
+  if (!report || typeof report !== "object" || Array.isArray(report) ||
+      typeof report.core_signed_payload !== "string" ||
+      report.core_signed_payload.length > 1500000)
     throw new Error("Invalid governed report");
-  const { core_attestation, ...content } = report;
-  // Domain separation prevents a signature for a different purpose being
-  // accepted as a queue completion, even with the same key.
-  return Buffer.from("ASCENSION-GOVERNED-REPORT-V1\n" + canonicalReport(content));
+  // The original Python core signs the exact serialized JSON payload bytes.
+  // The web never attempts to reproduce Python's number formatting.
+  return Buffer.from("ASCENSION-GOVERNED-REPORT-V1\n" + report.core_signed_payload);
 }
 
 export function verifyGovernedReport(report, publicKeyPem) {
@@ -34,7 +35,11 @@ export function verifyGovernedReport(report, publicKeyPem) {
       !/^[A-Za-z0-9+/]{86}==$/.test(report.core_attestation))
     return false;
   try {
-    const signature = Buffer.from(report.core_attestation, "base64");
+    const { core_attestation, core_signed_payload, ...fields } = report;
+    const signedFields = JSON.parse(core_signed_payload);
+    if (canonicalReport(signedFields) !== canonicalReport(fields))
+      return false;
+    const signature = Buffer.from(core_attestation, "base64");
     const key = createPublicKey(publicKeyPem);
     return key.asymmetricKeyType === "ed25519" && signature.length === 64 &&
       verify(null, governedReportMessage(report), key, signature);

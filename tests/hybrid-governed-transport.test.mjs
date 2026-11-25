@@ -23,8 +23,10 @@ for (const forbiddenDb of [
   "postgresql://owner:unused@top2.nearest.of.private.internal/ascension",
   "postgres://owner:unused@private.flycast/ascension",
   "postgres://owner:unused@fly.io/ascension",
+  "postgres://owner:unused@ascension-nexus-weave-production.up.railway.app/ascension",
+  "postgres://owner:unused@private.railway.internal/ascension",
 ]) {
-  assert.throws(() => assertNotRetiredFlyAddress(forbiddenDb), /retired Fly database/,
+  assert.throws(() => assertNotRetiredFlyAddress(forbiddenDb), /retired Fly\/Railway database/,
     "A leftover Fly database URL must never reconnect");
 }
 for (const existingDb of [
@@ -66,6 +68,8 @@ try {
     "http://192.168.1.10:9091",
     "http://worker.process.ascension-nexus-weave.internal:9091",
     "https://ascension-nexus-weave.fly.dev",
+    "https://ascension-nexus-weave-production.up.railway.app",
+    "https://private.railway.internal",
     "https://anything.internal",
     "https://username:password@owner-private-tunnel.example",
     "ftp://owner-private-tunnel.example",
@@ -73,8 +77,8 @@ try {
     calls.length = 0;
     process.env.ASCENSION_VOLUME_TRANSPORT_URL = forbidden;
     assert.equal(ownerVolumeTransportEnabled(),
-      forbidden.includes(".fly.dev") || forbidden.includes(".internal") ? false : true,
-      "Only explicitly retired Fly endpoints may be bypassed; all other unsafe URLs must fail closed");
+      forbidden.includes(".fly.dev") || forbidden.includes(".internal") || forbidden.includes(".railway.app") ? false : true,
+      "Retired Fly/Railway endpoints must be disabled; all other unsafe URLs must fail closed");
     await assert.rejects(callOwnerVolumeTransport("/health", "GET"));
     assert.equal(calls.length, 0, `Do not send token or call network for ${forbidden}`);
   }

@@ -5,19 +5,22 @@
  * No Fly Machines API, platform startup, replacement worker, or external AI.
  */
 
-function isRetiredFlyHost(host: string): boolean {
-  return host.endsWith(".fly.dev") || host.endsWith(".fly.io") ||
-    host.endsWith(".internal");
+function isRetiredHost(host: string): boolean {
+  // The owner retired BOTH Fly and Railway. Refuse old URLs even when
+  // environment secrets are still present; never reconnect automatically.
+  return ["fly.dev", "fly.io", "flycast", "internal",
+    "railway.app", "railway.internal"].some(suffix =>
+    host === suffix || host.endsWith("." + suffix));
 }
 
 export function ownerVolumeTransportEnabled(): boolean {
   const endpoint = process.env["ASCENSION_VOLUME_TRANSPORT_URL"]?.trim();
   if (!endpoint) return false;
-  // A stale Fly URL must never win over the existing database transport.
+  // A retired Fly/Railway URL must never win over the existing database transport.
   // OTHER invalid URLs still select this transport and fail validation:
   // do not silently switch persistence on a configuration mistake.
   try {
-    return !isRetiredFlyHost(new URL(endpoint).hostname.toLowerCase());
+    return !isRetiredHost(new URL(endpoint).hostname.toLowerCase());
   } catch {
     return true;
   }
@@ -36,8 +39,8 @@ function validatedOwnerEndpoint(endpoint: string): URL {
   if (!remoteTls && !localPlaintext) {
     throw new Error("ASCENSION hybrid transport must use HTTPS, or HTTP on local loopback.");
   }
-  if (isRetiredFlyHost(hostname)) {
-    throw new Error("ASCENSION owner hybrid cannot connect to the retired Fly endpoint.");
+  if (isRetiredHost(hostname)) {
+    throw new Error("ASCENSION owner hybrid cannot connect to a retired Fly or Railway endpoint.");
   }
   return url;
 }

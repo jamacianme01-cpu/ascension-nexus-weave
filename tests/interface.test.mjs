@@ -56,8 +56,14 @@ try {
     assert.ok(p.branches.some((b) => b.branch_id === p.selected.branch_id));
     assert.equal(model.branchTitle(p.selected), "Build and check in stages");
   });
-  check("governed persistence requires the core receipt", () => {
-    assert.equal(model.governedPersisted(run), true);
+  check("governed persistence requires a core-signed receipt", () => {
+    // A reporter with only the shared transport token can fabricate all
+    // previous fields; un-attested records must never earn verified Delta.
+    assert.equal(model.governedPersisted(run), false);
+    const attested = { ...run, result: {
+      ...run.result, core_attestation_verified: true,
+    } };
+    assert.equal(model.governedPersisted(attested), true);
     assert.equal(model.governedPersisted({ ...run, result: {} }), false);
   });
   check("external verified status never becomes ASCENSION verification", () => {

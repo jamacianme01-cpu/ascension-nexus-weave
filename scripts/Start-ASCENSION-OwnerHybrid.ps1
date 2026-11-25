@@ -144,9 +144,32 @@ try {
   )
   $started += $worker
 
-  Write-Host 'ASCENSION ORIGINAL OWNER-COMPUTER QUEUE CONNECTED'
+  # A healthy transport alone is not evidence that the original engine
+  # worker has imported its runtime and reached the authenticated queue.
+  $workerConnected = $false
+  for ($attempt = 0; $attempt -lt 45; $attempt++) {
+    if ($worker.HasExited) {
+      throw "Original ASCENSION worker exited before polling (exit code $($worker.ExitCode))."
+    }
+    try {
+      $health = Invoke-RestMethod -Uri 'http://127.0.0.1:9091/health' -Method Get -TimeoutSec 2 -Headers @{
+        'x-ascension-publish-token' = $env:ASCENSION_PUBLISH_TOKEN
+      }
+      if ($health.worker_poll_seen -eq $true -and $health.worker_recently_polling -eq $true) {
+        $workerConnected = $true
+        break
+      }
+    } catch {
+      # Wait for the actual authenticated worker poll, not a process launch.
+    }
+    Start-Sleep -Seconds 1
+  }
+  if (-not $workerConnected) {
+    throw 'Original ASCENSION engine worker did not reach its authenticated queue. Inspect the original worker output; no substitute runtime has been started.'
+  }
+  Write-Host 'ASCENSION ORIGINAL WORKER CONNECTED TO LOCAL QUEUE'
+  Write-Host 'Objective execution and result delivery still require a real verified run.'
   Write-Host 'Open http://127.0.0.1:4174/'
-  Write-Host 'Oracle Cloud has not been paired by this local test.'
   while ($true) {
     foreach ($child in $started) {
       if ($child.HasExited) { throw "ASCENSION process exited unexpectedly (PID $($child.Id))." }

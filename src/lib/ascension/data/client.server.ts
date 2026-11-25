@@ -77,12 +77,13 @@ function bucketApi() {
         return { data: null, error: { message: "Owner model listing failed." } };
       }
     },
-    async createSignedUploadUrl(filePath: string, _options?: { upsert?: boolean }): Promise<{
+    async createSignedUploadUrl(filePath: string, _options?: { upsert?: boolean; origin?: string }): Promise<{
       data: { signedUrl: string } | null;
       error: { message: string } | null;
     }> {
       const objectPath = bucketName(this) + "/" + filePath;
-      const base = process.env["ASCENSION_PUBLIC_BASE_URL"]?.trim().replace(/\/$/, "") || "";
+      const base = process.env["ASCENSION_PUBLIC_BASE_URL"]?.trim().replace(/\/$/, "") ||
+        _options?.origin?.trim().replace(/\/$/, "") || "";
       const secret = process.env["ASCENSION_PUBLISH_TOKEN"]?.trim() || "";
       if (!modelStorageObjectPath(objectPath) || !objectPath.endsWith(".glb") ||
           !/^https:\/\/[^/]+/i.test(base) || !STORAGE_DIR || !path.isAbsolute(STORAGE_DIR))

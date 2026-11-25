@@ -58,17 +58,17 @@ def patched(source: str, diff: str) -> str:
 
 def preserve_original_objective(schema: str, pipeline: str, capabilities: str):
     """Carry original Destiny untouched through Branch, planner, and writer."""
-    needle_schema = "    evaluation: Dict[str, Any] = field(default_factory=dict)\\n\\n    def to_dict(self) -> Dict:\\n"
+    needle_schema = "    evaluation: Dict[str, Any] = field(default_factory=dict)\n\n    def to_dict(self) -> Dict:\n"
     replaced_schema = (
-        "    evaluation: Dict[str, Any] = field(default_factory=dict)\\n"
-        "    # Exact owner objective is not the branch plan label.\\n"
-        '    original_objective: str = ""\\n\\n'
-        "    def to_dict(self) -> Dict:\\n"
+        "    evaluation: Dict[str, Any] = field(default_factory=dict)\n"
+        "    # Exact owner objective is not the branch plan label.\n"
+        '    original_objective: str = ""\n\n'
+        "    def to_dict(self) -> Dict:\n"
     )
-    needle_pipeline = "    branches = [replace(b, capability=delegated) for b in branches]\\n"
+    needle_pipeline = "    branches = [replace(b, capability=delegated) for b in branches]\n"
     replaced_pipeline = (
         "    branches = [replace(b, capability=delegated, "
-        "original_objective=destiny) for b in branches]\\n"
+        "original_objective=destiny) for b in branches]\n"
     )
     if schema.count(needle_schema) != 1 or pipeline.count(needle_pipeline) != 1:
         raise ValueError("Original Destiny/DTF source differs; refusing to invent a replacement")

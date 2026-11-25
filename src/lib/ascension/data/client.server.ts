@@ -7,12 +7,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Query, rpcDatabase } from "./postgres.server";
+import { modelStorageObjectPath, modelUploadSignature } from "./model-storage-signature.mjs";
 
 const STORAGE_DIR = process.env["ASCENSION_STORAGE_DIR"]?.trim() || "";
 
 function publicUrl(bucket: string, filePath: string): string {
   const rel = path.join(bucket, filePath).split(path.sep).join("/");
   const base = process.env["ASCENSION_PUBLIC_BASE_URL"]?.replace(/\/$/, "") || "";
+  if (bucket === "ascension-models" && modelStorageObjectPath(rel)) {
+    const endpoint = "/api/public/ascension/model-file?path=" + encodeURIComponent(rel);
+    return base ? base + endpoint : endpoint;
+  }
   return base ? `${base}/storage/${rel}` : `/storage/${rel}`;
 }
 
@@ -26,7 +31,9 @@ function bucketApi() {
       try {
         if (!STORAGE_DIR || !path.isAbsolute(STORAGE_DIR))
           return { error: { message: "ASCENSION_STORAGE_DIR must be a mounted absolute persistent directory." } };
-        if (filePath.split(/[\\/]/).includes(".."))
+        if (filePath.split(/[\\/]/).includes("..") ||
+            (bucketName(this) === "ascension-models" &&
+             !modelStorageObjectPath("ascension-models/" + filePath)))
           return { error: { message: "Invalid stored file path." } };
         const full = path.join(STORAGE_DIR, bucketName(this), filePath);
         await fs.mkdir(path.dirname(full), { recursive: true });
@@ -47,17 +54,48 @@ function bucketApi() {
     getPublicUrl(filePath: string): { data: { publicUrl: string } } {
       return { data: { publicUrl: publicUrl(bucketName(this), filePath) } };
     },
-    async list(_prefix?: string, _options?: { search?: string; limit?: number }): Promise<{
+    async list(prefix?: string, options?: { search?: string; limit?: number }): Promise<{
       data: Array<{ name: string }> | null;
       error: { message: string } | null;
     }> {
-      return { data: [], error: null };
+      const bucket = bucketName(this);
+      if (bucket !== "ascension-models" || !STORAGE_DIR || !path.isAbsolute(STORAGE_DIR))
+        return { data: null, error: { message: "Owner model storage is unavailable." } };
+      if (prefix && !/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(prefix))
+        return { data: null, error: { message: "Invalid model list prefix." } };
+      const folder = path.join(STORAGE_DIR, bucket, prefix || "");
+      try {
+        const files = await fs.readdir(folder, { withFileTypes: true });
+        return { data: files.filter(entry => entry.isFile() &&
+          !!modelStorageObjectPath(bucket + "/" + (prefix ? prefix + "/" : "") + entry.name) &&
+          (!options?.search || entry.name.includes(options.search)))
+          .slice(0, Math.min(1000, Math.max(1, options?.limit ?? 100)))
+          .map(entry => ({ name: entry.name })), error: null };
+      } catch (cause) {
+        if ((cause as NodeJS.ErrnoException).code === "ENOENT")
+          return { data: [], error: null };
+        return { data: null, error: { message: "Owner model listing failed." } };
+      }
     },
-    async createSignedUploadUrl(_filePath: string, _options?: { upsert?: boolean }): Promise<{
+    async createSignedUploadUrl(filePath: string, _options?: { upsert?: boolean }): Promise<{
       data: { signedUrl: string } | null;
       error: { message: string } | null;
     }> {
-      return { data: null, error: { message: "Signed uploads are not configured for this independent build." } };
+      const objectPath = bucketName(this) + "/" + filePath;
+      const base = process.env["ASCENSION_PUBLIC_BASE_URL"]?.trim().replace(/\/$/, "") || "";
+      const secret = process.env["ASCENSION_PUBLISH_TOKEN"]?.trim() || "";
+      if (!modelStorageObjectPath(objectPath) || !objectPath.endsWith(".glb") ||
+          !/^https:\/\/[^/]+/i.test(base) || !STORAGE_DIR || !path.isAbsolute(STORAGE_DIR))
+        return { data: null, error: { message: "Owner model URL/storage is not configured." } };
+      const expires = Date.now() + 2 * 60 * 60 * 1000;
+      const signature = modelUploadSignature(objectPath, expires, secret);
+      if (!signature)
+        return { data: null, error: { message: "Model upload signing secret is not configured." } };
+      const url = new URL(base + "/api/public/ascension/model-file");
+      url.searchParams.set("path", objectPath);
+      url.searchParams.set("expires", String(expires));
+      url.searchParams.set("signature", signature);
+      return { data: { signedUrl: url.toString() }, error: null };
     },
   };
 }

@@ -21,6 +21,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 
 DEFAULT_QUEUE_URL = ""  # Explicit owner-selected active host only; no retired platform default.
@@ -207,7 +208,83 @@ def _report(
     return _json_request(queue_url, token, "POST", payload, 60)
 
 
+def _pending_dir() -> Path:
+    """Owner-local durable completion receipts: no cloud DB or extra service."""
+    configured = os.environ.get("ASCENSION_MODEL_JOURNAL_DIR", "").strip()
+    return Path(configured).expanduser() if configured else Path.home() / ".ascension" / "model-reports"
+
+
+def _pending_file(job_id: str) -> Path:
+    # A model job ID comes from the existing UUID model queue.
+    canonical = str(uuid.UUID(job_id))
+    if canonical != job_id.lower():
+        raise ValueError("Noncanonical model job ID")
+    return _pending_dir() / (canonical + ".json")
+
+
+def _save_pending_completion(job_id: str) -> None:
+    target = _pending_file(job_id)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name("." + target.name + "." + uuid.uuid4().hex + ".tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as handle:
+            json.dump({"job_id": job_id, "status": "completed"}, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _report_completed_with_retry(queue_url: str, token: str, job_id: str):
+    for attempt in range(6):
+        try:
+            result = _report(queue_url, token, job_id, "completed")
+            if result.get("ok") is not True:
+                raise RuntimeError("Completion report lacked a positive acknowledgment")
+            return result
+        except RuntimeError as exc:
+            message = str(exc).lower()
+            transient = any(marker in message for marker in (
+                "http 500", "http 502", "http 503", "http 504",
+                "unavailable", "interrupted", "timed out", "timeout",
+                "connection reset", "connection refused",
+            ))
+            if not transient or attempt == 5:
+                raise
+            time.sleep(min(2 ** attempt, 8))
+    raise RuntimeError("Completion report was not acknowledged")
+
+
+def _drain_pending_completions(queue_url: str, token: str) -> bool:
+    """Retry previously uploaded GLBs without running Hunyuan again.
+
+    A failed acknowledgment stays on disk; it never becomes a false failed job.
+    Returns True while any unacknowledged completion remains.
+    """
+    root = _pending_dir()
+    if not root.is_dir():
+        return False
+    for entry in sorted(root.glob("*.json")):
+        try:
+            item = json.loads(entry.read_text(encoding="utf-8"))
+            job_id = item["job_id"]
+            if entry != _pending_file(job_id) or item.get("status") != "completed":
+                raise ValueError("Invalid completion receipt")
+            _report_completed_with_retry(queue_url, token, job_id)
+            entry.unlink()
+            print("[Hunyuan] recovered completion " + job_id, flush=True)
+        except Exception as exc:
+            print("[Hunyuan] completion remains pending " + entry.name + " | " + str(exc), flush=True)
+    return any(root.glob("*.json"))
+
+
 def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
+    if _drain_pending_completions(queue_url, token):
+        return False
     separator = "&" if "?" in queue_url else "?"
     claim_url = queue_url + separator + urllib.parse.urlencode({"runner": runner})
     payload = _json_request(claim_url, token, "GET", None, 180)
@@ -233,6 +310,7 @@ def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
         return True
 
     print("[Hunyuan] claimed " + job_id + " | " + label, flush=True)
+    uploaded = False
     try:
         _report(queue_url, token, job_id, "running")
         with tempfile.TemporaryDirectory(prefix="ascension-hunyuan-") as temp:
@@ -241,7 +319,12 @@ def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
             png_path = _download_source_image(source_image_url, work)
             glb = _generate_glb(hunyuan_url, png_path)
             _upload_glb(upload_url, glb)
-        result = _report(queue_url, token, job_id, "completed")
+            uploaded = True
+        # Record the completed GLB before the remote status update. A lost
+        # HTTP reply must NOT turn a successfully created model into 'failed'.
+        _save_pending_completion(job_id)
+        result = _report_completed_with_retry(queue_url, token, job_id)
+        _pending_file(job_id).unlink()
         print(
             "[Hunyuan] completed "
             + job_id
@@ -253,6 +336,10 @@ def run_once(queue_url: str, hunyuan_url: str, token: str, runner: str) -> bool:
         )
     except Exception as exc:
         message = str(exc)
+        if uploaded:
+            print("[Hunyuan] completion pending retry; original GLB is retained " +
+                  job_id + " | " + message, flush=True)
+            return False
         print("[Hunyuan] FAILED " + job_id + " | " + message, flush=True)
         try:
             _report(queue_url, token, job_id, "failed", message)

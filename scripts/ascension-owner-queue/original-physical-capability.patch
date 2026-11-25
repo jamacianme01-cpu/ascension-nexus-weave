@@ -1,6 +1,6 @@
 --- a/ASCENSION_CORE/capabilities.py
 +++ b/ASCENSION_CORE/capabilities.py
-@@ -148,9 +148,142 @@
+@@ -148,9 +148,172 @@
          )
  
  
@@ -98,6 +98,35 @@
 +        raw = model.read_bytes()
 +        if len(raw) < 20 or raw[:4] != b"glTF" or int.from_bytes(raw[4:8], "little") != 2 or int.from_bytes(raw[8:12], "little") != len(raw):
 +            raise RuntimeError("REAL_PHYSICAL_GENERATION_BLOCKED: original Hunyuan GLB failed container validation.")
++        # A valid GLB header alone does not prove that a mesh was produced.
++        json_length = int.from_bytes(raw[12:16], "little")
++        json_type = int.from_bytes(raw[16:20], "little")
++        bin_offset = 20 + json_length
++        if (len(raw) < 48 or json_type != 0x4e4f534a or json_length < 20 or
++                json_length % 4 != 0 or bin_offset + 8 > len(raw) or
++                int.from_bytes(raw[bin_offset+4:bin_offset+8], "little") != 0x004e4942 or
++                bin_offset + 8 + int.from_bytes(raw[bin_offset:bin_offset+4], "little") != len(raw)):
++            raise RuntimeError("REAL_PHYSICAL_GENERATION_BLOCKED: empty or malformed GLB geometry.")
++        gltf = json.loads(raw[20:bin_offset].decode("utf-8"))
++        geometries = gltf.get("meshes", []) if isinstance(gltf, dict) else []
++        accessors = gltf.get("accessors", []) if isinstance(gltf, dict) else []
++        views = gltf.get("bufferViews", []) if isinstance(gltf, dict) else []
++        has_mesh = any(
++            isinstance(mesh, dict) and any(
++                isinstance(p, dict) and isinstance(p.get("attributes"), dict) and
++                isinstance(p["attributes"].get("POSITION"), int) and
++                0 <= p["attributes"]["POSITION"] < len(accessors) and
++                isinstance(accessors[p["attributes"]["POSITION"]], dict) and
++                accessors[p["attributes"]["POSITION"]].get("type") == "VEC3" and
++                accessors[p["attributes"]["POSITION"]].get("count", 0) >= 3 and
++                isinstance(accessors[p["attributes"]["POSITION"]].get("bufferView"), int) and
++                0 <= accessors[p["attributes"]["POSITION"]]["bufferView"] < len(views)
++                for p in mesh.get("primitives", [])
++            )
++            for mesh in geometries if isinstance(mesh, dict)
++        )
++        if not has_mesh:
++            raise RuntimeError("REAL_PHYSICAL_GENERATION_BLOCKED: GLB contains no geometric mesh.")
 +        metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
 +        digest = hashlib.sha256(raw).hexdigest()
 +        if (metadata.get("status") != "validated_candidate" or
@@ -144,7 +173,7 @@
  }
  
  
-@@ -207,6 +340,11 @@
+@@ -207,6 +370,11 @@
  def select_capability(destiny: str, mes: List[MeaningElement], requested_type: str = "") -> str:
      """Select only capabilities whose output matches the requested contract."""
      contract = requested_output_contract(destiny, requested_type)

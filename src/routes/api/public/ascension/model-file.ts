@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { modelStorageObjectPath, verifyModelUploadSignature } from
   "@/lib/ascension/data/model-storage-signature.mjs";
+import { validateGlbGeometry } from "@/lib/ascension/data/glb-geometry.mjs";
 
 const BUCKET = "ascension-models";
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -114,11 +115,8 @@ export const Route = createFileRoute("/api/public/ascension/model-file")({
           bytes.set(chunk, offset);
           offset += chunk.byteLength;
         }
-        if (bytes.byteLength < 20 ||
-            new TextDecoder().decode(bytes.subarray(0, 4)) !== "glTF" ||
-            new DataView(bytes.buffer, bytes.byteOffset).getUint32(4, true) !== 2 ||
-            new DataView(bytes.buffer, bytes.byteOffset).getUint32(8, true) !== bytes.byteLength)
-          return response({ error: "invalid_glb" }, 422);
+        if (!validateGlbGeometry(bytes))
+          return response({ error: "invalid_glb_geometry" }, 422);
         const { error } = await ascensionDb.storage.from(BUCKET).upload(relative, bytes, {
           contentType: "model/gltf-binary", upsert: true,
         });

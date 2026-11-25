@@ -50,7 +50,6 @@
 +        import hashlib
 +        import os
 +        from pathlib import Path as _Path
-+        from clarity.autosync.construction_engine import UniversalConstructionEngine
 +
 +        root = _Path(os.environ.get("ASCENSION_REPOSITORY_ROOT") or
 +                     os.environ.get("ASCENSION_WORKSPACE_ROOT") or ".").resolve()
@@ -70,6 +69,7 @@
 +        if not objective or not meaning:
 +            raise RuntimeError("REAL_PHYSICAL_GENERATION_BLOCKED: objective and Meaning Elements are required.")
 +
++        from clarity.autosync.construction_engine import UniversalConstructionEngine
 +        engine = UniversalConstructionEngine(repository_root=root)
 +        job = engine.create_job(
 +            objective=objective,

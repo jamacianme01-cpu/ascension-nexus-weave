@@ -179,6 +179,71 @@ export class Query<T = Row[]> implements PromiseLike<Result<T>> {
   ): Promise<TResult1 | TResult2> { return this.execute().then(onfulfilled,onrejected); }
 }
 
+
+/**
+ * Atomically accept an ordered, complete observation publication. A newer
+ * publication must never be rolled back by an older HTTP retry, and pruning
+ * must never happen outside the same transaction as the accepted upsert.
+ *
+ * All writes through this relay are serialized with a transaction-scoped
+ * advisory lock. No tables, external services, or new database are created.
+ */
+export interface RelayPublicationRow {
+  path: string;
+  body: string;
+  revision: number;
+  source_classification: string | null;
+  http_status: number;
+  received_at: string;
+}
+export async function persistRelayPublication(
+  rows: RelayPublicationRow[],
+  replace: boolean,
+): Promise<{ accepted: boolean; revision: number }> {
+  if (!rows.length) throw new Error("Refusing an empty relay publication");
+  const revision = rows[0]!.revision;
+  if (!Number.isSafeInteger(revision) || revision < 0 ||
+      rows.some(row => row.revision !== revision))
+    throw new Error("A coherent relay publication requires a nonnegative integer revision");
+  const sql = database();
+  return sql.begin(async tx => {
+    await tx.unsafe("SELECT pg_advisory_xact_lock(2026112501::bigint)");
+    const current = await tx.unsafe(
+      'SELECT MAX("revision") AS "latest" FROM public."ascension_relay_documents"',
+    );
+    const latest = current[0]?.latest;
+    if (latest != null && revision <= Number(latest)) {
+      // Exact or outdated replay: no prune, no upsert, no sidecar rollback.
+      return { accepted: false, revision: Number(latest) };
+    }
+    if (replace) {
+      await tx.unsafe(
+        'DELETE FROM public."ascension_relay_documents" WHERE NOT ("path" = ANY($1::text[]))',
+        [rows.map(row => row.path)],
+      );
+    }
+    const values: unknown[] = [];
+    const tuples = rows.map(row => {
+      const fields: unknown[] = [
+        row.path, row.body, row.revision, row.source_classification,
+        row.http_status, row.received_at,
+      ];
+      const slots = fields.map(value => bind(values, value));
+      return "(" + slots.join(",") + ")";
+    });
+    await tx.unsafe(
+      'INSERT INTO public."ascension_relay_documents" ' +
+      '("path","body","revision","source_classification","http_status","received_at") ' +
+      'VALUES ' + tuples.join(",") + ' ON CONFLICT ("path") DO UPDATE SET ' +
+      '"body"=EXCLUDED."body", "revision"=EXCLUDED."revision", ' +
+      '"source_classification"=EXCLUDED."source_classification", ' +
+      '"http_status"=EXCLUDED."http_status", "received_at"=EXCLUDED."received_at"',
+      values as any[],
+    );
+    return { accepted: true, revision };
+  });
+}
+
 export async function rpcDatabase(name: string, args: Record<string, unknown> = {}): Promise<Result<any>> {
   if (!connectionString()) return {data:null,error:OFFLINE,count:null};
   try {

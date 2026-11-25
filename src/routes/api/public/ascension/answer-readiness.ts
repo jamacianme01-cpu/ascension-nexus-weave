@@ -7,10 +7,15 @@ export const Route = createFileRoute("/api/public/ascension/answer-readiness")({
   server: {
     handlers: {
       GET: async () => {
-        const database = await databaseConnectivity();
+        const ownerTransportSelected = ownerVolumeTransportEnabled();
+        // The owner queue is authoritative in this mode. Never contact a legacy
+        // database merely to report whether the selected local transport is ready.
+        const database = ownerTransportSelected
+          ? { connected: false, reason: "OWNER_VOLUME_TRANSPORT_SELECTED" }
+          : await databaseConnectivity();
         let ownerQueueConnected = false;
         let ownerPublicationRevision: number | null = null;
-        if (ownerVolumeTransportEnabled()) {
+        if (ownerTransportSelected) {
           try {
             const snapshot = await callOwnerVolumeTransport<{
               status: string;
@@ -26,7 +31,7 @@ export const Route = createFileRoute("/api/public/ascension/answer-readiness")({
           pc_independent_answers_configured: false,
           governed_runtime_connected: false,
           database_connected: database.connected,
-          database_status: ownerVolumeTransportEnabled() ? "OWNER_VOLUME_TRANSPORT_SELECTED" : database.reason,
+          database_status: database.reason,
           owner_queue_transport_connected: ownerQueueConnected,
           owner_publication_revision_at_worker_start: ownerPublicationRevision,
           live_inference_tested: false,

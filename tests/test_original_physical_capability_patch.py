@@ -95,6 +95,32 @@ class OriginalEngineAdapterTests(unittest.TestCase):
         self.assertNotIn('files["construction_job.json"]', physical)
         self.assertNotIn('job.build_state = "verified"', physical)
 
+    def test_unapproved_reference_blocks_without_a_model_engine(self):
+        import os
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        source = mod.patched(synthetic_original(), PATCH.read_text(encoding="utf-8"))
+        node = next(item for item in ast.parse(source).body
+                    if isinstance(item, ast.ClassDef) and
+                    item.name == "PhysicalDesignCapability")
+        ns = {
+            "CapabilityContract": lambda **kwargs: SimpleNamespace(**kwargs),
+            "CapabilityResult": lambda **kwargs: SimpleNamespace(**kwargs),
+            "Branch": object,
+            "MeaningElement": object,
+            "List": list,
+            "Dict": dict,
+        }
+        exec(compile(ast.Module(body=[node], type_ignores=[]),
+                     "ASCENSION_CORE/capabilities.py", "exec"), ns)
+        writer = ns["PhysicalDesignCapability"]()
+        branch = SimpleNamespace(approach="Make worker drones for people with dementia",
+                                 expected=SimpleNamespace(artifact_name="drone.md"))
+        elements = [SimpleNamespace(text="dementia guidance and environmental awareness")]
+        with patch.dict(os.environ, {"ASCENSION_PHYSICAL_REFERENCE_IMAGE": ""}):
+            with self.assertRaisesRegex(RuntimeError, "REAL_PHYSICAL_GENERATION_BLOCKED"):
+                writer.write(branch, elements)
+
     def test_modified_original_source_is_rejected(self):
         old = synthetic_original().replace("DocumentBundleCapability()", "MissingOwnerCapability()")
         with self.assertRaises(ValueError):

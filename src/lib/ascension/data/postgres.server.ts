@@ -212,7 +212,7 @@ export async function persistRelayPublication(
     const current = await tx.unsafe(
       'SELECT MAX("revision") AS "latest" FROM public."ascension_relay_documents"',
     );
-    const latest = current[0]?.latest;
+    const latest = current[0]?.["latest"];
     if (!shouldAcceptRelayRevision(latest, revision)) {
       // Exact or outdated replay: no prune, no upsert, no sidecar rollback.
       return { accepted: false, revision: Number(latest) };
@@ -255,7 +255,7 @@ export async function persistRuntimeQueueReport(
   id: string,
   patch: Record<string, unknown>,
   sidecars: Record<string, unknown>[],
-): Promise<{ kind: "updated" | "replayed" | "conflict" | "missing"; status?: string }> {
+): Promise<{ kind: "updated" | "replayed" | "conflict" | "missing"; status?: string | undefined }> {
   const requested = String(patch["status"] || "");
   if (!["claimed", "running", "verified", "failed", "rejected"].includes(requested))
     throw new Error("Invalid governed queue report status");
@@ -266,7 +266,7 @@ export async function persistRuntimeQueueReport(
       'WHERE "id" = $1 AND "engine" = $2 FOR UPDATE',
       [id, "governed_runtime"],
     );
-    const existing = found[0]?.status as string | undefined;
+    const existing = found[0]?.["status"] as string | undefined;
     const transition = governedQueueTransition(existing, requested);
     if (transition !== "updated")
       return { kind: transition, status: existing };

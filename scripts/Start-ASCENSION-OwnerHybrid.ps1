@@ -9,13 +9,49 @@ if ($env:COMPUTERNAME -eq 'GORDONS') {
 }
 
 $webRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if (-not $OriginalRoot) {
-  $OriginalRoot = Join-Path $HOME 'Projects\clarity'
+function Test-OriginalRoot([string]$Candidate) {
+  if (-not $Candidate -or -not (Test-Path -LiteralPath $Candidate -PathType Container)) { return $false }
+  foreach ($relative in @(
+    'ASCENSION_CORE\cloud_queue_worker.py',
+    'ASCENSION_CORE\live_publication.py',
+    'clarity\core_runtime.py',
+    'ASCENSION_CORE\state\live\published\governed_state.json'
+  )) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Candidate $relative) -PathType Leaf)) { return $false }
+  }
+  return $true
 }
-if (-not (Test-Path -LiteralPath $OriginalRoot -PathType Container)) {
-  throw "Original ASCENSION/CLARITY source was not found at $OriginalRoot. No substitute core will be created."
+
+if ($PSBoundParameters.ContainsKey('OriginalRoot')) {
+  if (-not (Test-OriginalRoot $OriginalRoot)) {
+    throw "The explicitly selected original root is incomplete: $OriginalRoot. No substitute core will be created."
+  }
+} elseif (-not (Test-OriginalRoot $OriginalRoot)) {
+  # Look only in current local working locations; never restore an archive or
+  # retired OneDrive checkout. Refuse ambiguous matches rather than guessing.
+  $locations = @((Join-Path $HOME 'Projects'), (Split-Path -Parent $webRoot))
+  $candidates = @()
+  foreach ($location in ($locations | Select-Object -Unique)) {
+    if (Test-Path -LiteralPath $location -PathType Container) {
+      $candidates += $location
+      $candidates += @(Get-ChildItem -LiteralPath $location -Directory -ErrorAction SilentlyContinue |
+        Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and $_.Name -notmatch '(?i)archive|backup|retired|onedrive' } |
+        Select-Object -ExpandProperty FullName)
+    }
+  }
+  $matchesFound = @($candidates | Where-Object {
+    $_ -notmatch '(?i)(^|[\\/])OneDrive[^\\/]*([\\/]|$)' -and (Test-OriginalRoot $_)
+  } | ForEach-Object { (Resolve-Path -LiteralPath $_).Path } | Sort-Object -Unique)
+  if ($matchesFound.Count -ne 1) {
+    if ($matchesFound.Count -gt 1) {
+      throw ("Multiple original runtime folders found; choose the existing owner root explicitly: " + ($matchesFound -join '; '))
+    }
+    throw 'No complete original ASCENSION/CLARITY root found in the local project folders. No substitute core or state will be created.'
+  }
+  $OriginalRoot = $matchesFound[0]
 }
 $OriginalRoot = (Resolve-Path -LiteralPath $OriginalRoot).Path
+Write-Host "ASCENSION original runtime: $OriginalRoot"
 $core = Join-Path $OriginalRoot 'ASCENSION_CORE'
 $live = Join-Path $core 'state\live'
 $required = @(

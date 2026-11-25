@@ -86,8 +86,34 @@ export const Route = createFileRoute("/api/public/ascension/model-file")({
 
         const reported = Number(request.headers.get("content-length"));
         if (reported > MAX_BYTES) return response({ error: "model_too_large" }, 413);
-        const bytes = new Uint8Array(await request.arrayBuffer());
-        if (bytes.byteLength > MAX_BYTES) return response({ error: "model_too_large" }, 413);
+        // Read in bounded chunks: a missing/false Content-Length cannot force
+        // an unlimited in-memory upload before the size guard runs.
+        if (!request.body) return response({ error: "model_body_missing" }, 400);
+        const reader = request.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            total += value.byteLength;
+            if (total > MAX_BYTES) {
+              await reader.cancel();
+              return response({ error: "model_too_large" }, 413);
+            }
+            chunks.push(value);
+          }
+        } catch {
+          return response({ error: "model_upload_interrupted" }, 400);
+        } finally {
+          reader.releaseLock();
+        }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          bytes.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
         if (bytes.byteLength < 20 ||
             new TextDecoder().decode(bytes.subarray(0, 4)) !== "glTF" ||
             new DataView(bytes.buffer, bytes.byteOffset).getUint32(4, true) !== 2 ||

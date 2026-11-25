@@ -82,6 +82,19 @@ class OriginalEngineAdapterTests(unittest.TestCase):
         self.assertIn("class DigitalArtifactWriter:", result)
         self.assertIn("class DocumentBundleCapability:", result)
 
+    def test_physical_design_never_uses_placeholder_geometry(self):
+        original = synthetic_original()
+        patched = mod.patched(original, PATCH.read_text(encoding="utf-8"))
+        physical = patched.split("class PhysicalDesignCapability:", 1)[1].split("REGISTRY:", 1)[0]
+        self.assertIn('artifact_type="generative_3d_form"', physical)
+        self.assertNotIn('artifact_type="physical_design"', physical)
+        self.assertIn('job.build_state != "candidate_validated"', physical)
+        self.assertIn('model.suffix.lower() != ".glb"', physical)
+        self.assertIn('metadata.get("mesh_sha256") != digest', physical)
+        self.assertIn('metadata.get("dimensionally_authoritative") is not False', physical)
+        self.assertNotIn('files["construction_job.json"]', physical)
+        self.assertNotIn('job.build_state = "verified"', physical)
+
     def test_modified_original_source_is_rejected(self):
         old = synthetic_original().replace("DocumentBundleCapability()", "MissingOwnerCapability()")
         with self.assertRaises(ValueError):

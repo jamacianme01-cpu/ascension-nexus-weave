@@ -15,11 +15,19 @@ const original = {
 };
 assert.equal(canonicalReport({z:1,a:{y:2,x:3}}),
   '{"a":{"x":3,"y":2},"z":1}');
-const signature = sign(null, governedReportMessage(original), privateKey).toString("base64");
-const report = { ...original, core_attestation: signature };
+const core_signed_payload = JSON.stringify(original);
+const signature = sign(null,
+  governedReportMessage({ core_signed_payload }), privateKey).toString("base64");
+const report = { ...original, core_signed_payload, core_attestation: signature };
 assert.equal(verifyGovernedReport(report, pem), true);
 assert.equal(verifyGovernedReport(report, undefined), false);
 assert.equal(verifyGovernedReport({ ...original }, pem), false);
+assert.equal(verifyGovernedReport({
+  ...report, core_signed_payload: '{"status":"verified"}',
+}, pem), false);
+assert.equal(verifyGovernedReport({
+  ...report, result: { ...original.result, transaction: "FAILED" },
+}, pem), false);
 assert.equal(verifyGovernedReport({ ...report, request_id: "different" }, pem), false);
 assert.equal(verifyGovernedReport({ ...report, runtime_revision: 45 }, pem), false);
 assert.equal(verifyGovernedReport({

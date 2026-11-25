@@ -332,6 +332,8 @@ export function CrystalExperience() {
       // A real governed result is stored with this encrypted original
       // across tab closure and owner-chosen Library Card backup/sync.
       // It is still a recorded answer, never physical or scientific proof.
+      const growth = newlyVerifiedCount(crystal, seenVerifiedGrowth());
+      const growthMessage = describeNewGrowth(growth);
       const recorded = crystal.governedResults?.at(-1);
       if (recorded) {
         governedAuth.current = {
@@ -343,7 +345,8 @@ export function CrystalExperience() {
         governedIndex.current = selectedResult >= 0 ? selectedResult : null;
         setGovernedMediaPending(crystalHasPendingModels(recorded.choices));
         if (selectedResult >= 0) {
-          revealGovernedChoice(selectedResult, false);
+          revealGovernedChoice(selectedResult, false, growthMessage);
+          acknowledgeVerifiedGrowth(crystal);
         } else {
           setAnswer(null);
           speak("This original intent is saved, but it has no usable governed result.");
@@ -358,7 +361,7 @@ export function CrystalExperience() {
       if (next && last) {
         const isNew = lastPresentedJob.current !== last.jobId;
         lastPresentedJob.current = last.jobId;
-        speak("I've retrieved your intent from this device. " +
+        speak(growthMessage + "I've retrieved your intent from this device. " +
           (isNew ? "A new on-device draft has been recorded. It has not been independently verified. " : "") +
           next.body + " " + guideSuggestion(next));
       } else {
@@ -462,7 +465,7 @@ export function CrystalExperience() {
       ". Does: " + (part.purpose || "The delivered result does not specify a function."));
   }
 
-  function revealGovernedChoice(index: number, persistSelection = true) {
+  function revealGovernedChoice(index: number, persistSelection = true, introduction = "") {
     const selected = governedChoices.current[index];
     if (!selected || !chosen.current ||
         governedAuth.current?.crystalId !== chosen.current.id) return;
@@ -477,7 +480,7 @@ export function CrystalExperience() {
     const components = selected.parts.length
       ? "Its delivered components include " + selected.parts.map(p => p.name).join(", ") + "."
       : "The engine has not supplied a component specification for this result.";
-    speak(selected.title + ". " + selected.body + " " + components);
+    speak(introduction + selected.title + ". " + selected.body + " " + components);
   }
 
   async function watchGovernedIntent(

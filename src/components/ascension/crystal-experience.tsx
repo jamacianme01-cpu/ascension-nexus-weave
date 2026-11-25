@@ -169,9 +169,6 @@ export function CrystalExperience() {
     recognition.current?.stop();
     const synthesis = window.speechSynthesis;
     synthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(words.slice(0, 1600));
-    utterance.rate = 0.96;
-    utterance.pitch = 1.01;
     // Only device-installed voices, never a browser's cloud TTS provider.
     const voices = synthesis.getVoices().filter(voice =>
       voice.lang.toLowerCase().startsWith("en") && voice.localService === true);
@@ -192,20 +189,47 @@ export function CrystalExperience() {
       }, 1500);
       return;
     }
-    utterance.voice = localVoice;
-    utterance.onstart = () => { if (speechSerial.current === serial) setSpeaking(true); };
-    utterance.onend = () => {
-      if (speechSerial.current !== serial) return;
-      setSpeaking(false);
-      if (thenListen && enteredRef.current && !workingRef.current) listen(true);
+    // Keep the entire result audible, splitting long speech at word boundaries.
+    // Each chunk is spoken by the same installed voice; cancellation invalidates
+    // all remaining chunks, and the microphone opens only after the last one.
+    const remaining = words.trim();
+    if (!remaining) return;
+    const chunks: string[] = [];
+    let tail = remaining;
+    while (tail.length > 900) {
+      const boundary = tail.lastIndexOf(" ", 900);
+      const end = boundary > 0 ? boundary : 900;
+      chunks.push(tail.slice(0, end));
+      tail = tail.slice(end).trimStart();
+    }
+    if (tail) chunks.push(tail);
+    const speakChunk = (index: number) => {
+      if (speechSerial.current !== serial || mutedRef.current) return;
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      utterance.rate = 0.96;
+      utterance.pitch = 1.01;
+      utterance.voice = localVoice;
+      utterance.onstart = () => {
+        if (speechSerial.current === serial) setSpeaking(true);
+      };
+      utterance.onend = () => {
+        if (speechSerial.current !== serial) return;
+        if (index + 1 < chunks.length) {
+          speakChunk(index + 1);
+          return;
+        }
+        setSpeaking(false);
+        if (thenListen && enteredRef.current && !workingRef.current) listen(true);
+      };
+      utterance.onerror = () => {
+        if (speechSerial.current !== serial) return;
+        setSpeaking(false);
+        setBackup(true);
+        setIssue("The installed voice could not speak. Your Library Card and intent remain available.");
+      };
+      synthesis.speak(utterance);
     };
-    utterance.onerror = () => {
-      if (speechSerial.current !== serial) return;
-      setSpeaking(false);
-      setBackup(true);
-      setIssue("The installed voice could not speak. Your Library Card and intent remain available.");
-    };
-    synthesis.speak(utterance);
+    speakChunk(0);
   }
   function listen(automatic = false) {
     if (workingRef.current) return;

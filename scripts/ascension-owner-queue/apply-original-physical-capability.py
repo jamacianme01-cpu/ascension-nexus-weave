@@ -72,7 +72,7 @@ def preserve_original_objective(schema: str, pipeline: str, capabilities: str):
     )
     if schema.count(needle_schema) != 1 or pipeline.count(needle_pipeline) != 1:
         raise ValueError("Original Destiny/DTF source differs; refusing to invent a replacement")
-    if "getattr(branch, \\"original_objective\\"" not in capabilities:
+    if 'getattr(branch, "original_objective"' not in capabilities:
         raise ValueError("Physical generation must use original_objective, not branch.approach")
     schema = schema.replace(needle_schema, replaced_schema)
     pipeline = pipeline.replace(needle_pipeline, replaced_pipeline)

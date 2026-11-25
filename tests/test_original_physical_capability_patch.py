@@ -121,6 +121,48 @@ class OriginalEngineAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "REAL_PHYSICAL_GENERATION_BLOCKED"):
                 writer.write(branch, elements)
 
+    def test_exact_user_intent_survives_original_dtf_branches(self):
+        from types import SimpleNamespace
+        from dataclasses import dataclass, field, replace
+        from typing import Any, Dict
+        schema = (
+            "from dataclasses import dataclass, field\\n"
+            "from typing import Dict, Any\\n"
+            "@dataclass\\n"
+            "class Branch:\\n"
+            "    evaluation: Dict[str, Any] = field(default_factory=dict)\\n\\n"
+            "    def to_dict(self) -> Dict:\\n"
+            "        return {}\\n"
+        )
+        pipeline = (
+            "from dataclasses import replace\\n"
+            "def construct_branches(branches, delegated, destiny):\\n"
+            "    branches = [replace(b, capability=delegated) for b in branches]\\n"
+            "    return branches\\n"
+        )
+        capability = mod.patched(synthetic_original(), PATCH.read_text(encoding="utf-8"))
+        schema_out, pipeline_out, capability_out = mod.preserve_original_objective(
+            schema, pipeline, capability,
+        )
+        ns = {}
+        exec(schema_out, ns)
+        original = "Make worker drones for people with dementia"
+        original_branch = ns["Branch"]()
+        original_branch.capability = "unused"
+        # Use the actual patched branch data model; no normalizing, guessing,
+        # changing words, or substituting a generic construction branch label.
+        exec(pipeline_out, {"replace": replace}, fn := {})
+        result = fn["construct_branches"]([original_branch], "physical_design", original)
+        self.assertEqual(result[0].original_objective, original)
+        self.assertIn('getattr(branch, "original_objective"', capability_out)
+        self.assertNotIn('getattr(branch, "approach"', capability_out)
+        with self.assertRaises(ValueError):
+            mod.preserve_original_objective(schema.replace("evaluation:", "evaluation_changed:"),
+                                            pipeline, capability)
+        with self.assertRaises(ValueError):
+            mod.preserve_original_objective(schema,
+                pipeline.replace("capability=delegated", "capability=obsolete"), capability)
+
     def test_modified_original_source_is_rejected(self):
         old = synthetic_original().replace("DocumentBundleCapability()", "MissingOwnerCapability()")
         with self.assertRaises(ValueError):

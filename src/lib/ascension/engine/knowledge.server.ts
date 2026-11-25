@@ -105,10 +105,10 @@ function classifyRecord(sourcePath: string, path: string) {
               : /guardian|constraint|confidence|governance/.test(key)
                 ? "governance_record"
                 : "knowledge_record";
-  const provenance_status: KnowledgeEvidence["provenance_status"] =
-    /verified_delta|ledger|evidence|transition/.test(key)
-      ? "verified_runtime_record"
-      : "recorded";
+  // Keyword matches identify where knowledge was stored, not whether the
+  // underlying observation passed Guardian/AutoSync or came from the core.
+  // Never promote a record to VERIFIED from a JSON path or field name.
+  const provenance_status: KnowledgeEvidence["provenance_status"] = "recorded";
   return { record_kind, provenance_status };
 }
 

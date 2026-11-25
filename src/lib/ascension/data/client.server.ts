@@ -61,7 +61,7 @@ function bucketApi() {
       const bucket = bucketName(this);
       if (bucket !== "ascension-models" || !STORAGE_DIR || !path.isAbsolute(STORAGE_DIR))
         return { data: null, error: { message: "Owner model storage is unavailable." } };
-      if (prefix && !/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(prefix))
+      if (prefix && !modelStorageObjectPath(bucket + "/" + prefix + "/index.png"))
         return { data: null, error: { message: "Invalid model list prefix." } };
       const folder = path.join(STORAGE_DIR, bucket, prefix || "");
       try {

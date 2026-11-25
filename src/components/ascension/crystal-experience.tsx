@@ -163,6 +163,7 @@ export function CrystalExperience() {
 
   function speak(words: string, thenListen = true) {
     const serial = ++speechSerial.current;
+    setSpeaking(false);
     if (mutedRef.current) return;
     if (!("speechSynthesis" in window)) { setBackup(true); return; }
     recognition.current?.stop();
@@ -198,7 +199,12 @@ export function CrystalExperience() {
       setSpeaking(false);
       if (thenListen && enteredRef.current && !workingRef.current) listen(true);
     };
-    utterance.onerror = () => { if (speechSerial.current === serial) setSpeaking(false); };
+    utterance.onerror = () => {
+      if (speechSerial.current !== serial) return;
+      setSpeaking(false);
+      setBackup(true);
+      setIssue("The installed voice could not speak. Your Library Card and intent remain available.");
+    };
     synthesis.speak(utterance);
   }
   function listen(automatic = false) {
@@ -214,6 +220,7 @@ export function CrystalExperience() {
       return;
     }
     speechSerial.current++; // Cancelled utterances must never restart the microphone.
+    setSpeaking(false);
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
     const mic = new Ctor();
@@ -809,6 +816,7 @@ export function CrystalExperience() {
     void sendIntent(input);
   };
   async function enter() {
+    if (enteredRef.current) return;
     try {
       libraryCapability();
       enteredRef.current = true;
@@ -981,8 +989,10 @@ export function CrystalExperience() {
       <button type="button" className="ascension-voice-toggle"
         aria-label={muted ? "Unmute groundskeeper" : "Mute groundskeeper"}
         onClick={() => {
-          setMuted(value => !value);
-          if (!muted) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
+          const next = !mutedRef.current;
+          mutedRef.current = next;
+          setMuted(next);
+          if (next) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
         }}>{muted ? "◖×" : "◖))"}</button>
       {working && <span className="sr-only" role="status">Your device is saving this intent.</span>}
       {governedWorking && <span className="sr-only" role="status">The authorized governed ASCENSION engine is processing the selected intent.</span>}

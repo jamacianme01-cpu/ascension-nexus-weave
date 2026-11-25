@@ -70,7 +70,8 @@ export const Route = createFileRoute("/api/public/ascension/relay")({
         if (entries.length > 64) return json({ error: "too many documents" }, 400);
 
         const revision =
-          typeof body.revision === "number" && Number.isInteger(body.revision) ? body.revision : null;
+          typeof body.revision === "number" && Number.isSafeInteger(body.revision) && body.revision >= 0 ? body.revision : null;
+        if (revision === null) return json({ error: "relay_revision_required" }, 422);
         const classification =
           typeof body.source_classification === "string" && body.source_classification.trim()
             ? body.source_classification
@@ -79,7 +80,7 @@ export const Route = createFileRoute("/api/public/ascension/relay")({
         const rows: {
           path: string;
           body: string;
-          revision: number | null;
+          revision: number;
           source_classification: string | null;
           http_status: number;
           received_at: string;
@@ -114,31 +115,25 @@ export const Route = createFileRoute("/api/public/ascension/relay")({
           });
         }
 
-        const { ascensionDb } = await import("@/lib/ascension/data/client.server");
-
-        // Whole-set replacement keeps relayed surfaces coherent: a stale surface
-        // from an earlier revision is never served alongside a newer one.
-        if (body.replace !== false) {
-          const keep = rows.map((row) => row.path);
-          const { error: pruneError } = await ascensionDb
-            .from("ascension_relay_documents")
-            .delete()
-            .not("path", "in", `(${keep.map((path) => `"${path}"`).join(",")})`);
-          if (pruneError) {
-            console.error("ascension relay prune failed", pruneError.message);
-            return json({ error: "store_failed" }, 500);
-          }
-        }
-
-        const { error } = await ascensionDb
-          .from("ascension_relay_documents")
-          .upsert(rows, { onConflict: "path" });
-        if (error) {
-          console.error("ascension relay store failed", error.message);
+        // Native PostgreSQL transaction ensures the revision guard, prune,
+        // and upsert cannot race. Older retries are acknowledged as ignored.
+        try {
+          const { persistRelayPublication } = await import(
+            "@/lib/ascension/data/postgres.server"
+          );
+          const outcome = await persistRelayPublication(rows, body.replace !== false);
+          return json({
+            ok: true,
+            revision: outcome.revision,
+            accepted: outcome.accepted,
+            paths: outcome.accepted ? rows.map(row => row.path) : [],
+          }, 200);
+        } catch (cause) {
+          console.error("ascension relay atomic publication failed",
+            cause instanceof Error ? cause.message : "unknown");
           return json({ error: "store_failed" }, 500);
         }
 
-        return json({ ok: true, revision, paths: rows.map((row) => row.path) }, 200);
       },
     },
   },

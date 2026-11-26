@@ -31,7 +31,6 @@ import {
   markGrowthSeen, describeNewGrowth, welcomeBackGrowth,
   type CrystalGrowth,
 } from "@/lib/ascension/crystal-return";
-import { GroundskeeperExpression } from "./groundskeeper-expression";
 import "./crystal-experience.css";
 import { readPendingGoverned, savePendingGoverned, clearPendingGoverned,
   type PendingGoverned } from "@/lib/ascension/pending-governed-session.mjs";
@@ -1011,7 +1010,6 @@ export function CrystalExperience() {
         aria-label="The owner-approved Groundskeeper, Tree of Knowledge, Book, and crystal scene">
         {sceneAvailable && <img src={APPROVED_SCENE} alt=""
           draggable={false} onError={() => setSceneAvailable(false)}/>}
-        {sceneAvailable && <GroundskeeperExpression source={APPROVED_SCENE} speaking={speaking}/>}
       </div>
       {!hasArtwork && <p className="ascension-artwork-pending" role="status">
         The exact owner-approved ASCENSION scene file is missing. No replacement image will be shown.

@@ -27,10 +27,7 @@ try {
         getVoices() { return [{ lang: "en-US", localService: true, name: "Ava" }]; },
         speak(utterance) {
           window.__ascensionSpoken.push(utterance.text);
-          queueMicrotask(() => {
-            utterance.onstart?.();
-            setTimeout(() => utterance.onend?.(), 650);
-          });
+          queueMicrotask(() => { utterance.onstart?.(); utterance.onend?.(); });
         },
         cancel() {}, addEventListener() {}, removeEventListener() {},
       },
@@ -74,14 +71,6 @@ try {
   await page.waitForFunction(() =>
     window.__ascensionSpoken.some(text => /^Welcome to ASCENSION\./.test(text)),
   null, { timeout: 10000 });
-  const expression = page.locator(".ascension-groundskeeper-expression");
-  await expression.waitFor({ state: "attached", timeout: 10000 });
-  await page.waitForFunction(() =>
-    document.querySelector(".ascension-groundskeeper-expression")?.dataset.motion === "active",
-    null, { timeout: 10000 });
-  await page.waitForFunction(() =>
-    document.querySelector(".ascension-groundskeeper-expression")?.dataset.motion === "idle",
-    null, { timeout: 10000 });
   assert.equal(await page.locator(".ascension-crystal-reality").count(), 0,
     "No invented design or preview belongs on the opening Tree");
   assert.equal(await page.getByRole("complementary",

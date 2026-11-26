@@ -35,7 +35,6 @@ import "./crystal-experience.css";
 import { readPendingGoverned, savePendingGoverned, clearPendingGoverned,
   type PendingGoverned } from "@/lib/ascension/pending-governed-session.mjs";
 
-const BOOK = "/approved-scene/01-closed-book.jpg";
 // Original owner-approved single composition, Tree + Groundskeeper + Book together.
 // Do not split, crop, recolor, regenerate, or replace either figure.
 const APPROVED_SCENE = "/approved-scene/ascension-exact-approved-scene.png";
@@ -991,7 +990,7 @@ export function CrystalExperience() {
 
   return <main className="ascension-living-world" aria-label="ASCENSION Knowledgeverse">
     {!entered ? <section className="ascension-library-book" aria-label="Library Card">
-      <img src={BOOK} alt="ASCENSION Library Card" draggable={false}/>
+      <img src={APPROVED_SCENE} alt="ASCENSION Library Card, Groundskeeper and Tree of Knowledge" draggable={false}/>
       <button type="button" onClick={() => void enter()} aria-label="Enter ASCENSION using the Library Card">
         Enter ASCENSION
       </button>

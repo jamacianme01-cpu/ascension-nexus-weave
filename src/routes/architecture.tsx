@@ -1,15 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { SystemArchitecture } from "@/components/ascension/system-architecture";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Retired interface: old bookmarks return to the single approved Knowledgeverse.
+// Governed runtime, observation APIs and saved knowledge remain unchanged.
 export const Route = createFileRoute("/architecture")({
-  head: () => ({
-    meta: [
-      { title: "Architecture — ASCENSION" },
-      {
-        name: "description",
-        content: "ASCENSION and CLARITY system architecture, governed engines, execution engines, epistemic chain, identity, Library Card and Knowledgeverse.",
-      },
-    ],
-  }),
-  component: () => <SystemArchitecture />,
+  beforeLoad: () => { throw redirect({ to: "/", replace: true }); },
 });

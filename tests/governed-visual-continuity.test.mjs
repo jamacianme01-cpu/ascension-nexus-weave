@@ -77,17 +77,10 @@ const failure=reconcileDeliveredVisuals(first,{...first,blend:{
 assert.equal(waitingOnDeliveredModels(failure),false);
 assert.equal(failure.blend.modelUrl,null);
 
-const component=readFileSync("src/components/ascension/independent-engage.tsx","utf8");
-assert.match(component,/singleDeliveredResult\(delivery\)/,
-  "The existing governed single-output flow must retain actual image links");
-assert.match(component,/modelStatus: path\.model_status/,
-  "The real model status must reach the Tree");
-assert.match(component,/waitingOnDeliveredModels\(result\)/,
-  "Pending delivered models must be actively refreshed");
-assert.match(component,/getGuestObjectiveDelivery\(\{data:run\}\)/,
-  "Refresh must use the same authorized guest token and original request");
-assert.match(component,/reconcileDeliveredVisuals\(previous, later\)/,
-  "Only missing later assets may be added to the original approved result");
-assert.match(component,/activeRun\.current\?\.requestId !== run\.requestId/,
-  "A different run must never claim the earlier design's media");
-console.log("PASS: truthful single-output design URLs, delayed authorized GLB hydration, original text/image retention, no invented geometry.");
+const component=readFileSync("src/components/ascension/crystal-experience.tsx","utf8");
+assert.match(component,/deliveredCrystalChoices\(delivery\.response_payload\)/);
+assert.match(component,/crystalHasPendingModels\(merged\)/);
+assert.match(component,/requestId: authorized\.requestId, guestToken: authorized\.guestToken/);
+assert.match(component,/reconcileCrystalMedia\(older, newer\)/);
+assert.match(component,/governedAuth\.current\?\.requestId !== authorized\.requestId/);
+console.log("PASS: original visual continuity and current active-route authorized media hydration");

@@ -35,7 +35,19 @@ assert.ok(deliveredCrystalChoices(directFour).every(x=>x.isBlend===false),
 assert.equal(selectGovernedAuthoredDelivery({
   objective_planning:{branches:[actual("planning")]},execution_receipts:[{files:[]}]
 },owner,getFiles),null,"A plan or receipt cannot pass as an original user-facing solution");
-assert.equal(selectGovernedAuthoredDelivery(root([]),owner,getFiles),null);
+const singleAnswer = selectGovernedAuthoredDelivery(root([]),owner,getFiles);
+assert.equal(singleAnswer.body,"Original answer, no paraphrase");
+assert.deepEqual(singleAnswer.pathways,[]);
+assert.equal(deliveredCrystalChoices(singleAnswer).length,1);
+assert.equal(deliveredCrystalChoices(singleAnswer)[0].body,singleAnswer.body);
+assert.equal(selectGovernedAuthoredDelivery(root([]).objective_delivery,owner,getFiles),null,
+  "An ambiguous root-level narrative is not an explicit single delivery");
+assert.equal(selectGovernedAuthoredDelivery({objective_delivery:{
+  body:"Unclassified narrative",pathways:[],blend:null
+}},owner,getFiles),null);
+assert.equal(selectGovernedAuthoredDelivery({objective_delivery:{
+  ...root([]).objective_delivery,kind:"not_produced"
+}},owner,getFiles),null);
 const duplicate=partial;
 duplicate.objective_delivery.blend={...actual("claude"),blend_reason:"Duplicate"};
 assert.equal(selectGovernedAuthoredDelivery(duplicate,owner,getFiles),null,

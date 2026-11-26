@@ -75,18 +75,21 @@ try {
   if (!guideSaidWelcome) throw Error("The groundskeeper did not speak her opening welcome");
   await page.getByRole("button", { name: "Speak with groundskeeper" }).click();
   await page.getByPlaceholder("Speak or type your intent").waitFor({ timeout: 15000 });
-  await command(objective);
-  await page.locator(".ascension-tree-crystal[data-active='true']").waitFor({ timeout: 25000 });
-  // Local saving does NOT authorize silently transmitting the owner objective.
-  if (await page.locator("span.sr-only[role='status']").filter({
-    hasText: "The authorized governed ASCENSION engine is processing",
-  }).count()) throw Error("Saving a private crystal silently started remote engines");
-
-  // The owner now explicitly authorizes the unchanged selected original.
-  await command("engage ascension");
+  const local = new URL(website);
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(local.hostname) || local.port !== "4174")
+    throw Error("Live acceptance requires the original owner-local ASCENSION installation");
+  const readinessResponse = await page.request.get(new URL("/api/public/ascension/answer-readiness", website).href);
+  const readiness = await readinessResponse.json();
+  if (!readinessResponse.ok() || readiness.owner_local_transport_selected !== true ||
+      readiness.owner_queue_transport_connected !== true || readiness.owner_worker_recently_polling !== true)
+    throw Error("The original ASCENSION worker has not established its authenticated local queue connection");
   const busy = page.locator("span.sr-only[role='status']").filter({
     hasText: "The authorized governed ASCENSION engine is processing",
   });
+  await command(objective);
+  await page.locator(".ascension-tree-crystal[data-active='true']").waitFor({ timeout: 25000 });
+  // The spoken owner-local objective itself must invoke the original engines.
+  // A second ENGAGE command is not part of the current owner design.
   await busy.waitFor({ state: "attached", timeout: 25000 });
   await busy.waitFor({ state: "detached", timeout: 240000 });
   const error = await page.locator(".ascension-crystal-error").allTextContents();

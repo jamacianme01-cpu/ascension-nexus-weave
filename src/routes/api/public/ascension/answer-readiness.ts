@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { databaseConnectivity } from "@/lib/ascension/data/postgres.server";
-import { ownerVolumeTransportEnabled, callOwnerVolumeTransport } from "@/lib/ascension/data/volume-transport.server";
+import { ownerVolumeTransportEnabled, ownerVolumeTransportIsLoopback, callOwnerVolumeTransport } from "@/lib/ascension/data/volume-transport.server";
 
 /** Read-only ASCENSION status. Never infer governed execution from stored credentials. */
 export const Route = createFileRoute("/api/public/ascension/answer-readiness")({
@@ -37,6 +37,7 @@ export const Route = createFileRoute("/api/public/ascension/answer-readiness")({
           governed_runtime_connected: false,
           database_connected: database.connected,
           database_status: database.reason,
+          owner_local_transport_selected: ownerVolumeTransportIsLoopback(),
           owner_queue_transport_connected: ownerQueueConnected,
           owner_worker_recently_polling: ownerWorkerPolling,
           owner_publication_revision_at_worker_start: ownerPublicationRevision,

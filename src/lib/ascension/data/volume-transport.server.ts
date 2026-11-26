@@ -23,6 +23,16 @@ export function ownerVolumeTransportEnabled(): boolean {
   }
 }
 
+// Used by the owner installation to prevent any remote or database fallback.
+export function ownerVolumeTransportIsLoopback(): boolean {
+  try {
+    const url = validatedOwnerEndpoint(process.env["ASCENSION_VOLUME_TRANSPORT_URL"]?.trim() || "");
+    return url.protocol === "http:" &&
+      ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname.toLowerCase()) &&
+      url.port === "9091";
+  } catch { return false; }
+}
+
 /** Credentials are never sent to a remote plaintext address. */
 function validatedOwnerEndpoint(endpoint: string): URL {
   const url = new URL(endpoint);

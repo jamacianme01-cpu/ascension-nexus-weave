@@ -8,7 +8,7 @@ import {
 import { startDesktopBackgroundSync, stopDesktopBackgroundSync } from "@/lib/ascension/device-background-sync";
 import type { DesignView } from "./v1-design-viewport";
 import {
-  listDeviceCrystals, readDeviceCrystal, recordDeviceGovernedReceipt,
+  listDeviceCrystals, readDeviceCrystal, recordDeviceGovernedReceipt, createDeviceCrystal,
   selectDeviceGovernedResult, type DeviceCrystal,
 } from "@/lib/ascension/device-knowledgeverse";
 import {
@@ -380,6 +380,13 @@ export function CrystalExperience() {
     }
   }
 
+  // The owner launcher binds the app to this local address. Speaking a new
+  // intent there requests the original governed runtime, not a draft model.
+  function ownerLocalInstallation() {
+    return ["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname)
+      && window.location.port === "4174";
+  }
+
   async function sendIntent(intent: string, authorizeGoverned = false) {
     const statement = intent.trim();
     if (!statement || workingRef.current) return;
@@ -409,6 +416,7 @@ export function CrystalExperience() {
     recognition.current?.stop();
     try {
       let message = "";
+      const localOwner = ownerLocalInstallation();
       if (parent) {
         const own = await readDeviceCrystal(parent.id);
         if (own.developing) {
@@ -423,7 +431,9 @@ export function CrystalExperience() {
           }
         }
       } else {
-        const result = await startDeviceIntent(statement);
+        const result = localOwner
+          ? { crystal: await createDeviceCrystal(statement), submitted: false }
+          : await startDeviceIntent(statement);
         chosen.current = { id: result.crystal.id, intent: result.crystal.intent };
         governedAuth.current = null;
         governedChoices.current = [];
@@ -438,10 +448,10 @@ export function CrystalExperience() {
       await refreshCrystals();
       workingRef.current = false;
       setWorking(false);
-      if (authorizeGoverned && !parent) {
-        // Owner spoke explicit ENGAGE together with the objective. Submit
-        // only after its original encrypted on-device crystal was created.
-        // A plain spoken objective still stays private on this device.
+      if ((authorizeGoverned || localOwner) && !parent) {
+        // The crystal is persisted first. In the owner installation, send
+        // the spoken request only to the existing local governed transport.
+        // Elsewhere, retain the explicit authorization requirement.
         await runGovernedIntent();
       } else {
         speak(message);
@@ -650,6 +660,7 @@ export function CrystalExperience() {
       if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
       const authorized = await submitGuestObjective({ data: {
         objective: change || original.intent,
+        requireOwnerLocal: ownerLocalInstallation(),
         ...(previous ? {
           parentRequestId: previous.requestId,
           parentGuestToken: previous.guestToken,

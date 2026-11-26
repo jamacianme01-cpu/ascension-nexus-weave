@@ -62,7 +62,7 @@ assert.match(newIntentFlow.slice(activeIntentGuard, clearChosen),
   /return;/);
 
 const sendIntentGuard = tree.slice(
-  tree.indexOf("async function sendIntent(intent: string)"),
+  tree.indexOf("async function sendIntent(intent: string, authorizeGoverned = false)"),
   tree.indexOf("const parent = continuing.current")
 );
 assert.match(sendIntentGuard, /if \(governedPending\.current\) \{/);

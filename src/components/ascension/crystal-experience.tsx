@@ -8,7 +8,7 @@ import {
 import { startDesktopBackgroundSync, stopDesktopBackgroundSync } from "@/lib/ascension/device-background-sync";
 import type { DesignView } from "./v1-design-viewport";
 import {
-  listDeviceCrystals, readDeviceCrystal, recordDeviceGovernedReceipt,
+  listDeviceCrystals, readDeviceCrystal, recordDeviceGovernedReceipt, createDeviceCrystal,
   selectDeviceGovernedResult, type DeviceCrystal,
 } from "@/lib/ascension/device-knowledgeverse";
 import {
@@ -19,7 +19,8 @@ import {
 } from "@/lib/ascension/guest.functions";
 import {
   choiceForVoiceCommand, deliveredCrystalChoices, governedVoiceCommand,
-  crystalHasPendingModels, reconcileCrystalMedia,
+  explicitlyEngagedIntent,
+  crystalHasPendingModels, reconcileCrystalMedia, evolvingCrystalResultIndex,
   type CrystalGovernedChoice,
 } from "@/lib/ascension/governed-crystal-voice.mjs";
 import {
@@ -34,7 +35,6 @@ import "./crystal-experience.css";
 import { readPendingGoverned, savePendingGoverned, clearPendingGoverned,
   type PendingGoverned } from "@/lib/ascension/pending-governed-session.mjs";
 
-const BOOK = "/approved-scene/01-closed-book.jpg";
 // Original owner-approved single composition, Tree + Groundskeeper + Book together.
 // Do not split, crop, recolor, regenerate, or replace either figure.
 const APPROVED_SCENE = "/approved-scene/ascension-exact-approved-scene.png";
@@ -162,14 +162,12 @@ export function CrystalExperience() {
 
   function speak(words: string, thenListen = true) {
     const serial = ++speechSerial.current;
+    setSpeaking(false);
     if (mutedRef.current) return;
     if (!("speechSynthesis" in window)) { setBackup(true); return; }
     recognition.current?.stop();
     const synthesis = window.speechSynthesis;
     synthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(words.slice(0, 1600));
-    utterance.rate = 0.96;
-    utterance.pitch = 1.01;
     // Only device-installed voices, never a browser's cloud TTS provider.
     const voices = synthesis.getVoices().filter(voice =>
       voice.lang.toLowerCase().startsWith("en") && voice.localService === true);
@@ -190,15 +188,47 @@ export function CrystalExperience() {
       }, 1500);
       return;
     }
-    utterance.voice = localVoice;
-    utterance.onstart = () => { if (speechSerial.current === serial) setSpeaking(true); };
-    utterance.onend = () => {
-      if (speechSerial.current !== serial) return;
-      setSpeaking(false);
-      if (thenListen && enteredRef.current && !workingRef.current) listen(true);
+    // Keep the entire result audible, splitting long speech at word boundaries.
+    // Each chunk is spoken by the same installed voice; cancellation invalidates
+    // all remaining chunks, and the microphone opens only after the last one.
+    const remaining = words.trim();
+    if (!remaining) return;
+    const chunks: string[] = [];
+    let tail = remaining;
+    while (tail.length > 900) {
+      const boundary = tail.lastIndexOf(" ", 900);
+      const end = boundary > 0 ? boundary : 900;
+      chunks.push(tail.slice(0, end));
+      tail = tail.slice(end).trimStart();
+    }
+    if (tail) chunks.push(tail);
+    const speakChunk = (index: number) => {
+      if (speechSerial.current !== serial || mutedRef.current) return;
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      utterance.rate = 0.96;
+      utterance.pitch = 1.01;
+      utterance.voice = localVoice;
+      utterance.onstart = () => {
+        if (speechSerial.current === serial) setSpeaking(true);
+      };
+      utterance.onend = () => {
+        if (speechSerial.current !== serial) return;
+        if (index + 1 < chunks.length) {
+          speakChunk(index + 1);
+          return;
+        }
+        setSpeaking(false);
+        if (thenListen && enteredRef.current && !workingRef.current) listen(true);
+      };
+      utterance.onerror = () => {
+        if (speechSerial.current !== serial) return;
+        setSpeaking(false);
+        setBackup(true);
+        setIssue("The installed voice could not speak. Your Library Card and intent remain available.");
+      };
+      synthesis.speak(utterance);
     };
-    utterance.onerror = () => { if (speechSerial.current === serial) setSpeaking(false); };
-    synthesis.speak(utterance);
+    speakChunk(0);
   }
   function listen(automatic = false) {
     if (workingRef.current) return;
@@ -213,6 +243,7 @@ export function CrystalExperience() {
       return;
     }
     speechSerial.current++; // Cancelled utterances must never restart the microphone.
+    setSpeaking(false);
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
     const mic = new Ctor();
@@ -239,8 +270,14 @@ export function CrystalExperience() {
     mic.continuous = false;
     mic.interimResults = false;
     mic.onresult = event => {
+      if (recognition.current !== mic) return;
       const spoken = Array.from(event.results).at(-1)?.[0]?.transcript?.trim();
-      if (spoken) processVoice.current(spoken);
+      if (spoken) {
+        recognition.current = null;
+        setListening(false);
+        mic.stop();
+        processVoice.current(spoken);
+      }
     };
     mic.onerror = event => {
       if (recognition.current !== mic) return;
@@ -300,6 +337,8 @@ export function CrystalExperience() {
       // A real governed result is stored with this encrypted original
       // across tab closure and owner-chosen Library Card backup/sync.
       // It is still a recorded answer, never physical or scientific proof.
+      const growth = newlyVerifiedCount(crystal, seenVerifiedGrowth());
+      const growthMessage = describeNewGrowth(growth);
       const recorded = crystal.governedResults?.at(-1);
       if (recorded) {
         governedAuth.current = {
@@ -307,17 +346,15 @@ export function CrystalExperience() {
           guestToken: recorded.guestToken,
         };
         governedChoices.current = recorded.choices;
-        governedIndex.current = recorded.selectedIndex;
+        const selectedResult = evolvingCrystalResultIndex(recorded.choices, recorded.selectedIndex);
+        governedIndex.current = selectedResult >= 0 ? selectedResult : null;
         setGovernedMediaPending(crystalHasPendingModels(recorded.choices));
-        if (recorded.selectedIndex !== null &&
-            recorded.choices[recorded.selectedIndex]) {
-          revealGovernedChoice(recorded.selectedIndex);
-        } else if (recorded.choices.length === 1) {
-          revealGovernedChoice(0);
+        if (selectedResult >= 0) {
+          revealGovernedChoice(selectedResult, false, growthMessage);
+          acknowledgeVerifiedGrowth(crystal);
         } else {
           setAnswer(null);
-          speak("I've retrieved the recorded ASCENSION pathways for this original intent. " +
-            recorded.choices.map(p => p.isBlend === true ? "BLEND" : p.title).join(", ") + ". Tell me which pathway to enter.");
+          speak("This original intent is saved, but it has no usable governed result.");
         }
         return;
       }
@@ -329,7 +366,7 @@ export function CrystalExperience() {
       if (next && last) {
         const isNew = lastPresentedJob.current !== last.jobId;
         lastPresentedJob.current = last.jobId;
-        speak("I've retrieved your intent from this device. " +
+        speak(growthMessage + "I've retrieved your intent from this device. " +
           (isNew ? "A new on-device draft has been recorded. It has not been independently verified. " : "") +
           next.body + " " + guideSuggestion(next));
       } else {
@@ -343,7 +380,14 @@ export function CrystalExperience() {
     }
   }
 
-  async function sendIntent(intent: string) {
+  // The owner launcher binds the app to this local address. Speaking a new
+  // intent there requests the original governed runtime, not a draft model.
+  function ownerLocalInstallation() {
+    return ["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname)
+      && window.location.port === "4174";
+  }
+
+  async function sendIntent(intent: string, authorizeGoverned = false) {
     const statement = intent.trim();
     if (!statement || workingRef.current) return;
     // New/edited on-device intent must not replace the currently tracked
@@ -372,6 +416,7 @@ export function CrystalExperience() {
     recognition.current?.stop();
     try {
       let message = "";
+      const localOwner = ownerLocalInstallation();
       if (parent) {
         const own = await readDeviceCrystal(parent.id);
         if (own.developing) {
@@ -386,7 +431,9 @@ export function CrystalExperience() {
           }
         }
       } else {
-        const result = await startDeviceIntent(statement);
+        const result = localOwner
+          ? { crystal: await createDeviceCrystal(statement), submitted: false }
+          : await startDeviceIntent(statement);
         chosen.current = { id: result.crystal.id, intent: result.crystal.intent };
         governedAuth.current = null;
         governedChoices.current = [];
@@ -401,7 +448,14 @@ export function CrystalExperience() {
       await refreshCrystals();
       workingRef.current = false;
       setWorking(false);
-      speak(message);
+      if ((authorizeGoverned || localOwner) && !parent) {
+        // The crystal is persisted first. In the owner installation, send
+        // the spoken request only to the existing local governed transport.
+        // Elsewhere, retain the explicit authorization requirement.
+        await runGovernedIntent();
+      } else {
+        speak(message);
+      }
     } catch (cause) {
       if (epoch !== requestEpoch.current) return;
       workingRef.current = false;
@@ -426,13 +480,13 @@ export function CrystalExperience() {
       ". Does: " + (part.purpose || "The delivered result does not specify a function."));
   }
 
-  function revealGovernedChoice(index: number) {
+  function revealGovernedChoice(index: number, persistSelection = true, introduction = "") {
     const selected = governedChoices.current[index];
     if (!selected || !chosen.current ||
         governedAuth.current?.crystalId !== chosen.current.id) return;
     governedIndex.current = index;
     const credentials = governedAuth.current;
-    if (credentials) {
+    if (credentials && persistSelection) {
       void selectDeviceGovernedResult(credentials.crystalId, credentials.requestId, index)
         .catch(error => setIssue("Private result selection was not saved: " + String(error)));
     }
@@ -441,7 +495,7 @@ export function CrystalExperience() {
     const components = selected.parts.length
       ? "Its delivered components include " + selected.parts.map(p => p.name).join(", ") + "."
       : "The engine has not supplied a component specification for this result.";
-    speak(selected.title + ". " + selected.body + " " + components);
+    speak(introduction + selected.title + ". " + selected.body + " " + components);
   }
 
   async function watchGovernedIntent(
@@ -499,7 +553,17 @@ export function CrystalExperience() {
         speak("The completed governed run has no usable result. Your original intent remains saved privately.");
         return;
       }
+      const selectedResult = evolvingCrystalResultIndex(choices);
+      if (selectedResult < 0) {
+        finished = true;
+        clearPendingGoverned(window.sessionStorage);
+        stopGovernedPolling();
+        setIssue("Governed engine: The completed result contains no usable answer.");
+        speak("The governed runtime did not deliver a usable result. Your intent remains saved.");
+        return;
+      }
       governedChoices.current = choices;
+      governedIndex.current = selectedResult;
       setGovernedMediaPending(crystalHasPendingModels(choices));
       // Write the actually delivered result under the same non-exportable
       // AES-GCM key as its original crystal. Do not mark verified growth.
@@ -509,7 +573,7 @@ export function CrystalExperience() {
           source: "governed",
           requestId: credentials.requestId, guestToken: credentials.guestToken,
           receivedAt: new Date().toISOString(),
-          choices, selectedIndex: null,
+          choices, selectedIndex: selectedResult,
         });
         receiptSaved = true;
       } catch (error) {
@@ -524,15 +588,10 @@ export function CrystalExperience() {
       stopGovernedPolling();
       // The server's verified run is NOT automatically copied into the
       // device's verified-growth field; no physical proof is invented.
-      if (choices.length > 1) {
-        setAnswer(null);
-        const names = choices.map(p => p.isBlend === true ? "BLEND" : p.title);
-        speak("ASCENSION's governed runtime delivered " + choices.length +
-          " recorded pathways: " + names.join(", ") +
-          ". Tell me which pathway to enter.");
-      } else {
-        revealGovernedChoice(0);
-      }
+      // The Groundskeeper presents one actual evolving design/conversation.
+      // Other authentic source outputs remain recorded privately, not
+      // displayed as an old provider selection screen.
+      revealGovernedChoice(selectedResult, false);
     } catch (error) {
       failures++;
       if (failures >= 3) {
@@ -601,6 +660,7 @@ export function CrystalExperience() {
       if (epoch !== governedEpoch.current || chosen.current?.id !== selected.id) return;
       const authorized = await submitGuestObjective({ data: {
         objective: change || original.intent,
+        requireOwnerLocal: ownerLocalInstallation(),
         ...(previous ? {
           parentRequestId: previous.requestId,
           parentGuestToken: previous.guestToken,
@@ -648,6 +708,11 @@ export function CrystalExperience() {
     const lower = input.toLowerCase().replace(/[.,!?]/g, "").trim();
     if (!enteredRef.current) { void enter(); return; }
     if (workingRef.current) return;
+    const explicitlyAuthorized = explicitlyEngagedIntent(input);
+    if (explicitlyAuthorized) {
+      void sendIntent(explicitlyAuthorized, true);
+      return;
+    }
     if (governedVoiceCommand(input)) {
       if (governedPending.current) {
         speak("This intent is already processing in the authorized ASCENSION runtime.");
@@ -657,11 +722,13 @@ export function CrystalExperience() {
       return;
     }
     if (governedChoices.current.length) {
-      const index = choiceForVoiceCommand(input, governedChoices.current);
-      if (index >= 0) { revealGovernedChoice(index); return; }
-      if (/^(?:what did the engines produce|show the pathways|what are the pathways)$/.test(lower)) {
-        speak("The recorded results are " + governedChoices.current.map(p => p.title).join(", ") +
-          ". Tell me which one to enter.");
+      // Legacy pathway commands must never open a second chooser or become a
+      // new invention. The active experience keeps one evolving result.
+      const oldSelection = choiceForVoiceCommand(input, governedChoices.current);
+      if (oldSelection >= 0 ||
+          /^(?:what did the engines produce|show the pathways|what are the pathways)$/.test(lower)) {
+        speak(answerRef.current?.body ||
+          "The original governed results are saved. Recall this crystal to hear the current design.");
         return;
       }
     }
@@ -746,11 +813,16 @@ export function CrystalExperience() {
       }
       if (/^(?:rotate|turn) (?:left|right)$/.test(lower)) {
         if (!answerRef.current.design?.modelUrl) speak("I need the delivered three-dimensional model to rotate it accurately.");
-        else setRotation(value => value + (lower.endsWith("right") ? 1 : -1));
+        else {
+          setRotation(value => value + (lower.endsWith("right") ? 1 : -1));
+          listen(true);
+        }
         return;
       }
       if (lower === "zoom in" || lower === "zoom out") {
-        setZoom(value => value + (lower.endsWith("in") ? 1 : -1)); return;
+        setZoom(value => value + (lower.endsWith("in") ? 1 : -1));
+        listen(true);
+        return;
       }
       const views: Record<string, DesignView> = {
         "show me inside": "dissect", "show inside": "dissect",
@@ -761,7 +833,10 @@ export function CrystalExperience() {
       };
       if (views[lower]) {
         if (!answerRef.current.design) speak("There is no delivered measured model or drawing for that view yet.");
-        else setView(views[lower]);
+        else {
+          setView(views[lower]);
+          listen(true);
+        }
         return;
       }
       if (/^(?:explain|tell me about it|how does it work)$/.test(lower)) {
@@ -792,6 +867,7 @@ export function CrystalExperience() {
     void sendIntent(input);
   };
   async function enter() {
+    if (enteredRef.current) return;
     try {
       libraryCapability();
       enteredRef.current = true;
@@ -925,7 +1001,7 @@ export function CrystalExperience() {
 
   return <main className="ascension-living-world" aria-label="ASCENSION Knowledgeverse">
     {!entered ? <section className="ascension-library-book" aria-label="Library Card">
-      <img src={BOOK} alt="ASCENSION Library Card" draggable={false}/>
+      <img src={APPROVED_SCENE} alt="ASCENSION Library Card, Groundskeeper and Tree of Knowledge" draggable={false}/>
       <button type="button" onClick={() => void enter()} aria-label="Enter ASCENSION using the Library Card">
         Enter ASCENSION
       </button>
@@ -946,7 +1022,12 @@ export function CrystalExperience() {
       <div className="ascension-voice-anchor">
         <button type="button" aria-label={listening ? "Stop microphone" : "Speak with groundskeeper"}
           aria-pressed={listening} onClick={() => {
-            if (listening) recognition.current?.stop(); else listen();
+            if (listening) {
+              const active = recognition.current;
+              recognition.current = null;
+              setListening(false);
+              active?.stop();
+            } else listen();
           }}>
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
             strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
@@ -964,8 +1045,10 @@ export function CrystalExperience() {
       <button type="button" className="ascension-voice-toggle"
         aria-label={muted ? "Unmute groundskeeper" : "Mute groundskeeper"}
         onClick={() => {
-          setMuted(value => !value);
-          if (!muted) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
+          const next = !mutedRef.current;
+          mutedRef.current = next;
+          setMuted(next);
+          if (next) { speechSerial.current++; window.speechSynthesis?.cancel(); setSpeaking(false); }
         }}>{muted ? "◖×" : "◖))"}</button>
       {working && <span className="sr-only" role="status">Your device is saving this intent.</span>}
       {governedWorking && <span className="sr-only" role="status">The authorized governed ASCENSION engine is processing the selected intent.</span>}

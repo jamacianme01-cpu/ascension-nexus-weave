@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   governedVoiceCommand, deliveredCrystalChoices, choiceForVoiceCommand,
-  crystalHasPendingModels, reconcileCrystalMedia,
+  crystalHasPendingModels, reconcileCrystalMedia, evolvingCrystalResultIndex,
+  explicitlyEngagedIntent,
 } from "../src/lib/ascension/governed-crystal-voice.mjs";
 const entry=readFileSync("src/components/ascension/crystal-experience.tsx","utf8");
 const fixture = id=>({
@@ -18,6 +19,12 @@ const payload={kind:"answer",title:"Governed owner result",body:"Owner's origina
   files:[],limitations:["Engineering measurements not physically tested"]};
 const choices=deliveredCrystalChoices(payload);
 assert.equal(choices.length,4);
+assert.equal(evolvingCrystalResultIndex(choices),3,
+  "The actual blend becomes the continuing result, not a menu");
+assert.equal(evolvingCrystalResultIndex(choices,1),1,
+  "A previously selected recorded result is preserved on recall");
+assert.equal(evolvingCrystalResultIndex(choices,99),3,
+  "Invalid legacy saved selection must never become a fabricated result");
 assert.deepEqual(choices.map(x=>x.id),["claude","grok","openai","combined"]);
 assert.equal(choices[0].design.modelUrl,"https://example.invalid/verified-job-output.glb");
 assert.equal(choices[0].design.blueprintUrl,"https://example.invalid/blueprint.png");
@@ -30,21 +37,33 @@ const partial=deliveredCrystalChoices({
   ...payload, pathways:[fixture("claude"),fixture("grok")],
 });
 assert.deepEqual(partial.map(c=>c.id),["claude","grok","combined"],
-  "A real BLEND must not erase two actually delivered pathways");
+  "Partial source deliveries remain genuine and are never filled with fake slots");
+assert.equal(evolvingCrystalResultIndex(partial),2,
+  "Use a real delivered blend even when only partial source outputs exist");
 assert.equal(choiceForVoiceCommand("choose blend",partial),2,
   "The actual BLEND remains voice-accessible without a fabricated fourth slot");
+assert.equal(evolvingCrystalResultIndex(deliveredCrystalChoices({
+  ...payload, pathways:[], blend:null,
+})),0, "An original single governed result remains a usable evolving result");
+assert.equal(evolvingCrystalResultIndex([]),-1);
 const fourWithoutBlend=deliveredCrystalChoices({
   ...payload, pathways:[fixture("claude"),fixture("grok"),fixture("openai"),fixture("fourth")],
 });
 assert.deepEqual(fourWithoutBlend.map(c=>c.id),["claude","grok","openai","fourth"],
-  "Never invent a fifth slot or hide genuine delivered pathways");
+  "Real source outputs remain stored without inventing BLEND");
+assert.equal(evolvingCrystalResultIndex(fourWithoutBlend),0,
+  "Without a recorded blend choose the first actual answer, never synthesize one");
 assert.equal(choiceForVoiceCommand("choose blend",fourWithoutBlend),-1,
   "Four real pathways alone must not be mislabeled as a BLEND");
 const collision=deliveredCrystalChoices({
   ...payload, pathways:[fixture("claude"),fixture("combined")],
 });
 assert.deepEqual(collision.map(c=>c.id),["claude","combined"],
-  "A repeated BLEND id may never create a duplicate encrypted pathway");
+  "An already-included BLEND must not be duplicated");
+assert.equal(collision[1].isBlend,true,
+  "Preserve real BLEND provenance when the source already included it");
+assert.equal(evolvingCrystalResultIndex(collision),1,
+  "Prefer the original recorded BLEND without synthesizing a replacement");
 assert.equal(crystalHasPendingModels(choices),false);
 const waiting={...payload,pathways:[{
   ...fixture("claude"),model_url:null,model_status:"running",
@@ -88,6 +107,36 @@ assert.equal(deliveredCrystalChoices({...payload,pathways:[{
   ...fixture("only"),generated_image_url:null,model_url:null,generated_blueprint_url:null,
 }],blend:null})[0].design,null,
 "Never invent a design image or geometry when the governed runtime has none");
+for(const [spoken, expected] of [
+  ["Engage ASCENSION, Design a modular workbench.", "Design a modular workbench."],
+  ["Run ASCENSION's engines: Model a garden irrigation nozzle.", "Model a garden irrigation nozzle."],
+  ["engage ascension; Build a folding chair.", "Build a folding chair."],
+  ["Engage ASCENSION design a folding cable tray.", "design a folding cable tray."],
+  ["Engage ASCENSION I want to design a memory aid.", "I want to design a memory aid."],
+  ["Run ASCENSION's engines to make a model.", "make a model."],
+  ["Engage ASCENSION. Create an equipment rack.", "Create an equipment rack."],
+]) assert.equal(explicitlyEngagedIntent(spoken), expected,
+  "One owner-authorized spoken objective is extracted verbatim");
+for(const unapproved of ["Design a modular workbench.", "engage ASCENSION",
+  "show the blueprint", "Engage ASCENSION without permission",
+  "Engage ASCENSION please", "Engage ASCENSION and tell me",
+  "I want to engage ASCENSION to design a lamp"]) {
+  assert.equal(explicitlyEngagedIntent(unapproved), null,
+    "Never infer remote authorization from an ordinary intent or incomplete command");
+}
+assert.match(entry, /const explicitlyAuthorized = explicitlyEngagedIntent\(input\)/,
+  "The active voice route recognizes the owner's explicit one-utterance instruction");
+assert.match(entry, /void sendIntent\(explicitlyAuthorized, true\)/,
+  "The one-utterance command preserves the owner-spoken objective");
+assert.match(entry, /if \(\(authorizeGoverned \|\| localOwner\) && !parent\)/,
+  "Owner-local speech submits to the original local engine; other installations require explicit authorization");
+assert.match(entry, /window\.location\.port === "4174"/);
+assert.match(entry, /requireOwnerLocal: ownerLocalInstallation\(\)/);
+const guest = readFileSync("src/lib/ascension/guest.functions.ts", "utf8");
+assert.match(guest, /data\.requireOwnerLocal && !volume\.ownerVolumeTransportIsLoopback\(\)/,
+  "Owner-local intents must fail closed instead of contacting an alternate service");
+assert.match(entry, /await runGovernedIntent\(\)/,
+  "Submit only once the owner's original local crystal has been saved");
 for(const spoken of ["run ASCENSION's engines","run my intent through ASCENSION engines",
   "engage ASCENSION","use ASCENSION engines"]) assert.equal(governedVoiceCommand(spoken),true);
 for(const input of ["make a drone","build on result","open my original crystal","save my library card","show blueprint"]) {
@@ -116,8 +165,12 @@ assert.match(entry,/parentRequestId: previous\.requestId/);
 assert.match(entry,/parentGuestToken: previous\.guestToken/);
 assert.match(entry,/followUp: "continue"/);
 assert.match(entry,/delivery\.source !== "governed"/);
-assert.match(entry,/if \(choices\.length > 1\)/,
-  "Show only the real number of delivered pathways");
+assert.match(entry,/const selectedResult = evolvingCrystalResultIndex\(choices\)/,
+  "The Tree must reveal the recorded evolving result without a chooser");
+assert.match(entry,/revealGovernedChoice\(selectedResult, false\)/,
+  "Present the real result automatically and do not duplicate receipt writes");
+assert.doesNotMatch(entry,/Tell me which pathway to enter\./,
+  "No obsolete spoken four-pathway menu on the current one-result screen");
 assert.match(entry,/reconcileCrystalMedia\(older, newer\)/);
 assert.match(entry,/governedAuth\.current\?\.requestId !== authorized\.requestId/,
   "Only the same authorized original run can hydrate a delivered GLB");
@@ -143,4 +196,10 @@ assert.doesNotMatch(smoke,/flyctl|FLY_API_TOKEN|superfly\//i,
   "Live V1 acceptance may never use Fly credentials or CLI after disconnection");
 assert.match(smoke,/Fly\/internal hosts are disconnected by the owner/,
   "Reject retired Fly hosts rather than connecting to them");
-console.log("PASS: owner-authorized engine handoff, literal original preservation, truthful four-or-single pathway voice reveal, no automatic disclosure");
+assert.doesNotMatch(smoke,/ascension-nexus-weave-production\.up\.railway\.app/,
+  "Never select the retired Railway page as the default ASCENSION live test");
+assert.match(smoke,/retired Railway deployment is not an approved ASCENSION live-test target/,
+  "Reject the retired Railway deployment before network access");
+assert.doesNotMatch(smoke,/default: https?:\/\//,
+  "Require the owner to explicitly supply the current live ASCENSION host");
+console.log("PASS: one owner-approved evolving result, genuine provider provenance saved, no selection menu or automatic disclosure");

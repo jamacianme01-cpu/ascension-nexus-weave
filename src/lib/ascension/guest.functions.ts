@@ -71,6 +71,7 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
       parentRequestId?: string;
       parentGuestToken?: string;
       followUp?: "continue" | "refine";
+      requireOwnerLocal?: boolean;
     }) => {
       const objective = input.objective?.trim();
       if (!objective) throw new Error("An objective statement is required.");
@@ -88,6 +89,7 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
         parentRequestId: input.parentRequestId ?? null,
         parentGuestToken: input.parentGuestToken ?? null,
         followUp: input.followUp ?? null,
+        requireOwnerLocal: input.requireOwnerLocal === true,
       };
     },
   )
@@ -95,6 +97,9 @@ export const submitGuestObjective = createServerFn({ method: "POST" })
     // The owner's existing Fly state volume is the authoritative queue transport
     // whenever the former web database is absent. Never create a substitute DB.
     const volume = await import("@/lib/ascension/data/volume-transport.server");
+    if (data.requireOwnerLocal && !volume.ownerVolumeTransportIsLoopback()) {
+      throw new Error("Original local ASCENSION transport is unavailable. No alternate engine or service will be used.");
+    }
     if (volume.ownerVolumeTransportEnabled()) {
       return volume.callOwnerVolumeTransport<GuestSubmission>("/guest/submit", "POST", data);
     }

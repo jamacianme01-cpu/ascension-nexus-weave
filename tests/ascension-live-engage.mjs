@@ -11,7 +11,9 @@ import { pathToFileURL } from "node:url";
 if (!process.env.PLAYWRIGHT_MODULE) throw Error("Missing Playwright location");
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
 const website = process.env.ASCENSION_V1_WEBSITE || "http://127.0.0.1:4174/";
-const objective = "I want to make worker drones for people with dementia.";
+// Exercise the real runtime with a neutral acceptance fixture, never an
+// owner's invention or unpublished project description.
+const objective = "Design a modular tabletop cable organizer with removable dividers.";
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.ASCENSION_CHROME_BIN,
@@ -73,56 +75,43 @@ try {
   if (!guideSaidWelcome) throw Error("The groundskeeper did not speak her opening welcome");
   await page.getByRole("button", { name: "Speak with groundskeeper" }).click();
   await page.getByPlaceholder("Speak or type your intent").waitFor({ timeout: 15000 });
-  await command(objective);
-  await page.locator(".ascension-tree-crystal[data-active='true']").waitFor({ timeout: 25000 });
-  // Local saving does NOT authorize silently transmitting the owner objective.
-  if (await page.locator("span.sr-only[role='status']").filter({
-    hasText: "The authorized governed ASCENSION engine is processing",
-  }).count()) throw Error("Saving a private crystal silently started remote engines");
-
-  // The owner now explicitly authorizes the unchanged selected original.
-  await command("engage ascension");
+  const local = new URL(website);
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(local.hostname) || local.port !== "4174")
+    throw Error("Live acceptance requires the original owner-local ASCENSION installation");
+  const readinessResponse = await page.request.get(new URL("/api/public/ascension/answer-readiness", website).href);
+  const readiness = await readinessResponse.json();
+  if (!readinessResponse.ok() || readiness.owner_local_transport_selected !== true ||
+      readiness.owner_queue_transport_connected !== true || readiness.owner_worker_recently_polling !== true)
+    throw Error("The original ASCENSION worker has not established its authenticated local queue connection");
   const busy = page.locator("span.sr-only[role='status']").filter({
     hasText: "The authorized governed ASCENSION engine is processing",
   });
+  await command(objective);
+  await page.locator(".ascension-tree-crystal[data-active='true']").waitFor({ timeout: 25000 });
+  // The spoken owner-local objective itself must invoke the original engines.
+  // A second ENGAGE command is not part of the current owner design.
   await busy.waitFor({ state: "attached", timeout: 25000 });
   await busy.waitFor({ state: "detached", timeout: 240000 });
   const error = await page.locator(".ascension-crystal-error").allTextContents();
   if (error.length) throw Error("Actual governed submission failed: " + error.join(" | ").slice(0, 500));
 
-  const utterances = await page.evaluate(() => window.__ascensionSpoken);
-  const pathways = utterances.find(msg => /delivered \d+ recorded pathways:/i.test(msg));
-  if (pathways && /delivered 4 recorded pathways:/i.test(pathways) &&
-      !/\bBLEND\b/.test(pathways))
-    throw Error("A genuine four-pathway result did not preserve BLEND");
-
-  // The existing voice-first result can be a single delivered output or
-  // multiple REAL engine choices. In either case, select only a real result.
-  // A genuine SINGLE result is revealed automatically. Sending "enter first"
-  // in that case would be mistaken for a NEW invention by the voice handler,
-  // falsely satisfying the test with an unrelated local crystal.
-  if (pathways) {
-    const count = Number(pathways.match(/delivered (\d+) recorded pathways:/i)?.[1] ?? 0);
-    if (!Number.isInteger(count) || count < 2 || count > 4)
-      throw Error("Governed runtime announced an invalid number of real pathways");
-    await command("enter first");
-  }
-  const delivered = page.locator("span.sr-only[role='status']").filter({
-    hasNotText: "The authorized governed ASCENSION engine is processing",
-  });
+  // A verified run should present the ONE actual evolving result itself,
+  // never demand a model/pathway selection or create a second local crystal.
   await page.waitForFunction(() => {
-    const alerts = document.querySelector(".ascension-crystal-error");
-    if (alerts) return true;
-    return [...document.querySelectorAll("span.sr-only[role='status']")]
-      .some(el => !!el.textContent?.trim() &&
-        !/Your device is saving|authorized governed ASCENSION engine is processing/i.test(el.textContent));
-  }, null, { timeout: 10000 });
-  const lastError = await page.locator(".ascension-crystal-error").allTextContents();
-  if (lastError.length) throw Error("The returned pathway could not be selected: " + lastError.join(" | "));
-  const answerText = await delivered.allTextContents();
-  if (!answerText.some(t => t.trim() &&
-      !/Your device is saving|authorized governed ASCENSION engine is processing/i.test(t)))
-    throw Error("No genuine governed answer was made available to the selected crystal");
+    const messages = window.__ascensionSpoken || [];
+    const answer = [...document.querySelectorAll("span.sr-only[role='status']")]
+      .map(el => (el.textContent || "").trim())
+      .find(t => t.length > 40 &&
+        !/Your device is saving|authorized governed ASCENSION engine is processing/i.test(t));
+    return Boolean(answer && messages.some(text => text.includes(answer.slice(0,60))));
+  }, null, { timeout: 15000 });
+  const spoken = await page.evaluate(() => window.__ascensionSpoken);
+  if (spoken.some(text => /tell me which pathway to enter|choose (claude|grok|openai|blend)/i.test(text)))
+    throw Error("Obsolete provider chooser interrupted the owner's one evolving result");
+  if (await page.locator(".ascension-crystal-error").count())
+    throw Error("The governed result could not be revealed");
+  if (await page.locator(".ascension-tree-crystal[data-active='true']").count() !== 1)
+    throw Error("A genuine governed result must remain on its original selected crystal");
 
   // No unapproved front overlay, and do not fake a GLB/blueprint from text.
   if (await page.locator(".living-tree, .designed-screen, .living-pathway-options").count())

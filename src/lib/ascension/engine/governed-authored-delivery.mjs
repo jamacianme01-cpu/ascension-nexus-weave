@@ -24,7 +24,12 @@ export function selectGovernedAuthoredDelivery(result, originalObjective, artifa
 
     // V1 has a maximum of three genuine paths plus BLEND, or four
     // directly authored paths. Partial results remain visible as partial.
-    if (!actual.length || actual.length > 4) continue;
+    if (actual.length > 4) continue;
+    // The current owner design accepts a single authored answer without
+    // pathways. Require an explicit typed delivery envelope: a root-level
+    // planning body, receipt, or unclassified narrative is not a delivery.
+    if (!actual.length && (entry === root ||
+      !["answer", "recommendation", "artifact"].includes(authored.kind))) continue;
     if (pathways.some(item => !authoredId(item) ||
       !text(record(item).label) || !text(record(item).summary))) continue;
     if (blend && (!authoredId(blend) || !text(record(blend).label) ||

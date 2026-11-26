@@ -35,9 +35,14 @@ export function deliveredCrystalChoices(delivery) {
     const imageUrl = choice.generated_image_url ?? null;
     const blueprintUrl = choice.generated_blueprint_url ?? null;
     const modelUrl = choice.model_url ?? null;
+    const recordedBlendId = typeof delivery.blend?.id === "string" &&
+      delivery.blend.id.trim() ? delivery.blend.id : null;
     return {
       id: choice.id,
-      isBlend: Boolean(appendBlend && index === pathways.length),
+      // A BLEND can already be in the original source pathways. Preserve its
+      // genuine identity without creating a duplicate or a synthetic slot.
+      isBlend: Boolean((appendBlend && index === pathways.length) ||
+        (recordedBlendId && choice.id === recordedBlendId)),
       title: choice.label || delivery.title,
       body: choice.summary || delivery.body,
       design: imageUrl || blueprintUrl || modelUrl ? {
@@ -50,6 +55,17 @@ export function deliveredCrystalChoices(delivery) {
       limitations: delivery.limitations ?? [],
     };
   });
+}
+/** A single spoken instruction can explicitly authorize ONE governed intent.
+ * Plain speech remains device-private; no invented response or new pathway.
+ */
+export function explicitlyEngagedIntent(words) {
+  const raw = String(words || "").trim();
+  // Speech recognizers often omit punctuation after "Engage ASCENSION".
+  // Accept a clearly spoken action/request without requiring a comma, while
+  // rejecting bare ENGAGE or unrelated words as remote-upload permission.
+  const match = raw.match(/^(?:engage\s+ascension(?:\s+engines)?|run\s+ascension(?:'s)?\s+engines)(?:\s*[,;:.]\s*|\s+(?:to\s+)?(?=(?:i|we|design|create|build|make|develop|invent|improve|explore|explain|fix|repair|produce|generate|show|plan|research|analyze|help)\b))(\S[\s\S]*)$/i);
+  return match ? match[1].trim() : null;
 }
 export function governedVoiceCommand(words) {
   const normalized = String(words || "").trim().toLowerCase()
@@ -127,4 +143,22 @@ export function reconcileCrystalMedia(original, later) {
         : null};
   });
   return updated ? merged : original;
+}
+
+/**
+ * The active V1 Tree reveals ONE continuing result, never a provider chooser.
+ * Prefer an already owner-selected, recorded answer on recall; otherwise use
+ * the original runtime's actual BLEND when present, or its first real output.
+ * This chooses among genuine returned data and does not synthesize a result.
+ */
+export function evolvingCrystalResultIndex(choices, recordedIndex = null) {
+  if (!Array.isArray(choices) || !choices.length) return -1;
+  const usable = index => typeof choices[index]?.body === "string" &&
+    Boolean(choices[index].body.trim());
+  if (Number.isInteger(recordedIndex) && recordedIndex >= 0 &&
+      recordedIndex < choices.length && usable(recordedIndex)) return recordedIndex;
+  const blend = choices.findIndex((choice, index) =>
+    choice?.isBlend === true && usable(index));
+  if (blend !== -1) return blend;
+  return choices.findIndex((_, index) => usable(index));
 }

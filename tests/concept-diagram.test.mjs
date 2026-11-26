@@ -41,64 +41,17 @@ try {
     assert.equal(parsed.pathways[0].model_spec.parts[1].purpose,'');
     assert.equal(parsed.pathways[0].model_spec.parts[1].location,'');
   });
-  check('approved immersive entry has no rejected top hologram; original geometry remains available',()=>{const scene=readFileSync('src/components/ascension/Envision3DScene.tsx','utf8');const engage=readFileSync('src/components/ascension/engage.tsx','utf8');assert.doesNotMatch(engage,/<Envision3DScene delivery=/);assert.match(engage,/<RealityViewer/);assert.match(engage,/onInspect={inspectPathwayReality}/);assert.doesNotMatch(scene,/if \(!modelViewActive\) return/);assert.match(scene,/assemblyCache.get/);assert.match(scene,/setVisualMode\(m\)/);assert.doesNotMatch(readFileSync('src/components/ascension/RealityViewer.tsx','utf8'),/buildConceptDiagram|concept-diagram/);});
-  const viewer=readFileSync('src/components/ascension/RealityViewer.tsx','utf8');
-  check('GLB path still parses actual downloaded models', () => { assert.match(viewer,/fetch\(loadedUrl/); assert.match(viewer,/GLTFLoader\(\)\.parseAsync/); assert.match(viewer,/model = gltf.scene/); });
-  check('concept controls are no longer blocked by absent model_url', () => { assert.doesNotMatch(viewer,/if \(!pathway.model_url\)/); assert.match(viewer,/setReady\(true\)/); assert.match(viewer,/api\.current\?\.explode\(false\)/); });
-  check('model arrival protects edited assemblies', () => { assert.match(viewer,/if \(!edited.current && pathway.model_url\)/); assert.match(viewer,/REPLACE EDITED CONCEPT WITH HUNYUAN MODEL/); });
-  check('all approved views are visible in full-screen editor on mobile', () => { const css=readStylesheet('src/components/ascension/reality-viewer.css'); assert.match(css,/\.reality-view-controls[\s\S]*repeat\(6, minmax\(0, 1fr\)\)/); assert.match(css,/\.reality-view-controls \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/); for (const control of ['CUTAWAY','BLUEPRINT','ENVIRONMENT','DISSECTED','PARTS']) assert.ok(viewer.includes(control)); assert.match(viewer,/setMode\("environment"\)/); });
-  check('part labels are clickable on the model picture for concepts and real GLBs', () => { assert.match(viewer,/ready && !dissected && showParts/); assert.match(viewer,/aria-label="Labels on the model"/); assert.match(viewer,/api.current\?\.locatePart\(index\)/); });
-  check('ASSEMBLED automatically generates the primary picture, DISSECTED remains optional', () => {
-    assert.match(viewer, /view:"assembled",requestId,pathwayId:pathway\.id/);
-    assert.match(viewer, /if \(!dissected \|\| !ready \|\| !api\.current \|\| dissection\) return/);
-    assert.match(viewer, /view:"dissected",\.\.\.\(requestId \? \{requestId\} : \{\}\)/);
-    assert.match(viewer, /\.\.\.\(referenceImageUrl \? \{referenceImageUrl\} : \{\}\)/);
-    assert.match(viewer, /const referenceImageUrl = sourceReference \?\? assembledImage/);
-    assert.match(viewer, /const displayedImageUrl = dissected && dissection \? dissection\.imageUrl : referenceImageUrl/);
-    assert.match(viewer, /displayedImageUrl && <RealityDissection imageUrl=\{displayedImageUrl\}/);
-    const extras = viewer.slice(viewer.indexOf('view:"dissected"'),viewer.indexOf('const [showParts,'));
-    assert.doesNotMatch(extras,/bindViewerReference\(/);
-    const imageFn=readFileSync('src/lib/ascension/parts.functions.ts','utf8');
-    assert.match(imageFn, /data\.view==='assembled'/);
-    assert.match(imageFn, /assembled\/\$\{hash\}\.png/);
-    assert.match(imageFn, /NO exploded view/);
+  check('current inspection uses delivered models and the separate component list',()=> {
+    const scene=readFileSync('src/components/ascension/crystal-experience.tsx','utf8');
+    const viewport=readFileSync('src/components/ascension/v1-design-viewport.tsx','utf8');
+    const surface=readFileSync('src/components/ascension/crystal-surface.tsx','utf8');
+    assert.match(scene,/ascension-exact-approved-scene\.png/);
+    assert.match(viewport,/new GLTFLoader\(\)\.load\(modelUrl/);
+    assert.match(viewport,/OrbitControls/);
+    assert.match(surface,/ascension-crystal-components/);
+    for(const field of ['What','Where','Does']) assert.ok(surface.includes('<dt>'+field+'</dt>'));
+    assert.doesNotMatch(scene,/RealityViewer|Envision3DScene|ENTER PATHWAY/);
   });
-  check('Clicking picture label shows its specific explanation, highlights it and enables 3D manipulation', () => {
-    assert.match(viewer, /onSelect=\{index=>\{setPartIndex\(index\);setShowParts\(true\);/);
-    assert.match(readFileSync('src/components/ascension/RealityDissection.tsx','utf8'), /reality-dissection-target/);
-    assert.match(viewer, /MANIPULATE THIS PART IN 3D/);
-    assert.match(viewer, /setEditorOpen\(true\)/);
-    assert.match(viewer, /api\.current\?\.selectComponent\(matching\.id\)/);
-    for (const detail of ['Purpose', 'How it works', 'Connections', 'Design limits']) assert.ok(viewer.includes(detail));
-  });
-  check('only ENGAGE and ANSWER play cues; viewer has no continuous ambience', () => {
-    const engage=readFileSync('src/components/ascension/engage.tsx','utf8');
-    assert.match(engage,/cue !== "engage" && cue !== "eruption"/);
-    assert.match(engage,/ctx\.resume\(\)\.then\(emit\)/);
-    assert.doesNotMatch(engage,/createRealityAtmosphere\(ctx\)/);
-    assert.doesNotMatch(viewer,/realityFeedback\(frame\.index\)/);
-    const toggle=engage.slice(engage.indexOf('const toggleSound'),engage.indexOf('const runQuery'));
-    assert.match(toggle,/setSoundBlocked\(ctx\.state !== "running"\)/);
-  });
-  check('Reference image persists beside CAD and Blueprint while 3D editing remains available', () => {
-    assert.match(viewer, /<div ref=\{host\} className="reality-viewport"[^>]*aria-label="Editable 3D model/);
-    assert.match(viewer, /const referenceImageUrl = sourceReference \?\? assembledImage/);
-    assert.match(viewer, /const splitReference = Boolean\(displayedImageUrl\)/);
-    assert.match(viewer, /const awaitingFaithfulMesh = Boolean\(conceptual && \(referenceImageUrl \|\| \["queued","claimed","running"\]\.includes\(pathway\.model_status \?\? ""\)\)\)/);
-    assert.match(viewer, /data-split=\{splitReference \? "true" : undefined\}/);
-    assert.match(viewer, /data-image-only=\{imageOnly \? "true" : undefined\}/);
-    assert.match(viewer, /visibility:awaitingFaithfulMesh \? "hidden" : "visible"/);
-    assert.match(viewer, /AWAITING SOURCE-DERIVED 3D MODEL/);
-    assert.doesNotMatch(viewer.slice(viewer.indexOf('const editIllustratedPart'), viewer.indexOf('const dive = useRef')), /setDissected\(false\)/);
-    assert.match(viewer, /<div className="reality-component-workbench">/);
-    assert.match(viewer, />ISOLATE</);
-    assert.match(viewer, /isolate\(id\)/);
-    const css=readStylesheet('src/components/ascension/reality-viewer.css');
-    assert.match(css, /data-split="true"\] \.reality-viewport \{ left:50%/);
-    assert.match(css, /data-sidebar="open"\] \{ padding-right:min\(380px,32vw\)/);
-    assert.match(css, /\.reality-dissection-label\[aria-pressed="true"\]/);
-  });
-
   const {demonstrationPhases,demonstrationFrame,zoomImage,fitImage,groundedComponent}=await server.ssrLoadModule('/src/components/ascension/reality-demonstration.ts');
   check('four unlike inquiries retain actual pathway steps without example branches',()=>{
     for(const steps of [['Charge battery','Power sensor','Read sensor'],['Parse source','Compile module','Run tests'],['Mix pigment','Apply brush strokes','Dry painted layer'],['Read evidence','Compare accounts','Explain historical causes']]){
@@ -110,21 +63,5 @@ try {
   check('image fit letterboxes landscape and square without narrow-strip constraints',()=>{assert.deepEqual(fitImage(1200,600,1600,900),{width:1066.6666666666665,height:600,x:66.66666666666674,y:0});assert.equal(fitImage(390,450,1024,1024).width,390);});
   check('zoom preserves pointer anchored image coordinates and caps scale',()=>{const a={x:0,y:0,zoom:1};const b=zoomImage(a,2,300,200);assert.equal((300-b.x)/b.zoom,300);assert.equal((200-b.y)/b.zoom,200);assert.equal(zoomImage(a,20,0,0).zoom,6);});
   check('picture mapping requires unique named semantic evidence not an arbitrary mesh name',()=>{assert.equal(groundedComponent('Coil',[{id:'x',name:'Coil',detail:null}]),null);assert.equal(groundedComponent('Copper coil',[{id:'a',name:'Mesh',detail:{...parts[0],name:'Copper coil'}}]).id,'a');assert.equal(groundedComponent('Copper coil',[{id:'a',name:'Coil',detail:{...parts[0],name:'Copper coil'}},{id:'b',name:'Coil',detail:{...parts[0],name:'Copper coil'}}]),null);});
-  check('image navigation has native wheel pinch drag fit focus and accessible labels',()=>{const image=readFileSync('src/components/ascension/RealityDissection.tsx','utf8');for(const marker of ['passive:false','setPointerCapture','onPointerMove','Focus selected part','Fit illustration','part.purpose','data-x','data-y'])assert.ok(image.includes(marker));});
-  check('demonstration exposes playback scrub and causal mesh cues without mutating transforms',()=>{for(const marker of ['CONCEPTUAL DEMONSTRATION · UNVERIFIED','Operational animation unavailable','Demonstration timeline','REPLAY','demoCue.position','demoMaterials.clear()'])assert.ok(viewer.includes(marker));});
-  check('sound remains sustained and bounded with feedback and volume control',()=>{const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8');assert.doesNotMatch(audio,/graph.scheduleDim\(12_000\)/);assert.match(audio,/setRealityVolume/);assert.match(audio,/tone.onended/);assert.match(viewer,/Ambient volume/);});
-  check('muted feedback cannot resume context or bypass zero volume',()=>{const audio=readFileSync('src/components/ascension/reality-audio.ts','utf8');assert.match(audio,/ctx.state !== 'running'/);assert.match(audio,/realityVolume === 0/);assert.doesNotMatch(audio,/ctx.resume\(/);assert.match(audio,/realityContext = null/);});
-  check('SIMULATE click starts playback immediately and the central objective animation is visible',()=>{
-    assert.match(viewer,/const start=!simulate;setSimulate\(start\);setPlaying\(start\);setSeconds\(0\)/);
-    assert.match(viewer,/if\(start\)\{setDissected\(false\);setShowParts\(false\);\}/);
-    assert.match(viewer,/simulate && !dissected && phases.length > 0 && <div className=/);
-    assert.match(viewer,/Animated objective operation/);
-    assert.match(viewer,/reality-operation-pulse/);
-    const css=readStylesheet('src/components/ascension/reality-viewer.css');
-    assert.match(css,/\.reality-operation-stage \{/);
-    assert.match(css,/@media \(max-width:760px\) \{[\s\S]*\.reality-operation-stage/);
-  });
-  check('nonphysical demonstrations show the actual pathway rather than unrelated 3D geometry',()=>{assert.match(viewer,/reality-operation-stage\$\{interpretiveDemo \? "" : " reality-operation-stage--with-model"\}/);assert.match(viewer,/CONCEPTUAL OPERATION/);assert.match(viewer,/Current phase progress/);assert.match(viewer,/phases\[frame.index\]\?\.caption/);});
-  check('image navigation avoids lower inspector overlap and desktop inspector leaves image room',()=>{const css=readStylesheet('src/components/ascension/reality-viewer.css');assert.match(css,/\.reality-image-tools \{[^}]*top:8px; bottom:auto/);assert.match(css,/\.reality-screen:has\(\.reality-parts\) \.reality-dissection \{ right:414px/);});
   console.log(`${passed} concept restoration checks passed`);
 } finally { await server.close(); }

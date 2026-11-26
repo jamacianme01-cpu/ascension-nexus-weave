@@ -1,17 +1,28 @@
 /* Voice-first ASCENSION: Library Card -> Groundskeeper + Tree + Intent Crystal.
    Deliberately do not fall back to unapproved characters or scenery. */
 .ascension-living-world {
-  position:relative; isolation:isolate; width:100vw; height:100svh;
-  min-height:440px; overflow:hidden;
+  position:relative; isolation:isolate; width:100%; height:100svh;
+  min-height:0; overflow:hidden;
   background:radial-gradient(ellipse at 65% 25%,#14234c 0%,#060e21 53%,#02040d 100%);
   color:#fbeac7;
 }
 .ascension-library-book { position:absolute; inset:0; z-index:50; display:grid; place-items:end center; overflow:hidden; }
-.ascension-library-book img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.ascension-library-book img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:center; }
+/* The Library Card is the book in the exact approved composition.
+   Match the scene's aspect ratio so the entry hit target stays on the book. */
+.ascension-library-book {
+  inset:50% auto auto 50%;
+  width:min(100%, calc(100svh * 1.7768331562));
+  height:min(100%, calc(100vw * .5627990431));
+  transform:translate(-50%, -50%);
+}
 .ascension-library-book button {
-  position:relative; z-index:1; margin-bottom:6vh; padding:.9rem 1.5rem;
-  color:#f6d89b; background:rgb(3 12 27 / 82%); cursor:pointer;
-  border:1px solid #ceae69; border-radius:999px; letter-spacing:.09em;
+  position:absolute; inset:auto auto 2% 42%; z-index:1; width:42%; height:24%;
+  margin:0; padding:0; color:transparent; font-size:0;
+  background:transparent; cursor:pointer; border:0; border-radius:0;
+}
+.ascension-library-book button:focus-visible {
+  outline:2px solid #ceae69; outline-offset:-4px;
 }
 /* The image is one owner-approved composition, not two separately manipulated layers. */
 .ascension-approved-scene {
@@ -21,8 +32,20 @@
   background:#030713;
   pointer-events:none;
 }
+/* Keep the scene and its live crystal overlay in one aspect-ratio coordinate
+   system. Letterboxing must not move crystal hit targets away from the artwork.
+   The approved source image remains completely unmodified. */
+.ascension-approved-scene,
+.ascension-living-world > .ascension-crystals {
+  inset:50% auto auto 50%;
+  width:min(100%, calc(100svh * 1.7768331562));
+  height:min(100%, calc(100vw * .5627990431));
+  transform:translate(-50%, -50%);
+}
 .ascension-approved-scene img {
-  width:100%; height:100%; display:block;
+  position:absolute; inset:0;
+  width:100%; height:100%; min-width:0; min-height:0;
+  max-width:100%; max-height:100%; display:block;
   object-fit:contain; object-position:center;
   /* Never crop, blur, mask, recolor, or animate the approved source pixels. */
 }

@@ -37,7 +37,7 @@
   background:#fff4d6; filter:blur(7px); border-radius:50%;
 }
 .ascension-crystal-reality {
-  position:absolute; left:51%; top:45%; width:min(53vw, 65rem);
+  position:absolute; left:51%; right:3%; top:45%; width:auto; max-width:65rem;
   height:min(45vh, 34rem); z-index:11;
   border:1px solid rgb(255 222 144 / 38%);
   border-radius:1.1rem;
@@ -105,7 +105,7 @@
 }
 @media(max-width:700px) {
   .ascension-held-crystal { left:24%; top:52%; }
-  .ascension-crystal-reality { top:38%; left:38%; width:59vw; height:35vh; }
+  .ascension-crystal-reality { top:38%; left:38%; right:3%; width:auto; height:35vh; }
   .ascension-crystal-components { flex-basis:42%; padding:.35rem; }
   .ascension-crystal-components button { padding:.35rem .2rem; }
 }

@@ -66,8 +66,10 @@ assert.match(backupUI, /Restore without overwriting/);
 assert.doesNotMatch(backups, /\bfetch\(|\bXMLHttpRequest\b|localStorage\./);
 
 assert.match(scene, /if \(governedVoiceCommand\(input\)\)/);
-assert.match(scene, /p\.isBlend === true \? "BLEND" : p\.title/,
-  "The Tree must announce only a real BLEND, not always the fourth position");
+assert.match(scene, /evolvingCrystalResultIndex\(recorded\.choices, recorded\.selectedIndex\)/,
+  "The returning Tree restores the recorded evolving result");
+assert.doesNotMatch(scene, /Tell me which pathway to enter\./,
+  "Do not reinstate the obsolete provider choice menu");
 assert.doesNotMatch(scene, /choices\.length === 4 && i === 3/,
   "Four genuine non-BLEND pathways must never be mislabeled");
 assert.match(scene, /submitGuestObjective/);
@@ -85,6 +87,8 @@ assert.match(scene, /new intent/);
 assert.match(scene, /ascension-exact-approved-scene\.png/);
 assert.doesNotMatch(scene, /ascension-approved-cosmic-groundskeeper\.png|ascension-knowledge-tree-crystals\.png/);
 assert.match(stylesheet, /object-fit:contain/);
+assert.match(stylesheet, /\.ascension-library-book img[^\n]*object-fit:contain/,
+  "The original Book artwork must not be cropped on small screens");
 assert.doesNotMatch(stylesheet, /\.ascension-groundskeeper|\.ascension-knowledge-tree/);
 assert.doesNotMatch(scene, /ENTER PATHWAY|showingPathways|FOUR PATHWAYS|living-pathway-options/);
 assert.match(crystal, /ascension-tree-crystal/);

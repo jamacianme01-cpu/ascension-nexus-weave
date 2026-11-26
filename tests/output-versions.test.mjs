@@ -86,12 +86,9 @@ try {
   }).length, 3);
   assert.equal(assessCreatedOutputVersions("draw a device", oldFailure).length, 0);
 
-  const engageUi = await readFile("src/components/ascension/engage.tsx", "utf8");
-  assert.match(engageUi, /OPEN & INTERACT/);
-  assert.match(engageUi, /STOP AUDIO · CLOSE PREVIEW/);
-  assert.match(engageUi, /openPreviewId === version\.id && \(/);
-  assert.match(engageUi, /onClick=\{\(\) => setOpenPreviewId/);
-  assert.match(engageUi, /sandbox="allow-scripts"/);
+  const activeUi = await readFile("src/components/ascension/crystal-experience.tsx", "utf8");
+  assert.doesNotMatch(activeUi, /OPEN & INTERACT|CLOSE PREVIEW|openPreviewId/);
+  assert.match(activeUi, /evolvingCrystalResultIndex/);
 
   const delivery = parseDelivery({
     kind: "answer", title: "Any invention", body: "Version production status is attached",

@@ -1,18 +1,7 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { ascensionSession } from "@/lib/ascension/data/session";
-
+// Retired interface: old bookmarks return to the single approved Knowledgeverse.
+// Governed runtime, observation APIs and saved knowledge remain unchanged.
 export const Route = createFileRoute("/_authenticated")({
-  ssr: false,
-  beforeLoad: async ({ location }) => {
-    const { data, error } = await ascensionSession.auth.getUser();
-    if (error || !data.user) {
-      throw redirect({
-        to: "/auth",
-        search: { next: location.pathname + location.searchStr },
-      });
-    }
-    return { user: data.user };
-  },
-  component: () => <Outlet />,
+  beforeLoad: () => { throw redirect({ to: "/", replace: true }); },
 });

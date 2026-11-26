@@ -1,7 +1,6 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
-@import "./book-entry.css";
 
 @custom-variant dark (&:is(.dark *));
 

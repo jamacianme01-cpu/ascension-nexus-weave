@@ -94,3 +94,12 @@
 }
 @media(prefers-reduced-motion:reduce) {
 }
+
+/* Exact source pixels: local speech-expression patch, aligned to approved scene. */
+.ascension-groundskeeper-expression {
+  position:absolute; z-index:1; pointer-events:none; opacity:0;
+  left:16.14832536%; top:22.31668438%; width:5.98086124%; height:10.83953241%;
+}
+@media(prefers-reduced-motion:reduce) {
+  .ascension-groundskeeper-expression { display:none; }
+}

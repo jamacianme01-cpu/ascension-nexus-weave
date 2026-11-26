@@ -49,7 +49,9 @@ try {
     fit: getComputedStyle(img).objectFit,
   }));
   assert.equal(bookDetails.ready, true, "The original Book must load on the ACTUAL route");
-  assert.equal(bookDetails.source, "/approved-scene/01-closed-book.jpg");
+  assert.equal(bookDetails.source, "/approved-scene/ascension-exact-approved-scene.png");
+  assert.equal(await page.locator('img[src*="01-closed-book.jpg"]').count(), 0,
+    "Do not restore the obsolete objective-entry artwork");
   assert.equal(bookDetails.fit, "contain", "Do not crop the approved Book");
 
   await page.getByRole("button", { name: "Enter ASCENSION using the Library Card" }).click();

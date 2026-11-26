@@ -128,8 +128,13 @@ assert.match(entry, /const explicitlyAuthorized = explicitlyEngagedIntent\(input
   "The active voice route recognizes the owner's explicit one-utterance instruction");
 assert.match(entry, /void sendIntent\(explicitlyAuthorized, true\)/,
   "The one-utterance command preserves the owner-spoken objective");
-assert.match(entry, /if \(authorizeGoverned && !parent\)/,
-  "Only the explicit owner-spoken command may submit a fresh crystal to the governed engine");
+assert.match(entry, /if \(\(authorizeGoverned \|\| localOwner\) && !parent\)/,
+  "Owner-local speech submits to the original local engine; other installations require explicit authorization");
+assert.match(entry, /window\.location\.port === "4174"/);
+assert.match(entry, /requireOwnerLocal: ownerLocalInstallation\(\)/);
+const guest = readFileSync("src/lib/ascension/guest.functions.ts", "utf8");
+assert.match(guest, /data\.requireOwnerLocal && !volume\.ownerVolumeTransportIsLoopback\(\)/,
+  "Owner-local intents must fail closed instead of contacting an alternate service");
 assert.match(entry, /await runGovernedIntent\(\)/,
   "Submit only once the owner's original local crystal has been saved");
 for(const spoken of ["run ASCENSION's engines","run my intent through ASCENSION engines",
